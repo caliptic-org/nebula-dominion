@@ -1,0 +1,45 @@
+---
+# infrastructure/backup/ansible/vars.yml
+# Override these in ansible-vault or host_vars.
+
+# Server details
+pg_version: "16"
+pg_data_dir: "/var/lib/postgresql/16/main"
+pg_stanza: "nebula-pg"
+
+# Hetzner Storage Box — set in vault
+hetzner_storage_box_host: "uXXXXXX.your-storagebox.de"
+hetzner_storage_box_user: "uXXXXXX"
+
+# pgBackRest — set in vault
+pgbackrest_repo1_cipher_pass: "{{ vault_pgbackrest_repo1_cipher_pass }}"
+pgbackrest_repo2_cipher_pass: "{{ vault_pgbackrest_repo2_cipher_pass }}"
+
+# Restic — set in vault
+restic_password: "{{ vault_restic_password }}"
+
+# MinIO
+minio_endpoint: "http://minio:9000"
+minio_access_key: "{{ vault_minio_access_key }}"
+minio_secret_key: "{{ vault_minio_secret_key }}"
+
+# Slack notifications — set in vault
+slack_webhook_url: "{{ vault_slack_webhook_url }}"
+
+# Retention
+restic_keep_daily: 30
+restic_keep_weekly: 12
+restic_keep_monthly: 12
+
+# Backup schedule (cron syntax)
+pgbackrest_full_backup_schedule: "0 3 * * *"         # Daily 03:00
+pgbackrest_incremental_schedule: "0 */6 * * *"       # Every 6 hours
+restic_minio_backup_schedule: "30 3 * * *"           # Daily 03:30
+restic_config_backup_schedule: "0 4 * * *"           # Daily 04:00
+dr_test_schedule: "0 10 1 * *"                       # Monthly, 1st at 10:00
+
+# Repo location on disk (for local fast-restore cache)
+local_backup_mount: "/mnt/backup"
+
+# Backup system source path on target host
+backup_src: "/opt/nebula-dominion/infrastructure/backup"

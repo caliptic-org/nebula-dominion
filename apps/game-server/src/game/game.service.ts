@@ -94,8 +94,11 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const room = await this.rooms.get(dto.roomId);
     if (!room) return fail('Room not found');
 
-    const violation = this.antiCheat.validate(userId, dto, room);
-    if (violation) return fail(violation);
+    // Skip anti-cheat for bot players
+    if (!userId.startsWith(BOT_USER_ID_PREFIX)) {
+      const violation = this.antiCheat.validate(userId, dto, room);
+      if (violation) return fail(violation);
+    }
 
     switch (dto.type) {
       case ActionType.ATTACK:       return this.handleAttack(userId, dto, room);
@@ -134,7 +137,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
       events.push({ type: 'unit_died', data: { unitId: targetUnitId, ownerId: opponentId } });
 
       if (room.players[opponentId].units.length === 0) {
-        return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber);
+        return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber, 'all_units_destroyed');
       }
     }
 
@@ -204,18 +207,23 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     room.players[userId].lastActionSequence = dto.sequenceNumber;
     await this.rooms.save(room);
 
-    return {
+    const result: ActionResult = {
       success: true,
       room,
       events: [{ type: 'turn_ended', data: { nextPlayerId: opponentId, turn: room.currentTurn } }],
     };
+
+    // Notify PveService to run bot turn if needed
+    this.emitter.emit('game.turn_ended', { room, newPlayerId: opponentId });
+
+    return result;
   }
 
   private async handleSurrender(userId: string, room: GameRoom): Promise<ActionResult> {
     const opponentId = this.opponentOf(room, userId);
     return this.finishGame(opponentId, userId, room, [
       { type: 'player_surrendered', data: { userId } },
-    ], -1);
+    ], -1, 'surrender');
   }
 
   async checkTurnTimeout(roomId: string): Promise<ActionResult | null> {
@@ -250,6 +258,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     room: GameRoom,
     events: GameEvent[],
     lastSeq: number,
+    endReason: string,
   ): Promise<ActionResult> {
     room.status = GameStatus.FINISHED;
     room.winner = winnerId;
@@ -257,16 +266,26 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const winner = room.players[winnerId];
     const loser = room.players[loserId];
 
+    const isPvE = winnerId.startsWith(BOT_USER_ID_PREFIX) || loserId.startsWith(BOT_USER_ID_PREFIX);
+
     const winResult = this.elo.calculate(winner.elo, loser.elo, true, winner.gamesPlayed);
     const loseResult = this.elo.calculate(loser.elo, winner.elo, false, loser.gamesPlayed);
+
+    const totalTurns = room.currentTurn;
+    const durationMs = Date.now() - room.createdAt;
+
+    const winnerRewards = this.rewards.calculate(true, totalTurns, winResult.delta, isPvE);
+    const loserRewards = this.rewards.calculate(false, totalTurns, loseResult.delta, isPvE);
 
     events.push({
       type: 'game_end',
       data: {
         winner: winnerId,
         loser: loserId,
+        endReason,
         eloDelta: { [winnerId]: winResult.delta, [loserId]: loseResult.delta },
         newElo: { [winnerId]: winResult.newElo, [loserId]: loseResult.newElo },
+        rewards: { [winnerId]: winnerRewards, [loserId]: loserRewards },
       },
     });
 

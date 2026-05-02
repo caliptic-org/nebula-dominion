@@ -1,0 +1,30 @@
+---
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ prometheus_data_dir }}"
+    - "{{ grafana_data_dir }}"
+    - "{{ loki_data_dir }}"
+    - /etc/prometheus
+    - /etc/grafana
+    - /etc/loki
+    - /etc/alertmanager
+
+- name: Install Prometheus
+  include_tasks: prometheus.yml
+
+- name: Install Alertmanager
+  include_tasks: alertmanager.yml
+
+- name: Install Loki
+  include_tasks: loki.yml
+
+- name: Install Grafana
+  include_tasks: grafana.yml
+
+- name: Deploy monitoring stack via Docker Compose on primary
+  include_tasks: docker_monitoring.yml
+  when: inventory_hostname == 'server1'

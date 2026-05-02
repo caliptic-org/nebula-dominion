@@ -1,0 +1,39 @@
+---
+- name: Create registry data directory
+  file:
+    path: "{{ registry_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create registry auth directory
+  file:
+    path: /etc/docker/registry
+    state: directory
+    mode: '0700'
+
+- name: Deploy Docker Registry container
+  command: >
+    docker run -d
+    --name registry
+    --restart always
+    -p {{ registry_port }}:5000
+    -v {{ registry_data_dir }}:/var/lib/registry
+    -e REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
+    -e REGISTRY_HTTP_ADDR=0.0.0.0:5000
+    registry:2
+  ignore_errors: yes
+  register: registry_run
+
+- name: Start existing registry if stopped
+  command: docker start registry
+  when: registry_run.rc != 0
+  ignore_errors: yes
+
+- name: Allow registry port on private network
+  ufw:
+    rule: allow
+    port: "{{ registry_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"

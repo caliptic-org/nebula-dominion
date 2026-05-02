@@ -1,0 +1,124 @@
+---
+- name: Remove old Docker versions
+  apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+
+- name: Install Docker dependencies
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Add Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Add deploy user to docker group
+  user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: yes
+
+- name: Configure Docker daemon
+  copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "50m",
+          "max-file": "5"
+        },
+        "storage-driver": "overlay2",
+        "data-root": "/data/docker",
+        "live-restore": true,
+        "metrics-addr": "0.0.0.0:9323",
+        "experimental": true,
+        "insecure-registries": ["registry.local:5000"]
+      }
+    dest: /etc/docker/daemon.json
+  notify: restart docker
+
+- name: Create Docker data directory
+  file:
+    path: /data/docker
+    state: directory
+    owner: root
+    group: root
+    mode: '0711'
+
+- name: Enable and start Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Initialize Docker Swarm on primary
+  command: docker swarm init --advertise-addr {{ server1_private_ip }}
+  register: swarm_init
+  when: inventory_hostname == 'server1'
+  ignore_errors: yes
+
+- name: Get swarm manager join token
+  command: docker swarm join-token manager -q
+  register: manager_token
+  when: inventory_hostname == 'server1'
+  changed_when: false
+
+- name: Join secondary as swarm manager
+  command: docker swarm join --token {{ hostvars['server1']['manager_token']['stdout'] }} {{ server1_private_ip }}:2377
+  when: inventory_hostname == 'server2'
+  ignore_errors: yes
+
+- name: Create overlay networks
+  command: docker network create --driver overlay --attachable nebula-net
+  when: inventory_hostname == 'server1'
+  ignore_errors: yes
+
+- name: Install Docker Registry (primary only)
+  include_tasks: registry.yml
+  when: inventory_hostname == 'server1'
+
+- name: Allow Docker swarm ports on private network
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+  loop:
+    - "2377"  # swarm management
+    - "7946"  # node communication
+    - "4789"  # overlay network (UDP handled separately)
+
+- name: Allow Docker swarm UDP overlay
+  ufw:
+    rule: allow
+    port: 4789
+    proto: udp
+    src: "{{ private_network_cidr }}"

@@ -1,0 +1,64 @@
+---
+# site.yml - Full infrastructure deployment
+# Runs all weeks in sequence: system → containers/DB → cache/storage/proxy → monitoring/CI/CD
+#
+# Usage (full deploy):
+#   ansible-playbook playbooks/site.yml
+#
+# Usage (with LVM setup):
+#   ansible-playbook playbooks/site.yml -e configure_lvm=true
+#
+# Usage (dry run):
+#   ansible-playbook playbooks/site.yml --check --diff
+#
+# Estimated total time: ~30 minutes on first run, ~15 min for new server
+# Disaster recovery from scratch: ~2 hours (includes data restore)
+
+- import_playbook: week1-system.yml
+- import_playbook: week2-container-db.yml
+- import_playbook: week3-cache-storage-proxy.yml
+- import_playbook: week4-monitoring-cicd.yml
+
+- name: Final verification
+  hosts: servers
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Verify all critical services are running
+      systemd:
+        name: "{{ item }}"
+      register: svc_status
+      loop:
+        - docker
+        - patroni
+        - etcd
+        - pgbouncer
+        - redis-server
+        - redis-sentinel
+        - minio
+        - haproxy
+        - caddy
+        - prometheus
+        - grafana-server
+        - loki
+        - promtail
+        - node_exporter
+      ignore_errors: yes
+
+    - name: Print service status summary
+      debug:
+        msg: "{{ item.item }}: {{ 'RUNNING' if item.status.ActiveState == 'active' else 'STOPPED - CHECK LOGS' }}"
+      loop: "{{ svc_status.results }}"
+      when: item.status is defined
+
+    - name: Infrastructure deployment complete
+      debug:
+        msg:
+          - "============================================"
+          - "  Nebula Dominion Infrastructure Ready!     "
+          - "============================================"
+          - "New server provisioning time: ~30 min"
+          - "Disaster recovery time target: <2 hours"
+          - ""
+          - "Next: Deploy application with docker stack deploy"

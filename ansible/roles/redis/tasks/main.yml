@@ -1,0 +1,93 @@
+---
+- name: Add Redis apt repository key
+  get_url:
+    url: https://packages.redis.io/gpg
+    dest: /etc/apt/keyrings/redis.asc
+    mode: '0644'
+
+- name: Add Redis apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/redis.asc] https://packages.redis.io/deb {{ ansible_distribution_release }} main"
+    state: present
+    filename: redis
+
+- name: Install Redis
+  apt:
+    name: redis
+    state: present
+    update_cache: yes
+
+- name: Create Redis data directory
+  file:
+    path: "{{ redis_data_dir }}"
+    state: directory
+    owner: redis
+    group: redis
+    mode: '0755'
+
+- name: Configure Redis
+  template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: '0640'
+  notify: restart redis
+
+- name: Configure Redis Sentinel
+  template:
+    src: sentinel.conf.j2
+    dest: /etc/redis/sentinel.conf
+    owner: redis
+    group: redis
+    mode: '0640'
+  notify: restart redis-sentinel
+
+- name: Create Redis Sentinel systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Redis Sentinel
+      After=network.target
+
+      [Service]
+      User=redis
+      Group=redis
+      ExecStart=/usr/bin/redis-sentinel /etc/redis/sentinel.conf
+      ExecStop=/usr/bin/redis-cli -p {{ redis_sentinel_port }} SHUTDOWN NOSAVE
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/redis-sentinel.service
+
+- name: Enable and start Redis
+  systemd:
+    name: redis-server
+    state: started
+    enabled: yes
+
+- name: Enable and start Redis Sentinel
+  systemd:
+    name: redis-sentinel
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Install redis_exporter
+  include_tasks: redis_exporter.yml
+
+- name: Allow Redis port on private network
+  ufw:
+    rule: allow
+    port: "{{ redis_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+
+- name: Allow Redis Sentinel port on private network
+  ufw:
+    rule: allow
+    port: "{{ redis_sentinel_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"

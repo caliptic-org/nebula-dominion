@@ -1,0 +1,121 @@
+---
+- name: Create loki user
+  user:
+    name: loki
+    system: yes
+    shell: /sbin/nologin
+    create_home: no
+
+- name: Set loki data dir ownership
+  file:
+    path: "{{ loki_data_dir }}"
+    state: directory
+    owner: loki
+    group: loki
+
+- name: Download Loki
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+    dest: /tmp/loki.zip
+
+- name: Extract Loki
+  unarchive:
+    src: /tmp/loki.zip
+    dest: /usr/local/bin/
+    remote_src: yes
+
+- name: Set Loki binary permissions
+  file:
+    path: /usr/local/bin/loki-linux-amd64
+    mode: '0755'
+
+- name: Create loki symlink
+  file:
+    src: /usr/local/bin/loki-linux-amd64
+    dest: /usr/local/bin/loki
+    state: link
+
+- name: Download Promtail
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/promtail-linux-amd64.zip"
+    dest: /tmp/promtail.zip
+
+- name: Extract Promtail
+  unarchive:
+    src: /tmp/promtail.zip
+    dest: /usr/local/bin/
+    remote_src: yes
+
+- name: Set Promtail binary permissions
+  file:
+    path: /usr/local/bin/promtail-linux-amd64
+    mode: '0755'
+
+- name: Create promtail symlink
+  file:
+    src: /usr/local/bin/promtail-linux-amd64
+    dest: /usr/local/bin/promtail
+    state: link
+
+- name: Configure Loki
+  template:
+    src: loki.yml.j2
+    dest: /etc/loki/loki.yml
+    owner: loki
+    group: loki
+    mode: '0640'
+
+- name: Configure Promtail
+  template:
+    src: promtail.yml.j2
+    dest: /etc/loki/promtail.yml
+    mode: '0640'
+
+- name: Create Loki systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Grafana Loki
+      After=network.target
+
+      [Service]
+      User=loki
+      ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki.yml
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/loki.service
+
+- name: Create Promtail systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Grafana Promtail
+      After=network.target
+
+      [Service]
+      User=root
+      ExecStart=/usr/local/bin/promtail -config.file=/etc/loki/promtail.yml
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/promtail.service
+
+- name: Enable and start Loki and Promtail
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  loop:
+    - loki
+    - promtail
+
+- name: Allow Loki port on private network
+  ufw:
+    rule: allow
+    port: 3100
+    proto: tcp
+    src: "{{ private_network_cidr }}"

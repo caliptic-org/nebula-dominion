@@ -95,8 +95,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     ports:
       - "${API_PORT:-4000}:4000"
     environment:
@@ -128,8 +128,8 @@ services:
 
   game-server:
     build:
-      context: ./apps/game-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/game-server/Dockerfile
     ports:
       - "${GAME_SERVER_PORT:-4001}:4001"
     environment:
@@ -162,8 +162,8 @@ services:
 
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:

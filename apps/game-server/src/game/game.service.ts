@@ -10,6 +10,8 @@ import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
 
+const BOT_USER_ID_PREFIX = 'bot:';
+
 export interface GameCreatedEvent {
   match: MatchResult;
   room: GameRoom;
@@ -38,6 +40,13 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GameService.name);
   private readonly maxRoundMs: number;
   private timeoutTimer: NodeJS.Timeout;
+  private readonly rewards = {
+    calculate: (isWin: boolean, totalTurns: number, eloDelta: number, isPvE: boolean) => ({
+      xp: isWin ? 100 : 25,
+      bonus: isPvE ? 0 : Math.round(Math.abs(eloDelta) * 0.5),
+      turns: totalTurns,
+    }),
+  };
 
   constructor(
     private readonly rooms: RoomService,

@@ -9,11 +9,10 @@ import { GameModule } from './game/game.module';
 import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
+import { ChatModule } from './chat/chat.module';
 import { PlayerLevel } from './progression/entities/player-level.entity';
 import { XpTransaction } from './progression/entities/xp-transaction.entity';
-import { UnitsModule } from './units/units.module';
-import { PlayerUnit } from './units/entities/player-unit.entity';
-import { TrainingQueue } from './units/entities/training-queue.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
 
 @Module({
   imports: [
@@ -28,7 +27,7 @@ import { TrainingQueue } from './units/entities/training-queue.entity';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('database.url'),
-        entities: [PlayerLevel, XpTransaction, PlayerUnit, TrainingQueue],
+        entities: [PlayerLevel, XpTransaction, ChatMessage],
         synchronize: config.get<boolean>('database.synchronize'),
         logging: config.get<boolean>('database.logging'),
       }),
@@ -43,7 +42,7 @@ import { TrainingQueue } from './units/entities/training-queue.entity';
     AntiCheatModule,
     HealthModule,
     ProgressionModule,
-    UnitsModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

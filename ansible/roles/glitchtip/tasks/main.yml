@@ -1,0 +1,46 @@
+---
+- name: Create GlitchTip directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ glitchtip_data_dir }}"
+    - "{{ glitchtip_data_dir }}/uploads"
+
+- name: Create GlitchTip database
+  become_user: postgres
+  postgresql_db:
+    name: glitchtip
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Create GlitchTip database user
+  become_user: postgres
+  postgresql_user:
+    name: glitchtip
+    password: "{{ glitchtip_db_password }}"
+    db: glitchtip
+    priv: ALL
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Deploy GlitchTip via Docker Compose
+  template:
+    src: glitchtip-compose.yml.j2
+    dest: "{{ glitchtip_data_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Start GlitchTip
+  command: docker compose up -d
+  args:
+    chdir: "{{ glitchtip_data_dir }}"
+  when: inventory_hostname == 'server1'
+
+- name: Allow GlitchTip port on private network
+  ufw:
+    rule: allow
+    port: "{{ glitchtip_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+  when: inventory_hostname == 'server1'

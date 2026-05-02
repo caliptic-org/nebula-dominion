@@ -80,39 +80,46 @@ export const BUILDING_CONFIGS: Record<BuildingType, BuildingConfig> = {
     maxPerPlayer: 2,
     description: 'Projects a shield that absorbs damage for the base.',
   },
-  // Zerg race-specific buildings
-  [BuildingType.SPAWNING_POOL]: {
-    buildTimeSeconds: 50,
-    cost: { mineral: 100, gas: 30, energy: 20 },
-    production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 0 },
-    energyConsumptionPerTick: 6,
-    maxPerPlayer: 2,
-    description: 'Zerg unit production building — trains Zerglings and Hydralisks.',
+  // Age 2 buildings (Automata)
+  [BuildingType.NANO_FORGE]: {
+    buildTimeSeconds: 90,
+    cost: { mineral: 300, gas: 100, energy: 80 },
+    production: { mineralPerTick: 25, gasPerTick: 5, energyPerTick: 0 },
+    energyConsumptionPerTick: 10,
+    maxPerPlayer: 3,
+    description: 'Automata birimleri üretir ve mineral işler. Requires Age 2.',
   },
-  [BuildingType.HATCHERY]: {
+  [BuildingType.CYBER_CORE]: {
+    buildTimeSeconds: 120,
+    cost: { mineral: 400, gas: 150, energy: 100 },
+    production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 25 },
+    energyConsumptionPerTick: 15,
+    maxPerPlayer: 1,
+    description: 'Gelişmiş Automata komuta merkezi. Yeni birim tiplerini etkinleştirir.',
+  },
+  [BuildingType.QUANTUM_REACTOR]: {
+    buildTimeSeconds: 100,
+    cost: { mineral: 350, gas: 200, energy: 0 },
+    production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 50 },
+    energyConsumptionPerTick: 0,
+    maxPerPlayer: 2,
+    description: 'Kuantum enerji reaktörü — yüksek enerji üretimi.',
+  },
+  [BuildingType.DEFENSE_MATRIX]: {
     buildTimeSeconds: 80,
-    cost: { mineral: 200, gas: 100, energy: 60 },
+    cost: { mineral: 250, gas: 100, energy: 60 },
     production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 0 },
-    energyConsumptionPerTick: 10,
+    energyConsumptionPerTick: 20,
     maxPerPlayer: 2,
-    description: 'Advanced Zerg hive structure — enables Ultralisks and Queen spawning.',
+    description: 'Alan savunma sistemi — çevre birimlerine kalkan sağlar.',
   },
-  // Human race-specific buildings
-  [BuildingType.FACTORY]: {
+  [BuildingType.REPAIR_DRONE_BAY]: {
     buildTimeSeconds: 75,
-    cost: { mineral: 200, gas: 100, energy: 60 },
-    production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 0 },
-    energyConsumptionPerTick: 10,
-    maxPerPlayer: 2,
-    description: 'Human heavy-weapons factory — produces Siege Tanks.',
-  },
-  [BuildingType.ACADEMY]: {
-    buildTimeSeconds: 65,
-    cost: { mineral: 150, gas: 75, energy: 40 },
+    cost: { mineral: 200, gas: 75, energy: 50 },
     production: { mineralPerTick: 0, gasPerTick: 0, energyPerTick: 0 },
     energyConsumptionPerTick: 8,
     maxPerPlayer: 2,
-    description: 'Human special-ops training facility — enables Ghost unit training.',
+    description: 'Hasar görmüş Automata birimlerini onarır.',
   },
 };
 

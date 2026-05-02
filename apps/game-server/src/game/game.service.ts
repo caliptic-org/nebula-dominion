@@ -94,14 +94,19 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const room = await this.rooms.get(dto.roomId);
     if (!room) return fail('Room not found');
 
-    const violation = this.antiCheat.validate(userId, dto, room);
-    if (violation) return fail(violation);
+    // Skip anti-cheat for bot players
+    if (!userId.startsWith(BOT_USER_ID_PREFIX)) {
+      const violation = this.antiCheat.validate(userId, dto, room);
+      if (violation) return fail(violation);
+    }
 
     switch (dto.type) {
       case ActionType.ATTACK:       return this.handleAttack(userId, dto, room);
       case ActionType.MOVE_UNIT:    return this.handleMove(userId, dto, room);
       case ActionType.DEPLOY_UNIT:  return this.handleDeploy(userId, dto, room);
       case ActionType.USE_ABILITY:  return this.handleAbility(userId, dto, room);
+      case ActionType.MERGE_UNITS:  return this.handleMerge(userId, dto, room);
+      case ActionType.MUTATE_UNIT:  return this.handleMutate(userId, dto, room);
       case ActionType.END_TURN:     return this.handleEndTurn(userId, dto, room);
       case ActionType.SURRENDER:    return this.handleSurrender(userId, room);
       default:                      return fail('Unknown action type');
@@ -134,7 +139,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
       events.push({ type: 'unit_died', data: { unitId: targetUnitId, ownerId: opponentId } });
 
       if (room.players[opponentId].units.length === 0) {
-        return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber);
+        return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber, 'all_units_destroyed');
       }
     }
 
@@ -204,10 +209,106 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     room.players[userId].lastActionSequence = dto.sequenceNumber;
     await this.rooms.save(room);
 
-    return {
+    const result: ActionResult = {
       success: true,
       room,
       events: [{ type: 'turn_ended', data: { nextPlayerId: opponentId, turn: room.currentTurn } }],
+    };
+
+    // Notify PveService to run bot turn if needed
+    this.emitter.emit('game.turn_ended', { room, newPlayerId: opponentId });
+
+    return result;
+  }
+
+  private async handleMerge(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
+    if (room.currentPlayerId !== userId) return fail('Not your turn');
+    if (room.phase !== TurnPhase.ACTION) return fail('Not action phase');
+
+    const { unitIds } = dto.payload as { unitIds: string[] };
+    if (!Array.isArray(unitIds) || unitIds.length < 2) return fail('Merge requires at least 2 unit IDs');
+
+    const playerUnits = room.players[userId].units;
+    const sourceUnits = unitIds.map((id) => playerUnits.find((u) => u.id === id)).filter(Boolean) as UnitState[];
+    if (sourceUnits.length !== unitIds.length) return fail('One or more units not found');
+    if (sourceUnits.some((u) => u.actionUsed)) return fail('Cannot merge units that have already acted this turn');
+
+    const unitTypes = sourceUnits.map((u) => u.type);
+    const recipe = this.mergeService.findRecipe(unitTypes);
+    if (!recipe) return fail(`No merge recipe found for: ${unitTypes.sort().join(' + ')}`);
+
+    const { mergedUnit, removedUnitIds } = this.mergeService.merge(sourceUnits, recipe);
+
+    room.players[userId].units = playerUnits
+      .filter((u) => !removedUnitIds.includes(u.id))
+      .concat(mergedUnit);
+
+    room.players[userId].lastActionSequence = dto.sequenceNumber;
+    await this.rooms.save(room);
+
+    return {
+      success: true,
+      room,
+      events: [
+        {
+          type: 'units_merged',
+          data: {
+            removedUnitIds,
+            mergedUnit,
+            recipeId: recipe.id,
+            ownerId: userId,
+            availableMutations: recipe.mutations,
+          },
+        },
+      ],
+    };
+  }
+
+  private async handleMutate(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
+    if (room.currentPlayerId !== userId) return fail('Not your turn');
+
+    const { unitId, mutationId } = dto.payload as { unitId: string; mutationId: string };
+    const unit = this.findUnit(room, userId, unitId);
+    if (!unit) return fail('Unit not found');
+
+    const result = this.mergeService.mutate(unit, mutationId);
+    if (!result) return fail(`Mutation '${mutationId}' is not available for unit type '${unit.type}'`);
+
+    const { manaCost, unlockedAbility, mutation } = result;
+    if (room.players[userId].mana < manaCost) return fail('Not enough mana');
+
+    room.players[userId].mana -= manaCost;
+    room.players[userId].lastActionSequence = dto.sequenceNumber;
+    await this.rooms.save(room);
+
+    const availableNext = this.mergeService.getAvailableMutationsForUnit(unit);
+
+    return {
+      success: true,
+      room,
+      events: [
+        {
+          type: 'unit_mutated',
+          data: {
+            unitId,
+            ownerId: userId,
+            mutationId,
+            mutationName: mutation.name,
+            manaCost,
+            unlockedAbility: unlockedAbility ?? null,
+            unitStats: {
+              attack: unit.attack,
+              defense: unit.defense,
+              speed: unit.speed,
+              hp: unit.hp,
+              maxHp: unit.maxHp,
+            },
+            appliedMutations: unit.appliedMutations,
+            abilities: unit.abilities,
+            nextAvailableMutations: availableNext,
+          },
+        },
+      ],
     };
   }
 
@@ -215,7 +316,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const opponentId = this.opponentOf(room, userId);
     return this.finishGame(opponentId, userId, room, [
       { type: 'player_surrendered', data: { userId } },
-    ], -1);
+    ], -1, 'surrender');
   }
 
   async checkTurnTimeout(roomId: string): Promise<ActionResult | null> {
@@ -250,6 +351,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     room: GameRoom,
     events: GameEvent[],
     lastSeq: number,
+    endReason: string,
   ): Promise<ActionResult> {
     room.status = GameStatus.FINISHED;
     room.winner = winnerId;
@@ -257,16 +359,26 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const winner = room.players[winnerId];
     const loser = room.players[loserId];
 
+    const isPvE = winnerId.startsWith(BOT_USER_ID_PREFIX) || loserId.startsWith(BOT_USER_ID_PREFIX);
+
     const winResult = this.elo.calculate(winner.elo, loser.elo, true, winner.gamesPlayed);
     const loseResult = this.elo.calculate(loser.elo, winner.elo, false, loser.gamesPlayed);
+
+    const totalTurns = room.currentTurn;
+    const durationMs = Date.now() - room.createdAt;
+
+    const winnerRewards = this.rewards.calculate(true, totalTurns, winResult.delta, isPvE);
+    const loserRewards = this.rewards.calculate(false, totalTurns, loseResult.delta, isPvE);
 
     events.push({
       type: 'game_end',
       data: {
         winner: winnerId,
         loser: loserId,
+        endReason,
         eloDelta: { [winnerId]: winResult.delta, [loserId]: loseResult.delta },
         newElo: { [winnerId]: winResult.newElo, [loserId]: loseResult.newElo },
+        rewards: { [winnerId]: winnerRewards, [loserId]: loserRewards },
       },
     });
 

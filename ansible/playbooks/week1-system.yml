@@ -1,0 +1,33 @@
+---
+# Week 1: System Preparation
+# Covers: Ubuntu 24.04, users, SSH hardening, firewall, networking,
+#         DNS, NTP, disk LVM, monitoring agent
+#
+# Usage: ansible-playbook playbooks/week1-system.yml
+#        ansible-playbook playbooks/week1-system.yml -e configure_lvm=true
+
+- name: Week 1 - System preparation on all servers
+  hosts: servers
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Verify Ubuntu 24.04
+      assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version is version("24.04", ">=")
+        fail_msg: "This playbook requires Ubuntu 24.04 LTS or newer"
+
+  roles:
+    - common
+
+  post_tasks:
+    - name: Display server info
+      debug:
+        msg:
+          - "Hostname: {{ inventory_hostname }}"
+          - "IP: {{ ansible_host }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "CPU cores: {{ ansible_processor_vcpus }}"
+          - "RAM: {{ (ansible_memtotal_mb / 1024) | round(1) }} GB"

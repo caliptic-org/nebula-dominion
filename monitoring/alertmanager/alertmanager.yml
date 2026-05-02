@@ -1,0 +1,154 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_API_URL}'
+  http_config:
+    follow_redirects: true
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  group_by: ['alertname', 'severity', 'team']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: default-slack
+
+  routes:
+    # ─── Critical alerts → Slack + SMS ────────────────────────────────────
+    - match:
+        severity: critical
+      receiver: critical-all
+      continue: false
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+
+    # ─── Page alerts (service/node down) → immediate ──────────────────────
+    - match:
+        page: "true"
+      receiver: critical-all
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 15m
+
+    # ─── Warning alerts → Slack only ─────────────────────────────────────
+    - match:
+        severity: warning
+      receiver: warning-slack
+      group_wait: 1m
+      group_interval: 5m
+      repeat_interval: 6h
+
+    # ─── DBA team alerts ─────────────────────────────────────────────────
+    - match:
+        team: dba
+      receiver: dba-slack
+      continue: true
+
+    # ─── Info alerts → Slack low-priority channel ─────────────────────────
+    - match:
+        severity: info
+      receiver: info-slack
+
+inhibit_rules:
+  # Inhibit warning if critical is already firing for same instance
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['instance', 'alertname']
+
+  # Inhibit app alerts if node is down
+  - source_match:
+      alertname: NodeDown
+    target_match_re:
+      alertname: '(ServiceDown|PostgresDown|RedisDown|HighCPU.*|HighMemory.*)'
+    equal: ['instance']
+
+receivers:
+  # ─── Default → general Slack channel ─────────────────────────────────────
+  - name: default-slack
+    slack_configs:
+      - channel: '#nebula-alerts'
+        send_resolved: true
+        username: 'Alertmanager'
+        icon_emoji: ':bell:'
+        title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Severity:* `{{ .Labels.severity }}`
+          *Instance:* `{{ .Labels.instance }}`
+          *Started:* {{ .StartsAt | since }}
+          {{ end }}
+
+  # ─── Critical → Slack #nebula-critical + SMS ─────────────────────────────
+  - name: critical-all
+    slack_configs:
+      - channel: '#nebula-critical'
+        send_resolved: true
+        username: 'Alertmanager 🚨'
+        icon_emoji: ':rotating_light:'
+        title: '🚨 CRITICAL: {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          Instance: `{{ .Labels.instance }}`
+          Started: {{ .StartsAt | since }} ago
+          {{ end }}
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: '${GRAFANA_ROOT_URL}/d/system-overview'
+          - type: button
+            text: 'Silence (1h)'
+            url: '${ALERTMANAGER_URL}/#/silences'
+    webhook_configs:
+      # SMS via webhook (Twilio or custom SMS gateway)
+      - url: '${SMS_WEBHOOK_URL}'
+        send_resolved: false
+        http_config:
+          bearer_token: '${SMS_WEBHOOK_TOKEN}'
+        max_alerts: 3
+
+  # ─── Warning → Slack #nebula-warnings ────────────────────────────────────
+  - name: warning-slack
+    slack_configs:
+      - channel: '#nebula-warnings'
+        send_resolved: true
+        username: 'Alertmanager ⚠️'
+        icon_emoji: ':warning:'
+        title: '⚠️ WARNING: {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+
+  # ─── DBA → dedicated channel ─────────────────────────────────────────────
+  - name: dba-slack
+    slack_configs:
+      - channel: '#nebula-dba'
+        send_resolved: true
+        username: 'DB Alertmanager'
+        icon_emoji: ':database:'
+        title: '[DB] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+
+  # ─── Info → low-priority channel ─────────────────────────────────────────
+  - name: info-slack
+    slack_configs:
+      - channel: '#nebula-info'
+        send_resolved: false
+        username: 'Alertmanager'
+        icon_emoji: ':information_source:'
+        title: 'ℹ️ {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}

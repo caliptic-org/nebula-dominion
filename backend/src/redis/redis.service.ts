@@ -51,4 +51,42 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async keys(pattern: string): Promise<string[]> {
     return this.client.keys(pattern);
   }
+
+  // ─── Sorted-set helpers (leaderboards) ──────────────────────────────────────
+
+  async zadd(key: string, score: number, member: string): Promise<void> {
+    await this.client.zadd(key, score, member);
+  }
+
+  async zincrby(key: string, increment: number, member: string): Promise<number> {
+    const result = await this.client.zincrby(key, increment, member);
+    return parseFloat(result);
+  }
+
+  async zscore(key: string, member: string): Promise<number | null> {
+    const raw = await this.client.zscore(key, member);
+    return raw !== null ? parseFloat(raw) : null;
+  }
+
+  async zrank(key: string, member: string): Promise<number | null> {
+    const rank = await this.client.zrevrank(key, member);
+    return rank !== null ? rank + 1 : null;
+  }
+
+  async zrevrangeWithScores(
+    key: string,
+    start: number,
+    stop: number,
+  ): Promise<Array<{ value: string; score: number }>> {
+    const raw = await this.client.zrevrange(key, start, stop, 'WITHSCORES');
+    const result: Array<{ value: string; score: number }> = [];
+    for (let i = 0; i < raw.length; i += 2) {
+      result.push({ value: raw[i], score: parseFloat(raw[i + 1]) });
+    }
+    return result;
+  }
+
+  async zcard(key: string): Promise<number> {
+    return this.client.zcard(key);
+  }
 }

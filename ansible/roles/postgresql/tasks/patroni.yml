@@ -1,0 +1,75 @@
+---
+- name: Install Patroni via pip
+  pip:
+    name:
+      - "patroni[etcd3]=={{ patroni_version }}"
+      - psycopg2-binary
+    executable: pip3
+
+- name: Create Patroni config directory
+  file:
+    path: /etc/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+
+- name: Create Patroni configuration
+  template:
+    src: patroni.yml.j2
+    dest: /etc/patroni/patroni.yml
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: restart patroni
+
+- name: Create Patroni systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Patroni HA PostgreSQL
+      After=network.target etcd.service
+
+      [Service]
+      User=postgres
+      Group=postgres
+      ExecStart=/usr/local/bin/patroni /etc/patroni/patroni.yml
+      KillMode=process
+      TimeoutSec=30
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/patroni.service
+
+- name: Enable and start Patroni
+  systemd:
+    name: patroni
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Wait for Patroni to be ready on primary
+  uri:
+    url: "http://{{ server1_private_ip }}:8008/master"
+    status_code: 200
+  register: patroni_ready
+  until: patroni_ready.status == 200
+  retries: 30
+  delay: 10
+  when: inventory_hostname == 'server1'
+
+- name: Allow Patroni REST API port
+  ufw:
+    rule: allow
+    port: 8008
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+
+- name: Allow PostgreSQL port on private network
+  ufw:
+    rule: allow
+    port: "{{ postgresql_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"

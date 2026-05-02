@@ -1,0 +1,57 @@
+---
+# Week 4: Monitoring & CI/CD
+# Covers: Prometheus, Grafana, Loki, Alertmanager, GlitchTip, Gitea, Drone CI
+#
+# Prerequisites: week3-cache-storage-proxy.yml must have run successfully
+# Usage: ansible-playbook playbooks/week4-monitoring-cicd.yml
+
+- name: Week 4 - Monitoring stack
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - monitoring
+
+- name: Week 4 - GlitchTip (self-hosted Sentry)
+  hosts: primary
+  become: yes
+  gather_facts: yes
+  roles:
+    - glitchtip
+
+- name: Week 4 - Gitea self-hosted Git
+  hosts: primary
+  become: yes
+  gather_facts: yes
+  roles:
+    - gitea
+
+- name: Week 4 - Drone CI/CD
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - drone
+
+  post_tasks:
+    - name: Display service URLs
+      debug:
+        msg:
+          - "Grafana:    http://{{ server1_private_ip }}:3000  (admin / <grafana_admin_password>)"
+          - "Prometheus: http://{{ server1_private_ip }}:9090"
+          - "Alertmanager: http://{{ server1_private_ip }}:9093"
+          - "Gitea:      http://{{ server1_private_ip }}:{{ gitea_port }}"
+          - "Drone CI:   http://{{ server1_private_ip }}:{{ drone_port }}"
+          - "GlitchTip:  http://{{ server1_private_ip }}:{{ glitchtip_port }}"
+      when: inventory_hostname == 'server1'
+
+    - name: Next steps reminder
+      debug:
+        msg:
+          - "1. Configure Cloudflare DNS to point to your servers"
+          - "2. Create Gitea admin user via web UI"
+          - "3. Create Drone OAuth app in Gitea"
+          - "4. Update drone_gitea_client_id and drone_gitea_client_secret in group_vars/all.yml"
+          - "5. Set Slack webhook URL for alerting"
+          - "6. Import Grafana dashboards (node-exporter-full, postgres, redis)"
+      when: inventory_hostname == 'server1'

@@ -15,11 +15,12 @@ export enum BuildingType {
   BARRACKS = 'barracks',
   TURRET = 'turret',
   SHIELD_GENERATOR = 'shield_generator',
-  // Race-specific production buildings
-  SPAWNING_POOL = 'spawning_pool',
-  HATCHERY = 'hatchery',
-  FACTORY = 'factory',
-  ACADEMY = 'academy',
+  // Age 2 buildings (Automata)
+  NANO_FORGE = 'nano_forge',
+  CYBER_CORE = 'cyber_core',
+  QUANTUM_REACTOR = 'quantum_reactor',
+  DEFENSE_MATRIX = 'defense_matrix',
+  REPAIR_DRONE_BAY = 'repair_drone_bay',
 }
 
 export enum BuildingStatus {

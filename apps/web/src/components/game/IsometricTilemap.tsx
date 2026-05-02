@@ -80,12 +80,14 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
   const [zoom, setZoom] = useState(1.0);
   const animFrameRef = useRef<number>(0);
   const timeRef = useRef(0);
+  const bgGradientRef = useRef<CanvasGradient | null>(null);
+  const nebulaGradientRef = useRef<{ gradient: CanvasGradient; raceColor: string; alphaBucket: number } | null>(null);
 
   const offsetX = CANVAS_W / 2;
   const offsetY = 60 * zoom;
   const raceColor = RACE_DESCRIPTIONS[race].color;
 
-  // Preload structure images
+  // Preload structure images and sync structures onto the tile map
   useEffect(() => {
     structures.forEach(({ structureKey }) => {
       const src = STRUCTURE_ASSETS[structureKey];
@@ -95,13 +97,25 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
         imagesRef.current[structureKey] = img;
       }
     });
-    // Place structures on map
+    // Clear stale structures left from a previous prop value before placing the new set
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (mapRef.current[r]?.[c]) {
+          mapRef.current[r][c].structure = undefined;
+        }
+      }
+    }
     structures.forEach(({ col, row, structureKey }) => {
       if (mapRef.current[row]?.[col]) {
         mapRef.current[row][col].structure = structureKey;
       }
     });
   }, [structures]);
+
+  // Invalidate the cached nebula gradient when raceColor changes (race switch)
+  useEffect(() => {
+    nebulaGradientRef.current = null;
+  }, [raceColor]);
 
   const draw = useCallback((timestamp: number) => {
     const canvas = canvasRef.current;
@@ -113,19 +127,27 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
 
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Background
-    const bg = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 3, 0, CANVAS_W / 2, CANVAS_H / 3, CANVAS_W * 0.8);
-    bg.addColorStop(0, 'rgba(8,15,30,1)');
-    bg.addColorStop(1, 'rgba(8,10,16,1)');
-    ctx.fillStyle = bg;
+    // Background — static gradient, build once and reuse to avoid per-frame heap allocation
+    if (!bgGradientRef.current) {
+      const bg = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 3, 0, CANVAS_W / 2, CANVAS_H / 3, CANVAS_W * 0.8);
+      bg.addColorStop(0, 'rgba(8,15,30,1)');
+      bg.addColorStop(1, 'rgba(8,10,16,1)');
+      bgGradientRef.current = bg;
+    }
+    ctx.fillStyle = bgGradientRef.current;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Animated nebula glow at background
-    const nebulaGrad = ctx.createRadialGradient(CANVAS_W * 0.3, CANVAS_H * 0.2, 0, CANVAS_W * 0.3, CANVAS_H * 0.2, 200);
+    // Animated nebula glow — quantize alpha so we only rebuild the gradient when it visibly changes
     const alpha = 0.04 + 0.02 * Math.sin(timeRef.current * 0.5);
-    nebulaGrad.addColorStop(0, hexToRgba(raceColor, alpha));
-    nebulaGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = nebulaGrad;
+    const alphaBucket = Math.round(alpha * 200);
+    const cachedNebula = nebulaGradientRef.current;
+    if (!cachedNebula || cachedNebula.raceColor !== raceColor || cachedNebula.alphaBucket !== alphaBucket) {
+      const nebulaGrad = ctx.createRadialGradient(CANVAS_W * 0.3, CANVAS_H * 0.2, 0, CANVAS_W * 0.3, CANVAS_H * 0.2, 200);
+      nebulaGrad.addColorStop(0, hexToRgba(raceColor, alphaBucket / 200));
+      nebulaGrad.addColorStop(1, 'transparent');
+      nebulaGradientRef.current = { gradient: nebulaGrad, raceColor, alphaBucket };
+    }
+    ctx.fillStyle = nebulaGradientRef.current!.gradient;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
     ctx.save();

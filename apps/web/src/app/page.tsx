@@ -24,6 +24,9 @@ const IsometricTilemap = dynamic(
   )}
 );
 
+// TODO(auth): replace DEMO_USER_ID with the authenticated session's userId.
+// The /battle route should also resolve the user from session/cookie rather
+// than receiving it via query string (avoids leaking IDs to logs / referrers).
 const DEMO_USER_ID = 'demo-player-001';
 
 const STRUCTURES_ON_MAP = [
@@ -170,8 +173,12 @@ export default function HomePage() {
         <main className="relative z-10 flex-1 overflow-auto pb-24">
 
           {/* ── Base Tab ──────────────────────────────────────── */}
-          {activeTab === 'base' && (
-            <div className="flex flex-col lg:flex-row gap-4 p-4 h-full">
+          {/* Kept mounted (hidden when inactive) so the IsometricTilemap canvas
+              survives tab switches without remount + re-init + image reload. */}
+          <div
+            className={clsx('flex-col lg:flex-row gap-4 p-4 h-full', activeTab === 'base' ? 'flex' : 'hidden')}
+            aria-hidden={activeTab !== 'base'}
+          >
 
               {/* Left: Tilemap */}
               <div className="flex-1 flex flex-col gap-4 min-w-0">
@@ -351,11 +358,9 @@ export default function HomePage() {
                 </MangaPanel>
               </div>
             </div>
-          )}
 
           {/* ── Map Tab ───────────────────────────────────────── */}
-          {activeTab === 'map' && (
-            <div className="p-4">
+          <div className={clsx('p-4', activeTab === 'map' ? 'block' : 'hidden')} aria-hidden={activeTab !== 'map'}>
               <div className="flex items-center gap-2 mb-4">
                 <span className="badge badge-race">Galaksi Haritası</span>
                 <h2 className="font-display text-lg font-black text-text-primary">
@@ -370,7 +375,6 @@ export default function HomePage() {
                 />
               </MangaPanel>
             </div>
-          )}
 
           {/* ── Battle Tab ────────────────────────────────────── */}
           {activeTab === 'battle' && (
@@ -392,7 +396,7 @@ export default function HomePage() {
                   Phaser.js ile güçlendirilmiş gerçek zamanlı savaş sahneleri yakında.
                 </p>
                 <a
-                  href={`/battle?race=${race}&mode=pve&userId=${DEMO_USER_ID}`}
+                  href={`/battle?race=${race}&mode=pve`}
                   className="btn-primary inline-flex items-center gap-2"
                   style={{ background: raceColor }}
                 >

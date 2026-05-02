@@ -1,0 +1,79 @@
+; Gitea configuration — copy to /etc/gitea/app.ini and fill in secrets
+; Reference: https://docs.gitea.com/administration/config-cheat-sheet
+
+APP_NAME = Nebula Dominion Git
+RUN_USER = git
+RUN_MODE = prod
+
+[server]
+DOMAIN           = gitea.local
+HTTP_PORT        = 3000
+ROOT_URL         = http://gitea.local:3000/
+SSH_DOMAIN       = gitea.local
+SSH_PORT         = 2222
+LFS_START_SERVER = true
+OFFLINE_MODE     = true
+
+[database]
+DB_TYPE  = postgres
+HOST     = gitea-db:5432
+NAME     = gitea
+USER     = gitea
+PASSWD   = ; fill in
+
+[repository]
+ROOT                      = /var/lib/gitea/repositories
+ENABLE_PUSH_CREATE_USER   = true
+ENABLE_PUSH_CREATE_ORG    = true
+DEFAULT_BRANCH            = main
+
+[git]
+; Large File Storage
+[lfs]
+STORAGE_TYPE = local
+PATH         = /var/lib/gitea/lfs
+
+[webhook]
+ALLOWED_HOST_LIST = private
+DELIVER_TIMEOUT   = 30
+SKIP_TLS_VERIFY   = false
+
+[service]
+DISABLE_REGISTRATION              = false
+REQUIRE_SIGNIN_VIEW               = false
+ENABLE_NOTIFY_MAIL                = false
+DEFAULT_KEEP_EMAIL_PRIVATE        = true
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+DEFAULT_USER_VISIBILITY           = public
+
+[security]
+INSTALL_LOCK                  = true
+SECRET_KEY                    = ; generate: openssl rand -hex 32
+INTERNAL_TOKEN                = ; generate: openssl rand -hex 32
+PASSWORD_HASH_ALGO            = argon2
+MIN_PASSWORD_LENGTH           = 8
+PASSWORD_COMPLEXITY           = lower,upper,digit,spec
+
+[cache]
+ADAPTER  = memory
+INTERVAL = 60
+
+[session]
+PROVIDER = db
+
+[log]
+MODE      = console
+LEVEL     = info
+ROOT_PATH = /var/lib/gitea/log
+
+[picture]
+DISABLE_GRAVATAR        = true
+ENABLE_FEDERATED_AVATAR = false
+
+[attachment]
+ENABLED = true
+MAX_SIZE = 100
+MAX_FILES = 10
+
+[mailer]
+ENABLED = false

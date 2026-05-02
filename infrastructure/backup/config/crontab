@@ -1,0 +1,41 @@
+# Nebula Dominion — Backup Crontab
+# Install with: crontab -u root /opt/nebula/backup/config/crontab
+# All times are UTC. Adjust SLACK_WEBHOOK_URL in /etc/environment.
+
+MAILTO=""
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# ────────────────────────────────────────────────
+# PostgreSQL WAL archiving (handled by pgBackRest archive-push, no cron needed)
+# pgBackRest archives WAL segments continuously via postgresql.conf:
+#   archive_command = 'pgbackrest --stanza=nebula archive-push %p'
+
+# ────────────────────────────────────────────────
+# Tier 2 — Daily incremental backup at 03:00 (full on Sunday 03:00)
+0 3 * * *  postgres  /opt/nebula/backup/scripts/tier2-pgbackrest-backup.sh >> /var/log/pgbackrest/cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# Tier 3 — Weekly full offsite backup Sunday at 04:00 (after Tier 2 full)
+0 4 * * 0  postgres  /opt/nebula/backup/scripts/tier3-offsite-backup.sh >> /var/log/pgbackrest/cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# Redis — Every 15 minutes
+*/15 * * * *  redis  /opt/nebula/backup/scripts/redis-backup.sh >> /var/log/nebula-backup/redis-cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# MinIO replication health check — Every hour
+0 * * * *  root  /opt/nebula/backup/scripts/minio-replication.sh verify >> /var/log/nebula-backup/minio-cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# Config backup via Restic — Daily at 02:00
+0 2 * * *  root  /opt/nebula/backup/scripts/restic-config-backup.sh >> /var/log/nebula-backup/restic-cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# Backup health check — Every 30 minutes
+*/30 * * * *  root  /opt/nebula/backup/monitoring/backup-health-check.sh >> /var/log/nebula-backup/health-cron.log 2>&1
+
+# ────────────────────────────────────────────────
+# Monthly disaster recovery test — First Sunday of month at 02:00
+# Runs a non-destructive restore validation (pitr to staging)
+0 2 * * 0  root  [ $(date +\%d) -le 7 ] && /opt/nebula/backup/disaster-recovery/monthly-dr-test.sh >> /var/log/nebula-backup/dr-test.log 2>&1

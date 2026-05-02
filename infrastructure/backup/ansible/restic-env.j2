@@ -1,0 +1,12 @@
+RESTIC_REPOSITORY=sftp:{{ hetzner_storage_box_user }}@{{ hetzner_storage_box_host }}:/nebula-dominion/restic
+HETZNER_STORAGE_BOX_HOST={{ hetzner_storage_box_host }}
+HETZNER_STORAGE_BOX_USER={{ hetzner_storage_box_user }}
+RESTIC_PASSWORD={{ restic_password }}
+MINIO_ENDPOINT={{ minio_endpoint }}
+MINIO_ACCESS_KEY={{ minio_access_key }}
+MINIO_SECRET_KEY={{ minio_secret_key }}
+SLACK_WEBHOOK_URL={{ slack_webhook_url }}
+RESTIC_KEEP_DAILY={{ restic_keep_daily }}
+RESTIC_KEEP_WEEKLY={{ restic_keep_weekly }}
+RESTIC_KEEP_MONTHLY={{ restic_keep_monthly }}
+RESTIC_SSH_KEY=/root/.ssh/hetzner_backup_key

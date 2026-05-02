@@ -1,0 +1,265 @@
+/* ── Level Indicator ─────────────────────────────────────────────────────── */
+
+.level-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 200, 50, 0.4);
+  border-radius: 8px;
+  color: #fff;
+  font-family: 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+.level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--tier-color, #ffc832);
+  background: radial-gradient(circle at 40% 40%, rgba(255, 200, 50, 0.25), transparent 70%);
+  font-weight: 700;
+}
+
+.level-badge .age-label {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--tier-color, #ffc832);
+  text-transform: uppercase;
+}
+
+.level-badge .level-number {
+  font-size: 20px;
+  line-height: 1;
+  color: #fff;
+}
+
+.level-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.tier-name {
+  font-size: 11px;
+  color: var(--tier-color, #ffc832);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.xp-label {
+  font-size: 11px;
+  color: #aaa;
+}
+
+/* Tier color vars */
+.tier-1 { --tier-color: #80cfff; }
+.tier-2 { --tier-color: #ffc832; }
+.tier-3 { --tier-color: #ff7b29; }
+
+/* ── XP Progress Bar ─────────────────────────────────────────────────────── */
+
+.xp-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.xp-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4a90e2, #7b5ea7);
+  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.xp-bar-fill.tier-2 {
+  background: linear-gradient(90deg, #e2a84a, #c97b20);
+}
+
+.xp-bar-fill.tier-3 {
+  background: linear-gradient(90deg, #e24a4a, #c92020);
+}
+
+.xp-bar-fill.maxed {
+  background: linear-gradient(90deg, #ffd700, #ffa500);
+}
+
+.xp-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #999;
+}
+
+/* ── Level-Up Modal ──────────────────────────────────────────────────────── */
+
+.level-up-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fade-in 0.2s ease;
+}
+
+.level-up-modal {
+  background: radial-gradient(ellipse at top, #1a1a2e 0%, #0d0d1a 70%);
+  border: 1px solid rgba(255, 200, 50, 0.5);
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  color: #fff;
+  max-width: 400px;
+  width: 90%;
+  animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 0 60px rgba(255, 200, 50, 0.2);
+}
+
+.level-up-title {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ffc832;
+  margin-bottom: 8px;
+}
+
+.level-up-number {
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(180deg, #fff 0%, #ffc832 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 8px 0;
+}
+
+.level-up-subtitle {
+  font-size: 15px;
+  color: #ccc;
+  margin-bottom: 24px;
+}
+
+.level-up-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.reward-chip {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reward-chip.gold  { background: rgba(255, 200, 0, 0.2);  color: #ffd700; border: 1px solid #ffd70040; }
+.reward-chip.gems  { background: rgba(100, 200, 255, 0.2); color: #64c8ff; border: 1px solid #64c8ff40; }
+.reward-chip.title { background: rgba(200, 100, 255, 0.2); color: #c864ff; border: 1px solid #c864ff40; }
+.reward-chip.badge { background: rgba(100, 255, 150, 0.2); color: #64ff96; border: 1px solid #64ff9640; }
+
+.level-up-unlocks {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 24px;
+}
+
+.unlock-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.unlock-list li::before {
+  content: '✦ ';
+  color: #ffc832;
+}
+
+.level-up-close {
+  padding: 10px 32px;
+  border: 1px solid rgba(255, 200, 50, 0.6);
+  border-radius: 8px;
+  background: transparent;
+  color: #ffc832;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.level-up-close:hover {
+  background: rgba(255, 200, 50, 0.1);
+}
+
+/* ── Unlock Notification (toast) ─────────────────────────────────────────── */
+
+.unlock-notifications {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.unlock-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(15, 20, 30, 0.92);
+  border-left: 3px solid #ffc832;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  animation: slide-in 0.3s ease, fade-out 0.5s ease 3.5s forwards;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.unlock-toast-icon { font-size: 18px; }
+.unlock-toast-label { font-weight: 600; color: #ffc832; }
+.unlock-toast-sub   { font-size: 11px; color: #aaa; }
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes slide-in {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fade-out {
+  to { opacity: 0; transform: translateX(120%); }
+}

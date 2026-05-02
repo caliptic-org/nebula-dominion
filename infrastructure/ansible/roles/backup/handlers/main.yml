@@ -1,0 +1,6 @@
+---
+- name: restart pgbackrest
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza=nebula check
+  become_user: postgres
+  changed_when: false

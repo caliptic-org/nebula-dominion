@@ -1,0 +1,280 @@
+---
+# infrastructure/backup/ansible/backup-setup.yml
+# Full backup system setup for Nebula Dominion servers.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts backup-setup.yml --ask-vault-pass
+#   ansible-playbook -i inventory/hosts backup-setup.yml --limit server1
+#
+# Targets:
+#   postgresql_primary — runs pgBackRest setup + stanza-create
+#   all_servers        — runs Restic setup on all servers
+
+- name: Install and configure backup system
+  hosts: all_servers
+  become: yes
+  vars_files:
+    - vars.yml
+  roles: []
+
+  tasks:
+    # ------------------------------------------------------------------ #
+    # Common setup
+    # ------------------------------------------------------------------ #
+    - name: Create backup directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: root
+        group: root
+      loop:
+        - /etc/pgbackrest
+        - /etc/restic
+        - "{{ local_backup_mount }}/pgbackrest"
+        - "{{ local_backup_mount }}/minio-staging"
+        - /var/log/pgbackrest
+        - /var/log/restic
+
+    - name: Deploy backup scripts
+      synchronize:
+        src: "../../"
+        dest: "{{ backup_src }}/"
+        delete: no
+        rsync_opts:
+          - "--exclude=ansible/vault*"
+      notify: chmod backup scripts
+
+    - name: Set executable permissions on scripts
+      find:
+        paths: "{{ backup_src }}"
+        patterns: "*.sh"
+        recurse: yes
+      register: script_files
+
+    - name: chmod +x all .sh scripts
+      file:
+        path: "{{ item.path }}"
+        mode: "0750"
+      loop: "{{ script_files.files }}"
+
+    # ------------------------------------------------------------------ #
+    # pgBackRest
+    # ------------------------------------------------------------------ #
+    - name: Install pgBackRest
+      apt:
+        name: pgbackrest
+        state: present
+        update_cache: yes
+
+    - name: Deploy pgBackRest env file
+      template:
+        src: pgbackrest-env.j2
+        dest: /etc/pgbackrest/pgbackrest.env
+        owner: postgres
+        group: postgres
+        mode: "0600"
+
+    - name: Deploy pgBackRest config (with env substitution)
+      shell: |
+        set -a && source /etc/pgbackrest/pgbackrest.env && set +a
+        envsubst < {{ backup_src }}/pgbackrest/pgbackrest.conf > /etc/pgbackrest/pgbackrest.conf
+        chown postgres:postgres /etc/pgbackrest/pgbackrest.conf
+        chmod 640 /etc/pgbackrest/pgbackrest.conf
+      changed_when: true
+
+    - name: Deploy PostgreSQL WAL archiving config
+      copy:
+        src: "{{ backup_src }}/pgbackrest/postgresql-archive.conf"
+        dest: "/etc/postgresql/{{ pg_version }}/main/conf.d/pgbackrest-archive.conf"
+        owner: postgres
+        group: postgres
+        mode: "0640"
+        remote_src: yes
+      notify: Restart PostgreSQL
+
+    - name: Generate pgBackRest SSH key
+      become_user: postgres
+      command: |
+        ssh-keygen -t ed25519 -N "" -C "pgbackrest@{{ inventory_hostname }}"
+                   -f /home/postgres/.ssh/hetzner_backup_key
+      args:
+        creates: /home/postgres/.ssh/hetzner_backup_key
+
+    - name: Fetch pgBackRest SSH public key
+      slurp:
+        src: /home/postgres/.ssh/hetzner_backup_key.pub
+      register: pgbackrest_pubkey
+
+    - name: Show pgBackRest SSH public key
+      debug:
+        msg: "Add this to Hetzner Storage Box: {{ pgbackrest_pubkey.content | b64decode }}"
+
+    - name: Add Hetzner Storage Box to postgres known_hosts
+      become_user: postgres
+      known_hosts:
+        name: "{{ hetzner_storage_box_host }}"
+        state: present
+        key: "{{ lookup('pipe', 'ssh-keyscan ' + hetzner_storage_box_host) }}"
+      ignore_errors: yes
+
+    # ------------------------------------------------------------------ #
+    # Restic + rclone
+    # ------------------------------------------------------------------ #
+    - name: Install restic
+      apt:
+        name: restic
+        state: present
+
+    - name: Install rclone
+      shell: |
+        curl -fsSL https://rclone.org/install.sh | bash
+      args:
+        creates: /usr/bin/rclone
+
+    - name: Deploy Restic env file
+      template:
+        src: restic-env.j2
+        dest: /etc/restic/restic.env
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Configure rclone for MinIO
+      template:
+        src: rclone.conf.j2
+        dest: /root/.config/rclone/rclone.conf
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Generate Restic SSH key
+      command: |
+        ssh-keygen -t ed25519 -N "" -C "restic@{{ inventory_hostname }}"
+                   -f /root/.ssh/hetzner_backup_key
+      args:
+        creates: /root/.ssh/hetzner_backup_key
+
+    - name: Fetch Restic SSH public key
+      slurp:
+        src: /root/.ssh/hetzner_backup_key.pub
+      register: restic_pubkey
+
+    - name: Show Restic SSH public key
+      debug:
+        msg: "Add this to Hetzner Storage Box: {{ restic_pubkey.content | b64decode }}"
+
+    # ------------------------------------------------------------------ #
+    # Cron jobs
+    # ------------------------------------------------------------------ #
+    - name: Install pgBackRest full backup cron (primary only)
+      cron:
+        name: "pgbackrest full backup"
+        minute: "{{ pgbackrest_full_backup_schedule.split()[0] }}"
+        hour:   "{{ pgbackrest_full_backup_schedule.split()[1] }}"
+        day:    "{{ pgbackrest_full_backup_schedule.split()[2] }}"
+        month:  "{{ pgbackrest_full_backup_schedule.split()[3] }}"
+        weekday: "{{ pgbackrest_full_backup_schedule.split()[4] }}"
+        user: postgres
+        job: >
+          pgbackrest --stanza={{ pg_stanza }} --type=full backup
+          >> /var/log/pgbackrest/cron-full.log 2>&1
+      when: inventory_hostname in groups['postgresql_primary']
+
+    - name: Install pgBackRest incremental backup cron (primary only)
+      cron:
+        name: "pgbackrest incremental backup"
+        minute: "{{ pgbackrest_incremental_schedule.split()[0] }}"
+        hour:   "{{ pgbackrest_incremental_schedule.split()[1] }}"
+        day:    "{{ pgbackrest_incremental_schedule.split()[2] }}"
+        month:  "{{ pgbackrest_incremental_schedule.split()[3] }}"
+        weekday: "{{ pgbackrest_incremental_schedule.split()[4] }}"
+        user: postgres
+        job: >
+          pgbackrest --stanza={{ pg_stanza }} --type=incr backup
+          >> /var/log/pgbackrest/cron-incr.log 2>&1
+      when: inventory_hostname in groups['postgresql_primary']
+
+    - name: Install Restic MinIO backup cron
+      cron:
+        name: "restic minio backup"
+        minute: "{{ restic_minio_backup_schedule.split()[0] }}"
+        hour:   "{{ restic_minio_backup_schedule.split()[1] }}"
+        day:    "{{ restic_minio_backup_schedule.split()[2] }}"
+        month:  "{{ restic_minio_backup_schedule.split()[3] }}"
+        weekday: "{{ restic_minio_backup_schedule.split()[4] }}"
+        user: root
+        job: "{{ backup_src }}/restic/backup-minio.sh >> /var/log/restic/cron-minio.log 2>&1"
+
+    - name: Install Restic config backup cron
+      cron:
+        name: "restic config backup"
+        minute: "{{ restic_config_backup_schedule.split()[0] }}"
+        hour:   "{{ restic_config_backup_schedule.split()[1] }}"
+        day:    "{{ restic_config_backup_schedule.split()[2] }}"
+        month:  "{{ restic_config_backup_schedule.split()[3] }}"
+        weekday: "{{ restic_config_backup_schedule.split()[4] }}"
+        user: root
+        job: "{{ backup_src }}/restic/backup-config.sh >> /var/log/restic/cron-config.log 2>&1"
+
+    - name: Install monthly DR test cron
+      cron:
+        name: "monthly disaster recovery test"
+        minute: "{{ dr_test_schedule.split()[0] }}"
+        hour:   "{{ dr_test_schedule.split()[1] }}"
+        day:    "{{ dr_test_schedule.split()[2] }}"
+        month:  "{{ dr_test_schedule.split()[3] }}"
+        weekday: "{{ dr_test_schedule.split()[4] }}"
+        user: root
+        job: "{{ backup_src }}/scripts/dr-test.sh >> /var/log/dr-test.log 2>&1"
+
+    # ------------------------------------------------------------------ #
+    # Log rotation
+    # ------------------------------------------------------------------ #
+    - name: Configure log rotation for backup logs
+      copy:
+        dest: /etc/logrotate.d/nebula-backup
+        content: |
+          /var/log/pgbackrest/*.log /var/log/restic/*.log /var/log/dr-test.log {
+              weekly
+              rotate 12
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 root root
+          }
+
+  handlers:
+    - name: Restart PostgreSQL
+      service:
+        name: "postgresql@{{ pg_version }}-main"
+        state: restarted
+
+    - name: chmod backup scripts
+      shell: find {{ backup_src }} -name "*.sh" -exec chmod 750 {} \;
+
+# ------------------------------------------------------------------ #
+# Stanza creation — only after PostgreSQL is running on primary
+# ------------------------------------------------------------------ #
+- name: Initialize pgBackRest stanza on primary
+  hosts: postgresql_primary
+  become: yes
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Create pgBackRest stanza
+      become_user: postgres
+      command: pgbackrest --stanza={{ pg_stanza }} stanza-create
+      register: stanza_result
+      failed_when: stanza_result.rc != 0 and "already exists" not in stanza_result.stderr
+      changed_when: "'already exists' not in stanza_result.stderr"
+
+    - name: Verify pgBackRest setup
+      become_user: postgres
+      command: pgbackrest --stanza={{ pg_stanza }} check
+      register: check_result
+
+    - name: Show check result
+      debug:
+        var: check_result.stdout_lines

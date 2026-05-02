@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.next/
+build/
+.env
+deploy/.env
+deploy/gitea-db-data/
+deploy/drone-db-data/
+*.log
+.DS_Store

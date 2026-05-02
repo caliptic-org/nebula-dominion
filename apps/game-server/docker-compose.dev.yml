@@ -1,0 +1,59 @@
+version: '3.9'
+
+services:
+  game-server:
+    build:
+      context: .
+      target: builder
+    command: npm run start:dev
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev-secret-change-in-prod
+      - DATABASE_URL=postgres://nebula:nebula@postgres:5432/nebula_dominion
+      - DB_SYNCHRONIZE=true
+      - DB_LOGGING=false
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nebula
+      POSTGRES_PASSWORD: nebula
+      POSTGRES_DB: nebula_dominion
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nebula -d nebula_dominion"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  redis-data:
+  postgres-data:

@@ -14,7 +14,8 @@
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.7.5",
     "clsx": "^2.1.1",
-    "phaser": "^3.60.0"
+    "phaser": "^3.60.0",
+    "swr": "^2.2.5"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

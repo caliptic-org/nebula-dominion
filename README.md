@@ -62,12 +62,58 @@ nebula-dominion/
 
 ## Kurulum
 
+### Docker ile Tam Ortam (Önerilen)
+
+Tüm servisleri tek komutla ayağa kaldırır: PostgreSQL, Redis, MinIO, API, Game Server ve Web.
+
+**Gereksinimler:** Docker 24+ ve Docker Compose v2+
+
+```bash
+# 1. Ortam değişkenlerini kopyala
+cp .env.example .env
+
+# 2. Tüm servisleri build edip başlat
+docker compose up --build
+
+# Arka planda çalıştırmak için
+docker compose up --build -d
+
+# Logları takip etmek için
+docker compose logs -f
+
+# Ortamı durdurmak için
+docker compose down
+
+# Volumes dahil tamamen silmek için
+docker compose down -v
+```
+
+**Servis Adresleri:**
+
+| Servis        | Adres                        |
+|---------------|------------------------------|
+| Web (Frontend)| http://localhost:3000        |
+| API           | http://localhost:4000        |
+| Game Server   | http://localhost:4001        |
+| MinIO API     | http://localhost:9000        |
+| MinIO Console | http://localhost:9001        |
+| PostgreSQL    | localhost:5432               |
+| Redis         | localhost:6379               |
+
+MinIO Console kullanıcı adı ve şifresi `.env` dosyasındaki `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` değerleridir (varsayılan: `minioadmin` / `minioadmin_dev_secret`).
+
+Otomatik oluşturulan MinIO bucket'ları: `game-assets`, `uploads`, `backups`.
+
+---
+
+### Yerel Geliştirme (Node.js)
+
 ```bash
 pnpm install
 pnpm dev
 ```
 
-### Gereksinimler
+**Gereksinimler:**
 
 - Node.js 20+
 - pnpm 9+

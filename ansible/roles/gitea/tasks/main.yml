@@ -1,0 +1,95 @@
+---
+- name: Create git user
+  user:
+    name: git
+    system: yes
+    shell: /bin/bash
+    home: /home/git
+    create_home: yes
+
+- name: Create Gitea directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: git
+    group: git
+    mode: '0755'
+  loop:
+    - "{{ gitea_data_dir }}"
+    - "{{ gitea_data_dir }}/repositories"
+    - "{{ gitea_data_dir }}/custom"
+    - "{{ gitea_data_dir }}/log"
+    - /etc/gitea
+
+- name: Create Gitea database
+  become_user: postgres
+  postgresql_db:
+    name: gitea
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Create Gitea database user
+  become_user: postgres
+  postgresql_user:
+    name: gitea
+    password: "{{ gitea_db_password }}"
+    db: gitea
+    priv: ALL
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Download Gitea
+  get_url:
+    url: "https://dl.gitea.com/gitea/{{ gitea_version }}/gitea-{{ gitea_version }}-linux-amd64"
+    dest: /usr/local/bin/gitea
+    mode: '0755'
+  when: inventory_hostname == 'server1'
+
+- name: Configure Gitea app.ini
+  template:
+    src: gitea_app.ini.j2
+    dest: /etc/gitea/app.ini
+    owner: git
+    group: git
+    mode: '0640'
+  notify: restart gitea
+  when: inventory_hostname == 'server1'
+
+- name: Create Gitea systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Gitea - Git with a cup of tea
+      After=network.target postgresql.service
+
+      [Service]
+      User=git
+      Group=git
+      WorkingDirectory={{ gitea_data_dir }}
+      ExecStart=/usr/local/bin/gitea web --config /etc/gitea/app.ini
+      Restart=on-failure
+      Environment=USER=git HOME=/home/git GITEA_WORK_DIR={{ gitea_data_dir }}
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/gitea.service
+  when: inventory_hostname == 'server1'
+
+- name: Enable and start Gitea
+  systemd:
+    name: gitea
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  when: inventory_hostname == 'server1'
+
+- name: Allow Gitea ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+  loop:
+    - "{{ gitea_port }}"
+    - "{{ gitea_ssh_port }}"
+  when: inventory_hostname == 'server1'

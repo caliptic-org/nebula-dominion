@@ -4,16 +4,14 @@
   "private": true,
   "workspaces": ["apps/*"],
   "scripts": {
-    "build": "pnpm -r run build",
-    "build:game-server": "pnpm --filter @nebula-dominion/game-server run build",
-    "build:api": "pnpm --filter @nebula-dominion/api run build",
-    "start:game-server": "pnpm --filter @nebula-dominion/game-server run start",
-    "start:api": "pnpm --filter @nebula-dominion/api run start",
-    "start:dev:game-server": "pnpm --filter @nebula-dominion/game-server run start:dev",
-    "start:dev:api": "pnpm --filter @nebula-dominion/api run start:dev",
-    "test": "pnpm -r run test",
-    "test:game-server": "pnpm --filter @nebula-dominion/game-server run test",
-    "test:api": "pnpm --filter @nebula-dominion/api run test",
-    "typecheck": "pnpm -r run typecheck"
+    "build:game-server": "npm --workspace apps/game-server run build",
+    "start:game-server": "npm --workspace apps/game-server run start",
+    "start:dev:game-server": "npm --workspace apps/game-server run start:dev",
+    "start:prod:game-server": "npm --workspace apps/game-server run start:prod",
+    "test:game-server": "npm --workspace apps/game-server run test",
+    "test:cov:game-server": "npm --workspace apps/game-server run test:cov",
+    "build:web": "npm --workspace apps/web run build",
+    "start:dev:web": "npm --workspace apps/web run dev",
+    "start:prod:web": "npm --workspace apps/web run start"
   }
 }

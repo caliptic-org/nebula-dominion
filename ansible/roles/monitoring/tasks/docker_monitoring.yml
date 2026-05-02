@@ -1,0 +1,10 @@
+---
+- name: Allow alertmanager ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+  loop:
+    - "9093"
+    - "9094"

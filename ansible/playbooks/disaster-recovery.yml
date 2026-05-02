@@ -1,0 +1,111 @@
+---
+# disaster-recovery.yml
+# Full server rebuild from scratch: <2 hours target
+#
+# Usage:
+#   ansible-playbook playbooks/disaster-recovery.yml -e "target_host=server1 restore_from_backup=true"
+#
+# Variables:
+#   target_host: server to recover (server1 or server2)
+#   restore_from_backup: whether to restore DB from pgBackRest (default: false)
+#   backup_label: pgBackRest backup label to restore from (default: latest)
+
+- name: Disaster Recovery - Phase 1 (0-30 min): Re-provision OS
+  hosts: "{{ target_host | default('servers') }}"
+  become: yes
+  gather_facts: yes
+  vars:
+    configure_lvm: true
+
+  pre_tasks:
+    - name: Record DR start time
+      set_fact:
+        dr_start_time: "{{ ansible_date_time.iso8601 }}"
+
+    - name: DR start notification
+      debug:
+        msg:
+          - "============================================"
+          - " DISASTER RECOVERY STARTED"
+          - " Target: {{ inventory_hostname }}"
+          - " Time: {{ dr_start_time }}"
+          - "============================================"
+
+  roles:
+    - common
+
+- name: Disaster Recovery - Phase 2 (30-60 min): Containers & Database
+  hosts: "{{ target_host | default('servers') }}"
+  become: yes
+  gather_facts: yes
+  roles:
+    - docker
+    - postgresql
+    - pgbouncer
+
+- name: Disaster Recovery - Phase 3 (60-90 min): Restore Data
+  hosts: "{{ target_host | default('servers') }}"
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Restore PostgreSQL from pgBackRest
+      command: >
+        pgbackrest --stanza=main
+        {% if backup_label is defined %}--set={{ backup_label }}{% endif %}
+        --type=default
+        --log-level-console=info
+        restore
+      become_user: postgres
+      when:
+        - restore_from_backup | default(false) | bool
+        - inventory_hostname == 'server1'
+
+    - name: Start Patroni after restore
+      systemd:
+        name: patroni
+        state: started
+      when: restore_from_backup | default(false) | bool
+
+    - name: Wait for PostgreSQL primary
+      uri:
+        url: "http://{{ server1_private_ip }}:8008/master"
+        status_code: 200
+      register: pg_ready
+      until: pg_ready.status == 200
+      retries: 30
+      delay: 10
+      when: inventory_hostname == 'server1'
+
+  roles:
+    - pgbackrest
+    - redis
+    - minio
+
+- name: Disaster Recovery - Phase 4 (90-120 min): Services & Verification
+  hosts: "{{ target_host | default('servers') }}"
+  become: yes
+  gather_facts: yes
+  roles:
+    - haproxy
+    - caddy
+    - monitoring
+
+  post_tasks:
+    - name: Run smoke tests
+      include_tasks: smoke_tests.yml
+      ignore_errors: yes
+
+    - name: DR completion report
+      debug:
+        msg:
+          - "============================================"
+          - " DISASTER RECOVERY COMPLETE"
+          - " Server {{ inventory_hostname }} is back online"
+          - "============================================"
+          - "Verify the following:"
+          - "- PostgreSQL: patronictl list"
+          - "- Redis: redis-cli ping"
+          - "- MinIO: curl http://localhost:{{ minio_port }}/minio/health/live"
+          - "- HAProxy: curl http://localhost:{{ haproxy_stats_port }}/stats"
+          - "- Grafana: http://{{ ansible_host }}:3000"

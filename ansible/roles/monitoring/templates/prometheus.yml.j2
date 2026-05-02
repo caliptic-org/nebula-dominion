@@ -1,0 +1,69 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    cluster: nebula-prod
+    environment: production
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+
+  - job_name: node
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:9100
+          - {{ server2_private_ip }}:9100
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  - job_name: postgresql
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:9187
+          - {{ server2_private_ip }}:9187
+
+  - job_name: redis
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:9121
+          - {{ server2_private_ip }}:9121
+
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:{{ minio_port }}
+          - {{ server2_private_ip }}:{{ minio_port }}
+
+  - job_name: haproxy
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:8405
+          - {{ server2_private_ip }}:8405
+
+  - job_name: docker
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:9323
+          - {{ server2_private_ip }}:9323
+
+  - job_name: patroni
+    static_configs:
+      - targets:
+          - {{ server1_private_ip }}:8008
+          - {{ server2_private_ip }}:8008
+    metrics_path: /metrics

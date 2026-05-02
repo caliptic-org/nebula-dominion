@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": ["apps/*"],
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "build:game-server": "npm --workspace apps/game-server run build",
-    "start:game-server": "npm --workspace apps/game-server run start",
-    "start:dev:game-server": "npm --workspace apps/game-server run start:dev",
-    "start:prod:game-server": "npm --workspace apps/game-server run start:prod",
-    "test:game-server": "npm --workspace apps/game-server run test",
-    "test:cov:game-server": "npm --workspace apps/game-server run test:cov"
+    "build": "pnpm --filter @nebula-dominion/web build && pnpm --filter @nebula-dominion/game-server build",
+    "build:web": "pnpm --filter @nebula-dominion/web build",
+    "build:game-server": "pnpm --filter @nebula-dominion/game-server build",
+    "dev:web": "pnpm --filter @nebula-dominion/web dev",
+    "dev:game-server": "pnpm --filter @nebula-dominion/game-server start:dev",
+    "start:game-server": "pnpm --filter @nebula-dominion/game-server start",
+    "start:prod:game-server": "pnpm --filter @nebula-dominion/game-server start:prod",
+    "test:game-server": "pnpm --filter @nebula-dominion/game-server test",
+    "test:cov:game-server": "pnpm --filter @nebula-dominion/game-server test:cov"
   }
 }

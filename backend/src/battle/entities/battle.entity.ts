@@ -52,6 +52,9 @@ export class Battle {
   @Column({ name: 'defender_army_state', type: 'jsonb', nullable: true })
   defenderArmyState: object | null;
 
+  @Column({ name: 'is_bot_opponent', type: 'boolean', default: false })
+  isBotOpponent: boolean;
+
   @Column({ name: 'replay_key', type: 'varchar', nullable: true })
   replayKey: string | null;
 

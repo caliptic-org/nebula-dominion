@@ -29,6 +29,7 @@ export class BattleController {
       defenderId: dto.defenderId,
       attackerUnits: dto.attackerUnits.map((u) => ({ ...u, hp: u.maxHp, isAlive: true })),
       defenderUnits: dto.defenderUnits.map((u) => ({ ...u, hp: u.maxHp, isAlive: true })),
+      isBotOpponent: dto.isBotOpponent,
     });
   }
 

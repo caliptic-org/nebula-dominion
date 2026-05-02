@@ -9,15 +9,21 @@ import { Sector } from './sector-wars/entities/sector.entity';
 import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
+import { PvpShield } from './pvp-protection/entities/pvp-shield.entity';
+import { PvpBotProfile } from './pvp-protection/entities/pvp-bot-profile.entity';
+import { PvpMatchRecord } from './pvp-protection/entities/pvp-match-record.entity';
+import { ComebackBonus } from './pvp-protection/entities/comeback-bonus.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
 import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { PvpProtectionModule } from './pvp-protection/pvp-protection.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
+import { PvpProtectionSchema1746400000000 } from './database/migrations/1746400000000-PvpProtectionSchema';
 
 @Module({
   imports: [
@@ -31,8 +37,18 @@ import { SectorWarsSchema1746300000000 } from './database/migrations/17463000000
         username: config.get('DB_USERNAME', 'postgres'),
         password: config.get('DB_PASSWORD', 'postgres'),
         database: config.get('DB_NAME', 'nebula_dominion'),
-        entities: [Battle, BattleLog, Unit, MutationRule, Sector, SectorBattle, WeeklyLeague, LeagueParticipant],
-        migrations: [BattleSchema1746100000000, UnitsSchema1746200000000, SectorWarsSchema1746300000000],
+        entities: [
+          Battle, BattleLog,
+          Unit, MutationRule,
+          Sector, SectorBattle, WeeklyLeague, LeagueParticipant,
+          PvpShield, PvpBotProfile, PvpMatchRecord, ComebackBonus,
+        ],
+        migrations: [
+          BattleSchema1746100000000,
+          UnitsSchema1746200000000,
+          SectorWarsSchema1746300000000,
+          PvpProtectionSchema1746400000000,
+        ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
@@ -44,6 +60,7 @@ import { SectorWarsSchema1746300000000 } from './database/migrations/17463000000
     UnitsModule,
     SectorWarsModule,
     LeaderboardModule,
+    PvpProtectionModule,
   ],
 })
 export class AppModule {}

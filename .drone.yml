@@ -1,30 +1,26 @@
----
 kind: pipeline
 type: docker
-name: nebula-dominion
+name: nebula-pipeline
 
 trigger:
   branch:
     - main
     - develop
-    - feature/*
-    - hotfix/*
-    - release/*
+  event:
+    - push
+    - pull_request
 
 steps:
   - name: install
     image: node:20-alpine
     commands:
-      - corepack enable
+      - npm install -g pnpm
       - pnpm install --frozen-lockfile
-    volumes:
-      - name: pnpm-cache
-        path: /root/.local/share/pnpm/store
 
   - name: typecheck
     image: node:20-alpine
     commands:
-      - corepack enable
+      - npm install -g pnpm
       - pnpm typecheck
     depends_on:
       - install
@@ -32,118 +28,190 @@ steps:
   - name: test
     image: node:20-alpine
     commands:
-      - corepack enable
-      - pnpm test --passWithNoTests
-    environment:
-      NODE_ENV: test
+      - npm install -g pnpm
+      - pnpm test
     depends_on:
       - install
 
   - name: build
     image: node:20-alpine
     commands:
-      - corepack enable
+      - npm install -g pnpm
       - pnpm build
-    environment:
-      NODE_ENV: production
     depends_on:
       - typecheck
       - test
 
-  - name: docker-build
+  - name: docker-build-web
     image: plugins/docker
     settings:
-      registry: registry.local:5000
-      repo: registry.local:5000/nebula-dominion
+      registry: registry.local
+      repo: registry.local/nebula-web
+      dockerfile: apps/web/Dockerfile
       tags:
         - latest
         - ${DRONE_COMMIT_SHA:0:7}
-        - ${DRONE_BRANCH//\//-}
-      dockerfile: Dockerfile
-      insecure: true
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
     depends_on:
       - build
     when:
       branch:
         - main
-        - develop
+
+  - name: docker-build-api
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-api
+      dockerfile: apps/api/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: docker-build-game
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-game
+      dockerfile: apps/game/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: docker-build-worker
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-worker
+      dockerfile: apps/worker/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: deploy
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: deploy_host
+      username: deploy
+      key:
+        from_secret: ssh_key
+      port: 22
+      script:
+        - docker service update --image registry.local/nebula-web:latest nebula_web
+        - docker service update --image registry.local/nebula-api:latest nebula_api
+        - docker service update --image registry.local/nebula-game:latest nebula_game
+        - docker service update --image registry.local/nebula-worker:latest nebula_worker
+        - docker stack ps nebula
+    depends_on:
+      - docker-build-web
+      - docker-build-api
+      - docker-build-game
+      - docker-build-worker
+    when:
+      branch:
+        - main
+
+---
+kind: pipeline
+type: docker
+name: nebula-pipeline-staging
+
+trigger:
+  branch:
+    - develop
+  event:
+    - push
+
+steps:
+  - name: install
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm install --frozen-lockfile
+
+  - name: typecheck
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm typecheck
+    depends_on:
+      - install
+
+  - name: test
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm test
+    depends_on:
+      - install
+
+  - name: build
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm build
+    depends_on:
+      - typecheck
+      - test
+
+  - name: docker-build-staging
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-web
+      dockerfile: apps/web/Dockerfile
+      tags:
+        - staging
+        - staging-${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
 
   - name: deploy-staging
     image: appleboy/drone-ssh
     settings:
       host:
-        from_secret: staging_host
+        from_secret: deploy_host_staging
       username: deploy
       key:
         from_secret: ssh_key
       port: 22
       script:
-        - docker service update --image registry.local:5000/nebula-dominion:${DRONE_COMMIT_SHA:0:7} nebula_web
-        - docker service update --image registry.local:5000/nebula-dominion:${DRONE_COMMIT_SHA:0:7} nebula_api
-        - docker system prune -f --filter "until=24h"
+        - docker service update --image registry.local/nebula-web:staging nebula_staging_web
+        - docker stack ps nebula_staging
     depends_on:
-      - docker-build
-    when:
-      branch:
-        - develop
-
-  - name: deploy-production
-    image: appleboy/drone-ssh
-    settings:
-      host:
-        from_secret: prod_host
-      username: deploy
-      key:
-        from_secret: ssh_key
-      port: 22
-      script:
-        - docker service update --image registry.local:5000/nebula-dominion:${DRONE_COMMIT_SHA:0:7} --update-parallelism 2 --update-delay 10s nebula_web
-        - docker service update --image registry.local:5000/nebula-dominion:${DRONE_COMMIT_SHA:0:7} --update-parallelism 2 --update-delay 10s nebula_api
-        - docker system prune -f --filter "until=24h"
-    depends_on:
-      - docker-build
-    when:
-      branch:
-        - main
-
-  - name: notify-success
-    image: plugins/slack
-    settings:
-      webhook:
-        from_secret: slack_webhook
-      channel: deployments
-      template: >
-        *Build Success* :white_check_mark:
-        Repo: {{ repo.name }}
-        Branch: {{ build.branch }}
-        Commit: {{ build.commit }}
-        Author: {{ build.author }}
-        Link: {{ build.link }}
-    when:
-      status:
-        - success
-    depends_on:
-      - deploy-staging
-      - deploy-production
-
-  - name: notify-failure
-    image: plugins/slack
-    settings:
-      webhook:
-        from_secret: slack_webhook
-      channel: deployments
-      template: >
-        *Build Failed* :x:
-        Repo: {{ repo.name }}
-        Branch: {{ build.branch }}
-        Commit: {{ build.commit }}
-        Author: {{ build.author }}
-        Link: {{ build.link }}
-    when:
-      status:
-        - failure
-
-volumes:
-  - name: pnpm-cache
-    host:
-      path: /var/cache/pnpm
+      - docker-build-staging

@@ -1,4 +1,4 @@
-name: Auto Create PR for Agent Branches
+name: Auto Merge Agent Branches to Main
 
 on:
   push:
@@ -6,42 +6,31 @@ on:
       - 'agent/**'
 
 jobs:
-  create-pr:
+  auto-merge:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
-      - name: Create PR if not exists
-        uses: actions/github-script@v7
+      - name: Checkout main
+        uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const branch = context.ref.replace('refs/heads/', '');
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-            // Check if PR already exists for this branch
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: `${context.repo.owner}:${branch}`,
-              state: 'open',
-            });
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            if (prs.length > 0) {
-              console.log(`PR already exists for ${branch}: #${prs[0].number}`);
-              return;
-            }
-
-            console.log(`Creating PR for branch: ${branch}`);
-
-            const { data: pr } = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Merge ${branch}`,
-              head: branch,
-              base: 'main',
-              body: 'Auto-created by GitHub Actions',
-            });
-
-            console.log(`PR #${pr.number} created: ${pr.html_url}`);
+      - name: Merge agent branch into main
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Merging $BRANCH into main"
+          git fetch origin "$BRANCH"
+          git merge --squash "origin/$BRANCH" || true
+          git diff --cached --quiet && echo "Nothing to merge" && exit 0
+          git commit -m "Merge $BRANCH into main [auto]"
+          git push origin main
+          echo "Successfully merged $BRANCH"

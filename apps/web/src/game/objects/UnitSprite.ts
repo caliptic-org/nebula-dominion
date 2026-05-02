@@ -13,23 +13,23 @@ const UNIT_SHAPES: Record<string, 'circle' | 'square' | 'triangle'> = {
 };
 
 export class UnitSprite extends Phaser.GameObjects.Container {
-  private body: Phaser.GameObjects.Graphics;
+  private unitBody: Phaser.GameObjects.Graphics;
   private healthBar: Phaser.GameObjects.Graphics;
   private selectionRing: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
 
-  state: UnitState;
+  unitState: UnitState;
   ownerId: string;
   isEnemy: boolean;
 
   constructor(scene: Phaser.Scene, x: number, y: number, state: UnitState, ownerId: string, isEnemy: boolean) {
     super(scene, x, y);
-    this.state = state;
+    this.unitState = state;
     this.ownerId = ownerId;
     this.isEnemy = isEnemy;
 
     this.selectionRing = scene.add.graphics();
-    this.body = scene.add.graphics();
+    this.unitBody = scene.add.graphics();
     this.healthBar = scene.add.graphics();
     this.label = scene.add.text(0, 22, state.type.slice(0, 3).toUpperCase(), {
       fontSize: '9px',
@@ -38,7 +38,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
       strokeThickness: 2,
     }).setOrigin(0.5, 0);
 
-    this.add([this.selectionRing, this.body, this.healthBar, this.label]);
+    this.add([this.selectionRing, this.unitBody, this.healthBar, this.label]);
     scene.add.existing(this);
 
     this.drawBody();
@@ -51,28 +51,28 @@ export class UnitSprite extends Phaser.GameObjects.Container {
   }
 
   private drawBody() {
-    const color = UNIT_COLORS[this.state.type] ?? 0x888888;
-    const shape = UNIT_SHAPES[this.state.type] ?? 'circle';
-    const alpha = this.state.actionUsed ? 0.45 : 1;
+    const color = UNIT_COLORS[this.unitState.type] ?? 0x888888;
+    const shape = UNIT_SHAPES[this.unitState.type] ?? 'circle';
+    const alpha = this.unitState.actionUsed ? 0.45 : 1;
 
-    this.body.clear();
-    this.body.fillStyle(color, alpha);
-    this.body.lineStyle(2, this.isEnemy ? THEME.DANGER : THEME.INFO, alpha);
+    this.unitBody.clear();
+    this.unitBody.fillStyle(color, alpha);
+    this.unitBody.lineStyle(2, this.isEnemy ? 0xff4444 : 0x4444ff, alpha);
 
     if (shape === 'circle') {
-      this.body.fillCircle(0, 0, 16);
-      this.body.strokeCircle(0, 0, 16);
+      this.unitBody.fillCircle(0, 0, 16);
+      this.unitBody.strokeCircle(0, 0, 16);
     } else if (shape === 'square') {
-      this.body.fillRect(-14, -14, 28, 28);
-      this.body.strokeRect(-14, -14, 28, 28);
+      this.unitBody.fillRect(-14, -14, 28, 28);
+      this.unitBody.strokeRect(-14, -14, 28, 28);
     } else {
-      this.body.fillTriangle(0, -16, 14, 12, -14, 12);
-      this.body.strokeTriangle(0, -16, 14, 12, -14, 12);
+      this.unitBody.fillTriangle(0, -16, 14, 12, -14, 12);
+      this.unitBody.strokeTriangle(0, -16, 14, 12, -14, 12);
     }
   }
 
   private drawHealth() {
-    const ratio = this.state.hp / this.state.maxHp;
+    const ratio = this.unitState.hp / this.unitState.maxHp;
     const w = 32;
     const h = 4;
     const x = -w / 2;
@@ -104,7 +104,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
   }
 
   applyState(state: UnitState) {
-    this.state = state;
+    this.unitState = state;
     this.drawBody();
     this.drawHealth();
   }

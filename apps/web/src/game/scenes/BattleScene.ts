@@ -121,7 +121,7 @@ export class BattleScene extends Phaser.Scene {
   private onOwnUnitClick(sprite: UnitSprite) {
     const myId = this.socket.myUserId;
     if (this.room.currentPlayerId !== myId) return;
-    if (sprite.state.actionUsed) return;
+    if (sprite.unitState.actionUsed) return;
 
     if (this.selectedUnit === sprite) {
       this.deselect();
@@ -138,7 +138,7 @@ export class BattleScene extends Phaser.Scene {
       if (s.isEnemy) s.setHighlighted(true);
     }
 
-    this.scene.get('UIScene').events.emit('unit_selected', sprite.state);
+    this.scene.get('UIScene').events.emit('unit_selected', sprite.unitState);
   }
 
   private handlePointerDown(ptr: Phaser.Input.Pointer) {
@@ -177,8 +177,8 @@ export class BattleScene extends Phaser.Scene {
     this.deselect();
 
     this.socket.sendAction('attack', {
-      attackerUnitId: attacker.state.id,
-      targetUnitId: target.state.id,
+      attackerUnitId: attacker.unitState.id,
+      targetUnitId: target.unitState.id,
     });
   }
 
@@ -186,13 +186,13 @@ export class BattleScene extends Phaser.Scene {
     if (!this.selectedUnit) return;
     const unit = this.selectedUnit;
     this.deselect();
-    this.socket.sendAction('move_unit', { unitId: unit.state.id, position: { x: col, y: row } });
+    this.socket.sendAction('move_unit', { unitId: unit.unitState.id, position: { x: col, y: row } });
   }
 
   private drawReachable(sprite: UnitSprite) {
-    const spd = sprite.state.speed;
-    const px = sprite.state.position.x;
-    const py = sprite.state.position.y;
+    const spd = sprite.unitState.speed;
+    const px = sprite.unitState.position.x;
+    const py = sprite.unitState.position.y;
     this.reachableCells = [];
 
     for (let dc = -spd; dc <= spd; dc++) {
@@ -203,7 +203,7 @@ export class BattleScene extends Phaser.Scene {
         if (dc === 0 && dr === 0) continue;
         // Don't allow moving into enemy half... actually allow it for aggression
         const occupied = Array.from(this.unitSprites.values()).some(
-          (s) => s.state.position.x === c && s.state.position.y === r,
+          (s) => s.unitState.position.x === c && s.unitState.position.y === r,
         );
         if (!occupied) this.reachableCells.push({ col: c, row: r });
       }
@@ -242,8 +242,8 @@ export class BattleScene extends Phaser.Scene {
       if (!attacker || !target) return;
 
       attacker.playAttackAnim(target.x, target.y, () => {
-        target.state.hp = targetHp;
-        target.applyState(target.state);
+        target.unitState.hp = targetHp;
+        target.applyState(target.unitState);
         spawnDamageText(this, target.x, target.y, damage);
       });
     });
@@ -261,14 +261,14 @@ export class BattleScene extends Phaser.Scene {
       const sprite = this.unitSprites.get(unitId);
       if (!sprite) return;
       const { x, y } = cellToPixel(position.x, position.y);
-      sprite.state.position = position;
+      sprite.unitState.position = position;
       sprite.playMoveAnim(x, y);
     });
 
     this.socket.on('ability_used', (data) => {
       const { unitId } = data as { unitId: string };
       const sprite = this.unitSprites.get(unitId);
-      if (sprite) spawnAbilityText(this, sprite.x, sprite.y, sprite.state.type);
+      if (sprite) spawnAbilityText(this, sprite.x, sprite.y, sprite.unitState.type);
     });
 
     this.socket.on('state_update', (data) => {
@@ -308,8 +308,8 @@ export class BattleScene extends Phaser.Scene {
       // Reset actionUsed visually for the new active player's units
       for (const [, sprite] of this.unitSprites) {
         if (sprite.ownerId === nextPlayerId) {
-          sprite.state.actionUsed = false;
-          sprite.applyState(sprite.state);
+          sprite.unitState.actionUsed = false;
+          sprite.applyState(sprite.unitState);
         }
       }
     });

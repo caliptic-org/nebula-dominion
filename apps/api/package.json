@@ -1,0 +1,9 @@
+{
+  "name": "@nebula-dominion/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/main.js",
+    "start:dev": "node --watch src/main.js"
+  }
+}

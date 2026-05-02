@@ -1,0 +1,9 @@
+{
+  "name": "@nebula-dominion/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "start:dev": "node --watch src/server.js"
+  }
+}

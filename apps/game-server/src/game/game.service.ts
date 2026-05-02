@@ -7,6 +7,8 @@ import { RoomService, GameRoom, GameStatus, TurnPhase, UnitState } from './room.
 import { SessionService } from './session.service';
 import { ActionType, GameActionDto } from './dto/game-action.dto';
 import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
+import { ProgressionService } from '../progression/progression.service';
+import { XpSource } from '../progression/config/level-config';
 
 export interface GameCreatedEvent {
   match: MatchResult;
@@ -38,6 +40,7 @@ export class GameService {
     private readonly antiCheat: AntiCheatService,
     private readonly emitter: EventEmitter2,
     private readonly config: ConfigService,
+    private readonly progression: ProgressionService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
   }
@@ -242,6 +245,13 @@ export class GameService {
     await this.rooms.save(room);
 
     this.logger.log(`Game over: room=${room.id} winner=${winnerId} loser=${loserId}`);
+
+    // Award XP asynchronously — fire-and-forget so it doesn't block game response
+    Promise.all([
+      this.progression.awardXp({ userId: winnerId, source: XpSource.BATTLE_WIN, referenceId: room.id }),
+      this.progression.awardXp({ userId: loserId, source: XpSource.BATTLE_LOSS, referenceId: room.id }),
+    ]).catch((err) => this.logger.error(`Failed to award battle XP: ${err.message}`));
+
     return { success: true, room, events };
   }
 

@@ -8,6 +8,13 @@ import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { GlowButton } from '@/components/ui/GlowButton';
 import { CommanderCard } from '@/components/ui/CommanderCard';
+import { EquipmentSlots } from '@/components/ui/EquipmentSlots';
+import {
+  CommanderEquipment,
+  EquipmentItem,
+  EquipmentSlotType,
+  DEMO_COMMANDER_EQUIPMENT,
+} from '@/types/equipment';
 import clsx from 'clsx';
 
 export default function CommandersPage() {
@@ -16,6 +23,36 @@ export default function CommandersPage() {
     RACE_DESCRIPTIONS[Race.INSAN].commanders[0]
   );
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
+
+  // Equipment state keyed by commander id
+  const [equipmentMap, setEquipmentMap] = useState<Record<string, CommanderEquipment>>({
+    voss: DEMO_COMMANDER_EQUIPMENT,
+  });
+
+  function getEquipment(commanderId: string): CommanderEquipment {
+    return equipmentMap[commanderId] ?? { commanderId, slots: {}, lockedSlots: [EquipmentSlotType.AKSESUAR_3, EquipmentSlotType.OZEL] };
+  }
+
+  function handleEquip(slot: EquipmentSlotType, item: EquipmentItem) {
+    if (!selectedCommander) return;
+    setEquipmentMap(prev => ({
+      ...prev,
+      [selectedCommander.id]: {
+        ...getEquipment(selectedCommander.id),
+        slots: { ...getEquipment(selectedCommander.id).slots, [slot]: item },
+      },
+    }));
+  }
+
+  function handleUnequip(slot: EquipmentSlotType) {
+    if (!selectedCommander) return;
+    setEquipmentMap(prev => {
+      const curr = getEquipment(selectedCommander.id);
+      const slots = { ...curr.slots };
+      delete slots[slot];
+      return { ...prev, [selectedCommander.id]: { ...curr, slots } };
+    });
+  }
 
   const races = Object.values(Race) as Race[];
   const raceDesc = RACE_DESCRIPTIONS[race];
@@ -272,6 +309,21 @@ export default function CommandersPage() {
                   </GlowButton>
                 )}
               </div>
+
+              {/* Equipment Slots */}
+              {selectedCommander.isUnlocked && (
+                <div
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <EquipmentSlots
+                    equipment={getEquipment(selectedCommander.id)}
+                    raceColor={RACE_DESCRIPTIONS[selectedCommander.race].color}
+                    raceGlow={RACE_DESCRIPTIONS[selectedCommander.race].glowColor}
+                    onEquip={handleEquip}
+                    onUnequip={handleUnequip}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}

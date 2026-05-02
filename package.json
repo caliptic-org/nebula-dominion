@@ -1,0 +1,14 @@
+{
+  "name": "nebula-dominion",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "build:game-server": "npm --workspace apps/game-server run build",
+    "start:game-server": "npm --workspace apps/game-server run start",
+    "start:dev:game-server": "npm --workspace apps/game-server run start:dev",
+    "start:prod:game-server": "npm --workspace apps/game-server run start:prod",
+    "test:game-server": "npm --workspace apps/game-server run test",
+    "test:cov:game-server": "npm --workspace apps/game-server run test:cov"
+  }
+}

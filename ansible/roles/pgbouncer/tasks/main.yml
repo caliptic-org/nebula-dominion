@@ -1,0 +1,36 @@
+---
+- name: Install PgBouncer
+  apt:
+    name: pgbouncer
+    state: present
+
+- name: Configure PgBouncer
+  template:
+    src: pgbouncer.ini.j2
+    dest: /etc/pgbouncer/pgbouncer.ini
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: restart pgbouncer
+
+- name: Configure PgBouncer userlist
+  template:
+    src: userlist.txt.j2
+    dest: /etc/pgbouncer/userlist.txt
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: restart pgbouncer
+
+- name: Enable and start PgBouncer
+  systemd:
+    name: pgbouncer
+    state: started
+    enabled: yes
+
+- name: Allow PgBouncer port on private network
+  ufw:
+    rule: allow
+    port: "{{ pgbouncer_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"

@@ -1,0 +1,56 @@
+---
+# Week 2: Container Orchestration & Database
+# Covers: Docker, Docker Swarm, internal registry,
+#         PostgreSQL 16 + Patroni + etcd, PgBouncer, pgBackRest
+#
+# Prerequisites: week1-system.yml must have run successfully
+# Usage: ansible-playbook playbooks/week2-container-db.yml
+
+- name: Week 2 - Docker and Docker Swarm
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - docker
+
+- name: Week 2 - PostgreSQL HA (etcd + Patroni)
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - postgresql
+
+- name: Week 2 - PgBouncer connection pooler
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - pgbouncer
+
+- name: Week 2 - pgBackRest backup
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - pgbackrest
+
+  post_tasks:
+    - name: Verify PostgreSQL cluster status
+      command: patronictl -c /etc/patroni/patroni.yml list
+      become_user: postgres
+      register: patroni_status
+      when: inventory_hostname == 'server1'
+      changed_when: false
+
+    - name: Display cluster status
+      debug:
+        msg: "{{ patroni_status.stdout_lines }}"
+      when: inventory_hostname == 'server1'
+
+    - name: Run failover test
+      debug:
+        msg: |
+          To test failover manually:
+          1. Run: patronictl -c /etc/patroni/patroni.yml failover nebula-cluster
+          2. Verify: patronictl -c /etc/patroni/patroni.yml list
+          3. Check replication: psql -c "SELECT * FROM pg_stat_replication;"

@@ -1,0 +1,38 @@
+name: Auto Merge Agent PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'agent/')
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Auto merge agent PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            console.log(`Auto-merging PR #${pr.number}: ${pr.title}`);
+
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              merge_method: 'squash',
+              commit_title: pr.title,
+              commit_message: `Auto-merged by GitHub Actions\n\nPR #${pr.number} from ${pr.head.ref}`,
+            });
+
+            console.log(`PR #${pr.number} merged successfully.`);

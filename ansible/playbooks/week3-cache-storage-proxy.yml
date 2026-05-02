@@ -1,0 +1,53 @@
+---
+# Week 3: Cache, Storage, Proxy
+# Covers: Redis + Sentinel, MinIO, HAProxy, Caddy, Cloudflare DNS
+#
+# Prerequisites: week2-container-db.yml must have run successfully
+# Usage: ansible-playbook playbooks/week3-cache-storage-proxy.yml
+
+- name: Week 3 - Redis with Sentinel
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - redis
+
+- name: Week 3 - MinIO Object Storage
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - minio
+
+- name: Week 3 - HAProxy Load Balancer
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - haproxy
+
+- name: Week 3 - Caddy Reverse Proxy
+  hosts: servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - caddy
+
+  post_tasks:
+    - name: Verify Redis Sentinel
+      command: redis-cli -p {{ redis_sentinel_port }} SENTINEL masters
+      register: sentinel_status
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display Redis Sentinel status
+      debug:
+        msg: "{{ sentinel_status.stdout_lines | default(['Redis Sentinel not yet ready']) }}"
+
+    - name: Display HAProxy stats URL
+      debug:
+        msg: "HAProxy stats: http://{{ ansible_host }}:{{ haproxy_stats_port }}/stats"
+
+    - name: Display MinIO console URL
+      debug:
+        msg: "MinIO console: http://{{ ansible_host }}:{{ minio_console_port }}"

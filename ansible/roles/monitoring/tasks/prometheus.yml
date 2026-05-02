@@ -1,0 +1,101 @@
+---
+- name: Create prometheus user
+  user:
+    name: prometheus
+    system: yes
+    shell: /sbin/nologin
+    create_home: no
+
+- name: Set prometheus data dir ownership
+  file:
+    path: "{{ prometheus_data_dir }}"
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+
+- name: Download Prometheus
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: /tmp/prometheus.tar.gz
+
+- name: Extract Prometheus
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install Prometheus binaries
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+
+- name: Copy Prometheus console files
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "/etc/prometheus/{{ item }}"
+    remote_src: yes
+  loop:
+    - consoles
+    - console_libraries
+
+- name: Configure Prometheus
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0640'
+  notify: restart prometheus
+
+- name: Configure Prometheus alert rules
+  template:
+    src: alert_rules.yml.j2
+    dest: /etc/prometheus/alert_rules.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0640'
+  notify: restart prometheus
+
+- name: Create Prometheus systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Prometheus Monitoring
+      After=network.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path={{ prometheus_data_dir }} \
+        --storage.tsdb.retention.time=30d \
+        --web.console.libraries=/etc/prometheus/console_libraries \
+        --web.console.templates=/etc/prometheus/consoles \
+        --web.enable-lifecycle \
+        --web.enable-admin-api
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/prometheus.service
+
+- name: Enable and start Prometheus
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Allow Prometheus port on private network
+  ufw:
+    rule: allow
+    port: 9090
+    proto: tcp
+    src: "{{ private_network_cidr }}"

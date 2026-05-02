@@ -1,0 +1,23 @@
+[Unit]
+Description=Drone CI Docker Runner
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=on-failure
+ExecStartPre=-/usr/bin/docker stop drone-runner
+ExecStartPre=-/usr/bin/docker rm drone-runner
+ExecStart=/usr/bin/docker run --rm \
+  --name drone-runner \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e DRONE_RPC_PROTO=http \
+  -e DRONE_RPC_HOST={{ server1_private_ip }}:{{ drone_port }} \
+  -e DRONE_RPC_SECRET={{ drone_rpc_secret }} \
+  -e DRONE_RUNNER_CAPACITY=4 \
+  -e DRONE_RUNNER_NAME={{ inventory_hostname }} \
+  -e DRONE_RUNNER_NETWORKS=nebula-net \
+  -p 3000:3000 \
+  drone/drone-runner-docker:{{ drone_runner_version }}
+
+[Install]
+WantedBy=multi-user.target

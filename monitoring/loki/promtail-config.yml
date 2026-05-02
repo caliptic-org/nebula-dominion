@@ -1,0 +1,98 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: nebula
+    batchwait: 1s
+    batchsize: 1048576
+
+scrape_configs:
+  # ─── Docker container logs ────────────────────────────────────────────────
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: stream
+      - source_labels: ['__meta_docker_container_label_com_docker_swarm_service_name']
+        target_label: service
+      - source_labels: ['__meta_docker_container_label_com_docker_stack_namespace']
+        target_label: stack
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            ts: time
+      - labels:
+          level:
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+
+  # ─── System logs ─────────────────────────────────────────────────────────
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/{syslog,auth.log,kern.log}
+
+  # ─── NestJS application logs ──────────────────────────────────────────────
+  - job_name: nebula-api-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nebula-api
+          __path__: /var/log/nebula/api-*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            context: context
+            message: message
+            requestId: req.id
+            userId: req.user.id
+            statusCode: res.statusCode
+            responseTime: responseTime
+      - labels:
+          level:
+          context:
+      - metrics:
+          http_log_messages_total:
+            type: Counter
+            description: Count of log messages by level
+            source: level
+            config:
+              action: inc
+
+  # ─── NestJS game server logs ──────────────────────────────────────────────
+  - job_name: nebula-game-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nebula-game
+          __path__: /var/log/nebula/game-*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            context: context
+            message: message
+            sessionId: session
+            playerId: player
+      - labels:
+          level:
+          context:

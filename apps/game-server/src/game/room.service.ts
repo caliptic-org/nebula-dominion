@@ -64,6 +64,7 @@ export interface GameRoom {
 
 const ROOM_KEY = (id: string) => `game:room:${id}`;
 const USER_ROOM_KEY = (uid: string) => `user:room:${uid}`;
+const ACTIVE_ROOMS_KEY = 'game:active_rooms';
 
 const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUsed'>[]> = {
   [Race.HUMAN]: [
@@ -162,6 +163,18 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
 
   async clearUserRoom(userId: string): Promise<void> {
     await this.redis.del(USER_ROOM_KEY(userId));
+  }
+
+  async addToActiveRooms(roomId: string): Promise<void> {
+    await this.redis.sadd(ACTIVE_ROOMS_KEY, roomId);
+  }
+
+  async removeFromActiveRooms(roomId: string): Promise<void> {
+    await this.redis.srem(ACTIVE_ROOMS_KEY, roomId);
+  }
+
+  async getActiveRoomIds(): Promise<string[]> {
+    return this.redis.smembers(ACTIVE_ROOMS_KEY);
   }
 
   async getRoomByUser(userId: string): Promise<GameRoom | null> {

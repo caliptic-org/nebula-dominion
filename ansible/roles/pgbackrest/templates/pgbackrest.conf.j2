@@ -1,0 +1,15 @@
+[global]
+repo1-path={{ pgbackrest_repo_path }}
+repo1-retention-full={{ pgbackrest_retention_full }}
+repo1-retention-diff={{ pgbackrest_retention_diff }}
+log-level-console=warn
+log-level-file=info
+log-path=/var/log/pgbackrest
+start-fast=y
+compress-type=lz4
+process-max=4
+
+[main]
+pg1-path={{ postgresql_data_dir }}
+pg1-port={{ postgresql_port }}
+pg1-socket-path=/var/run/postgresql

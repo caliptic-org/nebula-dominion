@@ -611,3 +611,10 @@ body::before {
   align-items: center;
   justify-content: center;
 }
+
+/* ── HUD Component Animations ───────────────────────────────────────────── */
+@keyframes shimmer-slide {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(200%); }
+  100% { transform: translateX(200%); }
+}

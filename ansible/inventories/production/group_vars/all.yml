@@ -1,0 +1,190 @@
+---
+# ============================================================
+# Global variables for all hosts
+# ============================================================
+
+# Network
+private_network_cidr: "10.0.0.0/24"
+server1_private_ip: "10.0.0.1"
+server2_private_ip: "10.0.0.2"
+
+# Domain
+domain_name: "nebuladominion.com"
+internal_registry: "registry.local:5000"
+
+# System
+deploy_user: "deploy"
+admin_users:
+  - name: deploy
+    shell: /bin/bash
+    groups: sudo,docker
+
+# SSH
+ssh_port: 22
+allowed_ssh_ips: []  # Fill with office/VPN IPs: ["1.2.3.4"]
+
+# NTP
+ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# Timezone
+system_timezone: "Europe/Istanbul"
+
+# Packages
+common_packages:
+  - curl
+  - wget
+  - vim
+  - git
+  - htop
+  - iotop
+  - net-tools
+  - unzip
+  - jq
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - ufw
+  - fail2ban
+  - rsync
+  - ntp
+
+# Disk/LVM
+data_disk: /dev/sdb
+data_vg: vg_data
+data_lv: lv_data
+data_mount: /data
+data_fs: ext4
+
+# Cloudflare IPs (for UFW rules - restricts direct access)
+cloudflare_ipv4_ranges:
+  - "173.245.48.0/20"
+  - "103.21.244.0/22"
+  - "103.22.200.0/22"
+  - "103.31.4.0/22"
+  - "141.101.64.0/18"
+  - "108.162.192.0/18"
+  - "190.93.240.0/20"
+  - "188.114.96.0/20"
+  - "197.234.240.0/22"
+  - "198.41.128.0/17"
+  - "162.158.0.0/15"
+  - "104.16.0.0/13"
+  - "104.24.0.0/14"
+  - "172.64.0.0/13"
+  - "131.0.72.0/22"
+
+# Docker
+docker_version: "26.0"
+docker_compose_version: "2.27.0"
+swarm_manager_token: ""   # populated after swarm init
+swarm_worker_token: ""    # populated after swarm init
+
+# Registry
+registry_port: 5000
+registry_data_dir: /data/registry
+
+# PostgreSQL
+postgresql_version: "16"
+postgresql_data_dir: /data/postgresql
+postgresql_port: 5432
+postgresql_shared_buffers: "16GB"
+postgresql_effective_cache_size: "48GB"
+postgresql_maintenance_work_mem: "2GB"
+postgresql_work_mem: "64MB"
+postgresql_wal_buffers: "64MB"
+postgresql_max_wal_size: "8GB"
+postgresql_min_wal_size: "2GB"
+postgresql_max_connections: 500
+postgresql_max_wal_senders: 10
+postgresql_wal_keep_size: "2GB"
+postgresql_max_parallel_workers: 16
+postgresql_max_parallel_workers_per_gather: 4
+postgresql_replication_user: replicator
+postgresql_replication_password: "CHANGE_ME_REPLICATION_PASSWORD"
+postgresql_app_user: nebula
+postgresql_app_password: "CHANGE_ME_APP_PASSWORD"
+postgresql_app_db: nebula_db
+
+# Patroni
+etcd_version: "3.5.12"
+etcd_data_dir: /data/etcd
+patroni_version: "3.3.0"
+patroni_scope: nebula-cluster
+patroni_namespace: /nebula
+
+# PgBouncer
+pgbouncer_port: 6432
+pgbouncer_pool_size: 100
+pgbouncer_max_client_conn: 1000
+
+# pgBackRest
+pgbackrest_repo_path: /data/pgbackrest
+pgbackrest_retention_full: 7
+pgbackrest_retention_diff: 14
+
+# Redis
+redis_version: "7.2"
+redis_port: 6379
+redis_sentinel_port: 26379
+redis_maxmemory: "32gb"
+redis_password: "CHANGE_ME_REDIS_PASSWORD"
+redis_data_dir: /data/redis
+
+# MinIO
+minio_version: "RELEASE.2024-04-18T19-09-19Z"
+minio_port: 9000
+minio_console_port: 9001
+minio_data_dir: /data/minio
+minio_root_user: minioadmin
+minio_root_password: "CHANGE_ME_MINIO_PASSWORD"
+minio_site_name: nebula-storage
+
+# HAProxy
+haproxy_version: "2.9"
+haproxy_stats_port: 8404
+haproxy_stats_user: admin
+haproxy_stats_password: "CHANGE_ME_HAPROXY_STATS_PASSWORD"
+
+# Caddy
+caddy_version: "2.7.6"
+
+# Monitoring
+prometheus_version: "2.51.2"
+grafana_version: "10.4.2"
+loki_version: "3.0.0"
+alertmanager_version: "0.27.0"
+node_exporter_version: "1.7.0"
+postgres_exporter_version: "0.15.0"
+redis_exporter_version: "1.59.0"
+prometheus_data_dir: /data/prometheus
+grafana_data_dir: /data/grafana
+loki_data_dir: /data/loki
+grafana_admin_password: "CHANGE_ME_GRAFANA_PASSWORD"
+
+# Alerting
+slack_webhook_url: "CHANGE_ME_SLACK_WEBHOOK"
+alert_email: "admin@nebuladominion.com"
+
+# GlitchTip
+glitchtip_version: "4.0"
+glitchtip_port: 8080
+glitchtip_data_dir: /data/glitchtip
+glitchtip_secret_key: "CHANGE_ME_GLITCHTIP_SECRET"
+glitchtip_db_password: "CHANGE_ME_GLITCHTIP_DB_PASSWORD"
+
+# Gitea
+gitea_version: "1.21.11"
+gitea_port: 3001
+gitea_ssh_port: 2222
+gitea_data_dir: /data/gitea
+gitea_db_password: "CHANGE_ME_GITEA_DB_PASSWORD"
+
+# Drone CI
+drone_version: "2.23.0"
+drone_runner_version: "1.8.3"
+drone_port: 3002
+drone_rpc_secret: "CHANGE_ME_DRONE_RPC_SECRET"
+drone_gitea_client_id: "CHANGE_ME_DRONE_CLIENT_ID"
+drone_gitea_client_secret: "CHANGE_ME_DRONE_CLIENT_SECRET"

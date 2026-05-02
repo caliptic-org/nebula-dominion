@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { EloService } from '../matchmaking/elo.service';
@@ -7,9 +7,8 @@ import { RoomService, GameRoom, GameStatus, TurnPhase, UnitState } from './room.
 import { SessionService } from './session.service';
 import { ActionType, GameActionDto } from './dto/game-action.dto';
 import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
-import { BattleLogService } from '../battle/battle-log.service';
-import { RewardsService } from '../battle/rewards.service';
-import { BOT_USER_ID_PREFIX } from '../pve/pve.service';
+import { ProgressionService } from '../progression/progression.service';
+import { XpSource } from '../progression/config/level-config';
 
 export interface GameCreatedEvent {
   match: MatchResult;
@@ -29,10 +28,16 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface GameActionResultEvent {
+  roomId: string;
+  result: ActionResult;
+}
+
 @Injectable()
-export class GameService {
+export class GameService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GameService.name);
   private readonly maxRoundMs: number;
+  private timeoutTimer: NodeJS.Timeout;
 
   constructor(
     private readonly rooms: RoomService,
@@ -41,10 +46,18 @@ export class GameService {
     private readonly antiCheat: AntiCheatService,
     private readonly emitter: EventEmitter2,
     private readonly config: ConfigService,
-    private readonly battleLog: BattleLogService,
-    private readonly rewards: RewardsService,
+    private readonly progression: ProgressionService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
+  }
+
+  onModuleInit(): void {
+    this.timeoutTimer = setInterval(() => this.tickTurnTimeouts(), 5000);
+    this.logger.log('Turn timeout scheduler started');
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.timeoutTimer);
   }
 
   @OnEvent('matchmaking.matched')
@@ -65,6 +78,7 @@ export class GameService {
 
     room.status = GameStatus.IN_PROGRESS;
     await this.rooms.save(room);
+    await this.rooms.addToActiveRooms(room.id);
 
     this.logger.log(`Game created: room=${room.id} match=${matchId}`);
 
@@ -223,6 +237,21 @@ export class GameService {
     return this.handleEndTurn(room.currentPlayerId, dto, room);
   }
 
+  private async tickTurnTimeouts(): Promise<void> {
+    const roomIds = await this.rooms.getActiveRoomIds();
+    for (const roomId of roomIds) {
+      try {
+        const result = await this.checkTurnTimeout(roomId);
+        if (result?.success) {
+          const event: GameActionResultEvent = { roomId, result };
+          this.emitter.emit('game.action_result', event);
+        }
+      } catch (err) {
+        this.logger.error(`Turn timeout check error for room ${roomId}`, (err as Error).stack);
+      }
+    }
+  }
+
   private async finishGame(
     winnerId: string,
     loserId: string,
@@ -249,7 +278,7 @@ export class GameService {
     const loserRewards = this.rewards.calculate(false, totalTurns, loseResult.delta, isPvE);
 
     events.push({
-      type: 'game_over',
+      type: 'game_end',
       data: {
         winner: winnerId,
         loser: loserId,
@@ -262,25 +291,16 @@ export class GameService {
 
     if (lastSeq >= 0) room.players[winnerId].lastActionSequence = lastSeq;
     await this.rooms.save(room);
+    await this.rooms.removeFromActiveRooms(room.id);
 
-    // Persist battle log asynchronously — don't block the action result
-    this.battleLog.log({
-      matchId: room.matchId,
-      roomId: room.id,
-      mode: room.mode,
-      winnerId,
-      loserId,
-      winnerRace: winner.race,
-      loserRace: loser.race,
-      winnerEloGain: winResult.delta,
-      loserEloLoss: Math.abs(loseResult.delta),
-      totalTurns,
-      durationMs,
-      endReason,
-      rewards: { [winnerId]: winnerRewards, [loserId]: loserRewards },
-    }).catch(() => { /* already logged inside */ });
+    this.logger.log(`Game over: room=${room.id} winner=${winnerId} loser=${loserId}`);
 
-    this.logger.log(`Game over: room=${room.id} winner=${winnerId} loser=${loserId} reason=${endReason}`);
+    // Award XP asynchronously — fire-and-forget so it doesn't block game response
+    Promise.all([
+      this.progression.awardXp({ userId: winnerId, source: XpSource.BATTLE_WIN, referenceId: room.id }),
+      this.progression.awardXp({ userId: loserId, source: XpSource.BATTLE_LOSS, referenceId: room.id }),
+    ]).catch((err) => this.logger.error(`Failed to award battle XP: ${err.message}`));
+
     return { success: true, room, events };
   }
 

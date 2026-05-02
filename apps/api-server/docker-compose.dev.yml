@@ -1,0 +1,82 @@
+version: '3.9'
+
+services:
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    command: npm run start:dev
+    ports:
+      - '3002:3002'
+    environment:
+      PORT: 3002
+      NODE_ENV: development
+      JWT_SECRET: dev-secret-change-me
+      DB_HOST: pgbouncer
+      DB_PORT: 6432
+      DB_USERNAME: nebula
+      DB_PASSWORD: nebula_dev
+      DB_DATABASE: nebula_dominion
+      DB_POOL_MIN: 2
+      DB_POOL_MAX: 5
+      CORS_ORIGIN: '*'
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    networks:
+      - nebula-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nebula_dominion
+      POSTGRES_USER: nebula
+      POSTGRES_PASSWORD: nebula_dev
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nebula -d nebula_dominion']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nebula-net
+
+  # PgBouncer — transaction-pooling in front of PostgreSQL
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.0
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: nebula
+      DB_PASSWORD: nebula_dev
+      DB_NAME: nebula_dominion
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      SERVER_RESET_QUERY: DISCARD ALL
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+    ports:
+      - '6432:5432'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -p 5432 -U nebula']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nebula-net
+
+volumes:
+  pg_data:
+
+networks:
+  nebula-net:
+    driver: bridge

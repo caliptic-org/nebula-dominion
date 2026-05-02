@@ -1,0 +1,46 @@
+---
+- name: Add HAProxy PPA
+  apt_repository:
+    repo: "ppa:vbernat/haproxy-{{ haproxy_version }}"
+    state: present
+
+- name: Install HAProxy
+  apt:
+    name: "haproxy={{ haproxy_version }}.*"
+    state: present
+    update_cache: yes
+
+- name: Configure HAProxy
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: haproxy -c -f %s
+  notify: restart haproxy
+
+- name: Enable and start HAProxy
+  systemd:
+    name: haproxy
+    state: started
+    enabled: yes
+
+- name: Allow HAProxy stats port on private network
+  ufw:
+    rule: allow
+    port: "{{ haproxy_stats_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+
+- name: Allow PostgreSQL load balancer port
+  ufw:
+    rule: allow
+    port: 5000
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+
+- name: Allow PostgreSQL read-only port
+  ufw:
+    rule: allow
+    port: 5001
+    proto: tcp
+    src: "{{ private_network_cidr }}"

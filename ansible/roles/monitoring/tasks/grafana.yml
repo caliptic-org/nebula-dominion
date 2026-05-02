@@ -1,0 +1,54 @@
+---
+- name: Add Grafana apt repository key
+  get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /etc/apt/keyrings/grafana.asc
+    mode: '0644'
+
+- name: Add Grafana apt repository
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    state: present
+    update_cache: yes
+
+- name: Configure Grafana
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    mode: '0640'
+  notify: restart grafana
+
+- name: Set grafana data dir ownership
+  file:
+    path: "{{ grafana_data_dir }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    recurse: yes
+
+- name: Configure Grafana datasources
+  template:
+    src: grafana_datasources.yml.j2
+    dest: /etc/grafana/provisioning/datasources/nebula.yml
+    owner: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Enable and start Grafana
+  systemd:
+    name: grafana-server
+    state: started
+    enabled: yes
+
+- name: Allow Grafana port on private network
+  ufw:
+    rule: allow
+    port: 3000
+    proto: tcp
+    src: "{{ private_network_cidr }}"

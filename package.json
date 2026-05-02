@@ -10,8 +10,8 @@
     "start:prod:game-server": "npm --workspace apps/game-server run start:prod",
     "test:game-server": "npm --workspace apps/game-server run test",
     "test:cov:game-server": "npm --workspace apps/game-server run test:cov",
-    "dev:web": "npm --workspace apps/web run dev",
     "build:web": "npm --workspace apps/web run build",
-    "start:web": "npm --workspace apps/web run start"
+    "start:dev:web": "npm --workspace apps/web run dev",
+    "start:prod:web": "npm --workspace apps/web run start"
   }
 }

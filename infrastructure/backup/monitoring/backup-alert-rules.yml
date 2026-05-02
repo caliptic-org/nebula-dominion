@@ -1,0 +1,92 @@
+---
+# Prometheus alert rules for backup health
+# Place in /etc/prometheus/rules/backup-alerts.yml
+groups:
+  - name: nebula_backup
+    interval: 60s
+    rules:
+
+      # ── PostgreSQL Backup Staleness ───────────────────────────────────
+      - alert: PostgreSQLBackupStale
+        expr: nebula_backup_pg_last_success_age_minutes > 1500
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "PostgreSQL backup is stale on {{ $labels.instance }}"
+          description: "Last successful pgBackRest backup was {{ $value | humanizeDuration }} ago (threshold: 25h)"
+
+      - alert: PostgreSQLBackupCriticallyStale
+        expr: nebula_backup_pg_last_success_age_minutes > 2880
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "PostgreSQL backup critically stale on {{ $labels.instance }}"
+          description: "Last successful pgBackRest backup was {{ $value | humanizeDuration }} ago — RPO at risk!"
+
+      # ── WAL Archiving (RPO Risk) ──────────────────────────────────────
+      - alert: PostgreSQLWALArchiveLag
+        expr: nebula_backup_pg_wal_archive_age_minutes > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "PostgreSQL WAL archiving lag on {{ $labels.instance }}"
+          description: "Last WAL archive was {{ $value }}m ago. RPO target is 5 minutes."
+
+      - alert: PostgreSQLWALArchiveCritical
+        expr: nebula_backup_pg_wal_archive_age_minutes > 15
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "CRITICAL: PostgreSQL WAL archiving stalled on {{ $labels.instance }}"
+          description: "WAL archiving has not succeeded for {{ $value }}m — data loss risk!"
+
+      # ── Redis Backup Staleness ────────────────────────────────────────
+      - alert: RedisBackupStale
+        expr: nebula_backup_redis_last_success_age_minutes > 20
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Redis backup stale on {{ $labels.instance }}"
+          description: "Last Redis backup was {{ $value }}m ago (expected every 15m)"
+
+      # ── Backup Disk Space ─────────────────────────────────────────────
+      - alert: BackupDiskWarning
+        expr: nebula_backup_disk_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Backup disk at {{ $value }}% on {{ $labels.instance }}"
+          description: "Backup disk is filling up — review retention or expand disk"
+
+      - alert: BackupDiskCritical
+        expr: nebula_backup_disk_usage_percent > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "CRITICAL: Backup disk at {{ $value }}% on {{ $labels.instance }}"
+          description: "Backup disk critically full — backups may fail soon!"
+
+      # ── Health Check Runner ───────────────────────────────────────────
+      - alert: BackupHealthCheckNotRunning
+        expr: (time() - nebula_backup_health_check_last_run_timestamp) / 60 > 60
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Backup health check not running on {{ $labels.instance }}"
+          description: "Health check has not reported in {{ $value | humanizeDuration }}"

@@ -1,0 +1,33 @@
+---
+# Default variables for the backup role
+# Override in group_vars/all.yml or host_vars/<host>.yml
+
+restic_version: "0.17.3"
+
+# pgBackRest cipher passwords — MUST be overridden in vault
+pgbackrest_repo1_cipher_pass: "CHANGE_ME_IN_VAULT"
+pgbackrest_repo2_cipher_pass: "CHANGE_ME_IN_VAULT"
+
+# Hetzner Storage Box SFTP hostname
+hetzner_storagebox_host: "uXXXXXX.your-storagebox.de"
+
+# Redis
+redis_host: "127.0.0.1"
+redis_port: 6379
+redis_auth_password: ""
+redis_data_dir: "/var/lib/redis"
+
+# Restic — MUST be overridden in vault
+restic_password: "CHANGE_ME_IN_VAULT"
+
+# MinIO
+minio_primary_url: "http://10.0.0.1:9000"
+minio_primary_access_key: "CHANGE_ME"
+minio_primary_secret_key: "CHANGE_ME_IN_VAULT"
+minio_replica_url: "http://10.0.0.2:9000"
+minio_replica_access_key: "CHANGE_ME"
+minio_replica_secret_key: "CHANGE_ME_IN_VAULT"
+
+# Notifications
+slack_webhook_url: ""
+prometheus_pushgateway_url: ""

@@ -26,9 +26,9 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('progression');
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
   const [pendingUnlocks, setPendingUnlocks] = useState<ContentUnlock[]>([]);
-  const [selectedRace, setSelectedRace] = useState<Race>(Race.HUMAN);
+  const [selectedRace, setSelectedRace] = useState<Race>(Race.INSAN);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [demoUnits, setDemoUnits] = useState<PlayerUnit[]>(DEMO_UNITS[Race.HUMAN]);
+  const [demoUnits, setDemoUnits] = useState<PlayerUnit[]>(DEMO_UNITS[Race.INSAN]);
 
   const { progress, loading } = useProgression({
     userId: DEMO_USER_ID,

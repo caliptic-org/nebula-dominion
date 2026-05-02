@@ -9,6 +9,12 @@
     "start:dev:game-server": "npm --workspace apps/game-server run start:dev",
     "start:prod:game-server": "npm --workspace apps/game-server run start:prod",
     "test:game-server": "npm --workspace apps/game-server run test",
-    "test:cov:game-server": "npm --workspace apps/game-server run test:cov"
+    "test:cov:game-server": "npm --workspace apps/game-server run test:cov",
+    "build:api-server": "npm --workspace apps/api-server run build",
+    "start:api-server": "npm --workspace apps/api-server run start",
+    "start:dev:api-server": "npm --workspace apps/api-server run start:dev",
+    "start:prod:api-server": "npm --workspace apps/api-server run start:prod",
+    "test:api-server": "npm --workspace apps/api-server run test",
+    "test:cov:api-server": "npm --workspace apps/api-server run test:cov"
   }
 }

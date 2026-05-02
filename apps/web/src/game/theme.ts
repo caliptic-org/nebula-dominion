@@ -65,6 +65,18 @@ export const THEME = {
   REWARD_MINERAL: '#60aaff',
   REWARD_GAS:     '#88ffaa',
   REWARD_XP:      '#ffcc44',
+
+  // Manga HUD
+  PANEL_INK:        0x000000,
+  PANEL_FILL:       0x0a0c14,
+  PANEL_HIGHLIGHT:  0xffffff,
+  HUD_HP_TRACK:     0x141828,
+  HUD_HP_DAMAGE:    0xff4444,
+  HUD_TIMER_BG:     0x0a0c14,
+  HUD_TIMER_RING:   0xffffff,
+  HUD_TIMER_DANGER: 0xff4444,
+  SPEED_LINE:       0xffffff,
+  HALFTONE_DOT:     0xffffff,
 } as const;
 
 /** Unit body colors keyed by unit type string */

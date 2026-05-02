@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameSocket, GameRoom, UnitState } from '../socket/GameSocket';
+import { THEME } from '../theme';
 
 const PANEL_H = 90;
 const SCENE_W = 656; // matches BattleScene width
@@ -31,17 +32,17 @@ export class UIScene extends Phaser.Scene {
 
     // Top bar
     const topBar = this.add.graphics();
-    topBar.fillStyle(0x0a0a20, 0.92);
+    topBar.fillStyle(THEME.HUD_BG, 0.92);
     topBar.fillRect(0, 0, SCENE_W, 56);
 
     this.turnText = this.add.text(16, 8, 'Turn 1', {
-      fontSize: '18px', color: '#a0a0ff', fontStyle: 'bold',
+      fontSize: '18px', color: THEME.BRAND_STR, fontStyle: 'bold',
     });
     this.phaseText = this.add.text(16, 30, 'Phase: action', {
-      fontSize: '12px', color: '#668888',
+      fontSize: '12px', color: THEME.TEXT_MUTED,
     });
     this.activeText = this.add.text(SCENE_W / 2, 8, '', {
-      fontSize: '15px', color: '#ffff88', fontStyle: 'bold',
+      fontSize: '15px', color: THEME.ENERGY_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 0);
 
     // Mana bar
@@ -51,16 +52,16 @@ export class UIScene extends Phaser.Scene {
 
     // Bottom panel
     const btmPanel = this.add.graphics();
-    btmPanel.fillStyle(0x0a0a20, 0.92);
+    btmPanel.fillStyle(THEME.HUD_BG, 0.92);
     btmPanel.fillRect(0, sceneH - PANEL_H, SCENE_W, PANEL_H);
 
     this.unitInfoText = this.add.text(16, sceneH - PANEL_H + 12, 'Click a unit to select', {
-      fontSize: '12px', color: '#8888aa',
+      fontSize: '12px', color: THEME.TEXT_SECONDARY,
     });
 
     // End Turn button
     this.endTurnBtn = this.add.text(SCENE_W - 20, sceneH - PANEL_H + 20, 'END TURN', {
-      fontSize: '14px', color: '#44ff88', fontStyle: 'bold',
+      fontSize: '14px', color: THEME.HUD_END_TURN, fontStyle: 'bold',
       backgroundColor: '#0d3d1e', padding: { x: 12, y: 8 },
     }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
 
@@ -70,12 +71,12 @@ export class UIScene extends Phaser.Scene {
       }
     });
 
-    this.endTurnBtn.on('pointerover', () => this.endTurnBtn.setStyle({ color: '#88ffaa' }));
-    this.endTurnBtn.on('pointerout', () => this.endTurnBtn.setStyle({ color: '#44ff88' }));
+    this.endTurnBtn.on('pointerover', () => this.endTurnBtn.setStyle({ color: THEME.SUCCESS_STR }));
+    this.endTurnBtn.on('pointerout', () => this.endTurnBtn.setStyle({ color: THEME.HUD_END_TURN }));
 
     // Surrender button
     this.surrenderBtn = this.add.text(SCENE_W - 20, sceneH - PANEL_H + 52, 'SURRENDER', {
-      fontSize: '11px', color: '#ff6666',
+      fontSize: '11px', color: THEME.HUD_SURRENDER,
       backgroundColor: '#3d0d0d', padding: { x: 10, y: 6 },
     }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
 
@@ -87,7 +88,7 @@ export class UIScene extends Phaser.Scene {
 
     // Notification text (center)
     this.notifText = this.add.text(SCENE_W / 2, sceneH - PANEL_H / 2, '', {
-      fontSize: '16px', color: '#ffff44', fontStyle: 'bold',
+      fontSize: '16px', color: THEME.ENERGY_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 0.5).setAlpha(0);
 
     // Listen to events from BattleScene
@@ -123,7 +124,7 @@ export class UIScene extends Phaser.Scene {
 
     const isMyTurn = this.room.currentPlayerId === this.socket.myUserId;
     this.activeText.setText(isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN');
-    this.activeText.setStyle({ color: isMyTurn ? '#44ff88' : '#ff6666' });
+    this.activeText.setStyle({ color: isMyTurn ? THEME.SUCCESS_STR : THEME.DANGER_STR });
 
     const myState = this.room.players[this.socket.myUserId];
     if (myState) this.drawMana(myState.mana);
@@ -140,9 +141,9 @@ export class UIScene extends Phaser.Scene {
     const ratio = mana / 100;
 
     this.manaBar.clear();
-    this.manaBar.fillStyle(0x1a1a3a, 1);
+    this.manaBar.fillStyle(THEME.HUD_MANA_BG, 1);
     this.manaBar.fillRect(x, y, w, h);
-    this.manaBar.fillStyle(0x9966ff, 1);
+    this.manaBar.fillStyle(THEME.HUD_MANA, 1);
     this.manaBar.fillRect(x, y, Math.round(w * ratio), h);
 
     this.add.text(x + w + 6, y - 2, `${mana}`, { fontSize: '11px', color: '#aa88ff' });

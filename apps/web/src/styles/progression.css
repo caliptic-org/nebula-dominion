@@ -5,11 +5,11 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 200, 50, 0.4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-energy-dim);
   border-radius: 8px;
-  color: #fff;
-  font-family: 'Segoe UI', sans-serif;
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
   user-select: none;
 }
 
@@ -21,22 +21,22 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 2px solid var(--tier-color, #ffc832);
-  background: radial-gradient(circle at 40% 40%, rgba(255, 200, 50, 0.25), transparent 70%);
+  border: 2px solid var(--tier-color, var(--color-energy));
+  background: radial-gradient(circle at 40% 40%, var(--color-energy-dim), transparent 70%);
   font-weight: 700;
 }
 
 .level-badge .age-label {
   font-size: 9px;
   letter-spacing: 0.5px;
-  color: var(--tier-color, #ffc832);
+  color: var(--tier-color, var(--color-energy));
   text-transform: uppercase;
 }
 
 .level-badge .level-number {
   font-size: 20px;
   line-height: 1;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .level-info {
@@ -48,20 +48,21 @@
 
 .tier-name {
   font-size: 11px;
-  color: var(--tier-color, #ffc832);
+  color: var(--tier-color, var(--color-energy));
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
 
 .xp-label {
   font-size: 11px;
-  color: #aaa;
+  color: var(--color-text-secondary);
 }
 
-/* Tier color vars */
-.tier-1 { --tier-color: #80cfff; }
-.tier-2 { --tier-color: #ffc832; }
-.tier-3 { --tier-color: #ff7b29; }
+/* Tier color vars — map to semantic tokens where possible */
+.tier-1 { --tier-color: var(--color-info);   }
+.tier-2 { --tier-color: var(--color-energy); }
+.tier-3 { --tier-color: var(--color-warning);}
+
 
 /* ── XP Progress Bar ─────────────────────────────────────────────────────── */
 
@@ -75,7 +76,7 @@
 .xp-bar-track {
   width: 100%;
   height: 8px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -83,27 +84,27 @@
 .xp-bar-fill {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, #4a90e2, #7b5ea7);
+  background: linear-gradient(90deg, var(--color-brand), var(--color-accent));
   transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .xp-bar-fill.tier-2 {
-  background: linear-gradient(90deg, #e2a84a, #c97b20);
+  background: linear-gradient(90deg, var(--color-energy), var(--color-warning));
 }
 
 .xp-bar-fill.tier-3 {
-  background: linear-gradient(90deg, #e24a4a, #c92020);
+  background: linear-gradient(90deg, var(--color-danger), #c92020);
 }
 
 .xp-bar-fill.maxed {
-  background: linear-gradient(90deg, #ffd700, #ffa500);
+  background: var(--gradient-brand);
 }
 
 .xp-bar-labels {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 /* ── Level-Up Modal ──────────────────────────────────────────────────────── */
@@ -120,23 +121,23 @@
 }
 
 .level-up-modal {
-  background: radial-gradient(ellipse at top, #1a1a2e 0%, #0d0d1a 70%);
-  border: 1px solid rgba(255, 200, 50, 0.5);
+  background: radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
+  border: 1px solid var(--color-energy-dim);
   border-radius: 16px;
   padding: 40px 48px;
   text-align: center;
-  color: #fff;
+  color: var(--color-text-primary);
   max-width: 400px;
   width: 90%;
   animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 0 60px rgba(255, 200, 50, 0.2);
+  box-shadow: 0 0 60px var(--color-brand-glow);
 }
 
 .level-up-title {
   font-size: 13px;
   letter-spacing: 3px;
   text-transform: uppercase;
-  color: #ffc832;
+  color: var(--color-energy);
   margin-bottom: 8px;
 }
 
@@ -144,7 +145,7 @@
   font-size: 72px;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(180deg, #fff 0%, #ffc832 100%);
+  background: linear-gradient(180deg, var(--color-text-primary) 0%, var(--color-energy) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 8px 0;
@@ -152,7 +153,7 @@
 
 .level-up-subtitle {
   font-size: 15px;
-  color: #ccc;
+  color: var(--color-text-secondary);
   margin-bottom: 24px;
 }
 
@@ -171,14 +172,14 @@
   font-weight: 600;
 }
 
-.reward-chip.gold  { background: rgba(255, 200, 0, 0.2);  color: #ffd700; border: 1px solid #ffd70040; }
-.reward-chip.gems  { background: rgba(100, 200, 255, 0.2); color: #64c8ff; border: 1px solid #64c8ff40; }
-.reward-chip.title { background: rgba(200, 100, 255, 0.2); color: #c864ff; border: 1px solid #c864ff40; }
-.reward-chip.badge { background: rgba(100, 255, 150, 0.2); color: #64ff96; border: 1px solid #64ff9640; }
+.reward-chip.gold  { background: var(--color-energy-dim); color: var(--color-energy);  border: 1px solid rgba(255,200,50,0.25); }
+.reward-chip.gems  { background: var(--color-accent-dim); color: var(--color-accent);  border: 1px solid rgba(68,217,200,0.25); }
+.reward-chip.title { background: var(--color-brand-dim);  color: var(--color-brand);   border: 1px solid rgba(123,140,222,0.25); }
+.reward-chip.badge { background: rgba(68,221,136,0.15);   color: var(--color-success); border: 1px solid rgba(68,221,136,0.25); }
 
 .level-up-unlocks {
   font-size: 12px;
-  color: #aaa;
+  color: var(--color-text-muted);
   margin-bottom: 24px;
 }
 
@@ -193,22 +194,22 @@
 
 .unlock-list li::before {
   content: '✦ ';
-  color: #ffc832;
+  color: var(--color-energy);
 }
 
 .level-up-close {
   padding: 10px 32px;
-  border: 1px solid rgba(255, 200, 50, 0.6);
+  border: 1px solid var(--color-energy-dim);
   border-radius: 8px;
   background: transparent;
-  color: #ffc832;
+  color: var(--color-energy);
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .level-up-close:hover {
-  background: rgba(255, 200, 50, 0.1);
+  background: var(--color-energy-dim);
 }
 
 /* ── Unlock Notification (toast) ─────────────────────────────────────────── */
@@ -229,10 +230,10 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: rgba(15, 20, 30, 0.92);
-  border-left: 3px solid #ffc832;
+  background: var(--color-bg-surface);
+  border-left: 3px solid var(--color-energy);
   border-radius: 6px;
-  color: #fff;
+  color: var(--color-text-primary);
   font-size: 13px;
   animation: slide-in 0.3s ease, fade-out 0.5s ease 3.5s forwards;
   pointer-events: auto;
@@ -240,8 +241,8 @@
 }
 
 .unlock-toast-icon { font-size: 18px; }
-.unlock-toast-label { font-weight: 600; color: #ffc832; }
-.unlock-toast-sub   { font-size: 11px; color: #aaa; }
+.unlock-toast-label { font-weight: 600; color: var(--color-energy); }
+.unlock-toast-sub   { font-size: 11px; color: var(--color-text-muted); }
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 

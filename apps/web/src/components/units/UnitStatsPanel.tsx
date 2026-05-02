@@ -9,13 +9,12 @@ interface HpBarProps {
 
 function HpBar({ hp, maxHp }: HpBarProps) {
   const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
-  // Gradient from red (low) to green (full)
-  const color = pct > 60 ? '#44dd44' : pct > 30 ? '#ffaa22' : '#ff4444';
+  const color = pct > 60 ? 'var(--color-success)' : pct > 30 ? 'var(--color-warning)' : 'var(--color-danger)';
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Can
         </span>
         <span style={{ fontSize: 12, color, fontWeight: 700 }}>
@@ -52,7 +51,7 @@ interface StatRowProps {
   color?: string;
 }
 
-function StatRow({ icon, label, value, color = '#ccc' }: StatRowProps) {
+function StatRow({ icon, label, value, color = 'var(--color-text-primary)' }: StatRowProps) {
   return (
     <div
       style={{
@@ -60,13 +59,13 @@ function StatRow({ icon, label, value, color = '#ccc' }: StatRowProps) {
         alignItems: 'center',
         gap: 10,
         padding: '8px 12px',
-        background: 'rgba(255,255,255,0.03)',
+        background: 'var(--color-bg-elevated)',
         borderRadius: 8,
         marginBottom: 6,
       }}
     >
       <span style={{ fontSize: 16 }}>{icon}</span>
-      <span style={{ fontSize: 12, color: '#888', flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', flex: 1 }}>{label}</span>
       <span style={{ fontSize: 14, fontWeight: 700, color }}>{value}</span>
     </div>
   );
@@ -82,11 +81,11 @@ export function UnitStatsPanel({ unit }: UnitStatsPanelProps) {
       <div
         style={{
           padding: 24,
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: 'var(--color-bg-elevated)',
+          border: '1px solid var(--color-border)',
           borderRadius: 12,
           textAlign: 'center',
-          color: '#555',
+          color: 'var(--color-text-muted)',
           fontSize: 13,
         }}
       >
@@ -124,7 +123,7 @@ export function UnitStatsPanel({ unit }: UnitStatsPanelProps) {
           <span
             style={{
               fontSize: 10,
-              color: '#666',
+              color: 'var(--color-text-muted)',
               textTransform: 'uppercase',
               letterSpacing: 0.8,
             }}
@@ -141,9 +140,9 @@ export function UnitStatsPanel({ unit }: UnitStatsPanelProps) {
 
       {/* Stats */}
       <div style={{ marginBottom: 16 }}>
-        <StatRow icon="⚔️" label="Saldırı" value={unit.attack} color="#ff9944" />
-        <StatRow icon="🛡️" label="Savunma" value={unit.defense} color="#44aaff" />
-        <StatRow icon="💨" label="Hız" value={unit.speed} color="#44dd88" />
+        <StatRow icon="⚔️" label="Saldırı" value={unit.attack} color="var(--color-warning)" />
+        <StatRow icon="🛡️" label="Savunma" value={unit.defense} color="var(--color-info)" />
+        <StatRow icon="💨" label="Hız" value={unit.speed} color="var(--color-success)" />
       </div>
 
       {/* Position */}
@@ -158,19 +157,19 @@ export function UnitStatsPanel({ unit }: UnitStatsPanelProps) {
         }}
       >
         <div style={{ textAlign: 'center', flex: 1 }}>
-          <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', marginBottom: 2 }}>
+          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>
             Konum X
           </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#ccc' }}>{unit.positionX}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>{unit.positionX}</div>
         </div>
         <div
-          style={{ width: 1, background: 'rgba(255,255,255,0.06)' }}
+          style={{ width: 1, background: 'var(--color-border)' }}
         />
         <div style={{ textAlign: 'center', flex: 1 }}>
-          <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', marginBottom: 2 }}>
+          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>
             Konum Y
           </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#ccc' }}>{unit.positionY}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>{unit.positionY}</div>
         </div>
       </div>
 
@@ -180,7 +179,7 @@ export function UnitStatsPanel({ unit }: UnitStatsPanelProps) {
           <div
             style={{
               fontSize: 10,
-              color: '#666',
+              color: 'var(--color-text-muted)',
               textTransform: 'uppercase',
               letterSpacing: 0.8,
               marginBottom: 8,

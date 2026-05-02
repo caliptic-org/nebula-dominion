@@ -1,15 +1,6 @@
 import Phaser from 'phaser';
 import { UnitState } from '../socket/GameSocket';
-
-const UNIT_COLORS: Record<string, number> = {
-  soldier: 0x4488ff,
-  mage: 0xaa44ff,
-  archer: 0x44ffaa,
-  drone: 0xff6644,
-  guardian: 0xff2222,
-  'combat-bot': 0xffcc00,
-  artillery: 0xff8800,
-};
+import { THEME, UNIT_COLORS } from '../theme';
 
 const UNIT_SHAPES: Record<string, 'circle' | 'square' | 'triangle'> = {
   soldier: 'square',
@@ -66,7 +57,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
 
     this.body.clear();
     this.body.fillStyle(color, alpha);
-    this.body.lineStyle(2, this.isEnemy ? 0xff4444 : 0x4444ff, alpha);
+    this.body.lineStyle(2, this.isEnemy ? THEME.DANGER : THEME.INFO, alpha);
 
     if (shape === 'circle') {
       this.body.fillCircle(0, 0, 16);
@@ -91,7 +82,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
     this.healthBar.fillStyle(0x333333, 0.8);
     this.healthBar.fillRect(x, y, w, h);
 
-    const barColor = ratio > 0.6 ? 0x44ff44 : ratio > 0.3 ? 0xffaa00 : 0xff2222;
+    const barColor = ratio > 0.6 ? THEME.HP_HIGH : ratio > 0.3 ? THEME.HP_MED : THEME.HP_LOW;
     this.healthBar.fillStyle(barColor, 1);
     this.healthBar.fillRect(x, y, Math.round(w * ratio), h);
   }
@@ -99,7 +90,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
   setSelected(selected: boolean) {
     this.selectionRing.clear();
     if (selected) {
-      this.selectionRing.lineStyle(3, 0xffff00, 1);
+      this.selectionRing.lineStyle(3, THEME.ENERGY, 1);
       this.selectionRing.strokeCircle(0, 0, 22);
     }
   }
@@ -107,7 +98,7 @@ export class UnitSprite extends Phaser.GameObjects.Container {
   setHighlighted(on: boolean) {
     this.selectionRing.clear();
     if (on) {
-      this.selectionRing.lineStyle(2, 0xff6666, 0.8);
+      this.selectionRing.lineStyle(2, THEME.DANGER, 0.8);
       this.selectionRing.strokeCircle(0, 0, 22);
     }
   }

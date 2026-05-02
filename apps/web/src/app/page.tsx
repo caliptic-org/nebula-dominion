@@ -56,7 +56,8 @@ export default function HomePage() {
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
   const [pendingUnlocks, setPendingUnlocks] = useState<ContentUnlock[]>([]);
   const [selectedTile, setSelectedTile] = useState<{ col: number; row: number } | null>(null);
-  const [imgError, setImgError] = useState(false);
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const [portraitImgError, setPortraitImgError] = useState(false);
 
   const { progress, loading } = useProgression({
     userId: DEMO_USER_ID,
@@ -144,14 +145,14 @@ export default function HomePage() {
               style={{ borderColor: raceColor, boxShadow: `0 0 10px ${raceGlow}` }}
               title={primaryCommander.name}
             >
-              {!imgError ? (
+              {!avatarImgError ? (
                 <Image
                   src={primaryCommander.portrait}
                   alt={primaryCommander.name}
                   width={36}
                   height={36}
                   className="w-full h-full object-cover object-top"
-                  onError={() => setImgError(true)}
+                  onError={() => setAvatarImgError(true)}
                 />
               ) : (
                 <div
@@ -224,13 +225,13 @@ export default function HomePage() {
                 {/* Commander card */}
                 <MangaPanel className="overflow-hidden" glow>
                   <div className="relative h-52 overflow-hidden">
-                    {!imgError ? (
+                    {!portraitImgError ? (
                       <Image
                         src={primaryCommander.portrait}
                         alt={primaryCommander.name}
                         fill
                         className="object-cover object-top"
-                        onError={() => setImgError(true)}
+                        onError={() => setPortraitImgError(true)}
                         style={{ filter: `drop-shadow(0 4px 12px ${raceGlow})` }}
                       />
                     ) : (

@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ResourceService } from './resource.service';
+import { ResourceController } from './resource.controller';
+import { Resource } from './entities/resource.entity';
+import { Game } from '../game/entities/game.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Resource, Game])],
+  providers: [ResourceService],
+  controllers: [ResourceController],
+  exports: [ResourceService],
+})
+export class ResourceModule {}

@@ -1,6 +1,11 @@
 export default () => ({
   port: parseInt(process.env.PORT || '3001', 10),
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  database: {
+    url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/nebula_dominion',
+    synchronize: process.env.NODE_ENV !== 'production',
+    logging: process.env.DB_LOGGING === 'true',
+  },
   jwt: {
     secret: process.env.JWT_SECRET || 'nebula-dominion-dev-secret',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',

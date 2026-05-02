@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { EloService } from '../matchmaking/elo.service';
@@ -26,10 +26,16 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface GameActionResultEvent {
+  roomId: string;
+  result: ActionResult;
+}
+
 @Injectable()
-export class GameService {
+export class GameService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GameService.name);
   private readonly maxRoundMs: number;
+  private timeoutTimer: NodeJS.Timeout;
 
   constructor(
     private readonly rooms: RoomService,
@@ -40,6 +46,15 @@ export class GameService {
     private readonly config: ConfigService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
+  }
+
+  onModuleInit(): void {
+    this.timeoutTimer = setInterval(() => this.tickTurnTimeouts(), 5000);
+    this.logger.log('Turn timeout scheduler started');
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.timeoutTimer);
   }
 
   @OnEvent('matchmaking.matched')
@@ -60,6 +75,7 @@ export class GameService {
 
     room.status = GameStatus.IN_PROGRESS;
     await this.rooms.save(room);
+    await this.rooms.addToActiveRooms(room.id);
 
     this.logger.log(`Game created: room=${room.id} match=${matchId}`);
 
@@ -132,7 +148,6 @@ export class GameService {
     if (!unit) return fail('Unit not found');
     if (unit.actionUsed) return fail('Unit already acted this turn');
 
-    // Server-side movement validation
     const dx = Math.abs(unit.position.x - position.x);
     const dy = Math.abs(unit.position.y - position.y);
     if (dx + dy > unit.speed) return fail('Move distance exceeds unit speed');
@@ -181,7 +196,6 @@ export class GameService {
     room.turnStartedAt = Date.now();
     room.phase = TurnPhase.ACTION;
 
-    // Mana regeneration
     room.players[opponentId].mana = Math.min(100, room.players[opponentId].mana + 10);
 
     room.players[userId].lastActionSequence = dto.sequenceNumber;
@@ -212,6 +226,21 @@ export class GameService {
     return this.handleEndTurn(room.currentPlayerId, dto, room);
   }
 
+  private async tickTurnTimeouts(): Promise<void> {
+    const roomIds = await this.rooms.getActiveRoomIds();
+    for (const roomId of roomIds) {
+      try {
+        const result = await this.checkTurnTimeout(roomId);
+        if (result?.success) {
+          const event: GameActionResultEvent = { roomId, result };
+          this.emitter.emit('game.action_result', event);
+        }
+      } catch (err) {
+        this.logger.error(`Turn timeout check error for room ${roomId}`, (err as Error).stack);
+      }
+    }
+  }
+
   private async finishGame(
     winnerId: string,
     loserId: string,
@@ -229,7 +258,7 @@ export class GameService {
     const loseResult = this.elo.calculate(loser.elo, winner.elo, false, loser.gamesPlayed);
 
     events.push({
-      type: 'game_over',
+      type: 'game_end',
       data: {
         winner: winnerId,
         loser: loserId,
@@ -240,6 +269,7 @@ export class GameService {
 
     if (lastSeq >= 0) room.players[winnerId].lastActionSequence = lastSeq;
     await this.rooms.save(room);
+    await this.rooms.removeFromActiveRooms(room.id);
 
     this.logger.log(`Game over: room=${room.id} winner=${winnerId} loser=${loserId}`);
     return { success: true, room, events };

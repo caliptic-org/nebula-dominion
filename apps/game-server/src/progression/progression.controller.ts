@@ -17,6 +17,12 @@ export class ProgressionController {
     return this.progressionService.awardXp(dto);
   }
 
+  @Post(':userId/advance-age')
+  @HttpCode(HttpStatus.OK)
+  advanceAge(@Param('userId') userId: string) {
+    return this.progressionService.advanceAge(userId);
+  }
+
   @Get(':userId/transactions')
   getTransactions(@Param('userId') userId: string) {
     return this.progressionService.getRecentTransactions(userId);

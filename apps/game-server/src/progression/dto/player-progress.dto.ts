@@ -20,6 +20,13 @@ export interface XpGainedEvent {
   age: number;
 }
 
+export interface AgeAdvancedEvent {
+  userId: string;
+  previousAge: number;
+  newAge: number;
+  startLevel: number;
+}
+
 export class PlayerProgressDto {
   userId: string;
   age: number;
@@ -32,4 +39,5 @@ export class PlayerProgressDto {
   unlockedContent: ContentUnlock[];
   tierBonusMultiplier: number;
   isMaxLevel: boolean;
+  canAdvanceAge: boolean;
 }

@@ -12,7 +12,10 @@ import {
   ContentUnlock,
 } from './config/level-config';
 import { AwardXpDto } from './dto/award-xp.dto';
-import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { AgeAdvancedEvent, LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+
+// Maps age -> first level of that age
+const AGE_START_LEVEL: Record<number, number> = { 1: 1, 2: 10, 3: 19, 4: 28, 5: 37, 6: 46 };
 
 @Injectable()
 export class ProgressionService {
@@ -145,6 +148,57 @@ export class ProgressionService {
     return leveledUp;
   }
 
+  async advanceAge(userId: string): Promise<{ progress: PlayerProgressDto; advanced: boolean }> {
+    const record = await this.getOrCreateProgress(userId);
+    const maxLevel = getMaxLevel(record.currentAge);
+
+    const isAtAgeMax =
+      record.currentLevel >= maxLevel &&
+      (getLevelDef(record.currentLevel, record.currentAge)?.xpToNext === null);
+
+    if (!isAtAgeMax) {
+      return { progress: this.toDto(record), advanced: false };
+    }
+
+    const nextAge = record.currentAge + 1;
+    const nextAgeStartLevel = AGE_START_LEVEL[nextAge];
+    if (!nextAgeStartLevel) {
+      return { progress: this.toDto(record), advanced: false };
+    }
+
+    const nextAgeStartDef = getLevelDef(nextAgeStartLevel, nextAge);
+    if (!nextAgeStartDef) {
+      return { progress: this.toDto(record), advanced: false };
+    }
+
+    const previousAge = record.currentAge;
+    record.currentAge = nextAge;
+    record.currentLevel = nextAgeStartLevel;
+    record.currentTier = nextAgeStartDef.tier;
+    record.currentXp = 0;
+
+    const newUnlocks = nextAgeStartDef.unlocks.filter(
+      (u) => !record.unlockedContent.includes(u),
+    );
+    if (newUnlocks.length > 0) {
+      record.unlockedContent = [...record.unlockedContent, ...newUnlocks];
+    }
+
+    await this.playerLevelRepo.save(record);
+
+    const event: AgeAdvancedEvent = {
+      userId,
+      previousAge,
+      newAge: nextAge,
+      startLevel: nextAgeStartLevel,
+    };
+    this.emitter.emit('progression.age_advanced', event);
+
+    this.logger.log(`Age advanced: user=${userId} age=${previousAge}→${nextAge} level=${nextAgeStartLevel}`);
+
+    return { progress: this.toDto(record), advanced: true };
+  }
+
   async getRecentTransactions(userId: string, limit = 20): Promise<XpTransaction[]> {
     return this.xpTxRepo.find({
       where: { userId },
@@ -157,6 +211,11 @@ export class ProgressionService {
     const levelDef = getLevelDef(record.currentLevel, record.currentAge);
     const xpToNext = levelDef?.xpToNext ?? null;
     const isMaxLevel = xpToNext === null;
+    const maxLevel = getMaxLevel(record.currentAge);
+    const canAdvanceAge =
+      isMaxLevel &&
+      record.currentLevel >= maxLevel &&
+      !!AGE_START_LEVEL[record.currentAge + 1];
 
     const xpProgressPercent =
       !isMaxLevel && xpToNext ? Math.min(100, Math.round((record.currentXp / xpToNext) * 100)) : 100;
@@ -173,6 +232,7 @@ export class ProgressionService {
     dto.unlockedContent = record.unlockedContent;
     dto.tierBonusMultiplier = levelDef?.xpMultiplier ?? 1.0;
     dto.isMaxLevel = isMaxLevel;
+    dto.canAdvanceAge = canAdvanceAge;
     return dto;
   }
 }

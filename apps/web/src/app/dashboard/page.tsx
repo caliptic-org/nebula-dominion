@@ -1,247 +1,302 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Dashboard',
-}
+import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { Race, RACE_DESCRIPTIONS } from '@/types/units';
+import { MangaPanel } from '@/components/ui/MangaPanel';
+import { GlowButton } from '@/components/ui/GlowButton';
 
-const navItems = [
-  { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
-  { href: '/dashboard/fleet', label: 'Filo', icon: '🚀' },
-  { href: '/dashboard/battle', label: 'Savaş', icon: '⚔️' },
-  { href: '/dashboard/sectors', label: 'Sektörler', icon: '🌍' },
-  { href: '/dashboard/shop', label: 'Mağaza', icon: '🛍️' },
-  { href: '/dashboard/settings', label: 'Ayarlar', icon: '⚙️' },
-]
+const PLAYER_STATS = [
+  { label: 'Seviye', value: '1', icon: '⭐', color: '#ffc832' },
+  { label: 'Çağ', value: 'I', icon: '🌀', color: '#4a9eff' },
+  { label: 'Kazanma Oranı', value: '—', icon: '⚔️', color: '#44ff88' },
+  { label: 'Toplam XP', value: '0', icon: '✨', color: '#cc00ff' },
+];
 
-const playerStats = [
-  { label: 'Seviye', value: '1', icon: '⭐', color: 'var(--color-energy)' },
-  { label: 'Çağ', value: 'I', icon: '🌀', color: 'var(--color-brand)' },
-  { label: 'Puan', value: '0', icon: '💎', color: 'var(--color-accent)' },
-  { label: 'Savaş', value: '0W/0L', icon: '⚔️', color: 'var(--color-success)' },
-]
-
-const upcomingFeatures = [
-  { title: 'Filo Yönetimi', description: 'Birimlerini oluştur ve yönet', icon: '🚀', eta: 'Hafta 3' },
-  { title: 'PvP Savaşları', description: 'Gerçek zamanlı rakip eşleştirme', icon: '⚔️', eta: 'Hafta 5' },
-  { title: 'Sektör Kontrolü', description: 'Çok oyunculu bölge savaşları', icon: '🌌', eta: 'Çağ 4' },
-  { title: 'Premium Mağaza', description: 'Kozmetik itemler ve premium pass', icon: '🛍️', eta: 'Çağ 5' },
-]
+const QUICK_LINKS = [
+  { href: '/', icon: '🏰', label: 'Ana Üs', desc: 'İmparatorluğunu yönet' },
+  { href: '/race-selection', icon: '🧬', label: 'Irk Seç', desc: 'Stratejini belirle' },
+  { href: '/commanders', icon: '⚔️', label: 'Komutanlar', desc: 'Ekibini oluştur' },
+  { href: '/battle?mode=pve', icon: '🎯', label: 'Savaş', desc: 'PvE modu ile başla' },
+  { href: '/progression', icon: '📈', label: 'İlerleme', desc: 'Çağ yolculuğun' },
+];
 
 export default function DashboardPage() {
+  const { race, setRace, raceColor, raceGlow } = useRaceTheme();
+  const [imgError, setImgError] = useState(false);
+  const raceDesc = RACE_DESCRIPTIONS[race];
+  const primaryCommander = raceDesc.commanders[0];
+
   return (
     <div
-      className="min-h-screen flex"
+      className="min-h-[100dvh] flex flex-col lg:flex-row relative"
       style={{ background: 'var(--color-bg)' }}
     >
-      {/* ─── Sidebar ─────────────────────────────── */}
+      {/* Background */}
+      <div
+        className="fixed inset-0 pointer-events-none transition-all duration-700"
+        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
+        aria-hidden
+      />
+      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+
+      {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside
-        className="hidden lg:flex flex-col w-64 border-r border-border"
-        style={{ background: 'var(--color-bg-surface)' }}
-        aria-label="Yan menü"
+        className="hidden lg:flex flex-col w-64 shrink-0 relative z-20"
+        style={{
+          background: 'rgba(8,10,16,0.95)',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          backdropFilter: 'blur(20px)',
+        }}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-border">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl" aria-hidden>🌌</span>
-            <span className="font-display text-sm font-bold tracking-widest text-gradient-brand">
-              NEBULA DOMINION
+        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <Link href="/">
+            <span
+              className="font-display text-xs font-black tracking-[0.2em] uppercase block"
+              style={{ color: raceColor }}
+            >
+              ◆ NEBULA DOMINION
             </span>
           </Link>
         </div>
 
-        {/* Player info */}
-        <div className="p-4 border-b border-border">
+        {/* Commander profile */}
+        <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
-              style={{ background: 'var(--gradient-brand)', color: '#fff' }}
-              aria-hidden
+              className="w-12 h-12 rounded-full overflow-hidden border-2"
+              style={{ borderColor: raceColor, boxShadow: `0 0 12px ${raceGlow}` }}
             >
-              K
+              {!imgError ? (
+                <Image
+                  src={primaryCommander.portrait}
+                  alt={primaryCommander.name}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover object-top"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center text-lg"
+                  style={{ background: raceDesc.bgColor }}
+                >
+                  {raceDesc.icon}
+                </div>
+              )}
             </div>
             <div>
-              <p className="text-text-primary text-sm font-semibold">Komutan</p>
-              <p className="text-text-muted text-xs">Çağ I · Seviye 1</p>
+              <div className="font-display text-sm font-black text-text-primary">Komutan</div>
+              <div className="font-display text-[10px] text-text-muted">Çağ I · Seviye 1</div>
+              <div className="font-display text-[10px] mt-0.5" style={{ color: raceColor }}>
+                {raceDesc.icon} {raceDesc.name}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1" aria-label="Dashboard navigasyon">
-          {navItems.map((item) => (
+        {/* Nav links */}
+        <nav className="flex-1 p-3 space-y-1">
+          {QUICK_LINKS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                item.active
-                  ? 'bg-brand-dim text-brand border border-brand/20'
-                  : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-              }`}
-              aria-current={item.active ? 'page' : undefined}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-white/04 group"
             >
-              <span aria-hidden>{item.icon}</span>
-              {item.label}
+              <span className="text-base leading-none">{item.icon}</span>
+              <div>
+                <div className="font-display text-xs font-bold text-text-secondary group-hover:text-text-primary transition-colors">
+                  {item.label}
+                </div>
+                <div className="text-text-muted text-[10px]">{item.desc}</div>
+              </div>
             </Link>
           ))}
         </nav>
 
         {/* Connection status */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full bg-status-success animate-pulse-slow"
-              aria-label="Bağlantı durumu: bağlı"
-            />
-            <span className="text-text-muted text-xs">Sunucu bağlı</span>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse-slow" style={{ background: '#44ff88' }} />
+            <span className="font-display text-[10px] text-text-muted uppercase tracking-widest">Sunucu Bağlı</span>
           </div>
         </div>
       </aside>
 
-      {/* ─── Main ─────────────────────────────────── */}
-      <main className="flex-1 overflow-auto">
-        {/* Top bar */}
+      {/* ── Main ─────────────────────────────────────────────── */}
+      <main className="relative z-10 flex-1 overflow-auto">
         <header
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border"
-          style={{ background: 'rgba(7, 11, 22, 0.8)', backdropFilter: 'blur(12px)' }}
+          className="sticky top-0 z-40 flex items-center justify-between px-4 py-3"
+          style={{
+            background: 'rgba(8,10,16,0.9)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(20px)',
+          }}
         >
           <div className="flex items-center gap-3">
-            {/* Mobile logo */}
-            <Link href="/" className="flex items-center gap-2 lg:hidden">
-              <span aria-hidden>🌌</span>
-            </Link>
-            <h1 className="font-display text-lg font-bold text-text-primary">
-              Komuta Merkezi
-            </h1>
+            <Link href="/" className="font-display text-text-muted text-xs lg:hidden">← Üs</Link>
+            <div>
+              <span className="badge badge-race mr-2 hidden sm:inline-flex">Dashboard</span>
+              <span className="font-display text-sm font-black text-text-primary">Komuta Merkezi</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="btn-ghost text-sm px-3 py-2"
-              aria-label="Bildirimler"
+          <div className="flex items-center gap-2">
+            <button className="btn-ghost text-sm px-2 py-1.5" aria-label="Bildirimler">🔔</button>
+            <div
+              className="w-8 h-8 rounded-full overflow-hidden border"
+              style={{ borderColor: raceColor }}
             >
-              🔔
-            </button>
-            <button
-              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
-              style={{ background: 'var(--gradient-brand)', color: '#fff' }}
-              aria-label="Profil menüsü"
-            >
-              K
-            </button>
+              {!imgError ? (
+                <Image
+                  src={primaryCommander.portrait}
+                  alt="Profil"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-cover object-top"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-sm" style={{ background: raceDesc.bgColor }}>
+                  {raceDesc.icon}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        <div className="p-6 space-y-6 max-w-6xl">
+        <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
           {/* Welcome banner */}
-          <section
-            className="glass-card p-6 relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(168,85,247,0.06) 100%)',
-            }}
-            aria-labelledby="welcome-heading"
-          >
-            <div className="relative z-10">
-              <h2 id="welcome-heading" className="font-display text-xl font-bold mb-2">
-                Galaksiye Hoş Geldin, Komutan! 🚀
-              </h2>
-              <p className="text-text-secondary text-sm mb-4">
-                Nebula Dominion kapalı beta aşamasında. Yakında savaş sistemi ve filo yönetimi açılacak.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge badge-brand">Kapalı Beta</span>
-                <span className="badge badge-accent">Hafta 1–2</span>
-              </div>
-            </div>
-            {/* Decorative */}
+          <MangaPanel className="p-6 relative overflow-hidden animate-manga-appear">
             <div
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-6xl opacity-10 pointer-events-none hidden sm:block"
-              aria-hidden
-            >
-              🌌
-            </div>
-          </section>
-
-          {/* Player stats */}
-          <section aria-labelledby="stats-heading">
-            <h2 id="stats-heading" className="font-display text-sm font-bold text-text-secondary uppercase tracking-widest mb-3">
-              Oyuncu İstatistikleri
-            </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {playerStats.map((stat) => (
-                <div key={stat.label} className="stat-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg" aria-hidden>{stat.icon}</span>
-                    <span className="text-text-muted text-xs font-medium">{stat.label}</span>
-                  </div>
-                  <p
-                    className="font-display text-2xl font-black"
-                    style={{ color: stat.color }}
-                  >
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Coming soon features */}
-          <section aria-labelledby="features-heading">
-            <h2 id="features-heading" className="font-display text-sm font-bold text-text-secondary uppercase tracking-widest mb-3">
-              Yakında Gelecek Özellikler
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {upcomingFeatures.map((feat) => (
-                <div
-                  key={feat.title}
-                  className="glass-card p-5 flex items-start gap-4 group hover-glow"
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 transition-transform group-hover:scale-110"
-                    style={{ background: 'var(--color-bg-elevated)' }}
-                    aria-hidden
-                  >
-                    {feat.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-text-primary text-sm">{feat.title}</h3>
-                      <span className="badge badge-energy shrink-0">{feat.eta}</span>
-                    </div>
-                    <p className="text-text-muted text-xs">{feat.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Game area placeholder */}
-          <section aria-labelledby="game-heading">
-            <h2 id="game-heading" className="font-display text-sm font-bold text-text-secondary uppercase tracking-widest mb-3">
-              Oyun Alanı
-            </h2>
-            <div
-              className="glass-card flex flex-col items-center justify-center text-center p-16"
+              className="absolute inset-0 pointer-events-none"
               style={{
-                minHeight: '320px',
-                background: 'radial-gradient(ellipse at center, rgba(59,130,246,0.05) 0%, transparent 70%)',
-                border: '1px dashed var(--color-border-hover)',
+                background: `radial-gradient(ellipse 80% 100% at 100% 50%, ${raceDesc.glowColor} 0%, transparent 65%)`,
               }}
-            >
-              <div className="text-6xl mb-4 animate-float" aria-hidden>🚀</div>
-              <h3 className="font-display text-lg font-bold mb-2">
-                Phaser.js Oyun Motoru
-              </h3>
-              <p className="text-text-secondary text-sm max-w-sm">
-                Savaş sistemi geliştirme aşamasında. Hafta 4&apos;te BattleScene burada devreye girecek.
-              </p>
-              <div className="flex gap-2 mt-4">
-                <span className="badge badge-brand">Hafta 4</span>
-                <span className="badge badge-accent">Phaser.js 3.80</span>
+              aria-hidden
+            />
+            <div className="relative z-10 flex items-start justify-between gap-6">
+              <div>
+                <div className="mb-3">
+                  <span className="badge badge-race">Kapalı Beta</span>
+                </div>
+                <h2 className="font-display text-xl font-black text-text-primary mb-2">
+                  Galaksiye Hoş Geldin,{' '}
+                  <span style={{ color: raceColor, textShadow: `0 0 12px ${raceGlow}` }}>Komutan</span>!
+                </h2>
+                <p className="text-text-secondary text-sm max-w-sm mb-4">
+                  Nebula Dominion beta aşamasında. Irk seçimini yap ve imparatorluğunu kurmaya başla.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <GlowButton size="sm" onClick={() => (window.location.href = '/race-selection')} icon={<span>→</span>} style={{ background: raceColor }}>
+                    Irk Seç
+                  </GlowButton>
+                  <GlowButton size="sm" variant="ghost" onClick={() => (window.location.href = '/')}>
+                    Ana Üs
+                  </GlowButton>
+                </div>
               </div>
+              <div className="hidden sm:block relative w-24 h-28 shrink-0">
+                {!imgError ? (
+                  <Image
+                    src={primaryCommander.portrait}
+                    alt={primaryCommander.name}
+                    fill
+                    className="object-contain object-bottom"
+                    style={{ filter: `drop-shadow(0 0 12px ${raceGlow})` }}
+                    onError={() => setImgError(true)}
+                  />
+                ) : (
+                  <div className="text-5xl flex items-center justify-center w-full h-full">{raceDesc.icon}</div>
+                )}
+              </div>
+            </div>
+          </MangaPanel>
+
+          {/* Stats */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="badge badge-race">Oyuncu İstatistikleri</span>
+              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {PLAYER_STATS.map((stat) => (
+                <MangaPanel key={stat.label} className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{stat.icon}</span>
+                    <span className="font-display text-[10px] uppercase tracking-widest text-text-muted">{stat.label}</span>
+                  </div>
+                  <div className="font-display text-2xl font-black" style={{ color: stat.color }}>{stat.value}</div>
+                </MangaPanel>
+              ))}
+            </div>
+          </section>
+
+          {/* Quick links */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="badge badge-race">Hızlı Erişim</span>
+              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {QUICK_LINKS.map((item) => (
+                <Link key={item.href} href={item.href} className="group">
+                  <MangaPanel className="p-4 hover-glow transition-all duration-300 group-hover:border-white/15">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 transition-transform duration-300 group-hover:scale-110"
+                        style={{ background: 'rgba(255,255,255,0.04)' }}
+                      >
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display text-xs font-bold text-text-secondary group-hover:text-text-primary transition-colors mb-0.5">
+                          {item.label}
+                        </div>
+                        <div className="text-text-muted text-[10px]">{item.desc}</div>
+                      </div>
+                      <span className="text-text-muted text-sm opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </div>
+                  </MangaPanel>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {/* Race switcher */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="badge badge-race">Irk</span>
+              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(Object.values(Race) as Race[]).map((r) => {
+                const d = RACE_DESCRIPTIONS[r];
+                const active = r === race;
+                return (
+                  <button
+                    key={r}
+                    onClick={() => setRace(r)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300"
+                    style={{
+                      background: active ? d.bgColor : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${active ? d.color : 'rgba(255,255,255,0.08)'}`,
+                      color: active ? d.color : '#666',
+                      boxShadow: active ? `0 0 14px ${d.glowColor}` : 'none',
+                      transform: active ? 'scale(1.04)' : 'scale(1)',
+                    }}
+                  >
+                    <span className="text-base">{d.icon}</span>
+                    <span className="font-display text-xs font-bold uppercase tracking-wide">{d.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </section>
         </div>
       </main>
     </div>
-  )
+  );
 }

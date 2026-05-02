@@ -137,17 +137,27 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     if (!target) return fail('Target unit not found');
     if (attacker.actionUsed) return fail('Unit already acted this turn');
 
-    const damage = Math.max(1, attacker.attack - target.defense);
+    const isCrit = Math.random() < 0.15;
+    const baseDamage = Math.max(1, attacker.attack - target.defense);
+    const damage = isCrit ? Math.round(baseDamage * 1.75) : baseDamage;
     target.hp -= damage;
     attacker.actionUsed = true;
 
     const events: GameEvent[] = [
       { type: 'unit_attacked', data: { attackerUnitId, targetUnitId, damage, targetHp: target.hp } },
+      {
+        type: 'battle_event',
+        data: { type: 'damage', actorName: attacker.type, targetName: target.type, value: damage, isCrit },
+      },
     ];
 
     if (target.hp <= 0) {
       room.players[opponentId].units = room.players[opponentId].units.filter((u) => u.id !== targetUnitId);
       events.push({ type: 'unit_died', data: { unitId: targetUnitId, ownerId: opponentId } });
+      events.push({
+        type: 'battle_event',
+        data: { type: 'death', actorName: attacker.type, targetName: target.type, value: 0, isCrit: false },
+      });
 
       if (room.players[opponentId].units.length === 0) {
         return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber, 'all_units_destroyed');
@@ -189,25 +199,60 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   private async handleAbility(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.currentPlayerId !== userId) return fail('Not your turn');
 
-    const { unitId } = dto.payload as any;
+    const { unitId, skillIndex = 0, cooldown = 2 } = dto.payload as any;
+    if (skillIndex < 0 || skillIndex > 3) return fail('Invalid skill index');
+
     const unit = this.findUnit(room, userId, unitId);
     if (!unit) return fail('Unit not found');
     if (unit.actionUsed) return fail('Unit already acted this turn');
+
+    if (!unit.skillCooldowns) unit.skillCooldowns = [0, 0, 0, 0];
+    if (!unit.skillCooldownMax) unit.skillCooldownMax = [0, 0, 0, 0];
+    if (unit.skillCooldowns[skillIndex] > 0) return fail('Skill is on cooldown');
 
     const manaCost = 10;
     if (room.players[userId].mana < manaCost) return fail('Not enough mana');
 
     room.players[userId].mana -= manaCost;
+    unit.skillCooldowns[skillIndex] = cooldown;
+    unit.skillCooldownMax[skillIndex] = cooldown;
     unit.actionUsed = true;
     room.players[userId].lastActionSequence = dto.sequenceNumber;
     await this.rooms.save(room);
-    return { success: true, room, events: [{ type: 'ability_used', data: { ...dto.payload } }] };
+
+    return {
+      success: true,
+      room,
+      events: [
+        { type: 'ability_used', data: { unitId, skillIndex, cooldown } },
+        {
+          type: 'battle_event',
+          data: { type: 'ability', actorName: unit.type, targetName: '', value: 0, isCrit: false },
+        },
+      ],
+    };
   }
 
   private async handleEndTurn(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.currentPlayerId !== userId) return fail('Not your turn');
 
-    room.players[userId].units.forEach((u) => { u.actionUsed = false; });
+    const abilityReadyEvents: GameEvent[] = [];
+    room.players[userId].units.forEach((u) => {
+      u.actionUsed = false;
+      if (u.skillCooldowns) {
+        u.skillCooldowns = u.skillCooldowns.map((cd, skillIndex) => {
+          if (cd <= 0) return 0;
+          const next = cd - 1;
+          if (next === 0) {
+            abilityReadyEvents.push({
+              type: 'ability_ready',
+              data: { skillIndex, cooldown: u.skillCooldownMax?.[skillIndex] ?? 0 },
+            });
+          }
+          return next;
+        });
+      }
+    });
 
     const opponentId = this.opponentOf(room, userId);
     room.currentPlayerId = opponentId;
@@ -223,7 +268,14 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const result: ActionResult = {
       success: true,
       room,
-      events: [{ type: 'turn_ended', data: { nextPlayerId: opponentId, turn: room.currentTurn } }],
+      events: [
+        { type: 'turn_ended', data: { nextPlayerId: opponentId, turn: room.currentTurn } },
+        {
+          type: 'battle_event',
+          data: { type: 'turn_start', actorName: opponentId, targetName: '', value: room.currentTurn, isCrit: false },
+        },
+        ...abilityReadyEvents,
+      ],
     };
 
     // Notify PveService to run bot turn if needed

@@ -61,25 +61,26 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate aria-label="Kayıt formu">
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {error && (
           <div
             role="alert"
-            className="px-4 py-3 rounded-lg text-sm font-medium"
             style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              padding: '10px 14px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'rgba(232,64,48,0.12)',
+              border: '1px solid rgba(232,64,48,0.35)',
               color: 'var(--color-danger)',
             }}
           >
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
         <div>
-          <label htmlFor="username" className="form-label">
-            Kullanıcı Adı
-          </label>
+          <label htmlFor="username" className="form-label">Komutan Adı</label>
           <input
             id="username"
             type="text"
@@ -97,9 +98,7 @@ export function RegisterForm() {
         </div>
 
         <div>
-          <label htmlFor="reg-email" className="form-label">
-            E-posta
-          </label>
+          <label htmlFor="reg-email" className="form-label">E-posta</label>
           <input
             id="reg-email"
             type="email"
@@ -115,9 +114,7 @@ export function RegisterForm() {
         </div>
 
         <div>
-          <label htmlFor="reg-password" className="form-label">
-            Şifre
-          </label>
+          <label htmlFor="reg-password" className="form-label">Şifre</label>
           <input
             id="reg-password"
             type="password"
@@ -134,9 +131,7 @@ export function RegisterForm() {
         </div>
 
         <div>
-          <label htmlFor="confirm-password" className="form-label">
-            Şifre Tekrar
-          </label>
+          <label htmlFor="confirm-password" className="form-label">Şifre Tekrar</label>
           <input
             id="confirm-password"
             type="password"
@@ -153,17 +148,22 @@ export function RegisterForm() {
 
         <button
           type="submit"
-          className="btn-primary w-full mt-2"
+          className="btn-primary"
+          style={{ marginTop: 4, width: '100%' }}
           disabled={isLoading}
           aria-busy={isLoading}
         >
           {isLoading ? (
             <>
-              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+              <span
+                className="inline-block w-4 h-4 rounded-full animate-spin"
+                style={{ border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#1a0e00' }}
+                aria-hidden
+              />
               Hesap oluşturuluyor…
             </>
           ) : (
-            'Hesap Oluştur'
+            '🛸 HESAP OLUŞTUR'
           )}
         </button>
       </div>

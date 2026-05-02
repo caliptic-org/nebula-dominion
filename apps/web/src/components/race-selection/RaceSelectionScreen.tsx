@@ -11,30 +11,45 @@ interface StatBarProps {
 
 function StatBar({ label, value, color }: StatBarProps) {
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-        <span style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
           {label}
         </span>
-        <span style={{ fontSize: 11, color, fontWeight: 700 }}>{value}</span>
+        <span style={{ fontSize: 11, color, fontWeight: 900 }}>{value}</span>
       </div>
       <div
         style={{
-          height: 5,
-          background: 'rgba(255,255,255,0.08)',
-          borderRadius: 3,
+          height: 7,
+          background: 'rgba(255,255,255,0.07)',
+          borderRadius: 4,
           overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         <div
           style={{
             height: '100%',
             width: `${value}%`,
-            background: color,
-            borderRadius: 3,
+            background: `linear-gradient(90deg, ${color}aa, ${color})`,
+            borderRadius: 4,
             transition: 'width 0.4s ease',
+            boxShadow: `0 0 6px ${color}70`,
+            position: 'relative',
           }}
-        />
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '50%',
+              background: 'rgba(255,255,255,0.18)',
+              borderRadius: '4px 4px 0 0',
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -50,28 +65,8 @@ interface RaceCardProps {
 function RaceCard({ race, desc, selected, onSelect }: RaceCardProps) {
   const [hovered, setHovered] = useState(false);
 
-  const baseStyle: React.CSSProperties = {
-    position: 'relative',
-    background: selected ? desc.bgColor : 'rgba(255,255,255,0.03)',
-    border: `2px solid ${selected ? desc.color : hovered ? `${desc.color}60` : 'rgba(255,255,255,0.08)'}`,
-    borderRadius: 16,
-    padding: '28px 24px',
-    cursor: 'pointer',
-    transition: 'all 0.25s ease',
-    transform: hovered || selected ? 'translateY(-4px)' : 'translateY(0)',
-    boxShadow: selected
-      ? `0 0 24px ${desc.color}40, 0 8px 32px rgba(0,0,0,0.4)`
-      : hovered
-      ? `0 8px 24px rgba(0,0,0,0.3), 0 0 12px ${desc.color}20`
-      : '0 4px 12px rgba(0,0,0,0.2)',
-    flex: '1 1 280px',
-    minWidth: 260,
-    maxWidth: 340,
-  };
-
   return (
     <div
-      style={baseStyle}
       onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -79,7 +74,45 @@ function RaceCard({ race, desc, selected, onSelect }: RaceCardProps) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onSelect()}
       aria-pressed={selected}
+      style={{
+        position: 'relative',
+        background: selected
+          ? `linear-gradient(160deg, ${desc.color}20 0%, #0c0e17 100%)`
+          : 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+        border: `2px solid ${
+          selected ? desc.color : hovered ? `${desc.color}60` : 'rgba(232,168,32,0.18)'
+        }`,
+        borderRadius: 12,
+        padding: '24px 20px',
+        cursor: 'pointer',
+        transition: 'all 0.22s ease',
+        transform: hovered || selected ? 'translateY(-3px)' : 'translateY(0)',
+        boxShadow: selected
+          ? `0 0 28px ${desc.color}35, 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 ${desc.color}20`
+          : hovered
+          ? `0 8px 24px rgba(0,0,0,0.4), 0 0 14px ${desc.color}18`
+          : '0 4px 14px rgba(0,0,0,0.35)',
+        flex: '1 1 260px',
+        minWidth: 240,
+        maxWidth: 320,
+        overflow: 'hidden',
+      }}
     >
+      {/* Top border accent */}
+      {selected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: `linear-gradient(90deg, transparent, ${desc.color}, transparent)`,
+          }}
+          aria-hidden
+        />
+      )}
+
       {/* Selected badge */}
       {selected && (
         <div
@@ -89,72 +122,112 @@ function RaceCard({ race, desc, selected, onSelect }: RaceCardProps) {
             right: 12,
             background: desc.color,
             color: '#000',
-            fontSize: 10,
-            fontWeight: 800,
+            fontSize: 9,
+            fontWeight: 900,
             padding: '3px 8px',
-            borderRadius: 10,
+            borderRadius: 3,
             textTransform: 'uppercase',
             letterSpacing: 0.8,
           }}
         >
-          Seçildi
+          ✓ SEÇİLDİ
         </div>
       )}
 
       {/* Icon + Name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <span
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+        <div
           style={{
-            fontSize: 42,
-            lineHeight: 1,
-            filter: selected ? 'drop-shadow(0 0 8px currentColor)' : 'none',
+            width: 56,
+            height: 56,
+            borderRadius: 10,
+            background: `${desc.color}15`,
+            border: `1px solid ${desc.color}40`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 30,
+            flexShrink: 0,
+            boxShadow: selected ? `0 0 14px ${desc.color}40` : 'none',
           }}
+          aria-hidden
         >
           {desc.icon}
-        </span>
+        </div>
         <div>
-          <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: desc.color }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 20,
+              fontWeight: 900,
+              color: desc.color,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
             {desc.name}
           </h3>
-          <p style={{ margin: 0, fontSize: 12, color: '#888', marginTop: 2 }}>{desc.subtitle}</p>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontWeight: 600 }}>
+            {desc.subtitle}
+          </p>
         </div>
       </div>
 
       {/* Description */}
       <p
         style={{
-          fontSize: 13,
-          color: '#bbb',
+          fontSize: 12,
+          color: 'var(--color-text-secondary)',
           lineHeight: 1.6,
-          marginBottom: 20,
-          minHeight: 60,
+          marginBottom: 18,
+          minHeight: 54,
         }}
       >
         {desc.description}
       </p>
 
-      {/* Stats Bars */}
-      <div style={{ marginBottom: 20 }}>
-        <StatBar label="Saldırı" value={desc.stats.attack} color={desc.color} />
+      {/* Stats */}
+      <div style={{ marginBottom: 16 }}>
+        <StatBar label="Saldırı" value={desc.stats.attack}  color={desc.color} />
         <StatBar label="Savunma" value={desc.stats.defense} color={desc.color} />
-        <StatBar label="Hız" value={desc.stats.speed} color={desc.color} />
-        <StatBar label="Can" value={desc.stats.hp} color={desc.color} />
+        <StatBar label="Hız"     value={desc.stats.speed}   color={desc.color} />
+        <StatBar label="Can"     value={desc.stats.hp}      color={desc.color} />
       </div>
 
-      {/* Race tag */}
-      <div
-        style={{
-          display: 'inline-block',
-          padding: '4px 10px',
-          background: `${desc.color}18`,
-          border: `1px solid ${desc.color}40`,
-          borderRadius: 20,
-          fontSize: 11,
-          color: desc.color,
-          fontWeight: 600,
-        }}
-      >
-        {race.toUpperCase()}
+      {/* Faction tag + select button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            padding: '3px 10px',
+            background: `${desc.color}15`,
+            border: `1px solid ${desc.color}35`,
+            borderRadius: 3,
+            fontSize: 9,
+            fontWeight: 900,
+            color: desc.color,
+            textTransform: 'uppercase',
+            letterSpacing: 0.8,
+          }}
+        >
+          {race}
+        </div>
+        {!selected && (
+          <div
+            style={{
+              padding: '4px 14px',
+              background: `${desc.color}15`,
+              border: `1px solid ${desc.color}50`,
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 900,
+              color: desc.color,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
+            SEÇMEK İÇİN TIKLA
+          </div>
+        )}
       </div>
     </div>
   );
@@ -167,41 +240,59 @@ interface RaceSelectionScreenProps {
 
 export function RaceSelectionScreen({ selectedRace, onSelect }: RaceSelectionScreenProps) {
   return (
-    <div
-      style={{
-        minHeight: '100%',
-        background: 'transparent',
-        padding: '32px 0',
-      }}
-    >
+    <div style={{ padding: '8px 0 32px' }}>
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
+      <div
+        style={{
+          textAlign: 'center',
+          marginBottom: 32,
+          padding: '24px 16px',
+          background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+          border: '1px solid rgba(232,168,32,0.2)',
+          borderRadius: 10,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'linear-gradient(90deg, #e8a820, #f0c840, #e8a820)',
+          }}
+          aria-hidden
+        />
         <h2
           style={{
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: 900,
             margin: 0,
-            background: 'linear-gradient(135deg, #fff 0%, #aaa 100%)',
+            textTransform: 'uppercase',
+            letterSpacing: 2,
+            background: 'linear-gradient(180deg, #f0c840 0%, #c88010 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
           }}
         >
-          Irk Seçimi
+          🛡️ FRAKSIYON SEÇİMİ
         </h2>
-        <p style={{ color: '#666', fontSize: 14, marginTop: 8 }}>
-          Savaş stilinizi belirleyin — her ırkın benzersiz güçlü yanları var.
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginTop: 8, fontWeight: 600 }}>
+          Savaş stilinizi belirleyin — her fraksiyonun benzersiz güçlü yanları var.
         </p>
       </div>
 
-      {/* Race Cards */}
+      {/* Race Cards grid */}
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 20,
+          gap: 16,
           justifyContent: 'center',
-          marginBottom: 40,
+          marginBottom: 32,
         }}
       >
         {(Object.values(Race) as Race[]).map((race) => (
@@ -215,28 +306,38 @@ export function RaceSelectionScreen({ selectedRace, onSelect }: RaceSelectionScr
         ))}
       </div>
 
-      {/* Confirm section */}
+      {/* Confirm banner */}
       {selectedRace && (
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              display: 'inline-block',
-              padding: '12px 32px',
-              background: RACE_DESCRIPTIONS[selectedRace].color,
-              color: '#000',
-              borderRadius: 12,
-              fontSize: 15,
-              fontWeight: 800,
-              letterSpacing: 0.5,
-              boxShadow: `0 4px 20px ${RACE_DESCRIPTIONS[selectedRace].color}50`,
-              cursor: 'default',
-            }}
-          >
-            {RACE_DESCRIPTIONS[selectedRace].icon} {RACE_DESCRIPTIONS[selectedRace].name} Seçildi
+        <div
+          style={{
+            background: `linear-gradient(135deg, ${RACE_DESCRIPTIONS[selectedRace].color}18 0%, rgba(0,0,0,0.3) 100%)`,
+            border: `1px solid ${RACE_DESCRIPTIONS[selectedRace].color}50`,
+            borderRadius: 10,
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            boxShadow: `0 0 20px ${RACE_DESCRIPTIONS[selectedRace].color}20`,
+          }}
+        >
+          <span style={{ fontSize: 24 }}>{RACE_DESCRIPTIONS[selectedRace].icon}</span>
+          <div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 900,
+                color: RACE_DESCRIPTIONS[selectedRace].color,
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+              }}
+            >
+              {RACE_DESCRIPTIONS[selectedRace].name} SEÇİLDİ ✓
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              Birimler sekmesinden birliklerinizi görüntüleyebilirsiniz.
+            </div>
           </div>
-          <p style={{ color: '#555', fontSize: 12, marginTop: 10 }}>
-            Birimler sekmesinden birliklerinizi görüntüleyebilirsiniz.
-          </p>
         </div>
       )}
     </div>

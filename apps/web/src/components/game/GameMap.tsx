@@ -35,12 +35,22 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
     const W = GRID_COLS * CELL_SIZE;
     const H = GRID_ROWS * CELL_SIZE;
 
-    // Background — matches var(--color-bg-surface)
-    ctx.fillStyle = '#0d1020';
+    // Background — dark military map
+    ctx.fillStyle = '#080b14';
     ctx.fillRect(0, 0, W, H);
 
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    // Subtle terrain pattern — diagonal overlay
+    ctx.fillStyle = 'rgba(232,168,32,0.012)';
+    for (let x = 0; x < GRID_COLS; x++) {
+      for (let y = 0; y < GRID_ROWS; y++) {
+        if ((x + y) % 2 === 0) {
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+
+    // Grid lines — gold tint
+    ctx.strokeStyle = 'rgba(232,168,32,0.1)';
     ctx.lineWidth = 0.5;
     for (let x = 0; x <= GRID_COLS; x++) {
       ctx.beginPath();
@@ -156,7 +166,7 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
     }
 
     // Coordinate labels at edges (every 5 cells)
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillStyle = 'rgba(232,168,32,0.35)';
     ctx.font = '9px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -213,19 +223,29 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
           marginBottom: 10,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
-          Savaş Haritası
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 11,
+            fontWeight: 900,
+            color: 'var(--color-brand)',
+            textTransform: 'uppercase',
+            letterSpacing: 1.2,
+          }}
+        >
+          ⚔️ SAVAŞ HARİTASI
         </h3>
-        <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-          Birim seçmek için tıklayın • Hareket için boş hücreye tıklayın
+        <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 600 }}>
+          Tıkla: birim seç · Boş hücre: hareket
         </span>
       </div>
       <div
         style={{
           overflow: 'auto',
-          border: '1px solid var(--color-border)',
-          borderRadius: 10,
-          background: 'var(--color-bg-surface)',
+          border: '1px solid rgba(232,168,32,0.25)',
+          borderRadius: 8,
+          background: '#080b14',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 0 40px rgba(232,168,32,0.03)',
         }}
       >
         <canvas
@@ -242,7 +262,17 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          marginTop: 8,
+          padding: '8px 12px',
+          background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+          border: '1px solid rgba(232,168,32,0.15)',
+          borderRadius: 6,
+        }}
+      >
         {[
           { shape: 'square', label: 'İnsan', color: '#4a9eff' },
           { shape: 'circle', label: 'Zerg', color: '#44dd44' },
@@ -260,7 +290,7 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
                 <polygon points="7,1 13,7 7,13 1,7" fill={color} opacity="0.8" />
               )}
             </svg>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{label}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
           </div>
         ))}
       </div>

@@ -37,25 +37,26 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate aria-label="Giriş formu">
-      <div className="space-y-5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {error && (
           <div
             role="alert"
-            className="px-4 py-3 rounded-lg text-sm font-medium"
             style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              padding: '10px 14px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'rgba(232,64,48,0.12)',
+              border: '1px solid rgba(232,64,48,0.35)',
               color: 'var(--color-danger)',
             }}
           >
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
         <div>
-          <label htmlFor="email" className="form-label">
-            E-posta
-          </label>
+          <label htmlFor="email" className="form-label">E-posta</label>
           <input
             id="email"
             type="email"
@@ -71,13 +72,11 @@ export function LoginForm() {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="password" className="form-label mb-0">
-              Şifre
-            </label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <label htmlFor="password" className="form-label" style={{ marginBottom: 0 }}>Şifre</label>
             <a
               href="#"
-              className="text-xs text-text-muted hover:text-brand transition-colors"
+              style={{ fontSize: 11, color: 'var(--color-text-muted)', textDecoration: 'none' }}
             >
               Şifremi unuttum
             </a>
@@ -99,17 +98,22 @@ export function LoginForm() {
 
         <button
           type="submit"
-          className="btn-primary w-full mt-2"
+          className="btn-primary w-full"
+          style={{ marginTop: 4, width: '100%' }}
           disabled={isLoading}
           aria-busy={isLoading}
         >
           {isLoading ? (
             <>
-              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+              <span
+                className="inline-block w-4 h-4 rounded-full animate-spin"
+                style={{ border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#1a0e00' }}
+                aria-hidden
+              />
               Giriş yapılıyor…
             </>
           ) : (
-            'Giriş Yap'
+            '⚔️ GİRİŞ YAP'
           )}
         </button>
       </div>

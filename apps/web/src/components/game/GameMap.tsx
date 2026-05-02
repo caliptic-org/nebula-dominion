@@ -35,8 +35,8 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
     const W = GRID_COLS * CELL_SIZE;
     const H = GRID_ROWS * CELL_SIZE;
 
-    // Background
-    ctx.fillStyle = '#0a0e1a';
+    // Background — matches var(--color-bg-surface)
+    ctx.fillStyle = '#0d1020';
     ctx.fillRect(0, 0, W, H);
 
     // Grid lines
@@ -149,7 +149,8 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
       const barY = py + CELL_SIZE - 6;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(px + padding, barY, CELL_SIZE - padding * 2, 3);
-      const hpColor = hpPct > 0.6 ? '#44dd44' : hpPct > 0.3 ? '#ffaa22' : '#ff4444';
+      // HP bar colors match --color-success / --color-warning / --color-danger
+      const hpColor = hpPct > 0.6 ? '#44dd88' : hpPct > 0.3 ? '#ffaa22' : '#ff4444';
       ctx.fillStyle = hpColor;
       ctx.fillRect(px + padding, barY, (CELL_SIZE - padding * 2) * hpPct, 3);
     }
@@ -212,19 +213,19 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
           marginBottom: 10,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 14, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
           Savaş Haritası
         </h3>
-        <span style={{ fontSize: 11, color: '#555' }}>
+        <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
           Birim seçmek için tıklayın • Hareket için boş hücreye tıklayın
         </span>
       </div>
       <div
         style={{
           overflow: 'auto',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--color-border)',
           borderRadius: 10,
-          background: '#0a0e1a',
+          background: 'var(--color-bg-surface)',
         }}
       >
         <canvas
@@ -259,7 +260,7 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
                 <polygon points="7,1 13,7 7,13 1,7" fill={color} opacity="0.8" />
               )}
             </svg>
-            <span style={{ fontSize: 11, color: '#888' }}>{label}</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{label}</span>
           </div>
         ))}
       </div>

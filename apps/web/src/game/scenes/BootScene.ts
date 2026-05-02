@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameSocket, GameRoom } from '../socket/GameSocket';
 import { Race } from '../types';
+import { THEME } from '../theme';
 
 export class BootScene extends Phaser.Scene {
   private socket!: GameSocket;
@@ -22,7 +23,7 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    this.cameras.main.setBackgroundColor('#060612');
+    this.cameras.main.setBackgroundColor(THEME.BG);
 
     // Star field
     for (let i = 0; i < 120; i++) {
@@ -33,12 +34,12 @@ export class BootScene extends Phaser.Scene {
 
     this.add.text(width / 2, height / 2 - 60, 'NEBULA DOMINION', {
       fontSize: '32px', fontStyle: 'bold',
-      color: '#7b8cde',
+      color: THEME.BRAND_STR,
       stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5);
 
     this.loadingText = this.add.text(width / 2, height / 2, 'Connecting to battle server', {
-      fontSize: '16px', color: '#666688',
+      fontSize: '16px', color: THEME.TEXT_MUTED,
     }).setOrigin(0.5);
 
     this.dotTimer = this.time.addEvent({

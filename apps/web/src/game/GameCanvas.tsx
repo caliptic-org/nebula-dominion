@@ -34,7 +34,7 @@ export default function GameCanvas({ race, mode, userId }: Props) {
       width: GAME_W,
       height: GAME_H,
       parent: containerRef.current,
-      backgroundColor: '#060612',
+      backgroundColor: '#07090f',
       scene: [BootScene, BattleScene, UIScene, WinLoseScene],
       scale: {
         mode: Phaser.Scale.FIT,
@@ -59,8 +59,18 @@ export default function GameCanvas({ race, mode, userId }: Props) {
 
   return (
     <div
-      ref={containerRef}
-      style={{ width: GAME_W, height: GAME_H, maxWidth: '100vw', maxHeight: '100vh' }}
-    />
+      style={{
+        width: '100%',
+        maxWidth: GAME_W,
+        aspectRatio: `${GAME_W} / ${GAME_H}`,
+        margin: '0 auto',
+        position: 'relative',
+      }}
+    >
+      <div
+        ref={containerRef}
+        style={{ position: 'absolute', inset: 0 }}
+      />
+    </div>
   );
 }

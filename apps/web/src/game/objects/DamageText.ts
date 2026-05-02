@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
+import { THEME } from '../theme';
 
 export function spawnDamageText(scene: Phaser.Scene, x: number, y: number, value: number) {
   const isCrit = value > 12;
   const text = scene.add.text(x, y - 10, `-${value}`, {
     fontSize: isCrit ? '22px' : '16px',
     fontStyle: 'bold',
-    color: isCrit ? '#ff4444' : '#ffcc44',
+    color: isCrit ? THEME.DANGER_STR : THEME.ENERGY_STR,
     stroke: '#000000',
     strokeThickness: 3,
   }).setOrigin(0.5, 1).setDepth(100);
@@ -24,7 +25,7 @@ export function spawnHealText(scene: Phaser.Scene, x: number, y: number, value: 
   const text = scene.add.text(x, y - 10, `+${value}`, {
     fontSize: '16px',
     fontStyle: 'bold',
-    color: '#44ff88',
+    color: THEME.SUCCESS_STR,
     stroke: '#000000',
     strokeThickness: 3,
   }).setOrigin(0.5, 1).setDepth(100);
@@ -52,7 +53,7 @@ export function spawnAbilityText(scene: Phaser.Scene, x: number, y: number, unit
   const text = scene.add.text(x, y - 10, labels[unitType] ?? 'ABILITY!', {
     fontSize: '14px',
     fontStyle: 'bold',
-    color: '#cc88ff',
+    color: '#cc88ff', // ability purple — intentional, not in core palette
     stroke: '#000000',
     strokeThickness: 3,
   }).setOrigin(0.5, 1).setDepth(100);

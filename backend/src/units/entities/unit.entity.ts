@@ -4,67 +4,55 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
 } from 'typeorm';
-import { UnitType } from './unit-type.entity';
-
-export enum UnitStatus {
-  ALIVE = 'alive',
-  DEAD = 'dead',
-  IN_BATTLE = 'in_battle',
-}
+import { UnitRace } from '../types/units.types';
 
 @Entity('units')
-@Index(['playerId', 'status'])
-@Index(['playerId', 'unitTypeId'])
+@Index(['playerId'])
+@Index(['playerId', 'isActive'])
 export class Unit {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ name: 'player_id', type: 'uuid' })
-  @Index()
   playerId: string;
 
-  @Column({ name: 'unit_type_id', type: 'uuid' })
-  unitTypeId: string;
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
 
-  @ManyToOne(() => UnitType, (ut) => ut.units, { eager: true })
-  @JoinColumn({ name: 'unit_type_id' })
-  unitType: UnitType;
+  @Column({ type: 'enum', enum: UnitRace })
+  race: UnitRace;
 
-  // Current stats (can differ from base due to battle damage / buffs)
-  @Column({ name: 'current_hp', type: 'int' })
-  currentHp: number;
+  @Column({ name: 'tier_level', type: 'int', default: 1 })
+  tierLevel: number;
 
-  @Column({ name: 'max_hp', type: 'int' })
-  maxHp: number;
-
-  @Column({ name: 'attack', type: 'int' })
+  @Column({ type: 'int', default: 10 })
   attack: number;
 
-  @Column({ name: 'defense', type: 'int' })
+  @Column({ type: 'int', default: 5 })
   defense: number;
 
-  @Column({ name: 'speed', type: 'int' })
+  @Column({ type: 'int', default: 100 })
+  hp: number;
+
+  @Column({ name: 'max_hp', type: 'int', default: 100 })
+  maxHp: number;
+
+  @Column({ type: 'int', default: 10 })
   speed: number;
 
-  @Column({
-    type: 'enum',
-    enum: UnitStatus,
-    default: UnitStatus.ALIVE,
-  })
-  status: UnitStatus;
+  @Column({ type: 'jsonb', default: [] })
+  abilities: string[];
 
-  @Column({ name: 'experience', type: 'int', default: 0 })
-  experience: number;
+  @Column({ name: 'merge_count', type: 'int', default: 0 })
+  mergeCount: number;
 
-  @Column({ name: 'kills', type: 'int', default: 0 })
-  kills: number;
+  @Column({ name: 'parent_unit_ids', type: 'jsonb', default: [] })
+  parentUnitIds: string[];
 
-  @Column({ name: 'mutation_count', type: 'int', default: 0 })
-  mutationCount: number;
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

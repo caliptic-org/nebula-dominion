@@ -1,0 +1,220 @@
+---
+# Ansible role: backup
+# Installs and configures the 3-tier backup system for Nebula Dominion
+
+# ─── Packages ───────────────────────────────────────────────────────────────
+- name: Install pgBackRest
+  ansible.builtin.apt:
+    name: pgbackrest
+    state: present
+    update_cache: true
+
+- name: Install Restic
+  ansible.builtin.get_url:
+    url: "https://github.com/restic/restic/releases/download/v{{ restic_version }}/restic_{{ restic_version }}_linux_amd64.bz2"
+    dest: /tmp/restic.bz2
+    mode: "0644"
+  register: restic_download
+
+- name: Decompress Restic
+  ansible.builtin.shell: bzcat /tmp/restic.bz2 > /usr/local/bin/restic && chmod 755 /usr/local/bin/restic
+  when: restic_download.changed
+  args:
+    creates: /usr/local/bin/restic
+
+- name: Install MinIO client (mc)
+  ansible.builtin.get_url:
+    url: "https://dl.min.io/client/mc/release/linux-amd64/mc"
+    dest: /usr/local/bin/mc
+    mode: "0755"
+
+# ─── Directory structure ──────────────────────────────────────────────────
+- name: Create backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ item | regex_search('postgres|pgbackrest') | ternary('postgres', 'root') }}"
+    group: "{{ item | regex_search('postgres|pgbackrest') | ternary('postgres', 'root') }}"
+    mode: "0750"
+  loop:
+    - /backup/pgbackrest
+    - /backup/redis
+    - /etc/pgbackrest/ssh
+    - /var/log/pgbackrest
+    - /var/log/nebula-backup
+    - /opt/nebula/backup/scripts
+    - /opt/nebula/backup/config
+    - /opt/nebula/backup/monitoring
+    - /opt/nebula/backup/disaster-recovery/runbooks
+
+# ─── pgBackRest config ───────────────────────────────────────────────────
+- name: Deploy pgbackrest.conf
+  ansible.builtin.template:
+    src: pgbackrest.conf.j2
+    dest: /etc/pgbackrest/pgbackrest.conf
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: restart pgbackrest
+
+- name: Generate pgBackRest SSH key for standby backup
+  ansible.builtin.command:
+    cmd: ssh-keygen -t ed25519 -f /etc/pgbackrest/ssh/id_ed25519 -N "" -C "pgbackrest@{{ inventory_hostname }}"
+    creates: /etc/pgbackrest/ssh/id_ed25519
+  become_user: postgres
+
+- name: Set ownership on pgBackRest SSH key
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  loop:
+    - /etc/pgbackrest/ssh/id_ed25519
+    - /etc/pgbackrest/ssh/id_ed25519.pub
+
+- name: Initialize pgBackRest stanza (repo1)
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza=nebula --repo=1 stanza-create
+  become_user: postgres
+  register: stanza_create
+  changed_when: stanza_create.rc == 0
+  failed_when: stanza_create.rc not in [0, 1]
+
+- name: Initialize pgBackRest stanza (repo2 / offsite)
+  ansible.builtin.command:
+    cmd: pgbackrest --stanza=nebula --repo=2 stanza-create
+  become_user: postgres
+  register: stanza_create_repo2
+  changed_when: stanza_create_repo2.rc == 0
+  failed_when: stanza_create_repo2.rc not in [0, 1]
+
+# ─── Backup scripts ──────────────────────────────────────────────────────
+- name: Deploy backup scripts
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - { src: "tier2-pgbackrest-backup.sh", dest: "/opt/nebula/backup/scripts/tier2-pgbackrest-backup.sh" }
+    - { src: "tier3-offsite-backup.sh",    dest: "/opt/nebula/backup/scripts/tier3-offsite-backup.sh" }
+    - { src: "redis-backup.sh",            dest: "/opt/nebula/backup/scripts/redis-backup.sh" }
+    - { src: "minio-replication.sh",       dest: "/opt/nebula/backup/scripts/minio-replication.sh" }
+    - { src: "restic-config-backup.sh",    dest: "/opt/nebula/backup/scripts/restic-config-backup.sh" }
+    - { src: "backup-health-check.sh",     dest: "/opt/nebula/backup/monitoring/backup-health-check.sh" }
+    - { src: "monthly-dr-test.sh",         dest: "/opt/nebula/backup/disaster-recovery/monthly-dr-test.sh" }
+    - { src: "postgresql-recovery.sh",     dest: "/opt/nebula/backup/disaster-recovery/runbooks/postgresql-recovery.sh" }
+    - { src: "redis-recovery.sh",          dest: "/opt/nebula/backup/disaster-recovery/runbooks/redis-recovery.sh" }
+    - { src: "full-disaster-recovery.sh",  dest: "/opt/nebula/backup/disaster-recovery/runbooks/full-disaster-recovery.sh" }
+
+# ─── Crontab ─────────────────────────────────────────────────────────────
+- name: Install backup crontab
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    day: "{{ item.day | default('*') }}"
+    weekday: "{{ item.weekday | default('*') }}"
+    user: "{{ item.user }}"
+    job: "{{ item.job }}"
+    state: present
+  loop:
+    - name: "pgbackrest tier2 daily backup"
+      minute: "0"
+      hour: "3"
+      user: postgres
+      job: "/opt/nebula/backup/scripts/tier2-pgbackrest-backup.sh >> /var/log/pgbackrest/cron.log 2>&1"
+
+    - name: "pgbackrest tier3 offsite weekly"
+      minute: "0"
+      hour: "4"
+      weekday: "0"
+      user: postgres
+      job: "/opt/nebula/backup/scripts/tier3-offsite-backup.sh >> /var/log/pgbackrest/cron.log 2>&1"
+
+    - name: "redis backup every 15 minutes"
+      minute: "*/15"
+      hour: "*"
+      user: redis
+      job: "/opt/nebula/backup/scripts/redis-backup.sh >> /var/log/nebula-backup/redis-cron.log 2>&1"
+
+    - name: "minio replication health check"
+      minute: "0"
+      hour: "*"
+      user: root
+      job: "/opt/nebula/backup/scripts/minio-replication.sh verify >> /var/log/nebula-backup/minio-cron.log 2>&1"
+
+    - name: "restic config backup"
+      minute: "0"
+      hour: "2"
+      user: root
+      job: "/opt/nebula/backup/scripts/restic-config-backup.sh >> /var/log/nebula-backup/restic-cron.log 2>&1"
+
+    - name: "backup health check"
+      minute: "*/30"
+      hour: "*"
+      user: root
+      job: "/opt/nebula/backup/monitoring/backup-health-check.sh >> /var/log/nebula-backup/health-cron.log 2>&1"
+
+    - name: "monthly dr test"
+      minute: "0"
+      hour: "2"
+      weekday: "0"
+      user: root
+      job: "[ $(date +\\%d) -le 7 ] && /opt/nebula/backup/disaster-recovery/monthly-dr-test.sh >> /var/log/nebula-backup/dr-test.log 2>&1"
+
+# ─── Environment variables for backup scripts ────────────────────────────
+- name: Configure backup environment variables
+  ansible.builtin.template:
+    src: backup-env.j2
+    dest: /etc/nebula/backup.env
+    owner: root
+    group: root
+    mode: "0640"
+
+# ─── MinIO initial replication setup ─────────────────────────────────────
+- name: Configure MinIO aliases
+  ansible.builtin.command:
+    cmd: >
+      mc alias set {{ item.alias }}
+      {{ item.url }}
+      {{ item.access_key }}
+      {{ item.secret_key }}
+  loop:
+    - alias: minio-primary
+      url: "{{ minio_primary_url }}"
+      access_key: "{{ minio_primary_access_key }}"
+      secret_key: "{{ minio_primary_secret_key }}"
+    - alias: minio-replica
+      url: "{{ minio_replica_url }}"
+      access_key: "{{ minio_replica_access_key }}"
+      secret_key: "{{ minio_replica_secret_key }}"
+  no_log: true
+
+- name: Setup MinIO cross-replication
+  ansible.builtin.command:
+    cmd: /opt/nebula/backup/scripts/minio-replication.sh setup
+  register: minio_replication_setup
+  changed_when: "'Replication rule added' in minio_replication_setup.stdout"
+  failed_when: minio_replication_setup.rc != 0
+
+# ─── Log rotation ────────────────────────────────────────────────────────
+- name: Configure logrotate for backup logs
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/nebula-backup
+    content: |
+      /var/log/pgbackrest/*.log
+      /var/log/nebula-backup/*.log
+      {
+          daily
+          rotate 30
+          compress
+          missingok
+          notifempty
+          sharedscripts
+      }
+    owner: root
+    group: root
+    mode: "0644"

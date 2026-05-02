@@ -3,134 +3,110 @@ import {
   Get,
   Post,
   Delete,
-  Patch,
-  Param,
   Body,
+  Param,
   Query,
   ParseUUIDPipe,
-  ParseIntPipe,
-  DefaultValuePipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UnitsService } from './units.service';
-import { TrainUnitDto } from './dto/train-unit.dto';
-import { Race } from './entities/unit-type.entity';
-import { UnitStatus } from './entities/unit.entity';
+import { MergeService } from './merge.service';
+import { MutationService } from './mutation.service';
+import { CreateUnitDto } from './dto/create-unit.dto';
+import { MergeUnitsDto } from './dto/merge-units.dto';
+import { MergeConfirmDto } from './dto/merge-confirm.dto';
+import { QueryMutationsDto } from './dto/query-mutations.dto';
 
 @ApiTags('units')
 @Controller('api/v1/units')
 export class UnitsController {
-  constructor(private readonly unitsService: UnitsService) {}
+  constructor(
+    private readonly unitsService: UnitsService,
+    private readonly mergeService: MergeService,
+    private readonly mutationService: MutationService,
+  ) {}
 
-  // ── Unit Types ─────────────────────────────────────────────────────────────
+  // ─── Unit CRUD ────────────────────────────────────────────────────────────
 
-  @Get('types')
-  @ApiOperation({ summary: 'List all active unit types' })
-  getAllUnitTypes() {
-    return this.unitsService.getAllUnitTypes();
+  @Post()
+  @ApiOperation({ summary: 'Create a new unit for a player' })
+  @ApiResponse({ status: 201, description: 'Unit created' })
+  create(@Body() dto: CreateUnitDto) {
+    return this.unitsService.create(dto);
   }
 
-  @Get('types/race/:race')
-  @ApiOperation({ summary: 'List unit types by race (human | zerg | hybrid)' })
-  getUnitTypesByRace(@Param('race') race: Race) {
-    return this.unitsService.getUnitTypesByRace(race);
+  @Get('player/:playerId')
+  @ApiOperation({ summary: "Get all active units for a player" })
+  findByPlayer(@Param('playerId', ParseUUIDPipe) playerId: string) {
+    return this.unitsService.findByPlayer(playerId);
   }
 
-  @Get('types/age/:ageNumber')
-  @ApiOperation({ summary: 'List unit types for a specific age (tier tree)' })
-  getUnitTypesByAge(@Param('ageNumber', ParseIntPipe) ageNumber: number) {
-    return this.unitsService.getUnitTypesByAge(ageNumber);
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a unit by ID' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.unitsService.findById(id);
   }
 
-  @Get('types/code/:code')
-  @ApiOperation({ summary: 'Get a unit type by its code' })
-  getUnitTypeByCode(@Param('code') code: string) {
-    return this.unitsService.getUnitTypeByCode(code);
+  // ─── Merge ────────────────────────────────────────────────────────────────
+
+  @Post('merge')
+  @ApiOperation({
+    summary: 'Initiate a unit merge',
+    description:
+      'Validates both units, finds the matching mutation rule, calculates result preview, and stores an active merge session in Redis (TTL: 10 min). Call POST /units/merge/confirm with the returned sessionId to execute.',
+  })
+  @ApiResponse({ status: 201, description: 'Merge session created with preview' })
+  initiateMerge(@Body() dto: MergeUnitsDto) {
+    return this.mergeService.initiateMerge(dto);
   }
 
-  // ── Training / Production Queue ────────────────────────────────────────────
-
-  @Post('train')
-  @ApiOperation({ summary: 'Start training a unit (enqueue to Redis production queue)' })
-  @ApiResponse({ status: 201, description: 'Training job enqueued' })
-  trainUnit(@Body() dto: TrainUnitDto) {
-    return this.unitsService.trainUnit(dto);
+  @Post('merge/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Confirm and execute a pending merge session',
+    description:
+      'Consumes the Redis merge session, creates the merged unit in PostgreSQL, and deactivates the two source units in a single transaction.',
+  })
+  @ApiResponse({ status: 200, description: 'Merged unit created' })
+  confirmMerge(@Body() dto: MergeConfirmDto) {
+    return this.mergeService.confirmMerge(dto);
   }
 
-  @Post('players/:playerId/collect')
-  @ApiOperation({ summary: 'Collect all completed units from the production queue' })
-  collectUnits(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.unitsService.collectCompletedUnits(playerId);
-  }
-
-  @Delete('players/:playerId/queue/:jobId')
-  @ApiOperation({ summary: 'Cancel a pending production job' })
-  cancelTraining(
-    @Param('playerId', ParseUUIDPipe) playerId: string,
-    @Param('jobId', ParseUUIDPipe) jobId: string,
+  @Delete('merge/session/:sessionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cancel an active merge session' })
+  @ApiResponse({ status: 204, description: 'Session cancelled' })
+  cancelSession(
+    @Param('sessionId') sessionId: string,
+    @Query('playerId', ParseUUIDPipe) playerId: string,
   ) {
-    return this.unitsService.cancelTraining(playerId, jobId);
+    return this.mergeService.cancelSession(sessionId, playerId);
   }
 
-  @Get('players/:playerId/queue')
-  @ApiOperation({ summary: 'Get pending production queue for a player' })
-  getProductionQueue(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.unitsService.getProductionQueue(playerId);
+  @Get('merge/session/:sessionId')
+  @ApiOperation({ summary: 'Get status of an active merge session' })
+  getSession(@Param('sessionId') sessionId: string) {
+    return this.mergeService.getSession(sessionId);
   }
 
-  @Get('players/:playerId/queue/length')
-  @ApiOperation({ summary: 'Get production queue length for a player' })
-  getQueueLength(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.unitsService.getQueueLength(playerId);
+  // ─── Mutations ────────────────────────────────────────────────────────────
+
+  @Get('mutations')
+  @ApiOperation({
+    summary: 'Get the mutation tree',
+    description: 'Returns all active mutation rules. Filter by race1, race2, or minTier.',
+  })
+  getMutations(@Query() query: QueryMutationsDto) {
+    return this.mutationService
+      .findAll({ race1: query.race1, race2: query.race2, minTier: query.minTier })
+      .then((rules) => rules.map((r) => this.mutationService.toTreeEntry(r)));
   }
 
-  // ── Player Units ───────────────────────────────────────────────────────────
-
-  @Get('players/:playerId')
-  @ApiOperation({ summary: 'List all units for a player' })
-  @ApiQuery({ name: 'race', required: false, enum: Race })
-  @ApiQuery({ name: 'ageNumber', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: UnitStatus })
-  getPlayerUnits(
-    @Param('playerId', ParseUUIDPipe) playerId: string,
-    @Query('race') race?: Race,
-    @Query('ageNumber', new DefaultValuePipe(undefined)) ageNumber?: string,
-    @Query('status') status?: UnitStatus,
-  ) {
-    return this.unitsService.getPlayerUnits(playerId, {
-      race,
-      ageNumber: ageNumber !== undefined ? parseInt(ageNumber, 10) : undefined,
-      status,
-    });
-  }
-
-  @Get('players/:playerId/stats')
-  @ApiOperation({ summary: 'Get unit count statistics for a player' })
-  getPlayerUnitStats(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.unitsService.getPlayerUnitStats(playerId);
-  }
-
-  @Get(':unitId')
-  @ApiOperation({ summary: 'Get a single unit by ID' })
-  getUnit(@Param('unitId', ParseUUIDPipe) unitId: string) {
-    return this.unitsService.getUnit(unitId);
-  }
-
-  @Patch(':unitId/heal')
-  @ApiOperation({ summary: 'Heal a unit by a given amount' })
-  healUnit(
-    @Param('unitId', ParseUUIDPipe) unitId: string,
-    @Query('amount', new DefaultValuePipe(50), ParseIntPipe) amount: number,
-  ) {
-    return this.unitsService.healUnit(unitId, amount);
-  }
-
-  @Delete('players/:playerId/:unitId')
-  @ApiOperation({ summary: 'Delete (dismiss) a unit' })
-  deleteUnit(
-    @Param('playerId', ParseUUIDPipe) playerId: string,
-    @Param('unitId', ParseUUIDPipe) unitId: string,
-  ) {
-    return this.unitsService.deleteUnit(playerId, unitId);
+  @Get('mutations/:id')
+  @ApiOperation({ summary: 'Get a specific mutation rule by ID' })
+  getMutationRule(@Param('id', ParseUUIDPipe) id: string) {
+    return this.mutationService.findRuleById(id).then((r) => this.mutationService.toTreeEntry(r));
   }
 }

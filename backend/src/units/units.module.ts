@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UnitType } from './entities/unit-type.entity';
 import { Unit } from './entities/unit.entity';
+import { MutationRule } from './entities/mutation-rule.entity';
 import { UnitsService } from './units.service';
+import { MergeService } from './merge.service';
+import { MutationService } from './mutation.service';
 import { UnitsController } from './units.controller';
-import { ProductionQueueService } from './production-queue.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UnitType, Unit])],
-  providers: [UnitsService, ProductionQueueService],
+  imports: [TypeOrmModule.forFeature([Unit, MutationRule])],
   controllers: [UnitsController],
-  exports: [UnitsService],
+  providers: [UnitsService, MergeService, MutationService],
+  exports: [UnitsService, MergeService, MutationService],
 })
 export class UnitsModule {}

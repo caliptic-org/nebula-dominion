@@ -12,7 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { UseGuards, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
-import { GameService, GameCreatedEvent } from './game.service';
+import { GameService, GameActionResultEvent } from './game.service';
 import { RoomService, GameStatus } from './room.service';
 import { SessionService } from './session.service';
 import { GameActionDto } from './dto/game-action.dto';
@@ -144,23 +144,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('full_state_sync', { room });
   }
 
-  @OnEvent('game.created')
-  handleGameCreated(event: GameCreatedEvent): void {
-    const { match, room, tokens } = event;
-    const { player1, player2 } = match;
+  @OnEvent('game.action_result')
+  handleActionResult({ roomId, result }: GameActionResultEvent): void {
+    for (const event of result.events) {
+      this.server.to(roomId).emit(event.type, event.data);
+    }
 
-    this.server.to(player1.socketId).emit('game_ready', {
-      roomId: room.id,
-      reconnectToken: tokens[player1.userId],
-      yourTurn: room.currentPlayerId === player1.userId,
-      opponentRace: player2.race,
-    });
-
-    this.server.to(player2.socketId).emit('game_ready', {
-      roomId: room.id,
-      reconnectToken: tokens[player2.userId],
-      yourTurn: room.currentPlayerId === player2.userId,
-      opponentRace: player1.race,
-    });
+    if (result.room) {
+      this.server.to(roomId).emit('state_update', {
+        stateHash: result.room.stateHash,
+        currentPlayerId: result.room.currentPlayerId,
+        turn: result.room.currentTurn,
+        phase: result.room.phase,
+        status: result.room.status,
+      });
+    }
   }
 }

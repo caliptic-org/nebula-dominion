@@ -1,0 +1,22 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-dark: #0a0a14;
+  --bg-card: rgba(20, 22, 40, 0.9);
+  --text-primary: #e8e8f0;
+  --text-muted: #888;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}

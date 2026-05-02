@@ -44,7 +44,14 @@ export class AntiCheatService {
     }
 
     // 5. Turn enforcement for offensive actions
-    const turnRequired = [ActionType.ATTACK, ActionType.MOVE_UNIT, ActionType.USE_ABILITY, ActionType.END_TURN];
+    const turnRequired = [
+      ActionType.ATTACK,
+      ActionType.MOVE_UNIT,
+      ActionType.USE_ABILITY,
+      ActionType.MERGE_UNITS,
+      ActionType.MUTATE_UNIT,
+      ActionType.END_TURN,
+    ];
     if (turnRequired.includes(dto.type) && room.currentPlayerId !== userId) {
       return 'Not your turn';
     }

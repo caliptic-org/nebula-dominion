@@ -7,6 +7,8 @@ import { GameGateway } from './game.gateway';
 import { GameService } from './game.service';
 import { RoomService } from './room.service';
 import { SessionService } from './session.service';
+import { MergeService } from './merge/merge.service';
+import { MergeController } from './merge/merge.controller';
 
 @Module({
   imports: [AuthModule, MatchmakingModule, AntiCheatModule, ProgressionModule],

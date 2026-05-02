@@ -12,7 +12,7 @@ interface WinLoseData {
 
 export class WinLoseScene extends Phaser.Scene {
   private myId!: string;
-  private data!: WinLoseData;
+  private winLoseData!: WinLoseData;
 
   constructor() {
     super({ key: 'WinLoseScene' });
@@ -20,14 +20,14 @@ export class WinLoseScene extends Phaser.Scene {
 
   init(initData: { data: Record<string, unknown>; myId: string }) {
     this.myId = initData.myId;
-    this.data = initData.data as unknown as WinLoseData;
+    this.winLoseData = initData.data as unknown as WinLoseData;
   }
 
   create() {
     const { width, height } = this.scale;
-    const isWinner = this.data.winner === this.myId;
-    const rewards: BattleRewards | undefined = this.data.rewards?.[this.myId];
-    const eloDelta = this.data.eloDelta?.[this.myId] ?? 0;
+    const isWinner = this.winLoseData.winner === this.myId;
+    const rewards: BattleRewards | undefined = this.winLoseData.rewards?.[this.myId];
+    const eloDelta = this.winLoseData.eloDelta?.[this.myId] ?? 0;
 
     // Dark overlay
     const overlay = this.add.graphics();
@@ -71,14 +71,14 @@ export class WinLoseScene extends Phaser.Scene {
       surrender: 'Opponent surrendered',
       timeout: 'Time limit reached',
     };
-    this.add.text(width / 2, py + 90, reasonLabel[this.data.endReason] ?? '', {
+    this.add.text(width / 2, py + 90, reasonLabel[this.winLoseData.endReason] ?? '', {
       fontSize: '14px', color: '#888888',
     }).setOrigin(0.5, 0);
 
     // ELO change
     const eloDeltaStr = eloDelta >= 0 ? `+${eloDelta}` : `${eloDelta}`;
     const eloColor = eloDelta >= 0 ? '#44ff88' : '#ff6666';
-    this.add.text(width / 2, py + 120, `ELO: ${this.data.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
+    this.add.text(width / 2, py + 120, `ELO: ${this.winLoseData.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
       fontSize: '16px', fontStyle: 'bold', color: eloColor,
     }).setOrigin(0.5, 0);
 
@@ -126,7 +126,7 @@ export class WinLoseScene extends Phaser.Scene {
           delay: 800 + i * 120,
           ease: 'Power2',
           onUpdate: (tween) => {
-            valText.setText(String(Math.floor(tween.getValue())));
+            valText.setText(String(Math.floor(tween.getValue() ?? 0)));
           },
         });
       });

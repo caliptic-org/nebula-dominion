@@ -52,7 +52,7 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
             }
           : prev,
       );
-      setEvents((prev) => [{ type: 'level_up', payload }, ...prev].slice(0, 20));
+      setEvents((prev) => [{ type: 'level_up' as const, payload }, ...prev].slice(0, 20));
       onLevelUp?.(payload);
     });
 
@@ -62,7 +62,7 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
           ? { ...prev, currentXp: payload.currentXp, xpToNextLevel: payload.xpToNext }
           : prev,
       );
-      setEvents((prev) => [{ type: 'xp_gained', payload }, ...prev].slice(0, 20));
+      setEvents((prev) => [{ type: 'xp_gained' as const, payload }, ...prev].slice(0, 20));
       onXpGained?.(payload);
     });
 

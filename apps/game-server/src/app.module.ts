@@ -9,8 +9,10 @@ import { GameModule } from './game/game.module';
 import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
+import { ChatModule } from './chat/chat.module';
 import { PlayerLevel } from './progression/entities/player-level.entity';
 import { XpTransaction } from './progression/entities/xp-transaction.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { XpTransaction } from './progression/entities/xp-transaction.entity';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('database.url'),
-        entities: [PlayerLevel, XpTransaction],
+        entities: [PlayerLevel, XpTransaction, ChatMessage],
         synchronize: config.get<boolean>('database.synchronize'),
         logging: config.get<boolean>('database.logging'),
       }),
@@ -40,6 +42,7 @@ import { XpTransaction } from './progression/entities/xp-transaction.entity';
     AntiCheatModule,
     HealthModule,
     ProgressionModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

@@ -14,6 +14,7 @@ import { LeagueParticipant } from './entities/league-participant.entity';
 import { AttackSectorDto } from './dto/attack-sector.dto';
 import { JoinLeagueDto } from './dto/join-league.dto';
 import { RedisService } from '../redis/redis.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 const SECTOR_BONUS_MULTIPLIERS: Record<string, number> = {
   none: 0,
@@ -35,6 +36,7 @@ export class SectorWarsService {
     @InjectRepository(LeagueParticipant) private readonly participantRepo: Repository<LeagueParticipant>,
     private readonly redis: RedisService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   // ─── Sector Map ────────────────────────────────────────────────────────────
@@ -103,6 +105,18 @@ export class SectorWarsService {
     this.logger.log(
       `Sector battle ${saved.id} started: alliance ${dto.attackerAllianceId} attacks sector ${sectorId}`,
     );
+
+    void this.analytics.trackServer({
+      event_type: 'pvp.match_queued',
+      user_id: dto.attackerPlayerId,
+      session_id: saved.id,
+      properties: {
+        sector_id: sectorId,
+        attacker_alliance_id: dto.attackerAllianceId,
+        defender_alliance_id: sector.controllingAllianceId,
+        battle_type: 'sector_war',
+      },
+    });
 
     return saved;
   }
@@ -187,6 +201,13 @@ export class SectorWarsService {
 
     // Add to Redis sorted set for this league
     await this.redis.zadd(`leaderboard:weekly:${leagueId}`, 0, dto.playerId);
+
+    void this.analytics.trackServer({
+      event_type: 'guild.joined',
+      user_id: dto.playerId,
+      session_id: leagueId,
+      properties: { league_id: leagueId, league_tier: league.tier },
+    });
 
     return saved;
   }

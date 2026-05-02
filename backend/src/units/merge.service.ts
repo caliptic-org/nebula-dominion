@@ -13,6 +13,7 @@ import { Unit } from './entities/unit.entity';
 import { UnitsService } from './units.service';
 import { MutationService } from './mutation.service';
 import { RedisService } from '../redis/redis.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { MergeUnitsDto } from './dto/merge-units.dto';
 import { MergeConfirmDto } from './dto/merge-confirm.dto';
 import { MergePreview, MergeSession, MergeSessionStatus } from './types/units.types';
@@ -35,6 +36,7 @@ export class MergeService {
     private readonly redis: RedisService,
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    private readonly analytics: AnalyticsService,
   ) {
     this.sessionTtl = this.config.get<number>('MERGE_SESSION_TTL_SECONDS', 600);
   }
@@ -111,6 +113,22 @@ export class MergeService {
 
     await this.redis.del(this.sessionKey(dto.sessionId));
     this.logger.log(`Merge confirmed: ${unit1.id} + ${unit2.id} → ${newUnit.id}`);
+
+    const prevMaxTier = Math.max(unit1.tierLevel, unit2.tierLevel);
+    const prevAge = Math.ceil(prevMaxTier / 9);
+    const newAge = Math.ceil(newUnit.tierLevel / 9);
+
+    if (newAge > prevAge) {
+      void this.analytics.trackServer({
+        event_type: 'era.transition_completed',
+        user_id: dto.playerId,
+        session_id: dto.sessionId,
+        race: newUnit.race,
+        tier_age: newAge,
+        tier_level: newUnit.tierLevel,
+        properties: { from_age: prevAge, to_age: newAge, unit_id: newUnit.id },
+      });
+    }
 
     return newUnit;
   }

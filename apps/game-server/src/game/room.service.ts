@@ -27,6 +27,10 @@ export interface UnitState {
   speed: number;
   position: { x: number; y: number };
   actionUsed: boolean;
+  /** Ability IDs unlocked through mutations */
+  abilities?: string[];
+  /** IDs of mutations applied to this unit, in application order */
+  appliedMutations?: string[];
 }
 
 export interface PlayerState {

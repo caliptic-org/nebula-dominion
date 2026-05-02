@@ -5,6 +5,8 @@ export enum ActionType {
   MOVE_UNIT = 'move_unit',
   ATTACK = 'attack',
   USE_ABILITY = 'use_ability',
+  MERGE_UNITS = 'merge_units',
+  MUTATE_UNIT = 'mutate_unit',
   END_TURN = 'end_turn',
   SURRENDER = 'surrender',
 }

@@ -20,7 +20,6 @@ jobs:
           script: |
             const branch = context.ref.replace('refs/heads/', '');
 
-            // Check if PR already exists for this branch
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -32,8 +31,6 @@ jobs:
               console.log(`PR already exists for ${branch}: #${prs[0].number}`);
               return;
             }
-
-            console.log(`Creating PR for branch: ${branch}`);
 
             const { data: pr } = await github.rest.pulls.create({
               owner: context.repo.owner,

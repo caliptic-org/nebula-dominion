@@ -15,6 +15,11 @@ export enum BuildingType {
   BARRACKS = 'barracks',
   TURRET = 'turret',
   SHIELD_GENERATOR = 'shield_generator',
+  // Race-specific production buildings
+  SPAWNING_POOL = 'spawning_pool',
+  HATCHERY = 'hatchery',
+  FACTORY = 'factory',
+  ACADEMY = 'academy',
 }
 
 export enum BuildingStatus {

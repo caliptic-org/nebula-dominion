@@ -11,6 +11,9 @@ import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
 import { PlayerLevel } from './progression/entities/player-level.entity';
 import { XpTransaction } from './progression/entities/xp-transaction.entity';
+import { UnitsModule } from './units/units.module';
+import { PlayerUnit } from './units/entities/player-unit.entity';
+import { TrainingQueue } from './units/entities/training-queue.entity';
 
 @Module({
   imports: [
@@ -25,7 +28,7 @@ import { XpTransaction } from './progression/entities/xp-transaction.entity';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('database.url'),
-        entities: [PlayerLevel, XpTransaction],
+        entities: [PlayerLevel, XpTransaction, PlayerUnit, TrainingQueue],
         synchronize: config.get<boolean>('database.synchronize'),
         logging: config.get<boolean>('database.logging'),
       }),
@@ -40,6 +43,7 @@ import { XpTransaction } from './progression/entities/xp-transaction.entity';
     AntiCheatModule,
     HealthModule,
     ProgressionModule,
+    UnitsModule,
   ],
 })
 export class AppModule {}

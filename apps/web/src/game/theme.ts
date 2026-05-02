@@ -65,6 +65,15 @@ export const THEME = {
   REWARD_MINERAL: '#60aaff',
   REWARD_GAS:     '#88ffaa',
   REWARD_XP:      '#ffcc44',
+
+  // Race colors — used for race-adaptive UI accents (skill panel ring, log border)
+  RACE: {
+    insan:   { num: 0x4a9eff, str: '#4a9eff', glow: '#4a9eff44' },
+    zerg:    { num: 0x44ff44, str: '#44ff44', glow: '#44ff4444' },
+    otomat:  { num: 0x00cfff, str: '#00cfff', glow: '#00cfff44' },
+    canavar: { num: 0xff6600, str: '#ff6600', glow: '#ff660044' },
+    seytan:  { num: 0xcc00ff, str: '#cc00ff', glow: '#cc00ff44' },
+  },
 } as const;
 
 /** Unit body colors keyed by unit type string */

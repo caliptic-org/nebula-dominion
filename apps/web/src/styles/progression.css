@@ -264,3 +264,221 @@
 @keyframes fade-out {
   to { opacity: 0; transform: translateX(120%); }
 }
+
+/* ── Tier Pips ──────────────────────────────────────────────────────────── */
+
+.tier-pip {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.tier-pip--inactive {
+  background: rgba(255,255,255,0.06);
+}
+
+.tier-pip--active {
+  border-color: transparent;
+}
+
+/* ── XP Shimmer ─────────────────────────────────────────────────────────── */
+
+.xp-bar-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.35) 50%,
+    transparent 100%
+  );
+  animation: xp-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes xp-shimmer {
+  0%   { transform: translateX(-200%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(200%); opacity: 0; }
+}
+
+/* ── Age Timeline ───────────────────────────────────────────────────────── */
+
+.age-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.age-timeline__row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+  opacity: 0;
+  animation: age-row-in 0.6s cubic-bezier(0.32,0.72,0,1) forwards;
+}
+
+@keyframes age-row-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.age-timeline__rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.age-timeline__node {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 18px;
+  border: 2px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  color: var(--color-text-muted);
+  transition: transform 0.4s cubic-bezier(0.32,0.72,0,1),
+              box-shadow 0.4s cubic-bezier(0.32,0.72,0,1),
+              border-color 0.3s ease;
+  z-index: 1;
+}
+
+.age-timeline__node--past {
+  border-color: rgba(68,255,136,0.55);
+  background: rgba(68,255,136,0.10);
+  color: var(--color-success);
+  box-shadow: 0 0 10px rgba(68,255,136,0.30);
+}
+
+.age-timeline__node--current {
+  transform: scale(1.05);
+  animation: age-current-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes age-current-pulse {
+  0%, 100% { transform: scale(1.05); }
+  50%      { transform: scale(1.10); }
+}
+
+.age-timeline__node--future {
+  filter: grayscale(0.4);
+}
+
+.age-timeline__line {
+  flex: 1;
+  width: 2px;
+  margin: 4px 0;
+  border-radius: 2px;
+  min-height: 24px;
+}
+
+.age-timeline__line--done {
+  background: linear-gradient(180deg, rgba(68,255,136,0.55), rgba(68,255,136,0.20));
+  box-shadow: 0 0 8px rgba(68,255,136,0.20);
+}
+
+.age-timeline__line--pending {
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+}
+
+.age-timeline__card {
+  position: relative;
+}
+
+.age-timeline__card--current {
+  animation: age-card-glow 3.6s ease-in-out infinite;
+}
+
+@keyframes age-card-glow {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.08); }
+}
+
+.age-timeline__card--locked {
+  opacity: 0.55;
+}
+
+.age-timeline__card--locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 6px,
+    rgba(255,255,255,0.025) 6px,
+    rgba(255,255,255,0.025) 12px
+  );
+  z-index: 0;
+}
+
+/* ── Unlock Row ─────────────────────────────────────────────────────────── */
+
+.unlock-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.unlock-row:hover {
+  transform: translateX(2px);
+  background: rgba(255,255,255,0.05) !important;
+}
+
+.unlock-row__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.unlock-row__label {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unlock-row__check {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+/* ── Lock-Break Animation (for newly unlocked content) ──────────────────── */
+
+.lock-break {
+  animation: lock-break 0.8s cubic-bezier(0.32,0.72,0,1) forwards;
+}
+
+@keyframes lock-break {
+  0%   { transform: scale(0.6) rotate(-8deg); opacity: 0; filter: blur(6px); }
+  60%  { transform: scale(1.08) rotate(2deg); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}

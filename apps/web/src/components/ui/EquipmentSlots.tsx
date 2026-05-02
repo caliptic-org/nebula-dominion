@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   EquipmentItem,
   EquipmentSlotType,
+  EquipmentStats,
   CommanderEquipment,
   RARITY_COLORS,
   SLOT_META,
@@ -16,6 +17,10 @@ interface EquipmentSlotsProps {
   equipment: CommanderEquipment;
   raceColor: string;
   raceGlow: string;
+  inventory: EquipmentItem[];
+  inventoryLoading?: boolean;
+  inventoryError?: string | null;
+  onInventoryRetry?: () => void;
   onEquip?: (slot: EquipmentSlotType, item: EquipmentItem) => void;
   onUnequip?: (slot: EquipmentSlotType) => void;
 }
@@ -24,6 +29,10 @@ export function EquipmentSlots({
   equipment,
   raceColor,
   raceGlow,
+  inventory,
+  inventoryLoading,
+  inventoryError,
+  onInventoryRetry,
   onEquip,
   onUnequip,
 }: EquipmentSlotsProps) {
@@ -179,6 +188,10 @@ export function EquipmentSlots({
         <EquipmentModal
           slot={activeSlot}
           currentItem={equipment.slots[activeSlot]}
+          inventory={inventory}
+          inventoryLoading={inventoryLoading}
+          inventoryError={inventoryError}
+          onRetry={onInventoryRetry}
           raceColor={raceColor}
           raceGlow={raceGlow}
           onSelect={handleSelect}
@@ -194,7 +207,7 @@ export function EquipmentSlots({
   );
 }
 
-function StatBadges({ stats }: { stats: Record<string, number | undefined> }) {
+function StatBadges({ stats }: { stats: EquipmentStats }) {
   const entries = Object.entries(stats).filter(([, v]) => v !== undefined && v !== 0) as [string, number][];
   const labels: Record<string, string> = { attack: 'ATK', defense: 'DEF', speed: 'HZ', hp: 'HP' };
   return (

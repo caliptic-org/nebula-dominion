@@ -6,6 +6,7 @@ import {
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
+import { EraTransitionEvent } from './dto/era-transition.dto';
 
 @WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })
 export class ProgressionGateway {
@@ -16,7 +17,6 @@ export class ProgressionGateway {
 
   @OnEvent('progression.level_up')
   handleLevelUp(event: LevelUpEvent): void {
-    // Emit to the specific user's room
     this.server.to(`user:${event.userId}`).emit('level_up', {
       previousLevel: event.previousLevel,
       newLevel: event.newLevel,
@@ -24,6 +24,7 @@ export class ProgressionGateway {
       tier: event.tier,
       newUnlocks: event.newUnlocks,
       rewards: event.rewards,
+      eraTransitionPackage: event.eraTransitionPackage ?? null,
     });
     this.logger.log(`Emitted level_up to user=${event.userId} level=${event.newLevel}`);
   }
@@ -38,5 +39,17 @@ export class ProgressionGateway {
       currentLevel: event.currentLevel,
       age: event.age,
     });
+  }
+
+  @OnEvent('era.transition')
+  handleEraTransition(event: EraTransitionEvent): void {
+    this.server.to(`user:${event.userId}`).emit('era_transition', {
+      fromAge: event.fromAge,
+      toAge: event.toAge,
+      catchUpPackage: event.catchUpPackage,
+    });
+    this.logger.log(
+      `Emitted era_transition to user=${event.userId} age=${event.fromAge}→${event.toAge}`,
+    );
   }
 }

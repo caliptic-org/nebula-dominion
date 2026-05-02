@@ -1,18 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PlayerLevel } from './entities/player-level.entity';
 import { XpTransaction } from './entities/xp-transaction.entity';
+import { EraPackage } from './entities/era-package.entity';
 import {
   XpSource,
   XP_BASE_AMOUNTS,
   getLevelDef,
   getMaxLevel,
+  getFirstLevelForAge,
   ContentUnlock,
+  MAX_AGE,
+  ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
 } from './config/level-config';
 import { AwardXpDto } from './dto/award-xp.dto';
 import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { ActiveBoostDto, EraTransitionEvent, EraTransitionPackage } from './dto/era-transition.dto';
 
 @Injectable()
 export class ProgressionService {
@@ -23,6 +28,8 @@ export class ProgressionService {
     private readonly playerLevelRepo: Repository<PlayerLevel>,
     @InjectRepository(XpTransaction)
     private readonly xpTxRepo: Repository<XpTransaction>,
+    @InjectRepository(EraPackage)
+    private readonly eraPackageRepo: Repository<EraPackage>,
     private readonly emitter: EventEmitter2,
   ) {}
 
@@ -98,6 +105,117 @@ export class ProgressionService {
     );
 
     return { progress: this.toDto(record), leveledUp };
+  }
+
+  // Advances a player from their current max-level age to the next age and grants the era catch-up package.
+  async advanceAge(userId: string): Promise<{ progress: PlayerProgressDto; eraPackage: EraPackage }> {
+    const record = await this.getOrCreateProgress(userId);
+    const maxLevel = getMaxLevel(record.currentAge);
+
+    if (record.currentLevel < maxLevel) {
+      throw new BadRequestException(
+        `Player must reach max level (${maxLevel}) of Age ${record.currentAge} before advancing.`,
+      );
+    }
+
+    if (record.currentAge >= MAX_AGE) {
+      throw new BadRequestException(`Player is already at the maximum age (${MAX_AGE}).`);
+    }
+
+    const existing = await this.eraPackageRepo.findOne({
+      where: { userId, toAge: record.currentAge + 1 },
+    });
+    if (existing) {
+      throw new BadRequestException(`Era catch-up package for Age ${record.currentAge + 1} already granted.`);
+    }
+
+    const fromAge = record.currentAge;
+    const toAge = fromAge + 1;
+    const firstLevel = getFirstLevelForAge(toAge);
+    const newLevelDef = getLevelDef(firstLevel, toAge);
+
+    if (!newLevelDef) {
+      throw new BadRequestException(`No level definition found for Age ${toAge} Level ${firstLevel}.`);
+    }
+
+    // Move player to the first level of the new age
+    record.currentAge = toAge;
+    record.currentLevel = firstLevel;
+    record.currentTier = newLevelDef.tier;
+    record.currentXp = 0;
+
+    const newUnlocks = newLevelDef.unlocks.filter((u) => !record.unlockedContent.includes(u));
+    if (newUnlocks.length > 0) {
+      record.unlockedContent = [...record.unlockedContent, ...newUnlocks];
+    }
+
+    await this.playerLevelRepo.save(record);
+
+    // Build and persist the catch-up package
+    const boostHours = newLevelDef.rewards.productionBoostHours ?? 24;
+    const boostExpiresAt = new Date(Date.now() + boostHours * 60 * 60 * 1000);
+
+    const eraPackage = await this.eraPackageRepo.save(
+      this.eraPackageRepo.create({
+        userId,
+        fromAge,
+        toAge,
+        goldGranted: newLevelDef.rewards.gold ?? 0,
+        gemsGranted: newLevelDef.rewards.gems ?? 0,
+        premiumCurrencyGranted: newLevelDef.rewards.premiumCurrency ?? 0,
+        unitPackCount: newLevelDef.rewards.unitPackCount ?? 0,
+        productionBoostMultiplier: ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
+        productionBoostExpiresAt: boostExpiresAt,
+      }),
+    );
+
+    const catchUpPackage: EraTransitionPackage = {
+      goldGranted: eraPackage.goldGranted,
+      gemsGranted: eraPackage.gemsGranted,
+      premiumCurrencyGranted: eraPackage.premiumCurrencyGranted,
+      unitPackCount: eraPackage.unitPackCount,
+      productionBoostMultiplier: ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
+      productionBoostExpiresAt: boostExpiresAt,
+    };
+
+    const eraTransitionEvent: EraTransitionEvent = {
+      userId,
+      fromAge,
+      toAge,
+      catchUpPackage,
+    };
+    this.emitter.emit('era.transition', eraTransitionEvent);
+
+    const levelUpEvent: LevelUpEvent = {
+      userId,
+      previousLevel: maxLevel,
+      newLevel: firstLevel,
+      age: toAge,
+      tier: newLevelDef.tier,
+      newUnlocks,
+      rewards: newLevelDef.rewards,
+      eraTransitionPackage: catchUpPackage,
+    };
+    this.emitter.emit('progression.level_up', levelUpEvent);
+
+    this.logger.log(
+      `Era advance: user=${userId} age=${fromAge}→${toAge} boost_expires=${boostExpiresAt.toISOString()}`,
+    );
+
+    return { progress: this.toDto(record), eraPackage };
+  }
+
+  async getActiveProductionBoost(userId: string): Promise<ActiveBoostDto> {
+    const boost = await this.eraPackageRepo.findOne({
+      where: { userId, productionBoostExpiresAt: MoreThan(new Date()) },
+      order: { grantedAt: 'DESC' },
+    });
+
+    return {
+      productionBoostMultiplier: boost?.productionBoostMultiplier ?? 1.0,
+      productionBoostExpiresAt: boost?.productionBoostExpiresAt ?? null,
+      isActive: !!boost,
+    };
   }
 
   private async processLevelUps(record: PlayerLevel): Promise<boolean> {

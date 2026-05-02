@@ -7,6 +7,7 @@ import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { GameModule } from './game/game.module';
 import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
+import { PveModule } from './pve/pve.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { HealthModule } from './health/health.module';
     GameModule,
     AntiCheatModule,
     HealthModule,
+    PveModule,
   ],
 })
 export class AppModule {}

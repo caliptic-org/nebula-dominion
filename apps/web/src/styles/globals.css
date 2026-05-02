@@ -615,3 +615,42 @@ body::before {
   align-items: center;
   justify-content: center;
 }
+
+/* ── VIP screen animations ─────────────────────────────────────────────── */
+@keyframes vip-crown-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.35), 0 0 40px rgba(255, 215, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(255, 215, 0, 0.35), 0 0 64px rgba(255, 215, 0, 0.25);
+  }
+}
+
+@keyframes vip-ring-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.15;
+  }
+}
+
+@keyframes vip-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes vip-badge-pulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(255, 215, 0, 0.5);
+  }
+}

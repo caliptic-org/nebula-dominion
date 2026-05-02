@@ -147,3 +147,30 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--color-brand-glow); opacity: 0.85; }
+  50%       { box-shadow: 0 0 24px var(--color-brand-glow), 0 0 48px var(--color-brand-dim); opacity: 1; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; transform: translate(-50%, -50%) scale(0.8); }
+  50%       { opacity: 1;    transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Mail screen: manga-panel corner accent ────────────────── */
+.manga-panel {
+  position: relative;
+}
+
+/* ── Scrollbar thin style ──────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-hover); border-radius: 4px; }

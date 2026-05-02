@@ -83,8 +83,18 @@ const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUs
     { type: 'combat-bot', hp: 40, maxHp: 40, attack: 10, defense: 10, speed: 2 },
     { type: 'combat-bot', hp: 40, maxHp: 40, attack: 10, defense: 10, speed: 2 },
     { type: 'artillery', hp: 20, maxHp: 20, attack: 20, defense: 2, speed: 1 },
+    { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
   ],
 };
+
+export const AGE_2_AUTOMATON_UNITS: Omit<UnitState, 'id' | 'position' | 'actionUsed'>[] = [
+  { type: 'siege-automaton', hp: 80, maxHp: 80, attack: 25, defense: 15, speed: 1 },
+  { type: 'shield-sentinel', hp: 100, maxHp: 100, attack: 8, defense: 25, speed: 1 },
+  { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
+  { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
+  { type: 'repair-bot', hp: 30, maxHp: 30, attack: 5, defense: 8, speed: 3 },
+  { type: 'combat-bot-mk2', hp: 55, maxHp: 55, attack: 15, defense: 12, speed: 2 },
+];
 
 @Injectable()
 export class RoomService implements OnModuleDestroy, OnModuleInit {

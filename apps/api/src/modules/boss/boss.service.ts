@@ -52,6 +52,184 @@ export class BossService {
       .getMany();
   }
 
+  async getAge2Bosses() {
+    return this.bossRepository
+      .createQueryBuilder('boss')
+      .where('boss.code IN (:...codes)', { codes: ['hydra_phase1', 'hydra_phase2', 'titan_phase1', 'titan_phase2', 'titan_phase3'] })
+      .orderBy('boss.code', 'ASC')
+      .addOrderBy('boss.phase', 'ASC')
+      .getMany();
+  }
+
+  async getHydraEncounters() {
+    return this.bossRepository
+      .createQueryBuilder('boss')
+      .where('boss.code LIKE :pattern', { pattern: 'hydra%' })
+      .orderBy('boss.phase', 'ASC')
+      .getMany();
+  }
+
+  async getTitanEncounters() {
+    return this.bossRepository
+      .createQueryBuilder('boss')
+      .where('boss.code LIKE :pattern', { pattern: 'titan%' })
+      .orderBy('boss.phase', 'ASC')
+      .getMany();
+  }
+
+  /**
+   * Seed Age 2 boss encounters (Hydra and Titan).
+   * Safe to call multiple times — skips existing records.
+   */
+  async seedAge2Bosses(ageId: string): Promise<{ seeded: string[]; skipped: string[] }> {
+    const seeded: string[] = [];
+    const skipped: string[] = [];
+
+    const age2BossData: Omit<BossEncounter, 'id' | 'createdAt' | 'age'>[] = [
+      {
+        code: 'hydra_phase1',
+        name: 'Hidra — Faz 1: Uyanış',
+        phase: 1,
+        ageId,
+        levelRequired: 12,
+        hp: '80000',
+        attack: 35,
+        defense: 20,
+        speed: 2,
+        mechanics: [
+          { name: 'venom_spray', cooldown: 3, damage_pct: 120, effect: 'poison_dot' },
+          { name: 'head_regeneration', cooldown: 5, damage_pct: 0, effect: 'heal_10pct' },
+        ],
+        phases: [
+          { phase: 1, hp_threshold: 1.0 },
+          { phase: 2, hp_threshold: 0.5 },
+        ],
+        weaknesses: [{ type: 'fire', multiplier: 1.5 }],
+        resistances: [{ type: 'poison', multiplier: 0.0 }],
+        rewards: { gold: 10000, gems: 300, badge: 'hydra_slayer_1' },
+        lore: 'Hidra, Çağ 2\'nin derinliklerinden ortaya çıkan çok başlı bir yaratıktır. Her kesilen baş, iki yenisiyle büyür.',
+        isActive: true,
+      },
+      {
+        code: 'hydra_phase2',
+        name: 'Hidra — Faz 2: Öfke',
+        phase: 2,
+        ageId,
+        levelRequired: 12,
+        hp: '50000',
+        attack: 55,
+        defense: 15,
+        speed: 4,
+        mechanics: [
+          { name: 'venom_spray', cooldown: 2, damage_pct: 150, effect: 'poison_dot' },
+          { name: 'multi_bite', cooldown: 3, damage_pct: 200, effect: 'multi_target' },
+          { name: 'berserk_mode', cooldown: 10, damage_pct: 300, effect: 'attack_boost' },
+        ],
+        phases: [
+          { phase: 2, hp_threshold: 1.0 },
+        ],
+        weaknesses: [{ type: 'fire', multiplier: 2.0 }, { type: 'ice', multiplier: 1.25 }],
+        resistances: [{ type: 'poison', multiplier: 0.0 }, { type: 'physical', multiplier: 0.75 }],
+        rewards: { gold: 25000, gems: 750, title: 'Hidra Avcısı', badge: 'hydra_slayer_2' },
+        lore: 'Hidra yaralandıkça daha da güçlenir. Öfkesi doruk noktasında tüm başları aynı anda saldırıya geçer.',
+        isActive: true,
+      },
+      {
+        code: 'titan_phase1',
+        name: 'Titan — Faz 1: Demir Zırh',
+        phase: 1,
+        ageId,
+        levelRequired: 15,
+        hp: '150000',
+        attack: 50,
+        defense: 40,
+        speed: 1,
+        mechanics: [
+          { name: 'ground_slam', cooldown: 4, damage_pct: 180, effect: 'stun_1turn' },
+          { name: 'iron_shield', cooldown: 6, damage_pct: 0, effect: 'damage_reduction_50pct' },
+        ],
+        phases: [
+          { phase: 1, hp_threshold: 1.0 },
+          { phase: 2, hp_threshold: 0.6 },
+          { phase: 3, hp_threshold: 0.3 },
+        ],
+        weaknesses: [{ type: 'energy', multiplier: 1.75 }, { type: 'quantum', multiplier: 2.0 }],
+        resistances: [{ type: 'physical', multiplier: 0.5 }, { type: 'fire', multiplier: 0.75 }],
+        rewards: { gold: 20000, gems: 500, badge: 'titan_hunter_1' },
+        lore: 'Titan, antik bir savaş makinesidir. Zırhı neredeyse kırılmazdır; sadece enerji silahları etkili olabilir.',
+        isActive: true,
+      },
+      {
+        code: 'titan_phase2',
+        name: 'Titan — Faz 2: Çekirdek Açılımı',
+        phase: 2,
+        ageId,
+        levelRequired: 15,
+        hp: '100000',
+        attack: 70,
+        defense: 25,
+        speed: 2,
+        mechanics: [
+          { name: 'core_beam', cooldown: 3, damage_pct: 250, effect: 'armor_pierce' },
+          { name: 'seismic_stomp', cooldown: 5, damage_pct: 200, effect: 'aoe_damage' },
+          { name: 'self_repair', cooldown: 8, damage_pct: 0, effect: 'heal_15pct' },
+        ],
+        phases: [
+          { phase: 2, hp_threshold: 1.0 },
+          { phase: 3, hp_threshold: 0.5 },
+        ],
+        weaknesses: [{ type: 'energy', multiplier: 2.0 }, { type: 'quantum', multiplier: 2.5 }],
+        resistances: [{ type: 'physical', multiplier: 0.25 }],
+        rewards: { gold: 35000, gems: 900, badge: 'titan_hunter_2' },
+        lore: 'Çekirdek reaktörü açılan Titan daha da tehlikeli hale gelir. Enerji demeti zırhı deler geçer.',
+        isActive: true,
+      },
+      {
+        code: 'titan_phase3',
+        name: 'Titan — Faz 3: Kıyamet Protokolü',
+        phase: 3,
+        ageId,
+        levelRequired: 15,
+        hp: '75000',
+        attack: 100,
+        defense: 10,
+        speed: 3,
+        mechanics: [
+          { name: 'annihilation_beam', cooldown: 2, damage_pct: 400, effect: 'instant_kill_chance_10pct' },
+          { name: 'overload', cooldown: 4, damage_pct: 350, effect: 'aoe_damage_all' },
+          { name: 'self_destruct_threat', cooldown: 15, damage_pct: 500, effect: 'countdown_3turns' },
+        ],
+        phases: [
+          { phase: 3, hp_threshold: 1.0 },
+        ],
+        weaknesses: [{ type: 'energy', multiplier: 3.0 }, { type: 'quantum', multiplier: 3.0 }, { type: 'void', multiplier: 2.0 }],
+        resistances: [],
+        rewards: {
+          gold: 75000,
+          gems: 2000,
+          title: 'Titan Katili',
+          badge: 'titan_slayer',
+          unlock: 'age_2_champion',
+        },
+        lore: 'Kıyamet protokolü devrede. Titan\'ın son savunması — ya onu yok edersiniz ya da o sizi. Zaman dolmadan bitirin.',
+        isActive: true,
+      },
+    ];
+
+    for (const bossData of age2BossData) {
+      const existing = await this.bossRepository.findOne({ where: { code: bossData.code } });
+      if (existing) {
+        skipped.push(bossData.code);
+        continue;
+      }
+      await this.bossRepository.save(this.bossRepository.create(bossData));
+      seeded.push(bossData.code);
+      this.logger.log(`Age 2 boss seeded: ${bossData.code}`);
+    }
+
+    return { seeded, skipped };
+  }
+
   async startAttempt(userId: string, dto: StartAttemptDto): Promise<BossAttempt> {
     const boss = await this.bossRepository.findOne({ where: { code: dto.bossCode } });
     if (!boss) throw new NotFoundException(`Boss '${dto.bossCode}' bulunamadı`);

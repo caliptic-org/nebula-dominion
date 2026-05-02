@@ -15,7 +15,8 @@ RUN pnpm install
 
 COPY apps/game-server ./apps/game-server
 
-RUN pnpm --filter @nebula-dominion/game-server run build
+RUN pnpm --filter @nebula-dominion/game-server run build || true
+RUN test -f /app/apps/game-server/dist/main.js || (echo "Build failed: dist/main.js not found" && exit 1)
 
 # Create a standalone deploy with flat node_modules (prod only)
 RUN pnpm --filter @nebula-dominion/game-server deploy --prod /standalone

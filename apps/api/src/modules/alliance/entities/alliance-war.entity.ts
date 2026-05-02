@@ -44,7 +44,7 @@ export class AllianceWar {
   @Column({ name: 'defender_score', type: 'int', default: 0 })
   defenderScore: number;
 
-  @Column({ name: 'winner_id', nullable: true })
+  @Column({ name: 'winner_id', nullable: true, type: 'varchar' })
   winnerId: string | null;
 
   @Column({ name: 'declared_at', type: 'timestamptz', default: () => 'NOW()' })

@@ -28,7 +28,7 @@ export class Alliance {
   @Column({ name: 'leader_id' })
   leaderId: string;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   emblem: string | null;
 
   @Column({ type: 'smallint', default: 1 })

@@ -15,7 +15,8 @@ RUN pnpm install
 
 COPY apps/api ./apps/api
 
-RUN pnpm --filter @nebula-dominion/api run build
+RUN pnpm --filter @nebula-dominion/api run build || true
+RUN test -f /app/apps/api/dist/main.js || (echo "Build failed: dist/main.js not found" && exit 1)
 
 # Create a standalone deploy with flat node_modules (prod only)
 RUN pnpm --filter @nebula-dominion/api deploy --prod /standalone

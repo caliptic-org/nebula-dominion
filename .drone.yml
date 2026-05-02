@@ -1,0 +1,217 @@
+kind: pipeline
+type: docker
+name: nebula-pipeline
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: install
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm install --frozen-lockfile
+
+  - name: typecheck
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm typecheck
+    depends_on:
+      - install
+
+  - name: test
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm test
+    depends_on:
+      - install
+
+  - name: build
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm build
+    depends_on:
+      - typecheck
+      - test
+
+  - name: docker-build-web
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-web
+      dockerfile: apps/web/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: docker-build-api
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-api
+      dockerfile: apps/api/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: docker-build-game
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-game
+      dockerfile: apps/game/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: docker-build-worker
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-worker
+      dockerfile: apps/worker/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+    when:
+      branch:
+        - main
+
+  - name: deploy
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: deploy_host
+      username: deploy
+      key:
+        from_secret: ssh_key
+      port: 22
+      script:
+        - docker service update --image registry.local/nebula-web:latest nebula_web
+        - docker service update --image registry.local/nebula-api:latest nebula_api
+        - docker service update --image registry.local/nebula-game:latest nebula_game
+        - docker service update --image registry.local/nebula-worker:latest nebula_worker
+        - docker stack ps nebula
+    depends_on:
+      - docker-build-web
+      - docker-build-api
+      - docker-build-game
+      - docker-build-worker
+    when:
+      branch:
+        - main
+
+---
+kind: pipeline
+type: docker
+name: nebula-pipeline-staging
+
+trigger:
+  branch:
+    - develop
+  event:
+    - push
+
+steps:
+  - name: install
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm install --frozen-lockfile
+
+  - name: typecheck
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm typecheck
+    depends_on:
+      - install
+
+  - name: test
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm test
+    depends_on:
+      - install
+
+  - name: build
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm build
+    depends_on:
+      - typecheck
+      - test
+
+  - name: docker-build-staging
+    image: plugins/docker
+    settings:
+      registry: registry.local
+      repo: registry.local/nebula-web
+      dockerfile: apps/web/Dockerfile
+      tags:
+        - staging
+        - staging-${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    depends_on:
+      - build
+
+  - name: deploy-staging
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: deploy_host_staging
+      username: deploy
+      key:
+        from_secret: ssh_key
+      port: 22
+      script:
+        - docker service update --image registry.local/nebula-web:staging nebula_staging_web
+        - docker stack ps nebula_staging
+    depends_on:
+      - docker-build-staging

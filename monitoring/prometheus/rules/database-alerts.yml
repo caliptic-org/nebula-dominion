@@ -1,0 +1,163 @@
+groups:
+  - name: database.postgres
+    interval: 30s
+    rules:
+      # ─── Replica Lag ──────────────────────────────────────────────────────
+      - alert: PostgresReplicaLagWarning
+        expr: |
+          pg_replication_lag > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "PostgreSQL replica lag >10s on {{ $labels.instance }}"
+          description: "Replication lag is {{ printf \"%.0f\" $value }} seconds. Data may be stale on replicas."
+
+      - alert: PostgresReplicaLagCritical
+        expr: |
+          pg_replication_lag > 60
+        for: 2m
+        labels:
+          severity: critical
+          team: dba
+          page: "true"
+        annotations:
+          summary: "CRITICAL: PostgreSQL replica lag >60s on {{ $labels.instance }}"
+          description: "Replication lag is {{ printf \"%.0f\" $value }} seconds. Risk of data divergence."
+
+      - alert: PostgresReplicationDown
+        expr: |
+          pg_replication_is_replica == 1
+          and
+          pg_replication_lag offset 5m < 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+          page: "true"
+        annotations:
+          summary: "PostgreSQL replication appears broken on {{ $labels.instance }}"
+          description: "Replica is not receiving WAL. Investigate immediately."
+
+      # ─── Connections ──────────────────────────────────────────────────────
+      - alert: PostgresConnectionsHigh
+        expr: |
+          sum by(instance) (pg_stat_activity_count) / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "PostgreSQL connections at {{ printf \"%.0f\" $value }}% on {{ $labels.instance }}"
+          description: "Connection pool is nearly exhausted. Consider tuning PgBouncer."
+
+      - alert: PostgresConnectionsCritical
+        expr: |
+          sum by(instance) (pg_stat_activity_count) / pg_settings_max_connections * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "CRITICAL: PostgreSQL connections at {{ printf \"%.0f\" $value }}%"
+          description: "Connection limit nearly reached. New connections will be refused."
+
+      # ─── Database Down ────────────────────────────────────────────────────
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+          page: "true"
+        annotations:
+          summary: "CRITICAL: PostgreSQL is DOWN on {{ $labels.instance }}"
+          description: "PostgreSQL is unreachable. Service impact is immediate."
+
+      # ─── Long Running Queries ─────────────────────────────────────────────
+      - alert: PostgresLongRunningQuery
+        expr: |
+          max by(instance, usename, state) (
+            pg_stat_activity_max_tx_duration{state!="idle"}
+          ) > 300
+        for: 2m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "Long running query ({{ printf \"%.0f\" $value }}s) on {{ $labels.instance }}"
+          description: "Query by {{ $labels.usename }} running for {{ printf \"%.0f\" $value }} seconds."
+
+      # ─── Dead Tuples ──────────────────────────────────────────────────────
+      - alert: PostgresDeadTuplesHigh
+        expr: |
+          pg_stat_user_tables_n_dead_tup > 100000
+        for: 10m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "High dead tuples in {{ $labels.relname }} on {{ $labels.instance }}"
+          description: "{{ $value }} dead tuples in table {{ $labels.relname }}. VACUUM may be blocked."
+
+  - name: database.redis
+    rules:
+      # ─── Redis Down ───────────────────────────────────────────────────────
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+          page: "true"
+        annotations:
+          summary: "CRITICAL: Redis is DOWN on {{ $labels.instance }}"
+          description: "Redis is unreachable. Cache and session data unavailable."
+
+      # ─── Memory ───────────────────────────────────────────────────────────
+      - alert: RedisHighMemory
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Redis memory at {{ printf \"%.1f\" $value }}% on {{ $labels.instance }}"
+          description: "Redis memory usage is high. Eviction policy may trigger."
+
+      - alert: RedisHighMemoryCritical
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "CRITICAL: Redis memory at {{ printf \"%.1f\" $value }}%"
+          description: "Redis is nearly out of memory. Keys will be evicted aggressively."
+
+      # ─── Hit Ratio ────────────────────────────────────────────────────────
+      - alert: RedisLowHitRatio
+        expr: |
+          redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) * 100 < 70
+        for: 15m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Redis hit ratio dropped to {{ printf \"%.1f\" $value }}%"
+          description: "Cache effectiveness is low. Investigate cache invalidation patterns."
+
+      # ─── Replication ──────────────────────────────────────────────────────
+      - alert: RedisMasterLinkDown
+        expr: redis_master_link_up{role="slave"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+          page: "true"
+        annotations:
+          summary: "Redis replication link is DOWN on {{ $labels.instance }}"
+          description: "Redis replica cannot reach master. Failover may be required."

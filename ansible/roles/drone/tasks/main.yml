@@ -1,0 +1,59 @@
+---
+- name: Create Drone directories
+  file:
+    path: /data/drone
+    state: directory
+    mode: '0755'
+
+- name: Create Drone database
+  become_user: postgres
+  postgresql_db:
+    name: drone
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Create Drone database user
+  become_user: postgres
+  postgresql_user:
+    name: drone
+    password: "{{ drone_rpc_secret }}"
+    db: drone
+    priv: ALL
+    state: present
+  when: inventory_hostname == 'server1'
+
+- name: Deploy Drone server via Docker
+  template:
+    src: drone-compose.yml.j2
+    dest: /data/drone/docker-compose.yml
+    mode: '0644'
+  when: inventory_hostname == 'server1'
+
+- name: Start Drone server
+  command: docker compose up -d
+  args:
+    chdir: /data/drone
+  when: inventory_hostname == 'server1'
+
+- name: Deploy Drone runner on all servers
+  template:
+    src: drone-runner.service.j2
+    dest: /etc/systemd/system/drone-runner.service
+
+- name: Pull Drone runner image
+  command: docker pull drone/drone-runner-docker:{{ drone_runner_version }}
+
+- name: Enable and start Drone runner
+  systemd:
+    name: drone-runner
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Allow Drone port on private network
+  ufw:
+    rule: allow
+    port: "{{ drone_port }}"
+    proto: tcp
+    src: "{{ private_network_cidr }}"
+  when: inventory_hostname == 'server1'

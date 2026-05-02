@@ -1,12 +1,20 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import configuration from './config/configuration';
 import { AuthModule } from './auth/auth.module';
+import { PlayersModule } from './players/players.module';
+import { ResourcesModule } from './resources/resources.module';
+import { BuildingsModule } from './buildings/buildings.module';
+import { WorkersModule } from './workers/workers.module';
 import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { GameModule } from './game/game.module';
 import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
+import { ProgressionModule } from './progression/progression.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -16,11 +24,29 @@ import { HealthModule } from './health/health.module';
       envFilePath: ['.env.local', '.env'],
     }),
     EventEmitterModule.forRoot({ wildcard: false, maxListeners: 20 }),
+    ScheduleModule.forRoot(),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        url: config.get<string>('database.url'),
+        autoLoadEntities: true,
+        synchronize: config.get<boolean>('database.synchronize'),
+        logging: config.get<boolean>('database.logging'),
+        ssl: config.get<boolean>('database.ssl') ? { rejectUnauthorized: false } : false,
+      }),
+    }),
     AuthModule,
+    PlayersModule,
+    ResourcesModule,
+    BuildingsModule,
+    WorkersModule,
     MatchmakingModule,
     GameModule,
     AntiCheatModule,
     HealthModule,
+    ProgressionModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

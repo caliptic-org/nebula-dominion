@@ -27,6 +27,10 @@ export interface UnitState {
   speed: number;
   position: { x: number; y: number };
   actionUsed: boolean;
+  /** Ability IDs unlocked through mutations */
+  abilities?: string[];
+  /** IDs of mutations applied to this unit, in application order */
+  appliedMutations?: string[];
 }
 
 export interface PlayerState {
@@ -60,6 +64,7 @@ export interface GameRoom {
 
 const ROOM_KEY = (id: string) => `game:room:${id}`;
 const USER_ROOM_KEY = (uid: string) => `user:room:${uid}`;
+const ACTIVE_ROOMS_KEY = 'game:active_rooms';
 
 const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUsed'>[]> = {
   [Race.HUMAN]: [
@@ -78,8 +83,18 @@ const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUs
     { type: 'combat-bot', hp: 40, maxHp: 40, attack: 10, defense: 10, speed: 2 },
     { type: 'combat-bot', hp: 40, maxHp: 40, attack: 10, defense: 10, speed: 2 },
     { type: 'artillery', hp: 20, maxHp: 20, attack: 20, defense: 2, speed: 1 },
+    { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
   ],
 };
+
+export const AGE_2_AUTOMATON_UNITS: Omit<UnitState, 'id' | 'position' | 'actionUsed'>[] = [
+  { type: 'siege-automaton', hp: 80, maxHp: 80, attack: 25, defense: 15, speed: 1 },
+  { type: 'shield-sentinel', hp: 100, maxHp: 100, attack: 8, defense: 25, speed: 1 },
+  { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
+  { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
+  { type: 'repair-bot', hp: 30, maxHp: 30, attack: 5, defense: 8, speed: 3 },
+  { type: 'combat-bot-mk2', hp: 55, maxHp: 55, attack: 15, defense: 12, speed: 2 },
+];
 
 @Injectable()
 export class RoomService implements OnModuleDestroy, OnModuleInit {
@@ -158,6 +173,18 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
 
   async clearUserRoom(userId: string): Promise<void> {
     await this.redis.del(USER_ROOM_KEY(userId));
+  }
+
+  async addToActiveRooms(roomId: string): Promise<void> {
+    await this.redis.sadd(ACTIVE_ROOMS_KEY, roomId);
+  }
+
+  async removeFromActiveRooms(roomId: string): Promise<void> {
+    await this.redis.srem(ACTIVE_ROOMS_KEY, roomId);
+  }
+
+  async getActiveRoomIds(): Promise<string[]> {
+    return this.redis.smembers(ACTIVE_ROOMS_KEY);
   }
 
   async getRoomByUser(userId: string): Promise<GameRoom | null> {

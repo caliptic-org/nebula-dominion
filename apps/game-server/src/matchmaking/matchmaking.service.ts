@@ -108,6 +108,7 @@ export class MatchmakingService implements OnModuleInit, OnModuleDestroy {
       if (waitMs > this.maxWaitMs) {
         await this.leaveQueue(entry.userId, mode);
         this.events.emit('matchmaking.timeout', { userId: entry.userId });
+        matched.add(entry.userId); // prevent selecting as opponent after timeout
         continue;
       }
 

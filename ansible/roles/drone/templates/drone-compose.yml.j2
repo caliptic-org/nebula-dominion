@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  drone:
+    image: drone/drone:{{ drone_version }}
+    container_name: drone-server
+    ports:
+      - "{{ drone_port }}:80"
+    volumes:
+      - /data/drone/data:/data
+    environment:
+      - DRONE_GITEA_SERVER=http://{{ server1_private_ip }}:{{ gitea_port }}
+      - DRONE_GITEA_CLIENT_ID={{ drone_gitea_client_id }}
+      - DRONE_GITEA_CLIENT_SECRET={{ drone_gitea_client_secret }}
+      - DRONE_RPC_SECRET={{ drone_rpc_secret }}
+      - DRONE_SERVER_HOST={{ server1_private_ip }}:{{ drone_port }}
+      - DRONE_SERVER_PROTO=http
+      - DRONE_DATABASE_DRIVER=postgres
+      - DRONE_DATABASE_DATASOURCE=postgres://drone:{{ drone_rpc_secret }}@{{ server1_private_ip }}:{{ postgresql_port }}/drone?sslmode=disable
+      - DRONE_LOGS_DEBUG=false
+      - DRONE_CRON_DISABLED=false
+    restart: unless-stopped

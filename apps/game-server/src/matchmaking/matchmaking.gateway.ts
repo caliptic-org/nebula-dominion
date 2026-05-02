@@ -14,6 +14,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { MatchmakingService, QueueEntry, MatchResult } from './matchmaking.service';
 import { JoinQueueDto, GameMode } from './dto/join-queue.dto';
+import type { GameCreatedEvent } from '../game/game.service';
 
 @WebSocketGateway({ namespace: '/matchmaking', cors: { origin: '*' } })
 export class MatchmakingGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -118,5 +119,29 @@ export class MatchmakingGateway implements OnGatewayConnection, OnGatewayDisconn
         socket.emit('queue_timeout', { message: 'No match found, removed from queue' });
       }
     });
+  }
+
+  @OnEvent('game.created')
+  handleGameCreated(event: GameCreatedEvent): void {
+    const { match, room, tokens } = event;
+    const { player1, player2 } = match;
+
+    this.server.to(player1.socketId).emit('game_start', {
+      roomId: room.id,
+      reconnectToken: tokens[player1.userId],
+      yourTurn: room.currentPlayerId === player1.userId,
+      opponentRace: player2.race,
+      opponentElo: player2.elo,
+    });
+
+    this.server.to(player2.socketId).emit('game_start', {
+      roomId: room.id,
+      reconnectToken: tokens[player2.userId],
+      yourTurn: room.currentPlayerId === player2.userId,
+      opponentRace: player1.race,
+      opponentElo: player1.elo,
+    });
+
+    this.logger.log(`Sent game_start to ${player1.userId} and ${player2.userId} for room ${room.id}`);
   }
 }

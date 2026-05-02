@@ -1,0 +1,107 @@
+groups:
+  - name: app.api
+    interval: 15s
+    rules:
+      # ─── API Error Rate ───────────────────────────────────────────────────
+      - alert: APIErrorRateWarning
+        expr: |
+          (
+            sum by(service) (rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum by(service) (rate(http_requests_total[5m]))
+          ) * 100 > 1
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "API error rate >1% on {{ $labels.service }}"
+          description: "5xx error rate is {{ printf \"%.2f\" $value }}% for {{ $labels.service }}."
+
+      - alert: APIErrorRateCritical
+        expr: |
+          (
+            sum by(service) (rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum by(service) (rate(http_requests_total[5m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          page: "true"
+        annotations:
+          summary: "CRITICAL: API error rate >5% on {{ $labels.service }}"
+          description: "5xx error rate is {{ printf \"%.2f\" $value }}%. Check application logs."
+
+      # ─── API Latency ──────────────────────────────────────────────────────
+      - alert: APIHighLatencyWarning
+        expr: |
+          histogram_quantile(0.95, sum by(service, le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High p95 latency on {{ $labels.service }}: {{ printf \"%.2f\" $value }}s"
+          description: "95th percentile API latency exceeds 1 second."
+
+      - alert: APIHighLatencyCritical
+        expr: |
+          histogram_quantile(0.99, sum by(service, le) (rate(http_request_duration_seconds_bucket[5m]))) > 3
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "CRITICAL: p99 latency {{ printf \"%.2f\" $value }}s on {{ $labels.service }}"
+          description: "99th percentile latency exceeds 3 seconds."
+
+      # ─── Service Down ─────────────────────────────────────────────────────
+      - alert: ServiceDown
+        expr: up{job=~"nebula-api|nebula-game"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+          page: "true"
+        annotations:
+          summary: "SERVICE DOWN: {{ $labels.job }} on {{ $labels.instance }}"
+          description: "Service {{ $labels.job }} is unreachable for more than 1 minute."
+
+      - alert: AllReplicasDown
+        expr: |
+          count by(job) (up{job=~"nebula-api|nebula-game"} == 1) == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: devops
+          page: "true"
+        annotations:
+          summary: "ALL REPLICAS DOWN: {{ $labels.job }}"
+          description: "All instances of {{ $labels.job }} are down. Complete outage."
+
+  - name: app.game
+    rules:
+      # ─── WebSocket connections ─────────────────────────────────────────────
+      - alert: LowActiveConnections
+        expr: |
+          sum(nebula_websocket_connections_active) < 10
+        for: 30m
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "Low active WebSocket connections: {{ $value }}"
+          description: "Fewer than 10 active game connections. May indicate an issue during peak hours."
+
+      - alert: HighWebSocketErrors
+        expr: |
+          rate(nebula_websocket_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High WebSocket error rate: {{ printf \"%.1f\" $value }}/s"
+          description: "WebSocket errors are elevated. Check game server logs."

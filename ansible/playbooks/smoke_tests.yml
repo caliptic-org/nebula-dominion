@@ -1,0 +1,46 @@
+---
+- name: Check Docker daemon
+  command: docker info
+  changed_when: false
+
+- name: Check Docker Swarm
+  command: docker node ls
+  changed_when: false
+  ignore_errors: yes
+
+- name: Check PostgreSQL via PgBouncer
+  command: psql -h 127.0.0.1 -p {{ pgbouncer_port }} -U postgres -c "SELECT version();"
+  become_user: postgres
+  changed_when: false
+  ignore_errors: yes
+
+- name: Check Redis
+  command: redis-cli -a {{ redis_password }} ping
+  changed_when: false
+  no_log: true
+
+- name: Check MinIO health
+  uri:
+    url: "http://localhost:{{ minio_port }}/minio/health/live"
+    status_code: 200
+  ignore_errors: yes
+
+- name: Check HAProxy
+  uri:
+    url: "http://localhost:{{ haproxy_stats_port }}/stats"
+    status_code: 200
+    user: "{{ haproxy_stats_user }}"
+    password: "{{ haproxy_stats_password }}"
+  ignore_errors: yes
+
+- name: Check Prometheus
+  uri:
+    url: "http://localhost:9090/-/healthy"
+    status_code: 200
+  ignore_errors: yes
+
+- name: Check Grafana
+  uri:
+    url: "http://localhost:3000/api/health"
+    status_code: 200
+  ignore_errors: yes

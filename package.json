@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": ["apps/*"],
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
     "build:game-server": "npm --workspace apps/game-server run build",
     "start:game-server": "npm --workspace apps/game-server run start",

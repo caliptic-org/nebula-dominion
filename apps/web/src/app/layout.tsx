@@ -1,15 +1,29 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata, Viewport } from 'next';
+import { RaceThemeProvider } from '@/hooks/useRaceTheme';
+import '@/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Nebula Dominion',
-  description: 'Tier sistemi ile çağ bazlı ilerleme',
+  title: {
+    template: '%s | Nebula Dominion',
+    default: 'Nebula Dominion',
+  },
+  description: 'Karanlık Sci-Fi Manga Strateji Oyunu — 5 Irk, 3D Tilemap, Epik Savaşlar',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#080a10',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
-      <body>{children}</body>
+    <html lang="tr" data-race="insan">
+      <body>
+        <RaceThemeProvider>
+          {children}
+        </RaceThemeProvider>
+      </body>
     </html>
   );
 }

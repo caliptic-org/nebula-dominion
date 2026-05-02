@@ -71,14 +71,14 @@ export default function HomePage() {
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
         {/* Title */}
-        <h1 style={{ fontSize: 22, marginBottom: 24, color: '#ffc832' }}>Nebula Dominion</h1>
+        <h1 style={{ fontSize: 22, marginBottom: 24, color: 'var(--color-energy)' }}>Nebula Dominion</h1>
 
         {/* Tabs */}
         <div
           style={{
             display: 'flex',
             gap: 4,
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid var(--color-border)',
             marginBottom: 32,
           }}
         >
@@ -90,10 +90,10 @@ export default function HomePage() {
                 padding: '10px 20px',
                 fontSize: 13,
                 fontWeight: activeTab === tab.id ? 700 : 400,
-                color: activeTab === tab.id ? '#ffc832' : '#666',
+                color: activeTab === tab.id ? 'var(--color-energy)' : 'var(--color-text-muted)',
                 background: 'none',
                 border: 'none',
-                borderBottom: `2px solid ${activeTab === tab.id ? '#ffc832' : 'transparent'}`,
+                borderBottom: `2px solid ${activeTab === tab.id ? 'var(--color-energy)' : 'transparent'}`,
                 cursor: 'pointer',
                 transition: 'color 0.2s, border-color 0.2s',
                 marginBottom: -1,
@@ -109,12 +109,12 @@ export default function HomePage() {
           <>
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                <p style={{ color: '#aaa' }}>Yükleniyor…</p>
+                <p style={{ color: 'var(--color-text-secondary)' }}>Yükleniyor…</p>
               </div>
             )}
             {!loading && !progress && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                <p style={{ color: '#f66' }}>İlerleme yüklenemedi.</p>
+                <p style={{ color: 'var(--color-danger)' }}>İlerleme yüklenemedi.</p>
               </div>
             )}
             {!loading && progress && (
@@ -122,25 +122,15 @@ export default function HomePage() {
                 <LevelIndicator progress={progress} />
 
                 <section style={{ marginTop: 32 }}>
-                  <h2 style={{ fontSize: 14, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  <h2 style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
                     Açık İçerikler
                   </h2>
                   {progress.unlockedContent.length === 0 ? (
-                    <p style={{ color: '#666', fontSize: 13 }}>Henüz içerik açılmadı.</p>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Henüz içerik açılmadı.</p>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {progress.unlockedContent.map((unlock) => (
-                        <span
-                          key={unlock}
-                          style={{
-                            padding: '4px 10px',
-                            background: 'rgba(255,200,50,0.1)',
-                            border: '1px solid rgba(255,200,50,0.3)',
-                            borderRadius: 20,
-                            fontSize: 12,
-                            color: '#ffc832',
-                          }}
-                        >
+                        <span key={unlock} className="badge badge-energy">
                           {unlock.replace(/_/g, ' ')}
                         </span>
                       ))}
@@ -149,26 +139,18 @@ export default function HomePage() {
                 </section>
 
                 <section style={{ marginTop: 32 }}>
-                  <h2 style={{ fontSize: 14, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  <h2 style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
                     İstatistikler
                   </h2>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                     {[
                       { label: 'Toplam XP', value: progress.totalXp.toLocaleString('tr-TR') },
                       { label: 'Tier Bonusu', value: `×${progress.tierBonusMultiplier.toFixed(2)}` },
                       { label: 'Yaş', value: `Çağ ${progress.age}` },
                       { label: 'Seviye', value: `${progress.level} / 9` },
                     ].map(({ label, value }) => (
-                      <div
-                        key={label}
-                        style={{
-                          padding: '12px 16px',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: 8,
-                        }}
-                      >
-                        <div style={{ fontSize: 11, color: '#888', marginBottom: 4, textTransform: 'uppercase' }}>{label}</div>
+                      <div key={label} className="stat-card">
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>{label}</div>
                         <div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div>
                       </div>
                     ))}
@@ -203,7 +185,7 @@ export default function HomePage() {
                 alignItems: 'center',
               }}
             >
-              <span style={{ fontSize: 12, color: '#555', marginRight: 8 }}>Irk:</span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 8 }}>Irk:</span>
               {(Object.values(Race) as Race[]).map((race) => {
                 const desc = RACE_DESCRIPTIONS[race];
                 const active = selectedRace === race;
@@ -227,7 +209,7 @@ export default function HomePage() {
                   </button>
                 );
               })}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#444' }}>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-muted)' }}>
                 Demo modu • {demoUnits.length} birim
               </span>
             </div>
@@ -255,7 +237,7 @@ export default function HomePage() {
               <h3
                 style={{
                   fontSize: 13,
-                  color: '#666',
+                  color: 'var(--color-text-muted)',
                   textTransform: 'uppercase',
                   letterSpacing: 1,
                   marginBottom: 12,
@@ -265,7 +247,7 @@ export default function HomePage() {
               </h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {demoUnits.length === 0 && (
-                  <p style={{ color: '#555', fontSize: 13 }}>Bu ırk için demo birim yok.</p>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Bu ırk için demo birim yok.</p>
                 )}
                 {demoUnits.map((unit) => {
                   const desc = RACE_DESCRIPTIONS[unit.race];

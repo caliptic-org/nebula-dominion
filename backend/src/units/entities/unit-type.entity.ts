@@ -5,9 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
-  OneToMany,
 } from 'typeorm';
-import { Unit } from './unit.entity';
 
 export enum Race {
   HUMAN = 'human',
@@ -82,6 +80,4 @@ export class UnitType {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany(() => Unit, (unit) => unit.unitType)
-  units: Unit[];
 }

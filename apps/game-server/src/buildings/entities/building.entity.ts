@@ -15,6 +15,12 @@ export enum BuildingType {
   BARRACKS = 'barracks',
   TURRET = 'turret',
   SHIELD_GENERATOR = 'shield_generator',
+  // Human unit production
+  ACADEMY = 'academy',
+  FACTORY = 'factory',
+  // Zerg unit production
+  SPAWNING_POOL = 'spawning_pool',
+  HATCHERY = 'hatchery',
   // Age 2 buildings (Automata)
   NANO_FORGE = 'nano_forge',
   CYBER_CORE = 'cyber_core',

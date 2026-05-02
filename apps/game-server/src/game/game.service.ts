@@ -9,6 +9,7 @@ import { ActionType, GameActionDto } from './dto/game-action.dto';
 import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
+import { MergeService } from './merge/merge.service';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 
@@ -56,6 +57,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     private readonly emitter: EventEmitter2,
     private readonly config: ConfigService,
     private readonly progression: ProgressionService,
+    private readonly mergeService: MergeService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
   }

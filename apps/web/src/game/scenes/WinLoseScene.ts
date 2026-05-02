@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BattleRewards } from '../socket/GameSocket';
+import { THEME } from '../theme';
 
 interface WinLoseData {
   winner: string;
@@ -42,8 +43,8 @@ export class WinLoseScene extends Phaser.Scene {
     const py = (height - panelH) / 2;
 
     const panel = this.add.graphics();
-    panel.fillStyle(isWinner ? 0x0d2d0d : 0x2d0d0d, 0.97);
-    panel.lineStyle(3, isWinner ? 0x44ff88 : 0xff4444, 1);
+    panel.fillStyle(isWinner ? THEME.WIN_PANEL : THEME.LOSE_PANEL, 0.97);
+    panel.lineStyle(3, isWinner ? THEME.WIN_BORDER : THEME.LOSE_BORDER, 1);
     panel.fillRoundedRect(px, py, panelW, panelH, 16);
     panel.strokeRoundedRect(px, py, panelW, panelH, 16);
     panel.setAlpha(0);
@@ -51,7 +52,7 @@ export class WinLoseScene extends Phaser.Scene {
 
     // Title
     const titleText = isWinner ? 'VICTORY!' : 'DEFEAT';
-    const titleColor = isWinner ? '#44ff88' : '#ff4444';
+    const titleColor = isWinner ? THEME.SUCCESS_STR : THEME.DANGER_STR;
     const title = this.add.text(width / 2, py + 44, titleText, {
       fontSize: '48px', fontStyle: 'bold', color: titleColor,
       stroke: '#000000', strokeThickness: 6,
@@ -86,13 +87,13 @@ export class WinLoseScene extends Phaser.Scene {
     if (rewards) {
       const cy = py + 165;
       this.add.text(width / 2, cy, 'REWARDS', {
-        fontSize: '13px', color: '#aaaacc', fontStyle: 'bold',
+        fontSize: '13px', color: THEME.TEXT_SECONDARY, fontStyle: 'bold',
       }).setOrigin(0.5, 0);
 
       const rewardItems = [
-        { label: 'Minerals', value: rewards.minerals, color: '#60aaff', icon: '◆' },
-        { label: 'Gas', value: rewards.gas, color: '#88ffaa', icon: '◈' },
-        { label: 'XP', value: rewards.xp, color: '#ffcc44', icon: '★' },
+        { label: 'Minerals', value: rewards.minerals, color: THEME.REWARD_MINERAL, icon: '◆' },
+        { label: 'Gas', value: rewards.gas, color: THEME.REWARD_GAS, icon: '◈' },
+        { label: 'XP', value: rewards.xp, color: THEME.REWARD_XP, icon: '★' },
       ];
 
       rewardItems.forEach((item, i) => {
@@ -109,11 +110,11 @@ export class WinLoseScene extends Phaser.Scene {
         }).setOrigin(0.5, 0).setAlpha(0);
 
         const valText = this.add.text(itemX + 5, itemY + 40, '0', {
-          fontSize: '16px', fontStyle: 'bold', color: '#ffffff',
+          fontSize: '16px', fontStyle: 'bold', color: THEME.TEXT_PRIMARY,
         }).setOrigin(0.5, 0).setAlpha(0);
 
         const labelText = this.add.text(itemX + 5, itemY + 58, item.label, {
-          fontSize: '10px', color: '#666688',
+          fontSize: '10px', color: THEME.TEXT_MUTED,
         }).setOrigin(0.5, 0).setAlpha(0);
 
         this.tweens.add({ targets: [box, icon, valText, labelText], alpha: 1, duration: 300, delay: 700 + i * 120 });
@@ -140,7 +141,7 @@ export class WinLoseScene extends Phaser.Scene {
         };
         const badgeText = rewards.bonuses.map((b) => bonusLabels[b] ?? b).join('  ');
         this.add.text(width / 2, py + 290, badgeText, {
-          fontSize: '12px', color: '#ffaa44',
+          fontSize: '12px', color: THEME.WARNING_STR,
         }).setOrigin(0.5, 0);
       }
     }
@@ -149,26 +150,26 @@ export class WinLoseScene extends Phaser.Scene {
     const btnY = py + panelH - 56;
 
     const playAgainBtn = this.add.text(width / 2 - 80, btnY, 'PLAY AGAIN', {
-      fontSize: '14px', fontStyle: 'bold', color: '#44ff88',
+      fontSize: '14px', fontStyle: 'bold', color: THEME.SUCCESS_STR,
       backgroundColor: '#0d3d1e', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
     playAgainBtn.on('pointerdown', () => window.location.reload());
-    playAgainBtn.on('pointerover', () => playAgainBtn.setStyle({ color: '#88ffaa' }));
-    playAgainBtn.on('pointerout', () => playAgainBtn.setStyle({ color: '#44ff88' }));
+    playAgainBtn.on('pointerover', () => playAgainBtn.setStyle({ color: THEME.ACCENT_STR }));
+    playAgainBtn.on('pointerout', () => playAgainBtn.setStyle({ color: THEME.SUCCESS_STR }));
 
     const menuBtn = this.add.text(width / 2 + 80, btnY, 'MAIN MENU', {
-      fontSize: '14px', fontStyle: 'bold', color: '#8888cc',
+      fontSize: '14px', fontStyle: 'bold', color: THEME.BRAND_STR,
       backgroundColor: '#1a1a30', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
     menuBtn.on('pointerdown', () => { window.location.href = '/'; });
-    menuBtn.on('pointerover', () => menuBtn.setStyle({ color: '#aaaaff' }));
-    menuBtn.on('pointerout', () => menuBtn.setStyle({ color: '#8888cc' }));
+    menuBtn.on('pointerover', () => menuBtn.setStyle({ color: THEME.TEXT_PRIMARY }));
+    menuBtn.on('pointerout', () => menuBtn.setStyle({ color: THEME.BRAND_STR }));
   }
 
   private addVictoryParticles(cx: number, cy: number) {
-    const colors = [0xffcc00, 0x44ff88, 0xff88ff, 0x60aaff];
+    const colors = [THEME.ENERGY, THEME.SUCCESS, THEME.BRAND, THEME.INFO];
     for (let i = 0; i < 24; i++) {
       const angle = (i / 24) * Math.PI * 2;
       const dist = 60 + Math.random() * 80;

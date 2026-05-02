@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GameSocket, UnitState, GameRoom } from '../socket/GameSocket';
 import { UnitSprite } from '../objects/UnitSprite';
 import { spawnDamageText, spawnAbilityText } from '../objects/DamageText';
+import { THEME } from '../theme';
 
 const GRID_COLS = 8;
 const GRID_ROWS = 6;
@@ -46,7 +47,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#060612');
+    this.cameras.main.setBackgroundColor(THEME.BG);
     this.drawGrid();
     this.reachableGraphics = this.add.graphics();
     this.spawnAllUnits();
@@ -61,12 +62,12 @@ export class BattleScene extends Phaser.Scene {
     this.gridGraphics = this.add.graphics();
 
     // Background panel
-    this.gridGraphics.fillStyle(0x0d0d22, 1);
+    this.gridGraphics.fillStyle(THEME.BG_PANEL, 1);
     this.gridGraphics.fillRect(MARGIN_X - 4, MARGIN_Y - 4, GRID_COLS * CELL_SIZE + 8, GRID_ROWS * CELL_SIZE + 8);
 
     // Dividing line (player left, enemy right)
     const midX = MARGIN_X + (GRID_COLS / 2) * CELL_SIZE;
-    this.gridGraphics.lineStyle(2, 0x3333aa, 0.5);
+    this.gridGraphics.lineStyle(2, THEME.GRID_DIVIDER, 0.5);
     this.gridGraphics.lineBetween(midX, MARGIN_Y, midX, MARGIN_Y + GRID_ROWS * CELL_SIZE);
 
     // Grid cells
@@ -75,18 +76,18 @@ export class BattleScene extends Phaser.Scene {
         const x = MARGIN_X + c * CELL_SIZE;
         const y = MARGIN_Y + r * CELL_SIZE;
         const isPlayerSide = c < GRID_COLS / 2;
-        this.gridGraphics.lineStyle(1, isPlayerSide ? 0x223366 : 0x662233, 0.4);
+        this.gridGraphics.lineStyle(1, isPlayerSide ? THEME.GRID_PLAYER_SIDE : THEME.GRID_ENEMY_SIDE, 0.4);
         this.gridGraphics.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
       }
     }
 
     // Labels
     this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.25, MARGIN_Y - 24, 'YOUR FORCES', {
-      fontSize: '12px', color: '#4488ff', fontStyle: 'bold',
+      fontSize: '12px', color: THEME.INFO_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 1);
 
     this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.75, MARGIN_Y - 24, 'ENEMY FORCES', {
-      fontSize: '12px', color: '#ff4444', fontStyle: 'bold',
+      fontSize: '12px', color: THEME.DANGER_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 1);
   }
 
@@ -209,7 +210,7 @@ export class BattleScene extends Phaser.Scene {
     }
 
     this.reachableGraphics.clear();
-    this.reachableGraphics.fillStyle(0x4488ff, 0.25);
+    this.reachableGraphics.fillStyle(THEME.GRID_REACHABLE, 0.25);
     for (const { col, row } of this.reachableCells) {
       this.reachableGraphics.fillRect(
         MARGIN_X + col * CELL_SIZE + 2,

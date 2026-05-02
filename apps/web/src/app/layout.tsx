@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
+import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import '@/styles/globals.css';
+import '@/styles/guild.css';
 
 export const metadata: Metadata = {
   title: {
@@ -21,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" data-race="insan">
       <body>
         <RaceThemeProvider>
-          {children}
+          <GuildTutorialProvider>
+            {children}
+          </GuildTutorialProvider>
         </RaceThemeProvider>
       </body>
     </html>

@@ -1,0 +1,95 @@
+scope: {{ patroni_scope }}
+namespace: {{ patroni_namespace }}
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: {{ ansible_host }}:8008
+  connect_address: {{ ansible_host }}:8008
+
+etcd3:
+  hosts:
+    - {{ server1_private_ip }}:2379
+    - {{ server2_private_ip }}:2379
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 30
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_connections: {{ postgresql_max_connections }}
+        max_wal_senders: {{ postgresql_max_wal_senders }}
+        wal_keep_size: {{ postgresql_wal_keep_size }}
+        max_replication_slots: 10
+        wal_log_hints: "on"
+        archive_mode: "on"
+        archive_command: 'pgbackrest --stanza=main archive-push %p'
+        shared_buffers: {{ postgresql_shared_buffers }}
+        effective_cache_size: {{ postgresql_effective_cache_size }}
+        maintenance_work_mem: {{ postgresql_maintenance_work_mem }}
+        work_mem: {{ postgresql_work_mem }}
+        wal_buffers: {{ postgresql_wal_buffers }}
+        max_wal_size: {{ postgresql_max_wal_size }}
+        min_wal_size: {{ postgresql_min_wal_size }}
+        random_page_cost: "1.1"
+        effective_io_concurrency: "200"
+        max_parallel_workers: {{ postgresql_max_parallel_workers }}
+        max_parallel_workers_per_gather: {{ postgresql_max_parallel_workers_per_gather }}
+        log_min_duration_statement: 500
+        log_checkpoints: "on"
+        log_connections: "off"
+        log_disconnections: "off"
+        log_lock_waits: "on"
+        log_temp_files: "0"
+        log_autovacuum_min_duration: "0"
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+  pg_hba:
+    - host all all 0.0.0.0/0 md5
+    - host replication {{ postgresql_replication_user }} {{ private_network_cidr }} md5
+
+  users:
+    admin:
+      password: "{{ postgresql_app_password }}"
+      options:
+        - createrole
+        - createdb
+    {{ postgresql_replication_user }}:
+      password: "{{ postgresql_replication_password }}"
+      options:
+        - replication
+
+postgresql:
+  listen: "{{ ansible_host }},127.0.0.1:{{ postgresql_port }}"
+  connect_address: "{{ ansible_host }}:{{ postgresql_port }}"
+  data_dir: {{ postgresql_data_dir }}
+  bin_dir: /usr/lib/postgresql/{{ postgresql_version }}/bin
+  pgpass: /tmp/pgpass
+  authentication:
+    replication:
+      username: {{ postgresql_replication_user }}
+      password: {{ postgresql_replication_password }}
+    superuser:
+      username: postgres
+      password: {{ postgresql_app_password }}
+    rewind:
+      username: postgres
+      password: {{ postgresql_app_password }}
+
+watchdog:
+  mode: off
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false

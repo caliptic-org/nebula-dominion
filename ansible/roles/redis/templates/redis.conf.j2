@@ -1,0 +1,50 @@
+bind 127.0.0.1 {{ ansible_host }}
+port {{ redis_port }}
+protected-mode yes
+requirepass {{ redis_password }}
+
+# Memory
+maxmemory {{ redis_maxmemory }}
+maxmemory-policy allkeys-lru
+
+# Persistence
+dir {{ redis_data_dir }}
+dbfilename dump.rdb
+save 900 1
+save 300 10
+save 60 10000
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+
+# Replication
+{% if inventory_hostname == 'server2' %}
+replicaof {{ server1_private_ip }} {{ redis_port }}
+masterauth {{ redis_password }}
+replica-read-only yes
+{% endif %}
+repl-diskless-sync yes
+repl-diskless-sync-delay 5
+repl-backlog-size 128mb
+
+# Performance
+tcp-keepalive 300
+timeout 0
+tcp-backlog 511
+hz 10
+aof-rewrite-incremental-fsync yes
+rdb-save-incremental-fsync yes
+
+# Logging
+loglevel notice
+logfile /var/log/redis/redis-server.log
+
+# Slow log
+slowlog-log-slower-than 10000
+slowlog-max-len 128
+
+# Latency
+latency-monitor-threshold 100

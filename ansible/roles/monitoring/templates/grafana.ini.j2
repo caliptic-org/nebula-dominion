@@ -1,0 +1,50 @@
+[server]
+http_addr = 0.0.0.0
+http_port = 3000
+domain = {{ domain_name }}
+root_url = https://monitoring.{{ domain_name }}
+serve_from_sub_path = false
+
+[database]
+type = sqlite3
+path = {{ grafana_data_dir }}/grafana.db
+
+[security]
+admin_user = admin
+admin_password = {{ grafana_admin_password }}
+secret_key = {{ grafana_admin_password }}SECRETKEY
+disable_gravatar = true
+
+[users]
+allow_sign_up = false
+allow_org_create = false
+auto_assign_org = true
+auto_assign_org_role = Viewer
+
+[auth.anonymous]
+enabled = false
+
+[log]
+mode = file
+level = warn
+filters = alerting.scheduler:info
+
+[log.file]
+daily_rotate = true
+max_days = 7
+
+[paths]
+data = {{ grafana_data_dir }}
+logs = /var/log/grafana
+plugins = {{ grafana_data_dir }}/plugins
+provisioning = /etc/grafana/provisioning
+
+[alerting]
+enabled = true
+
+[unified_alerting]
+enabled = false
+
+[metrics]
+enabled = true
+interval_seconds = 10

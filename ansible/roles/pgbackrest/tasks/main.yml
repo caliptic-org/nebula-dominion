@@ -1,0 +1,58 @@
+---
+- name: Install pgBackRest
+  apt:
+    name: pgbackrest
+    state: present
+
+- name: Create pgBackRest directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  loop:
+    - "{{ pgbackrest_repo_path }}"
+    - /etc/pgbackrest
+    - /var/log/pgbackrest
+
+- name: Configure pgBackRest
+  template:
+    src: pgbackrest.conf.j2
+    dest: /etc/pgbackrest/pgbackrest.conf
+    owner: postgres
+    group: postgres
+    mode: '0640'
+
+- name: Create pgBackRest stanza (primary only)
+  command: pgbackrest --stanza=main --log-level-console=info stanza-create
+  become_user: postgres
+  when: inventory_hostname == 'server1'
+  ignore_errors: yes
+
+- name: Run initial full backup (primary only)
+  command: pgbackrest --stanza=main --type=full --log-level-console=info backup
+  become_user: postgres
+  when: inventory_hostname == 'server1'
+  ignore_errors: yes
+
+- name: Create pgBackRest cron jobs
+  cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    weekday: "{{ item.weekday | default('*') }}"
+    job: "{{ item.job }}"
+    user: postgres
+  loop:
+    - name: "pgbackrest full backup"
+      minute: "0"
+      hour: "3"
+      weekday: "0"
+      job: "pgbackrest --stanza=main --type=full backup >> /var/log/pgbackrest/cron.log 2>&1"
+    - name: "pgbackrest diff backup"
+      minute: "0"
+      hour: "3"
+      weekday: "1-6"
+      job: "pgbackrest --stanza=main --type=diff backup >> /var/log/pgbackrest/cron.log 2>&1"
+  when: inventory_hostname == 'server1'

@@ -1,0 +1,34 @@
+---
+- name: Install LVM tools
+  apt:
+    name: lvm2
+    state: present
+
+- name: Create physical volume
+  command: pvcreate {{ data_disk }}
+  args:
+    creates: /dev/{{ data_vg }}
+
+- name: Create volume group
+  lvg:
+    vg: "{{ data_vg }}"
+    pvs: "{{ data_disk }}"
+
+- name: Create logical volume (100% of VG)
+  lvol:
+    vg: "{{ data_vg }}"
+    lv: "{{ data_lv }}"
+    size: "100%FREE"
+
+- name: Create filesystem
+  filesystem:
+    fstype: "{{ data_fs }}"
+    dev: "/dev/{{ data_vg }}/{{ data_lv }}"
+
+- name: Mount data volume
+  mount:
+    path: "{{ data_mount }}"
+    src: "/dev/{{ data_vg }}/{{ data_lv }}"
+    fstype: "{{ data_fs }}"
+    opts: defaults,noatime
+    state: mounted

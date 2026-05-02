@@ -1,0 +1,68 @@
+APP_NAME = Nebula Dominion Git
+RUN_USER = git
+RUN_MODE = prod
+WORK_PATH = {{ gitea_data_dir }}
+
+[server]
+PROTOCOL           = http
+HTTP_ADDR          = 0.0.0.0
+HTTP_PORT          = {{ gitea_port }}
+DOMAIN             = git.{{ domain_name }}
+ROOT_URL           = https://git.{{ domain_name }}/
+SSH_DOMAIN         = git.{{ domain_name }}
+SSH_PORT           = {{ gitea_ssh_port }}
+SSH_LISTEN_PORT    = {{ gitea_ssh_port }}
+DISABLE_SSH        = false
+START_SSH_SERVER   = true
+LFS_START_SERVER   = true
+
+[database]
+DB_TYPE   = postgres
+HOST      = 127.0.0.1:{{ postgresql_port }}
+NAME      = gitea
+USER      = gitea
+PASSWD    = {{ gitea_db_password }}
+SCHEMA    =
+SSL_MODE  = disable
+CHARSET   = utf8
+
+[repository]
+ROOT = {{ gitea_data_dir }}/repositories
+
+[log]
+MODE      = file
+LEVEL     = Warn
+ROOT_PATH = {{ gitea_data_dir }}/log
+
+[security]
+INSTALL_LOCK = true
+INTERNAL_TOKEN = {{ gitea_db_password }}INTERNALTOKEN
+SECRET_KEY = {{ gitea_db_password }}SECRETKEY
+
+[service]
+REGISTER_EMAIL_CONFIRM  = false
+ENABLE_NOTIFY_MAIL      = false
+DISABLE_REGISTRATION    = false
+ENABLE_CAPTCHA          = false
+REQUIRE_SIGNIN_VIEW     = false
+
+[oauth2]
+ENABLE = true
+
+[mailer]
+ENABLED = false
+
+[cache]
+ENABLED    = true
+ADAPTER    = memory
+INTERVAL   = 60
+HOST       =
+
+[session]
+PROVIDER = memory
+
+[picture]
+DISABLE_GRAVATAR = true
+
+[webhook]
+ALLOWED_HOST_LIST = *

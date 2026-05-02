@@ -1,0 +1,118 @@
+---
+kind: pipeline
+type: docker
+name: nebula-dominion
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: install
+    image: node:20-alpine
+    commands:
+      - npm install -g pnpm
+      - pnpm install --frozen-lockfile
+
+  - name: typecheck
+    image: node:20-alpine
+    depends_on: [install]
+    commands:
+      - pnpm typecheck
+    when:
+      event: [push, pull_request]
+
+  - name: lint
+    image: node:20-alpine
+    depends_on: [install]
+    commands:
+      - pnpm lint
+
+  - name: test
+    image: node:20-alpine
+    depends_on: [install]
+    environment:
+      DATABASE_URL:
+        from_secret: test_database_url
+      REDIS_URL: redis://localhost:6379
+    commands:
+      - pnpm test:ci
+
+  - name: build
+    image: node:20-alpine
+    depends_on: [typecheck, lint, test]
+    commands:
+      - pnpm build
+    when:
+      branch: [main, develop]
+
+  - name: docker-build-web
+    image: plugins/docker
+    depends_on: [build]
+    settings:
+      registry: registry.local:5000
+      repo: registry.local:5000/nebula-web
+      dockerfile: apps/web/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+      username:
+        from_secret: registry_username
+      password:
+        from_secret: registry_password
+    when:
+      branch: main
+
+  - name: docker-build-api
+    image: plugins/docker
+    depends_on: [build]
+    settings:
+      registry: registry.local:5000
+      repo: registry.local:5000/nebula-api
+      dockerfile: apps/api/Dockerfile
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA:0:7}
+    when:
+      branch: main
+
+  - name: deploy-staging
+    image: appleboy/drone-ssh
+    depends_on: [docker-build-web, docker-build-api]
+    settings:
+      host:
+        from_secret: server1_host
+      username: deploy
+      key:
+        from_secret: ssh_private_key
+      script:
+        - docker service update --image registry.local:5000/nebula-web:${DRONE_COMMIT_SHA:0:7} nebula_web
+        - docker service update --image registry.local:5000/nebula-api:${DRONE_COMMIT_SHA:0:7} nebula_api
+        - docker service update --image registry.local:5000/nebula-api:${DRONE_COMMIT_SHA:0:7} nebula_game
+        - sleep 10
+        - curl -sf http://localhost/api/health || exit 1
+    when:
+      branch: develop
+
+  - name: deploy-production
+    image: appleboy/drone-ssh
+    depends_on: [docker-build-web, docker-build-api]
+    settings:
+      host:
+        from_secret: server1_host
+      username: deploy
+      key:
+        from_secret: ssh_private_key
+      script:
+        - docker service update --image registry.local:5000/nebula-web:${DRONE_COMMIT_SHA:0:7} --update-parallelism 1 --update-delay 30s nebula_web
+        - docker service update --image registry.local:5000/nebula-api:${DRONE_COMMIT_SHA:0:7} --update-parallelism 1 --update-delay 30s nebula_api
+        - docker service update --image registry.local:5000/nebula-api:${DRONE_COMMIT_SHA:0:7} --update-parallelism 1 --update-delay 30s nebula_game
+        - sleep 15
+        - curl -sf http://localhost/api/health || (docker service rollback nebula_web && docker service rollback nebula_api && exit 1)
+    when:
+      branch: main
+      event: push

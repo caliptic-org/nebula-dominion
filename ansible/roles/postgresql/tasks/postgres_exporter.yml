@@ -1,0 +1,63 @@
+---
+- name: Create postgres_exporter user
+  user:
+    name: postgres_exporter
+    system: yes
+    shell: /sbin/nologin
+    create_home: no
+
+- name: Download postgres_exporter
+  get_url:
+    url: "https://github.com/prometheus-community/postgres_exporter/releases/download/v{{ postgres_exporter_version }}/postgres_exporter-{{ postgres_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp/postgres_exporter.tar.gz
+
+- name: Extract postgres_exporter
+  unarchive:
+    src: /tmp/postgres_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install postgres_exporter binary
+  copy:
+    src: "/tmp/postgres_exporter-{{ postgres_exporter_version }}.linux-amd64/postgres_exporter"
+    dest: /usr/local/bin/postgres_exporter
+    mode: '0755'
+    remote_src: yes
+
+- name: Create postgres_exporter env file
+  copy:
+    content: "DATA_SOURCE_NAME=postgresql://postgres@/postgres?host=/var/run/postgresql&sslmode=disable\n"
+    dest: /etc/default/postgres_exporter
+    mode: '0640'
+    owner: postgres_exporter
+
+- name: Create postgres_exporter systemd service
+  copy:
+    content: |
+      [Unit]
+      Description=Prometheus PostgreSQL Exporter
+      After=network.target
+
+      [Service]
+      User=postgres_exporter
+      EnvironmentFile=/etc/default/postgres_exporter
+      ExecStart=/usr/local/bin/postgres_exporter
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/postgres_exporter.service
+
+- name: Enable and start postgres_exporter
+  systemd:
+    name: postgres_exporter
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Allow postgres_exporter port on private network
+  ufw:
+    rule: allow
+    port: 9187
+    proto: tcp
+    src: "{{ private_network_cidr }}"

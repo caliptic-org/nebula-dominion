@@ -1,0 +1,10 @@
+port {{ redis_sentinel_port }}
+bind 0.0.0.0
+sentinel monitor nebula-master {{ server1_private_ip }} {{ redis_port }} 2
+sentinel auth-pass nebula-master {{ redis_password }}
+sentinel down-after-milliseconds nebula-master 5000
+sentinel failover-timeout nebula-master 60000
+sentinel parallel-syncs nebula-master 1
+sentinel announce-ip {{ ansible_host }}
+sentinel announce-port {{ redis_sentinel_port }}
+logfile /var/log/redis/redis-sentinel.log

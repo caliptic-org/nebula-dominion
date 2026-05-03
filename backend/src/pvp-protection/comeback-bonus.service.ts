@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { ComebackBonus, ComebackBonusStatus } from './entities/comeback-bonus.entity';
 import { PvpMatchRecord, PvpMatchResult } from './entities/pvp-match-record.entity';
 
@@ -38,62 +38,91 @@ export class ComebackBonusService {
     comebackBonusGranted: boolean;
     comebackBonus: ComebackBonus | null;
   }> {
-    const lastRecord = await this.recordRepo.findOne({
-      where: { playerId: dto.playerId },
+    // Use a transaction with a per-player advisory lock to eliminate the
+    // read-then-increment race condition. Two concurrent match results for
+    // the same player will queue behind the lock instead of both reading
+    // consecutiveLosses=0 and both writing 1.
+    return this.recordRepo.manager.transaction(async (em: EntityManager) => {
+      // pg_advisory_xact_lock releases automatically when the transaction ends
+      await em.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [dto.playerId]);
+
+      // Compute consecutive losses by counting from actual records rather than
+      // trusting a stored counter (avoids stale-read race conditions)
+      const consecutiveLosses = await this.countConsecutiveLosses(em, dto.playerId, dto.result);
+
+      let comebackBonus: ComebackBonus | null = null;
+      let bonusGranted = false;
+
+      if (consecutiveLosses === CONSECUTIVE_LOSS_THRESHOLD) {
+        const existingPending = await em.findOne(ComebackBonus, {
+          where: { playerId: dto.playerId, status: ComebackBonusStatus.PENDING },
+        });
+
+        if (!existingPending) {
+          const expiresAt = new Date();
+          expiresAt.setHours(expiresAt.getHours() + BONUS_TTL_HOURS);
+
+          comebackBonus = await em.save(
+            em.create(ComebackBonus, {
+              playerId: dto.playerId,
+              triggerBattleId: dto.battleId,
+              status: ComebackBonusStatus.PENDING,
+              mineralReward: BONUS_MINERAL,
+              gasReward: BONUS_GAS,
+              freeHeal: true,
+              expiresAt,
+            }),
+          );
+          bonusGranted = true;
+          this.logger.log(
+            `Comeback bonus granted to player ${dto.playerId} after ${consecutiveLosses} consecutive losses`,
+          );
+        }
+      }
+
+      await em.save(
+        em.create(PvpMatchRecord, {
+          playerId: dto.playerId,
+          battleId: dto.battleId,
+          opponentId: dto.opponentId,
+          isBotMatch: dto.isBotMatch,
+          result: dto.result,
+          consecutiveLosses,
+          playerPowerScore: dto.playerPowerScore,
+          comebackBonusGranted: bonusGranted,
+        }),
+      );
+
+      return { comebackBonusGranted: bonusGranted, comebackBonus };
+    });
+  }
+
+  /** Count consecutive losses from actual DB records rather than a stored counter.
+   *  Must be called inside the advisory-locked transaction for accuracy. */
+  private async countConsecutiveLosses(
+    em: EntityManager,
+    playerId: string,
+    currentResult: PvpMatchResult,
+  ): Promise<number> {
+    if (currentResult !== PvpMatchResult.LOSS) return 0;
+
+    const recentRecords = await em.find(PvpMatchRecord, {
+      where: { playerId },
       order: { createdAt: 'DESC' },
+      take: CONSECUTIVE_LOSS_THRESHOLD,
     });
 
-    let consecutiveLosses = 0;
-    if (dto.result === PvpMatchResult.LOSS) {
-      consecutiveLosses = (lastRecord?.consecutiveLosses ?? 0) + 1;
-    }
-    // Win or draw resets the streak to 0
-
-    let comebackBonus: ComebackBonus | null = null;
-    let bonusGranted = false;
-
-    // Grant on the exact threshold hit (not beyond, to avoid duplicate grants)
-    if (consecutiveLosses === CONSECUTIVE_LOSS_THRESHOLD) {
-      const existingPending = await this.bonusRepo.findOne({
-        where: { playerId: dto.playerId, status: ComebackBonusStatus.PENDING },
-      });
-
-      if (!existingPending) {
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + BONUS_TTL_HOURS);
-
-        comebackBonus = await this.bonusRepo.save(
-          this.bonusRepo.create({
-            playerId: dto.playerId,
-            triggerBattleId: dto.battleId,
-            status: ComebackBonusStatus.PENDING,
-            mineralReward: BONUS_MINERAL,
-            gasReward: BONUS_GAS,
-            freeHeal: true,
-            expiresAt,
-          }),
-        );
-        bonusGranted = true;
-        this.logger.log(
-          `Comeback bonus granted to player ${dto.playerId} after ${consecutiveLosses} consecutive losses`,
-        );
+    // Count the current loss plus any preceding consecutive losses
+    let count = 1;
+    for (const record of recentRecords) {
+      if (record.result === PvpMatchResult.LOSS) {
+        count++;
+      } else {
+        break;
       }
+      if (count >= CONSECUTIVE_LOSS_THRESHOLD) break;
     }
-
-    await this.recordRepo.save(
-      this.recordRepo.create({
-        playerId: dto.playerId,
-        battleId: dto.battleId,
-        opponentId: dto.opponentId,
-        isBotMatch: dto.isBotMatch,
-        result: dto.result,
-        consecutiveLosses,
-        playerPowerScore: dto.playerPowerScore,
-        comebackBonusGranted: bonusGranted,
-      }),
-    );
-
-    return { comebackBonusGranted: bonusGranted, comebackBonus };
+    return count;
   }
 
   async getPendingBonus(playerId: string): Promise<ComebackBonus | null> {

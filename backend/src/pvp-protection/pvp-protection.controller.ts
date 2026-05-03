@@ -9,8 +9,11 @@ import {
   Query,
   ParseUUIDPipe,
   ParseBoolPipe,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard, JwtPayload } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PvpShieldService } from './pvp-shield.service';
 import { MatchmakingService } from './matchmaking.service';
 import { ComebackBonusService } from './comeback-bonus.service';
@@ -20,6 +23,8 @@ import { CreateBotProfileDto } from './dto/create-bot-profile.dto';
 import { BotDifficulty } from './entities/pvp-bot-profile.entity';
 
 @ApiTags('pvp-protection')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/pvp')
 export class PvpProtectionController {
   constructor(
@@ -30,33 +35,33 @@ export class PvpProtectionController {
 
   // ─── Shield ────────────────────────────────────────────────────────────────
 
-  @Post('shield/:playerId/init')
-  @ApiOperation({ summary: 'Initialize 7-day PvP shield for a new player' })
+  @Post('shield/init')
+  @ApiOperation({ summary: 'Initialize 7-day PvP shield for the authenticated player' })
   @ApiResponse({ status: 201, description: 'Shield initialized' })
-  initShield(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.shieldService.initShield(playerId);
+  initShield(@CurrentUser() user: JwtPayload) {
+    return this.shieldService.initShield(user.sub);
   }
 
-  @Get('shield/:playerId')
-  @ApiOperation({ summary: 'Get PvP shield status for a player' })
-  getShieldStatus(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.shieldService.getShieldStatus(playerId);
+  @Get('shield')
+  @ApiOperation({ summary: 'Get PvP shield status for the authenticated player' })
+  getShieldStatus(@CurrentUser() user: JwtPayload) {
+    return this.shieldService.getShieldStatus(user.sub);
   }
 
-  @Delete('shield/:playerId')
-  @ApiOperation({ summary: 'Opt out of PvP shield (player chooses to attack)' })
-  optOutShield(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.shieldService.optOut(playerId);
+  @Delete('shield')
+  @ApiOperation({ summary: 'Opt out of PvP shield (player chooses to attack real opponents)' })
+  optOutShield(@CurrentUser() user: JwtPayload) {
+    return this.shieldService.optOut(user.sub);
   }
 
-  @Patch('shield/:playerId/human-only')
+  @Patch('shield/human-only')
   @ApiOperation({ summary: 'Toggle human-only matchmaking preference' })
   @ApiQuery({ name: 'enabled', type: Boolean })
   setHumanOnly(
-    @Param('playerId', ParseUUIDPipe) playerId: string,
+    @CurrentUser() user: JwtPayload,
     @Query('enabled', ParseBoolPipe) enabled: boolean,
   ) {
-    return this.shieldService.setHumanOnlyMatchmaking(playerId, enabled);
+    return this.shieldService.setHumanOnlyMatchmaking(user.sub, enabled);
   }
 
   // ─── Matchmaking ───────────────────────────────────────────────────────────
@@ -64,9 +69,13 @@ export class PvpProtectionController {
   @Post('matchmaking/find')
   @ApiOperation({ summary: 'Find PvP opponent (bot for first 5 matches, then real player)' })
   @ApiResponse({ status: 201, description: 'Opponent found — use returned opponentId and opponentUnits to create battle' })
-  findMatch(@Body() dto: FindMatchDto) {
+  findMatch(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: FindMatchDto,
+  ) {
+    // attackerId is always sourced from the validated JWT, never from the request body
     return this.matchmakingService.findMatch(
-      dto.attackerId,
+      user.sub,
       dto.attackerUnits,
       dto.candidateDefenderIds ?? [],
     );
@@ -100,9 +109,13 @@ export class PvpProtectionController {
   @Post('match-record')
   @ApiOperation({ summary: 'Record PvP match result and check for comeback bonus trigger' })
   @ApiResponse({ status: 201, description: 'Result recorded; comebackBonus is set if 3-loss streak triggered' })
-  recordResult(@Body() dto: RecordResultDto) {
+  recordResult(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: RecordResultDto,
+  ) {
+    // playerId is always sourced from the validated JWT
     return this.comebackBonusService.recordMatchResult({
-      playerId: dto.playerId,
+      playerId: user.sub,
       battleId: dto.battleId,
       result: dto.result,
       isBotMatch: dto.isBotMatch,
@@ -111,24 +124,24 @@ export class PvpProtectionController {
     });
   }
 
-  @Get('comeback-bonus/:playerId')
-  @ApiOperation({ summary: 'Get pending comeback bonus for a player (if any)' })
-  getPendingBonus(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.comebackBonusService.getPendingBonus(playerId);
+  @Get('comeback-bonus')
+  @ApiOperation({ summary: 'Get pending comeback bonus for the authenticated player (if any)' })
+  getPendingBonus(@CurrentUser() user: JwtPayload) {
+    return this.comebackBonusService.getPendingBonus(user.sub);
   }
 
-  @Post('comeback-bonus/:playerId/claim/:bonusId')
+  @Post('comeback-bonus/claim/:bonusId')
   @ApiOperation({ summary: 'Claim a pending comeback bonus' })
   claimBonus(
-    @Param('playerId', ParseUUIDPipe) playerId: string,
+    @CurrentUser() user: JwtPayload,
     @Param('bonusId', ParseUUIDPipe) bonusId: string,
   ) {
-    return this.comebackBonusService.claimBonus(playerId, bonusId);
+    return this.comebackBonusService.claimBonus(user.sub, bonusId);
   }
 
-  @Get('stats/:playerId')
-  @ApiOperation({ summary: 'Get PvP stats for a player (wins, losses, streak)' })
-  getPlayerStats(@Param('playerId', ParseUUIDPipe) playerId: string) {
-    return this.comebackBonusService.getPlayerStats(playerId);
+  @Get('stats')
+  @ApiOperation({ summary: 'Get PvP stats for the authenticated player (wins, losses, streak)' })
+  getPlayerStats(@CurrentUser() user: JwtPayload) {
+    return this.comebackBonusService.getPlayerStats(user.sub);
   }
 }

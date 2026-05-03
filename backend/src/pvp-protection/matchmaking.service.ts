@@ -115,4 +115,11 @@ export class MatchmakingService {
   async deactivateBotProfile(id: string): Promise<void> {
     await this.botProfileRepo.update(id, { isActive: false });
   }
+
+  /** Returns true if the given ID belongs to an active bot profile.
+   *  Used by BattleService to determine isBotOpponent server-side. */
+  async isBotProfile(id: string): Promise<boolean> {
+    const count = await this.botProfileRepo.count({ where: { id, isActive: true } });
+    return count > 0;
+  }
 }

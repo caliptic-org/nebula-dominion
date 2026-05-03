@@ -20,8 +20,6 @@ RUN pnpm --filter @nebula-dominion/api deploy --prod /standalone
 
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache netcat-openbsd
-
 ENV NODE_ENV=production
 
 WORKDIR /app
@@ -29,8 +27,6 @@ WORKDIR /app
 COPY --from=builder /standalone/node_modules ./node_modules
 COPY --from=builder /standalone/dist ./dist
 COPY --from=builder /standalone/package.json ./package.json
-COPY apps/api/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
@@ -40,5 +36,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD wget -qO- http://localhost:4000/api/docs-json || exit 1
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

@@ -1,22 +1,44 @@
 FROM node:20-alpine AS builder
 
+RUN corepack enable
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production && npm ci
-COPY . .
-RUN npm run build
+
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/game-server/package.json ./apps/game-server/
+COPY apps/api-server/package.json ./apps/api-server/
+COPY apps/web/package.json ./apps/web/
+
+RUN pnpm install
+
+COPY apps/api ./apps/api
+
+RUN pnpm --filter @nebula-dominion/api run build
+
+RUN pnpm --filter @nebula-dominion/api deploy --prod /standalone
 
 FROM node:20-alpine AS production
 
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
+RUN apk add --no-cache netcat-openbsd
 
 ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY --from=builder /standalone/node_modules ./node_modules
+COPY --from=builder /standalone/dist ./dist
+COPY --from=builder /standalone/package.json ./package.json
+COPY apps/api/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:4000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+  CMD wget -qO- http://localhost:4000/api/docs-json || exit 1
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

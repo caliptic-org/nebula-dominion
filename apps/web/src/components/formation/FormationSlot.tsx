@@ -85,6 +85,26 @@ export function UnitSlot({
       {unit ? (
         <>
           <div className="relative w-full flex-1 overflow-hidden rounded-t-[6px]">
+            {/* Radar-style HUD ring overlay — sci-fi targeting accent */}
+            <div
+              className="absolute pointer-events-none z-[1]"
+              style={
+                {
+                  left: '50%',
+                  top: '50%',
+                  width: '88%',
+                  aspectRatio: '1 / 1',
+                  transform: 'translate(-50%, -50%)',
+                  ['--hud-ring-color' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}40`,
+                  ['--hud-ring-shadow-outer' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}1F`,
+                  ['--hud-ring-shadow-inner' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}14`,
+                } as React.CSSProperties
+              }
+              aria-hidden
+            >
+              <span className="hud-ring" />
+              <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+            </div>
             {!imgError ? (
               <Image
                 src={unit.portrait}
@@ -209,6 +229,26 @@ export function CommanderSlot({
             ))}
           </div>
           <div className="relative w-full flex-1 overflow-hidden rounded-t-[6px] mt-3">
+            {/* Radar-style HUD ring overlay around commander portrait */}
+            <div
+              className="absolute pointer-events-none z-[1]"
+              style={
+                {
+                  left: '50%',
+                  top: '50%',
+                  width: '92%',
+                  aspectRatio: '1 / 1',
+                  transform: 'translate(-50%, -50%)',
+                  ['--hud-ring-color' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}55`,
+                  ['--hud-ring-shadow-outer' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}26`,
+                  ['--hud-ring-shadow-inner' as string]: `${rc?.color ?? 'rgba(0,207,255,1)'}1A`,
+                } as React.CSSProperties
+              }
+              aria-hidden
+            >
+              <span className="hud-ring" />
+              <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+            </div>
             {!imgError ? (
               <Image
                 src={commander.portrait}

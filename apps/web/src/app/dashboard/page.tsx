@@ -269,7 +269,21 @@ export default function DashboardPage() {
                   className="stat-card ink-border-race p-4 transition-all hover-glow"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg" aria-hidden>{stat.icon}</span>
+                    <span
+                      className="relative inline-flex items-center justify-center w-7 h-7 text-lg"
+                      aria-hidden
+                      style={
+                        {
+                          ['--hud-ring-color' as string]: `${stat.color}55`,
+                          ['--hud-ring-shadow-outer' as string]: `${stat.color}26`,
+                          ['--hud-ring-shadow-inner' as string]: `${stat.color}1A`,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className="hud-ring" />
+                      <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+                      {stat.icon}
+                    </span>
                     <span className="manga-label">{stat.label}</span>
                   </div>
                   <p className="manga-number" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', color: stat.color }}>{stat.value}</p>

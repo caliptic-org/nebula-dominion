@@ -1856,3 +1856,64 @@ body::after {
   .hud-progress-fill { transition: none; }
   .hud-progress-bar--scanning .hud-progress-fill::before { animation: none; }
 }
+
+/* ── HUD Rings — radar-style decorative concentric rings ────────────────── */
+/* Use as an absolutely positioned, pointer-events:none overlay around any
+   focal element (avatar, icon, slot). Combine .hud-ring with .hud-ring-dashed
+   for a slowly rotating dashed companion ring. Color follows --color-race
+   when set on an ancestor; otherwise falls back to the accent cyan. */
+.hud-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--hud-ring-color, rgba(0, 207, 255, 0.25));
+  box-shadow:
+    0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.1)),
+    inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.05));
+  animation: hud-ring-pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.hud-ring-dashed {
+  border-style: dashed;
+  animation: hud-ring-rotate 20s linear infinite;
+}
+
+/* Inset variant — sits slightly inside its container for layered ring stacks */
+.hud-ring-inset {
+  inset: 4px;
+  opacity: 0.7;
+}
+
+/* Race-tinted ring — picks up the active race accent via CSS vars */
+.hud-ring-race {
+  border-color: var(--color-race-glow, rgba(0, 207, 255, 0.35));
+  --hud-ring-shadow-outer: var(--color-race-dim, rgba(0, 207, 255, 0.12));
+  --hud-ring-shadow-inner: var(--color-race-dim, rgba(0, 207, 255, 0.08));
+}
+
+@keyframes hud-ring-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    box-shadow:
+      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.1)),
+      inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.05));
+  }
+  50% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.18)),
+      0 0 12px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.18)),
+      inset 0 0 24px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.1));
+  }
+}
+
+@keyframes hud-ring-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-ring,
+  .hud-ring-dashed { animation: none; }
+}

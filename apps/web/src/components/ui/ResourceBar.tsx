@@ -45,8 +45,19 @@ export function ResourceBar(props: ResourceBarProps) {
             key={r.label}
             className="resource-bar"
             title={r.label}
+            style={
+              {
+                ['--hud-ring-color' as string]: `${r.color ?? 'rgba(0,207,255,0.35)'}55`,
+                ['--hud-ring-shadow-outer' as string]: `${r.color ?? 'rgba(0,207,255,0.2)'}22`,
+                ['--hud-ring-shadow-inner' as string]: `${r.color ?? 'rgba(0,207,255,0.1)'}33`,
+              } as React.CSSProperties
+            }
           >
-            <span aria-hidden>{r.icon}</span>
+            <span className="relative inline-flex items-center justify-center w-5 h-5 text-[0.85em]" aria-hidden>
+              <span className="hud-ring" />
+              <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+              {r.icon}
+            </span>
             <span style={{ color: r.color ?? 'var(--color-text-primary)' }}>
               {typeof r.value === 'number' ? r.value.toLocaleString('tr-TR') : r.value}
             </span>

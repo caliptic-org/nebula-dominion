@@ -646,6 +646,7 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
           o.body.rotation.x += dt * 0.8;
         } else if (o.kind === 'base') {
           // Race-specific update owns its own per-frame motion (gears, portals, pulses).
+          o.raceBase?.setSelected?.(o === selectedRef.current);
           o.raceBase?.update(elapsed, dt);
           // Pulse halo intensity for player base
           if (o.glow && o.base?.isPlayer) {

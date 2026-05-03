@@ -96,6 +96,46 @@ export function createParticleField(cfg: ParticleConfig): ParticleField {
   return { points, update, dispose };
 }
 
+/**
+ * Ground glow plane — additive blend disc that sits flat at y=0 to fake bloom on the floor.
+ * Each race uses one of these tinted to its accent color. Disposal is the caller's job.
+ */
+export function createGroundGlow(color: THREE.ColorRepresentation, size: number, opacity = 0.15): THREE.Mesh {
+  const geo = new THREE.PlaneGeometry(size, size);
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/**
+ * Walks a group and disposes every geometry/material it owns. Use in factory `dispose`
+ * to avoid hand-tracking each mesh — the host already removes the root from the scene.
+ */
+export function disposeGroup(root: THREE.Object3D): void {
+  const seenGeoms = new Set<THREE.BufferGeometry>();
+  const seenMats = new Set<THREE.Material>();
+  root.traverse(obj => {
+    const mesh = obj as THREE.Mesh;
+    if (mesh.geometry && !seenGeoms.has(mesh.geometry)) {
+      seenGeoms.add(mesh.geometry);
+      mesh.geometry.dispose();
+    }
+    const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+    mats.forEach(m => {
+      if (!seenMats.has(m)) { seenMats.add(m); m.dispose(); }
+    });
+  });
+}
+
 function makePointTexture(color: string): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = 64;

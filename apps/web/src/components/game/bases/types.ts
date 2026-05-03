@@ -15,8 +15,10 @@ export interface RaceBaseInstance {
   group: THREE.Group;
   /** Approximate bounding radius for hit-testing & ring sizing. */
   radius: number;
-  /** Per-frame animation step. Selected pulse is the responsibility of the host. */
+  /** Per-frame animation step. The host still owns the outer selection ring. */
   update: (elapsed: number, dt: number) => void;
+  /** Toggle race-specific "selected" animation (overcharge, portal swirl, hive wake, etc.). */
+  setSelected?: (selected: boolean) => void;
   /** Geometry/material/texture cleanup. */
   dispose: () => void;
 }

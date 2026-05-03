@@ -1,111 +1,184 @@
 import * as THREE from 'three';
 import { Race } from '@/types/units';
-import { createParticleField } from './particles';
+import { createGroundGlow, createParticleField, disposeGroup } from './particles';
 import type { RaceBaseFactory } from './types';
 import { RACE_LIGHT_INTENSITY } from './types';
 
 /**
  * Canavar — Titan Mağarası
- * Yassılaştırılmış torus kemer + ters konik stalaktitler + dodecahedron lav zemin.
+ * Cave floor disc surrounded by stalagmite cones, descending stalactite pair, bone clusters,
+ * and a central biolumen pool. Selected: pool intensity surges & cave breathes.
  */
 export const createBeastBase: RaceBaseFactory = (color, opts) => {
   const compact = !!opts.compact;
-  const scale = compact ? 0.55 : 1;
+  const s = (compact ? 0.55 : 1) * 0.5;
   const root = new THREE.Group();
 
-  const stoneTan = '#3b2a1f';
-  const boneCream = '#d8c8a8';
-  const lavaOrange = new THREE.Color(color);
-
-  // ── Mağara giriş kemeri (yassılaştırılmış torus) ──────────────────────
-  const archGeom = new THREE.TorusGeometry(1.8 * scale, 0.45 * scale, 14, 32, Math.PI);
-  const archMat = new THREE.MeshStandardMaterial({
-    color: stoneTan,
-    roughness: 1.0,
-    metalness: 0.05,
-    emissive: lavaOrange,
-    emissiveIntensity: 0.12,
+  const caveStoneMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1f0f,
+    roughness: 0.92,
+    metalness: 0.02,
+    emissive: new THREE.Color(0x0a0500),
+    emissiveIntensity: 0.05,
   });
-  const arch = new THREE.Mesh(archGeom, archMat);
-  arch.scale.set(1, 1, 0.55); // yassılaştır
-  arch.position.y = 0.4 * scale;
-  arch.rotation.z = Math.PI; // ağzı aşağı
-  root.add(arch);
+  const boneMat = new THREE.MeshStandardMaterial({
+    color: 0xd4c49a,
+    roughness: 0.85,
+    metalness: 0.0,
+    emissive: new THREE.Color(0xff6600),
+    emissiveIntensity: 0.05,
+  });
+  const biolumenPoolMat = new THREE.MeshStandardMaterial({
+    color: 0xff4400,
+    roughness: 0.1,
+    metalness: 0.0,
+    emissive: new THREE.Color(0xff6600),
+    emissiveIntensity: 1.8,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+  });
 
-  // ── Stalaktitler — ters koniler ───────────────────────────────────────
+  const baseBioEmissive = 1.8;
+  const baseBioOpacity = 0.7;
+
+  // cave_floor — wide low cylinder
+  const floor = new THREE.Mesh(
+    new THREE.CylinderGeometry(4.0 * s, 4.5 * s, 0.3 * s, 12),
+    caveStoneMat,
+  );
+  floor.position.y = 0.15 * s;
+  root.add(floor);
+
+  // entry arch — half torus suggesting a cave mouth, oriented vertical & toward camera
+  const entryArch = new THREE.Mesh(
+    new THREE.TorusGeometry(1.5 * s, 0.25 * s, 8, 16, Math.PI),
+    caveStoneMat,
+  );
+  entryArch.position.set(0, 0.3 * s, 2.5 * s);
+  root.add(entryArch);
+
+  // stalagmites — ground cones pointing up
+  const stalagmiteSpecs = [
+    { r: 0.4, h: 2.8, seg: 6, x: -1.5, z: -1.0 },
+    { r: 0.3, h: 3.5, seg: 5, x:  1.2, z: -1.8 },
+    { r: 0.5, h: 1.8, seg: 7, x:  1.8, z:  1.2 },
+    { r: 0.25, h: 2.2, seg: 5, x: -2.0, z:  1.5 },
+  ];
+  const stalagmites: THREE.Mesh[] = [];
+  stalagmiteSpecs.slice(0, compact ? 2 : 4).forEach(spec => {
+    const mesh = new THREE.Mesh(
+      new THREE.ConeGeometry(spec.r * s, spec.h * s, spec.seg),
+      caveStoneMat,
+    );
+    mesh.position.set(spec.x * s, 0.3 * s + (spec.h * s) / 2, spec.z * s);
+    root.add(mesh);
+    stalagmites.push(mesh);
+  });
+
+  // stalactites — ceiling cones pointing down
+  const stalactiteSpecs = [
+    { r: 0.35, h: 2.5, x: -0.5, y: 4.0, z: 0 },
+    { r: 0.2, h: 1.8, x:  1.0, y: 4.5, z: -0.5 },
+  ];
   const stalactites: THREE.Mesh[] = [];
-  const stCount = compact ? 4 : 7;
-  for (let i = 0; i < stCount; i++) {
-    const t = i / (stCount - 1);
-    const angle = -Math.PI * (0.15 + t * 0.7); // kemerin alt kısmında dizilim
-    const r = 1.65 * scale;
-    const len = (0.4 + Math.random() * 0.6) * scale;
-    const g = new THREE.ConeGeometry(0.13 * scale, len, 8);
-    const m = new THREE.MeshStandardMaterial({
-      color: boneCream,
-      roughness: 0.85,
-      metalness: 0.05,
+  if (!compact) {
+    stalactiteSpecs.forEach(spec => {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(spec.r * s, spec.h * s, 6),
+        caveStoneMat,
+      );
+      mesh.rotation.x = Math.PI;
+      mesh.position.set(spec.x * s, spec.y * s, spec.z * s);
+      root.add(mesh);
+      stalactites.push(mesh);
     });
-    const cone = new THREE.Mesh(g, m);
-    cone.position.set(Math.cos(angle) * r, Math.sin(angle) * r + 0.4 * scale, 0);
-    cone.rotation.z = Math.PI; // sivri uç aşağı
-    root.add(cone);
-    stalactites.push(cone);
   }
 
-  // ── Lav zemin — dodecahedron parçaları ────────────────────────────────
-  const groundGeom = new THREE.DodecahedronGeometry(1.6 * scale, 0);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: '#241712',
-    roughness: 0.95,
-    metalness: 0.0,
-    emissive: lavaOrange,
-    emissiveIntensity: 0.45,
-    flatShading: true,
-  });
-  const ground = new THREE.Mesh(groundGeom, groundMat);
-  ground.scale.set(1, 0.45, 1);
-  ground.position.y = -0.05 * scale;
-  root.add(ground);
+  // bone clusters — randomly sized octahedrons scattered on the floor
+  const boneCount = compact ? 3 : 7;
+  for (let i = 0; i < boneCount; i++) {
+    const a = (i / boneCount) * Math.PI * 2 + 0.4;
+    const r = 2.2 + Math.sin(i * 1.7) * 0.6;
+    const radius = 0.3 + (i % 3) * 0.1;
+    const bone = new THREE.Mesh(
+      new THREE.OctahedronGeometry(radius * s, 0),
+      boneMat,
+    );
+    bone.position.set(Math.cos(a) * r * s, 0.3 * s + radius * s * 0.5, Math.sin(a) * r * s);
+    bone.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    root.add(bone);
+  }
 
-  // ── Lav damla partikülleri (aşağı akar) ───────────────────────────────
-  const lava = createParticleField({
+  // biolumen pool — flat lava disc + additive glow underneath
+  const pool = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8 * s, 32),
+    biolumenPoolMat,
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.31 * s;
+  root.add(pool);
+
+  const poolGlow = createGroundGlow(0xff6600, 3.5 * s, 0.22);
+  poolGlow.position.y = 0.32 * s;
+  root.add(poolGlow);
+
+  // ground halo
+  const glow = createGroundGlow(0xff6600, 8 * s, 0.10);
+  glow.position.y = 0.01;
+  root.add(glow);
+
+  // particles — orange spore drift + spark flecks
+  const spores = createParticleField({
     count: compact ? 14 : 40,
-    color: '#ff8c33',
-    size: 0.18 * scale,
-    spread: 2.6 * scale,
-    velocity: new THREE.Vector3(0, -0.45, 0),
-    jitter: 0.15,
-    lifespan: [1.2, 2.5],
-    spawnRadius: 1.4 * scale,
+    color: '#ffaa55',
+    size: 0.18 * s,
+    spread: 3.0 * s,
+    velocity: new THREE.Vector3(0, 0.12, 0),
+    jitter: 0.2,
+    lifespan: [2.0, 4.0],
+    spawnRadius: 1.6 * s,
   });
-  lava.points.position.y = 1.4 * scale;
-  root.add(lava.points);
+  spores.points.position.y = 0.6 * s;
+  root.add(spores.points);
 
-  // ── Aksan ışığı ───────────────────────────────────────────────────────
-  const light = new THREE.PointLight(color, RACE_LIGHT_INTENSITY[Race.CANAVAR] * (compact ? 0.5 : 1), 22, 1.6);
-  light.position.set(0, 0.8 * scale, 0);
-  root.add(light);
+  const bioLight = new THREE.PointLight(0xff6600, RACE_LIGHT_INTENSITY[Race.CANAVAR] * 1.1 * (compact ? 0.5 : 1), 10, 1.6);
+  bioLight.position.set(0, 0.7 * s, 0);
+  root.add(bioLight);
+
+  const depthLight = new THREE.PointLight(0x330022, 0.6 * (compact ? 0.5 : 1), 8, 1.6);
+  depthLight.position.set(0, -0.5 * s, 0);
+  root.add(depthLight);
+
+  let selected = false;
 
   const update = (elapsed: number, dt: number) => {
-    // Lava çatlakları "nefes" alır
-    groundMat.emissiveIntensity = 0.35 + 0.2 * Math.sin(elapsed * 1.3);
-    // Stalaktitler hafifçe sarkar
-    stalactites.forEach((s, i) => {
-      s.position.y += Math.sin(elapsed * 0.5 + i * 0.7) * 0.0008;
+    if (selected) {
+      biolumenPoolMat.emissiveIntensity = 3.0 + Math.sin(elapsed * 3) * 0.8;
+      biolumenPoolMat.opacity = baseBioOpacity + 0.2 + Math.sin(elapsed * 3) * 0.1;
+      root.scale.y = 1 + Math.sin(elapsed * 2.5) * 0.06;
+    } else {
+      biolumenPoolMat.emissiveIntensity = baseBioEmissive + Math.sin(elapsed * 1.2) * 0.6;
+      biolumenPoolMat.opacity = baseBioOpacity + Math.sin(elapsed * 1.2) * 0.15;
+      root.scale.y = 1;
+    }
+
+    stalactites.forEach((st, i) => {
+      st.rotation.z = Math.sin(elapsed * (0.7 + i * 0.2) + i) * 0.02;
     });
-    lava.update(dt);
+    stalagmites.forEach((sm, i) => {
+      sm.scale.y = 1 + Math.sin(elapsed * 0.5 + i * 1.2) * 0.008;
+    });
+
+    spores.update(dt);
   };
+
+  const setSelected = (v: boolean) => { selected = v; };
 
   const dispose = () => {
-    archGeom.dispose(); archMat.dispose();
-    groundGeom.dispose(); groundMat.dispose();
-    stalactites.forEach(s => {
-      (s.geometry as THREE.BufferGeometry).dispose();
-      (s.material as THREE.Material).dispose();
-    });
-    lava.dispose();
+    disposeGroup(root);
+    spores.dispose();
   };
 
-  return { group: root, radius: 2.2 * scale, update, dispose };
+  return { group: root, radius: 4.5 * s, update, setSelected, dispose };
 };

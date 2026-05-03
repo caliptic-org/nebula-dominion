@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { UserCosmetic } from './user-cosmetic.entity';
 
 export type CosmeticCategory = 'skin' | 'frame' | 'title' | 'effect';
 export type CosmeticRarity = 'common' | 'rare' | 'epic' | 'legendary';
@@ -46,4 +48,7 @@ export class CosmeticItem {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => UserCosmetic, (uc) => uc.cosmeticItem)
+  userCosmetics: UserCosmetic[];
 }

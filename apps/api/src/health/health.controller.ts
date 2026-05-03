@@ -1,12 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  HealthCheck,
-  HealthCheckService,
-  HealthCheckResult,
-  HealthIndicatorResult,
-  TypeOrmHealthIndicator,
-} from '@nestjs/terminus';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -16,8 +11,8 @@ export class HealthController {
   private redis: Redis;
 
   constructor(
-    private readonly health: HealthCheckService,
-    private readonly db: TypeOrmHealthIndicator,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly config: ConfigService,
   ) {
     this.redis = new Redis(config.get<string>('redis.url', 'redis://localhost:6379'), {
@@ -27,13 +22,12 @@ export class HealthController {
   }
 
   @Get()
-  @HealthCheck()
   @ApiOperation({ summary: 'Full health check (DB + Redis)' })
-  check(): Promise<HealthCheckResult> {
-    return this.health.check([
-      () => this.db.pingCheck('database'),
-      () => this.redisCheck(),
-    ]);
+  async check(): Promise<{ status: string; db: string; redis: string; timestamp: string }> {
+    const db = await this.dbCheck();
+    const redis = await this.redisCheck();
+    const status = db === 'up' && redis === 'up' ? 'ok' : 'degraded';
+    return { status, db, redis, timestamp: new Date().toISOString() };
   }
 
   @Get('live')
@@ -43,21 +37,29 @@ export class HealthController {
   }
 
   @Get('ready')
-  @HealthCheck()
   @ApiOperation({ summary: 'Readiness probe (DB + Redis)' })
-  readiness(): Promise<HealthCheckResult> {
-    return this.health.check([
-      () => this.db.pingCheck('database'),
-      () => this.redisCheck(),
-    ]);
+  async readiness(): Promise<{ status: string; db: string; redis: string; timestamp: string }> {
+    const db = await this.dbCheck();
+    const redis = await this.redisCheck();
+    const status = db === 'up' && redis === 'up' ? 'ok' : 'degraded';
+    return { status, db, redis, timestamp: new Date().toISOString() };
   }
 
-  private async redisCheck(): Promise<HealthIndicatorResult> {
+  private async dbCheck(): Promise<string> {
+    try {
+      await this.dataSource.query('SELECT 1');
+      return 'up';
+    } catch {
+      return 'down';
+    }
+  }
+
+  private async redisCheck(): Promise<string> {
     try {
       await this.redis.ping();
-      return { redis: { status: 'up' } };
+      return 'up';
     } catch {
-      return { redis: { status: 'down' } };
+      return 'down';
     }
   }
 }

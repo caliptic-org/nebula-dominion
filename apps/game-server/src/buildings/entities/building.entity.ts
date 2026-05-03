@@ -13,6 +13,10 @@ export enum BuildingType {
   GAS_REFINERY = 'gas_refinery',
   SOLAR_PLANT = 'solar_plant',
   BARRACKS = 'barracks',
+  ACADEMY = 'academy',
+  FACTORY = 'factory',
+  SPAWNING_POOL = 'spawning_pool',
+  HATCHERY = 'hatchery',
   TURRET = 'turret',
   SHIELD_GENERATOR = 'shield_generator',
   // Age 2 buildings (Automata)

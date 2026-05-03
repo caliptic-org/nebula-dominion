@@ -13,8 +13,10 @@ import {
   getLevelDef,
   getMaxLevel,
   getFirstLevel,
+  getFirstLevelForAge,
   getAgeTierBadge,
   AgeTierBadge,
+  AGE_BADGE_LABELS,
   MAX_AGE,
   MAX_LEVEL,
   ContentUnlock,
@@ -22,7 +24,7 @@ import {
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
-import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { AgeTransitionEvent, EraTransitionEvent, EraTransitionPackage, LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
 import {
   EVENT_GUILD_TUTORIAL_REQUIRED,
   GUILD_TUTORIAL_XP_THRESHOLD,
@@ -242,7 +244,7 @@ export class ProgressionService {
     return { progress: this.toDto(record), eraPackage };
   }
 
-  async getActiveProductionBoost(userId: string): Promise<ActiveBoostDto> {
+  async getActiveProductionBoost(userId: string): Promise<{ productionBoostMultiplier: number; productionBoostExpiresAt: Date | null; isActive: boolean }> {
     const boost = await this.eraPackageRepo.findOne({
       where: { userId, productionBoostExpiresAt: MoreThan(new Date()) },
       order: { grantedAt: 'DESC' },
@@ -351,6 +353,25 @@ export class ProgressionService {
     return leveledUp;
   }
 
+  private emitTelemetry(
+    userId: string,
+    source: XpSource,
+    baseAmount: number,
+    finalAmount: number,
+    record: PlayerLevel,
+  ): void {
+    this.emitter.emit('progression.xp_telemetry', {
+      userId,
+      source,
+      baseAmount,
+      finalAmount,
+      level: record.currentLevel,
+      age: record.currentAge,
+      totalXp: record.totalXp,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   async reloadConfig(): Promise<{ success: boolean; reason?: string }> {
     return this.progressionConfigService.reloadFromDb();
   }
@@ -386,7 +407,7 @@ export class ProgressionService {
     dto.unlockedContent = record.unlockedContent;
     dto.tierBonusMultiplier = levelDef?.xpMultiplier ?? 1.0;
     dto.isMaxLevel = isMaxLevel;
-    dto.canAdvanceAge = canAdvanceAge;
+    dto.canAdvanceAge = record.currentLevel >= getMaxLevel(record.currentAge) && record.currentAge < MAX_AGE;
     return dto;
   }
 }

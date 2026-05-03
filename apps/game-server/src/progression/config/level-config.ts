@@ -563,4 +563,17 @@ export function getAgeForLevel(level: number): number {
   return Math.ceil(level / LEVELS_PER_AGE);
 }
 
+/** Alias for getFirstLevel — returns global level number of the first level in the given age */
+export const getFirstLevelForAge = getFirstLevel;
+
+/** Production multiplier granted to players catching up after an era transition */
+export const ERA_CATCH_UP_PRODUCTION_MULTIPLIER = 2.0;
+
+/** Human-readable badge labels keyed by AgeTierBadge */
+export const AGE_BADGE_LABELS: Record<AgeTierBadge, string> = {
+  [AgeTierBadge.ACEMI]:     'Acemi',
+  [AgeTierBadge.DENEYIMLI]: 'Deneyimli',
+  [AgeTierBadge.SAMPIYON]:  'Şampiyon',
+};
+
 export { ALL_LEVELS };

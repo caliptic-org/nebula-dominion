@@ -1,5 +1,21 @@
 import { AgeTierBadge, ContentUnlock } from '../config/level-config';
 
+export interface EraTransitionPackage {
+  goldGranted: number;
+  gemsGranted: number;
+  premiumCurrencyGranted: number;
+  unitPackCount: number;
+  productionBoostMultiplier: number;
+  productionBoostExpiresAt: Date;
+}
+
+export interface EraTransitionEvent {
+  userId: string;
+  fromAge: number;
+  toAge: number;
+  catchUpPackage: EraTransitionPackage;
+}
+
 export interface LevelUpEvent {
   userId: string;
   previousLevel: number;

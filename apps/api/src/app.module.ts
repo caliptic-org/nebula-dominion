@@ -10,6 +10,7 @@ import { BossModule } from './modules/boss/boss.module';
 import { ShopModule } from './modules/shop/shop.module';
 import { PremiumModule } from './modules/premium/premium.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { VipModule } from './modules/vip/vip.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     ShopModule,
     PremiumModule,
     PaymentModule,
+    VipModule,
   ],
 })
 export class AppModule {}

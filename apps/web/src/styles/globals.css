@@ -901,3 +901,139 @@ body::after {
   align-items: center;
   justify-content: center;
 }
+
+/* ── HUD Progress Bar (Sci-Fi telemetry strip) ───────────────────────────── */
+.hud-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: var(--hud-track-bg, rgba(0, 207, 255, 0.08));
+  border: 1px solid var(--hud-track-border, rgba(0, 207, 255, 0.15));
+  overflow: hidden;
+}
+
+/* Tick marks — overlaid on track via ::after */
+.hud-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 19px,
+    var(--hud-tick-color, rgba(0, 207, 255, 0.15)) 19px,
+    var(--hud-tick-color, rgba(0, 207, 255, 0.15)) 20px
+  );
+}
+
+.hud-progress-fill {
+  position: relative;
+  height: 100%;
+  background: var(
+    --hud-fill-gradient,
+    linear-gradient(90deg, rgba(0, 207, 255, 0.4), #00cfff)
+  );
+  box-shadow: 0 0 8px var(--hud-fill-glow, rgba(0, 207, 255, 0.6));
+  transition: width 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 1;
+}
+
+/* Forward edge — leading scanner line */
+.hud-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  background: var(--hud-edge-color, rgba(255, 255, 255, 0.85));
+  box-shadow: 0 0 6px var(--hud-edge-glow, rgba(0, 207, 255, 0.9));
+}
+
+/* Size variants */
+.hud-progress-bar--xs { height: 2px; }
+.hud-progress-bar--sm { height: 4px; }
+.hud-progress-bar--md { height: 6px; }
+.hud-progress-bar--lg { height: 10px; }
+
+/* Variant tokens — recolour without redefining structure */
+.hud-progress-bar--brand {
+  --hud-track-bg:     rgba(74, 158, 255, 0.08);
+  --hud-track-border: rgba(74, 158, 255, 0.18);
+  --hud-tick-color:   rgba(74, 158, 255, 0.18);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(74, 158, 255, 0.4), #4a9eff);
+  --hud-fill-glow:    rgba(74, 158, 255, 0.55);
+  --hud-edge-glow:    rgba(74, 158, 255, 0.9);
+}
+
+.hud-progress-bar--accent {
+  --hud-track-bg:     rgba(0, 207, 255, 0.08);
+  --hud-track-border: rgba(0, 207, 255, 0.18);
+  --hud-tick-color:   rgba(0, 207, 255, 0.18);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(0, 207, 255, 0.4), #00cfff);
+  --hud-fill-glow:    rgba(0, 207, 255, 0.6);
+  --hud-edge-glow:    rgba(0, 207, 255, 0.95);
+}
+
+.hud-progress-bar--energy {
+  --hud-track-bg:     rgba(255, 200, 50, 0.08);
+  --hud-track-border: rgba(255, 200, 50, 0.20);
+  --hud-tick-color:   rgba(255, 200, 50, 0.20);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(255, 200, 50, 0.4), #ffc832);
+  --hud-fill-glow:    rgba(255, 200, 50, 0.55);
+  --hud-edge-glow:    rgba(255, 200, 50, 0.9);
+}
+
+.hud-progress-bar--health {
+  --hud-track-bg:     rgba(68, 255, 136, 0.08);
+  --hud-track-border: rgba(68, 255, 136, 0.20);
+  --hud-tick-color:   rgba(68, 255, 136, 0.20);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(68, 255, 136, 0.4), #44ff88);
+  --hud-fill-glow:    rgba(68, 255, 136, 0.55);
+  --hud-edge-glow:    rgba(68, 255, 136, 0.9);
+}
+
+.hud-progress-bar--danger {
+  --hud-track-bg:     rgba(255, 51, 85, 0.08);
+  --hud-track-border: rgba(255, 51, 85, 0.20);
+  --hud-tick-color:   rgba(255, 51, 85, 0.20);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(255, 51, 85, 0.4), #ff3355);
+  --hud-fill-glow:    rgba(255, 51, 85, 0.55);
+  --hud-edge-glow:    rgba(255, 51, 85, 0.9);
+}
+
+.hud-progress-bar--xp {
+  --hud-track-bg:     rgba(192, 74, 255, 0.08);
+  --hud-track-border: rgba(192, 74, 255, 0.20);
+  --hud-tick-color:   rgba(192, 74, 255, 0.20);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(192, 74, 255, 0.45), #c04aff 70%, #ff3344);
+  --hud-fill-glow:    rgba(192, 74, 255, 0.55);
+  --hud-edge-glow:    rgba(192, 74, 255, 0.9);
+}
+
+/* Stripe scan animation (active state) */
+.hud-progress-bar--scanning .hud-progress-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0,
+    transparent 6px,
+    rgba(255, 255, 255, 0.18) 6px,
+    rgba(255, 255, 255, 0.18) 7px
+  );
+  animation: hud-scan-stripes 1.6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hud-scan-stripes {
+  from { background-position: 0 0; }
+  to   { background-position: 28px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-progress-fill { transition: none; }
+  .hud-progress-bar--scanning .hud-progress-fill::before { animation: none; }
+}

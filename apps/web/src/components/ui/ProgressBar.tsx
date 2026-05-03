@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 
-type ProgressVariant = 'brand' | 'energy' | 'health' | 'xp' | 'custom';
+type ProgressVariant = 'brand' | 'accent' | 'energy' | 'health' | 'xp' | 'danger' | 'custom';
 
 interface ProgressBarProps {
   value: number;
@@ -13,62 +13,76 @@ interface ProgressBarProps {
   className?: string;
   customColor?: string;
   animated?: boolean;
+  scanning?: boolean;
 }
 
-const VARIANT_COLORS: Record<ProgressVariant, string> = {
+const VARIANT_LABEL_COLOR: Record<ProgressVariant, string> = {
   brand:  'var(--color-brand)',
+  accent: 'var(--color-accent)',
   energy: 'var(--color-energy)',
   health: 'var(--color-success)',
-  xp:     'var(--color-accent)',
-  custom: 'var(--color-brand)',
-};
-
-const VARIANT_GLOW: Record<ProgressVariant, string> = {
-  brand:  'var(--color-brand-glow)',
-  energy: 'var(--color-energy-dim)',
-  health: 'rgba(68,221,136,0.4)',
-  xp:     'var(--color-accent-dim)',
-  custom: 'transparent',
-};
-
-const SIZE_HEIGHTS: Record<NonNullable<ProgressBarProps['size']>, string> = {
-  xs: '3px',
-  sm: '5px',
-  md: '8px',
-  lg: '12px',
+  xp:     '#c04aff',
+  danger: 'var(--color-danger)',
+  custom: 'var(--color-accent)',
 };
 
 export function ProgressBar({
   value,
   max = 100,
-  variant = 'brand',
+  variant = 'accent',
   size = 'sm',
   label,
   showValue = false,
-  glow = false,
+  glow = true,
   className,
   customColor,
-  animated = false,
+  animated = true,
+  scanning = false,
 }: ProgressBarProps) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
-  const color = customColor ?? VARIANT_COLORS[variant];
-  const glowColor = VARIANT_GLOW[variant];
-  const height = SIZE_HEIGHTS[size];
+  const labelColor = customColor ?? VARIANT_LABEL_COLOR[variant];
+
+  const customStyle =
+    variant === 'custom' && customColor
+      ? ({
+          ['--hud-fill-gradient' as string]: `linear-gradient(90deg, ${customColor}66, ${customColor})`,
+          ['--hud-fill-glow' as string]: `${customColor}99`,
+          ['--hud-edge-glow' as string]: customColor,
+          ['--hud-track-border' as string]: `${customColor}33`,
+          ['--hud-tick-color' as string]: `${customColor}33`,
+        } as React.CSSProperties)
+      : undefined;
 
   return (
     <div className={clsx('w-full', className)}>
       {(label || showValue) && (
         <div
-          className="flex justify-between items-center mb-1.5"
+          className="flex justify-between items-baseline mb-1.5"
           style={{ fontSize: 11 }}
         >
           {label && (
-            <span style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <span
+              style={{
+                color: 'var(--color-text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.18em',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+              }}
+            >
               {label}
             </span>
           )}
           {showValue && (
-            <span style={{ color, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+            <span
+              style={{
+                color: labelColor,
+                fontWeight: 700,
+                fontFamily: 'var(--font-display)',
+                fontVariantNumeric: 'tabular-nums',
+                letterSpacing: '0.05em',
+              }}
+            >
               {value.toLocaleString('tr-TR')} / {max.toLocaleString('tr-TR')}
             </span>
           )}
@@ -76,39 +90,29 @@ export function ProgressBar({
       )}
 
       <div
-        style={{
-          height,
-          background: 'rgba(255,255,255,0.07)',
-          borderRadius: height,
-          overflow: 'hidden',
-          position: 'relative',
-        }}
+        className={clsx(
+          'hud-progress-bar',
+          `hud-progress-bar--${size}`,
+          variant !== 'custom' && `hud-progress-bar--${variant}`,
+          scanning && 'hud-progress-bar--scanning',
+        )}
+        style={customStyle}
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label}
       >
         <div
+          className="hud-progress-fill"
           style={{
-            height: '100%',
             width: `${pct}%`,
-            background: color,
-            borderRadius: height,
-            transition: animated ? 'width 0.6s cubic-bezier(0.32,0.72,0,1)' : 'width 0.3s ease',
-            boxShadow: glow ? `0 0 8px ${glowColor}` : undefined,
-            position: 'relative',
+            transition: animated
+              ? 'width 0.6s cubic-bezier(0.32,0.72,0,1)'
+              : 'none',
+            boxShadow: glow ? undefined : 'none',
           }}
-        >
-          {glow && pct > 5 && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: '20px',
-                background: `linear-gradient(to right, transparent, rgba(255,255,255,0.4))`,
-                borderRadius: height,
-              }}
-            />
-          )}
-        </div>
+        />
       </div>
     </div>
   );

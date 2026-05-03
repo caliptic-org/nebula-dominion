@@ -531,13 +531,14 @@ export default function WorldMapPage() {
       <nav
         className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-around px-2 py-3"
         style={{ background:'rgba(8,10,16,0.96)', borderTop:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(24px)' }}
+        aria-label="Ana navigasyon"
       >
         {([
           { href:'/',           icon:'🏰', label:'Ana Üs'    },
           { href:'/map',        icon:'🌌', label:'Harita', active:true },
           { href:'/battle',     icon:'⚔️', label:'Savaş'     },
           { href:'/commanders', icon:'🤝', label:'Komutanlar' },
-          { href:'/dashboard',  icon:'💎', label:'Mağaza'    },
+          { href:'/shop',       icon:'💎', label:'Mağaza'    },
         ] as const).map(tab=>(
           <a
             key={tab.href}

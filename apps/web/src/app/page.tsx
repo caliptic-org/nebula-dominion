@@ -47,8 +47,8 @@ const RESOURCES = [
   { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
 ];
 
-type Tab = 'base' | 'map' | 'commanders';
-type NavTabId = Tab | 'battle' | 'shop';
+type Tab = 'base' | 'commanders';
+type NavTabId = Tab | 'map' | 'battle' | 'shop';
 
 const TABS: { id: NavTabId; icon: string; label: string }[] = [
   { id: 'base', icon: '🏰', label: 'Ana Üs' },
@@ -390,23 +390,6 @@ export default function HomePage() {
               </div>
             </div>
 
-          {/* ── Map Tab ───────────────────────────────────────── */}
-          <div className={clsx('p-4', activeTab === 'map' ? 'block' : 'hidden')} aria-hidden={activeTab !== 'map'}>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="badge badge-race">Galaksi Haritası</span>
-                <h2 className="font-display text-lg font-black text-text-primary">
-                  Nebula <span style={{ color: raceColor }}>Sektörü</span>
-                </h2>
-              </div>
-              <MangaPanel className="overflow-hidden rounded-lg">
-                <IsometricTilemap
-                  race={race}
-                  structures={STRUCTURES_ON_MAP}
-                  onTileSelect={(col, row) => setSelectedTile({ col, row })}
-                />
-              </MangaPanel>
-            </div>
-
           {/* ── Commanders Tab ────────────────────────────────── */}
           {activeTab === 'commanders' && (
             <div className="p-4">
@@ -462,9 +445,11 @@ export default function HomePage() {
         >
           {TABS.map((tab) => {
             const active =
-              tab.id !== 'battle' && tab.id !== 'shop' && activeTab === tab.id;
+              (tab.id === 'base' || tab.id === 'commanders') && activeTab === tab.id;
             const handleClick = () => {
-              if (tab.id === 'battle') {
+              if (tab.id === 'map') {
+                router.push('/map');
+              } else if (tab.id === 'battle') {
                 router.push(battleHref);
               } else if (tab.id === 'shop') {
                 router.push('/shop');

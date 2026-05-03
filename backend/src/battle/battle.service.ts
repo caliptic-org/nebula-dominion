@@ -11,6 +11,7 @@ import { Battle } from './entities/battle.entity';
 import { BattleLog } from './entities/battle-log.entity';
 import { BattleEngineService } from './battle-engine.service';
 import { MinioService } from '../storage/minio.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import {
   BattleStatus,
   BattleSide,
@@ -47,6 +48,7 @@ export class BattleService {
     private readonly logRepo: Repository<BattleLog>,
     private readonly engine: BattleEngineService,
     private readonly minio: MinioService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   async createBattle(dto: CreateBattleDto): Promise<Battle> {
@@ -81,6 +83,14 @@ export class BattleService {
 
     const saved = await this.battleRepo.save(battle);
     this.logger.log(`Battle created: ${saved.id} (${dto.attackerId} vs ${dto.defenderId})`);
+
+    void this.analytics.trackServer({
+      event_type: 'pvp.match_started',
+      user_id: dto.attackerId,
+      session_id: saved.id,
+      properties: { battle_id: saved.id, defender_id: dto.defenderId, is_bot: false },
+    });
+
     return saved;
   }
 
@@ -172,6 +182,25 @@ export class BattleService {
 
     await this.battleRepo.save(battle);
     this.logger.log(`Battle ${battle.id} completed. Winner: ${winnerId ?? 'draw'}`);
+
+    const durationMs = battle.startedAt
+      ? Date.now() - battle.startedAt.getTime()
+      : undefined;
+
+    for (const playerId of [battle.attackerId, battle.defenderId]) {
+      const result = winnerId === playerId ? 'win' : winnerId ? 'loss' : 'draw';
+      void this.analytics.trackServer({
+        event_type: 'pvp.match_ended',
+        user_id: playerId,
+        session_id: battle.id,
+        properties: {
+          battle_id: battle.id,
+          result,
+          duration_ms: durationMs,
+          total_turns: state.currentTurn,
+        },
+      });
+    }
   }
 
   private async buildAndStoreReplay(battle: Battle, finalState: any): Promise<string | null> {
@@ -330,6 +359,15 @@ export class BattleService {
     battle.status = BattleStatus.ABANDONED;
     battle.winnerId = winnerId;
     battle.endedAt = new Date();
-    return this.battleRepo.save(battle);
+    const saved = await this.battleRepo.save(battle);
+
+    void this.analytics.trackServer({
+      event_type: 'pvp.match_ended',
+      user_id: playerId,
+      session_id: battleId,
+      properties: { battle_id: battleId, result: 'abandoned' },
+    });
+
+    return saved;
   }
 }

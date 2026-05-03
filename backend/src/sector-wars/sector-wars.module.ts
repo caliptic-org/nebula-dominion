@@ -6,9 +6,13 @@ import { WeeklyLeague } from './entities/weekly-league.entity';
 import { LeagueParticipant } from './entities/league-participant.entity';
 import { SectorWarsService } from './sector-wars.service';
 import { SectorWarsController } from './sector-wars.controller';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Sector, SectorBattle, WeeklyLeague, LeagueParticipant])],
+  imports: [
+    TypeOrmModule.forFeature([Sector, SectorBattle, WeeklyLeague, LeagueParticipant]),
+    AnalyticsModule,
+  ],
   providers: [SectorWarsService],
   controllers: [SectorWarsController],
   exports: [SectorWarsService, TypeOrmModule],

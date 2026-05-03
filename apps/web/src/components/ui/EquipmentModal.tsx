@@ -78,10 +78,9 @@ export function EquipmentModal({
       aria-label={`${slotMeta.label} ekipmanı seç`}
     >
       <div
-        className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+        className="hud-panel hud-panel-corners relative w-full sm:max-w-lg flex flex-col"
         style={{
           background: 'linear-gradient(160deg, #0d1117 0%, #080a10 100%)',
-          border: `1px solid rgba(255,255,255,0.06)`,
           maxHeight: '90dvh',
         }}
       >

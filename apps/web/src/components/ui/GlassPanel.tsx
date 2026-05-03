@@ -32,11 +32,11 @@ export function GlassPanel({
   as: Tag = 'div',
 }: GlassPanelProps) {
   const borderColor = raceColor
-    ? `${raceColor}30`
-    : 'var(--color-border)';
+    ? `${raceColor}55`
+    : 'rgba(0, 207, 255, 0.2)';
 
-  const boxShadow = glow
-    ? `0 0 24px ${glowColor ?? raceColor ?? 'var(--color-brand-glow)'}`
+  const filterGlow = glow
+    ? `drop-shadow(0 0 12px ${glowColor ?? raceColor ?? 'rgba(0, 207, 255, 0.45)'})`
     : undefined;
 
   const Component = Tag as 'div';
@@ -46,8 +46,8 @@ export function GlassPanel({
       className={clsx('glass-card', className)}
       style={{
         padding: PADDING_MAP[padding],
-        border: bordered ? `1px solid ${borderColor}` : undefined,
-        boxShadow,
+        border: bordered ? `1px solid ${borderColor}` : 'none',
+        filter: filterGlow,
         ...style,
       }}
     >

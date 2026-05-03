@@ -127,15 +127,14 @@ export function RacePreviewModal({ race, onClose, onPick }: RacePreviewModalProp
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="hud-panel hud-panel-corners"
         style={{
-          position: 'relative',
           width: '100%',
           maxWidth: 640,
           background: 'var(--color-bg-surface)',
-          border: `1px solid ${desc.color}40`,
-          borderRadius: 16,
+          border: `1px solid ${desc.color}55`,
           padding: 24,
-          boxShadow: `0 0 60px ${desc.color}30, 0 20px 60px rgba(0,0,0,0.6)`,
+          filter: `drop-shadow(0 0 24px ${desc.color}40) drop-shadow(0 12px 32px rgba(0,0,0,0.6))`,
         }}
       >
         {/* Close */}

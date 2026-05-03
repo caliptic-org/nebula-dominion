@@ -1,12 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import {
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets';
+import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
-import { EraTransitionEvent } from './dto/era-transition.dto';
+import { AgeTransitionEvent, LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
 
 @WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })
 export class ProgressionGateway {
@@ -27,6 +23,20 @@ export class ProgressionGateway {
       eraTransitionPackage: event.eraTransitionPackage ?? null,
     });
     this.logger.log(`Emitted level_up to user=${event.userId} level=${event.newLevel}`);
+  }
+
+  @OnEvent('progression.age_transition')
+  handleAgeTransition(event: AgeTransitionEvent): void {
+    // badge_upgrade payload delivered to frontend for UI animations / badge display
+    this.server.to(`user:${event.userId}`).emit('age_transition', {
+      previousAge: event.previousAge,
+      newAge: event.newAge,
+      totalXpAtTransition: event.totalXpAtTransition,
+      badge_upgrade: event.badge_upgrade,
+    });
+    this.logger.log(
+      `Emitted age_transition to user=${event.userId} age=${event.previousAge}→${event.newAge} badge=${event.badge_upgrade.newBadgeTier}`,
+    );
   }
 
   @OnEvent('progression.xp_gained')

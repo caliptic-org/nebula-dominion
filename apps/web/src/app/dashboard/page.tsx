@@ -1,66 +1,45 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { useMemo, useState } from 'react';
-import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { Race, RACE_DESCRIPTIONS, CommanderInfo } from '@/types/units';
-import { TIER_NAMES } from '@/types/progression';
-import { MangaPanel } from '@/components/ui/MangaPanel';
-import { GlowButton } from '@/components/ui/GlowButton';
-
-interface MatchRecord {
-  id: string;
-  result: 'win' | 'loss';
-  mode: 'PvP' | 'PvE' | 'Ranked';
-  race: Race;
-  opponentRace: Race;
-  commanderId: string;
-  durationMin: number;
-  xpGained: number;
-  ago: string;
+export const metadata: Metadata = {
+  title: 'Komuta Merkezi — Nebula Dominion',
 }
 
-const navItems = [
-  { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
-  { href: '/dashboard/fleet', label: 'Filo', icon: '🚀' },
-  { href: '/dashboard/battle', label: 'Savaş', icon: '⚔️' },
-  { href: '/dashboard/guild', label: 'Lonca', icon: '🛡️' },
-  { href: '/dashboard/sectors', label: 'Sektörler', icon: '🌍' },
-  { href: '/dashboard/shop', label: 'Mağaza', icon: '🛍️' },
-  { href: '/dashboard/settings', label: 'Ayarlar', icon: '⚙️' },
+const resources = [
+  { icon: '💰', label: 'Altın',   value: '124,800', color: '#e8a820' },
+  { icon: '⚡', label: 'Enerji',  value: '8,420',   color: '#40c8e0' },
+  { icon: '🔩', label: 'Maden',   value: '32,550',  color: '#a8c8e0' },
+  { icon: '💎', label: 'Taş',     value: '240',     color: '#c880f0' },
 ]
 
-const RECENT_MATCHES: MatchRecord[] = [
-  { id: 'm1', result: 'win',  mode: 'PvP',    race: Race.INSAN,   opponentRace: Race.ZERG,    commanderId: 'voss',           durationMin: 14, xpGained: 240, ago: '12dk önce' },
-  { id: 'm2', result: 'loss', mode: 'Ranked', race: Race.INSAN,   opponentRace: Race.SEYTAN,  commanderId: 'voss',           durationMin: 21, xpGained: 80,  ago: '1sa önce' },
-  { id: 'm3', result: 'win',  mode: 'PvP',    race: Race.OTOMAT,  opponentRace: Race.CANAVAR, commanderId: 'demiurge_prime', durationMin: 9,  xpGained: 220, ago: '3sa önce' },
-  { id: 'm4', result: 'win',  mode: 'PvE',    race: Race.ZERG,    opponentRace: Race.OTOMAT,  commanderId: 'vex_thara',      durationMin: 18, xpGained: 160, ago: 'Dün' },
-  { id: 'm5', result: 'loss', mode: 'Ranked', race: Race.SEYTAN,  opponentRace: Race.INSAN,   commanderId: 'malphas',        durationMin: 27, xpGained: 60,  ago: 'Dün' },
-];
+const navItems = [
+  { href: '/dashboard',          label: 'Üs',        icon: '🏰', active: true  },
+  { href: '/dashboard/fleet',    label: 'Filo',      icon: '🚀', active: false },
+  { href: '/battle',             label: 'Savaş',     icon: '⚔️', active: false },
+  { href: '/dashboard/sectors',  label: 'Harita',    icon: '🌍', active: false },
+  { href: '/dashboard/shop',     label: 'Mağaza',    icon: '🛒', active: false },
+  { href: '/dashboard/settings', label: 'Ayarlar',   icon: '⚙️', active: false },
+]
 
-const QUICK_LINKS = [
-  { href: '/commanders',      icon: '⚔️', label: 'Komutanlar', desc: 'Ekibini oluştur' },
-  { href: '/battle?mode=pve', icon: '🎯', label: 'Savaş',      desc: 'PvE / PvP başlat' },
-  { href: '/progression',     icon: '📈', label: 'İlerleme',   desc: 'Çağ yolculuğun' },
-];
+const playerStats = [
+  { label: 'Güç',     value: '18,420', icon: '⚔️', color: '#e8a820' },
+  { label: 'Seviye',  value: '12',     icon: '⭐', color: '#f0c840' },
+  { label: 'İttifak', value: 'NOVA',   icon: '🛡️', color: '#40c8e0' },
+  { label: 'Galibiyet', value: '47W',  icon: '🏆', color: '#44dd88' },
+]
 
-const NAV_LINKS = [
-  { href: '/',                icon: '🏰', label: 'Ana Üs',      desc: 'İmparatorluğunu yönet' },
-  { href: '/dashboard',       icon: '👤', label: 'Profil',      desc: 'İstatistik & lonca' },
-  { href: '/race-selection',  icon: '🧬', label: 'Irk Seç',     desc: 'Stratejini belirle' },
-  { href: '/commanders',      icon: '⚔️', label: 'Komutanlar', desc: 'Ekibini oluştur' },
-  { href: '/battle?mode=pve', icon: '🎯', label: 'Savaş',      desc: 'PvE modu ile başla' },
-  { href: '/progression',     icon: '📈', label: 'İlerleme',   desc: 'Çağ yolculuğun' },
-];
+const buildings = [
+  { title: 'Komuta Kalesi',   level: 12, icon: '🏰', progress: 82, nextUpgrade: '2s 14d', color: '#e8a820' },
+  { title: 'Araştırma Üssü', level: 9,  icon: '🔬', progress: 55, nextUpgrade: '4s 6d',  color: '#40c8e0' },
+  { title: 'Eğitim Alanı',   level: 11, icon: '⚔️', progress: 70, nextUpgrade: '1s 22d', color: '#e84030' },
+  { title: 'Kaynak Fabrikası', level: 8, icon: '🔩', progress: 40, nextUpgrade: '6s 0d',  color: '#a8c8e0' },
+]
 
-function findCommander(commanderId: string): CommanderInfo | null {
-  for (const desc of Object.values(RACE_DESCRIPTIONS)) {
-    const found = desc.commanders.find((c) => c.id === commanderId);
-    if (found) return found;
-  }
-  return null;
-}
+const upcomingFeatures = [
+  { title: 'Filo Yönetimi',  description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3', color: '#e8a820' },
+  { title: 'PvP Savaşları',  description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5', color: '#e84030' },
+  { title: 'Sektör Kontrolü', description: 'Çok oyunculu bölge savaşları',        icon: '🌌', eta: 'Çağ 4',   color: '#40c8e0' },
+  { title: 'Premium Mağaza', description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5',   color: '#c880f0' },
+]
 
 export default function DashboardPage() {
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();
@@ -91,44 +70,56 @@ export default function DashboardPage() {
   const guildPercent = Math.round((PROFILE.guild.members / PROFILE.guild.capacity) * 100);
 
   return (
-    <div
-      className="min-h-[100dvh] flex flex-col lg:flex-row relative"
-      style={{ background: 'var(--color-bg)' }}
-    >
-      {/* Background ambience */}
-      <div
-        className="fixed inset-0 pointer-events-none transition-all duration-700"
-        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
-        aria-hidden
-      />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+    <div className="min-h-screen flex" style={{ background: 'var(--color-bg)' }}>
 
-      {/* ── Sidebar ──────────────────────────────────────────── */}
+      {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <aside
-        className="hidden lg:flex flex-col w-64 shrink-0 relative z-20"
+        className="hidden lg:flex flex-col w-56 shrink-0"
         style={{
-          background: 'rgba(8,10,16,0.95)',
-          borderRight: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(20px)',
+          background: 'linear-gradient(180deg, #0c0f1a 0%, #08090f 100%)',
+          borderRight: '1px solid rgba(232,168,32,0.15)',
         }}
+        aria-label="Yan menü"
       >
-        <div className="p-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <Link href="/">
+        {/* Logo */}
+        <div
+          style={{
+            padding: '20px 16px 16px',
+            borderBottom: '1px solid rgba(232,168,32,0.12)',
+          }}
+        >
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-2xl" aria-hidden>🚀</span>
             <span
-              className="font-display text-xs font-black tracking-[0.2em] uppercase block"
-              style={{ color: raceColor }}
+              className="font-display font-black text-sm tracking-widest uppercase"
+              style={{
+                background: 'linear-gradient(180deg, #f0c840 0%, #c88010 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
             >
-              ◆ NEBULA DOMINION
+              NEBULA
             </span>
           </Link>
         </div>
 
-        {/* Mini commander chip */}
-        <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Player card */}
+        <div
+          style={{
+            padding: '14px 16px',
+            borderBottom: '1px solid rgba(232,168,32,0.10)',
+          }}
+        >
           <div className="flex items-center gap-3">
             <div
-              className="w-12 h-12 rounded-full overflow-hidden border-2"
-              style={{ borderColor: raceColor, boxShadow: `0 0 12px ${raceGlow}` }}
+              className="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0"
+              style={{
+                background: 'linear-gradient(145deg, #f0c840 0%, #c88010 100%)',
+                color: '#1a0e00',
+                boxShadow: '0 0 12px rgba(232,168,32,0.4)',
+              }}
+              aria-hidden
             >
               {!navImgError ? (
                 <Image
@@ -149,483 +140,440 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="min-w-0">
-              <div className="font-display text-sm font-black text-text-primary truncate">{PROFILE.playerName}</div>
-              <div className="font-display text-[10px] text-text-muted">Çağ {PROFILE.age} · Sv. {PROFILE.level}</div>
-              <div className="font-display text-[10px] mt-0.5 truncate" style={{ color: raceColor }}>
-                {raceDesc.icon} {raceDesc.name}
+              <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>Komutan</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-xs" style={{ color: 'var(--color-brand)' }}>⭐ Lv.12</span>
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>· NOVA</span>
               </div>
             </div>
           </div>
+          {/* Power score */}
+          <div
+            className="mt-3 flex items-center justify-between rounded px-3 py-2"
+            style={{
+              background: 'rgba(232,168,32,0.08)',
+              border: '1px solid rgba(232,168,32,0.18)',
+            }}
+          >
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Güç Puanı</span>
+            <span className="text-sm font-black" style={{ color: 'var(--color-brand)' }}>18,420 ⚔️</span>
+          </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
-          {NAV_LINKS.map((item) => {
-            const isActive = item.href === '/dashboard';
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-white/05 group"
-                style={isActive ? { background: 'rgba(255,255,255,0.04)', boxShadow: `inset 0 0 0 1px ${raceColor}40` } : undefined}
-              >
-                <span className="text-base leading-none" aria-hidden>{item.icon}</span>
-                <div className="min-w-0">
-                  <div
-                    className="font-display text-xs font-bold transition-colors"
-                    style={{ color: isActive ? raceColor : undefined }}
-                  >
-                    <span className={isActive ? '' : 'text-text-secondary group-hover:text-text-primary'}>{item.label}</span>
-                  </div>
-                  <div className="text-text-muted text-[10px] truncate">{item.desc}</div>
-                </div>
-              </Link>
-            );
-          })}
+        {/* Nav */}
+        <nav className="flex-1 p-2 space-y-0.5" aria-label="Dashboard navigasyon">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all"
+              style={
+                item.active
+                  ? {
+                      background: 'linear-gradient(90deg, rgba(232,168,32,0.18) 0%, transparent 100%)',
+                      borderLeft: '3px solid var(--color-brand)',
+                      color: 'var(--color-brand)',
+                      paddingLeft: '10px',
+                    }
+                  : {
+                      color: 'var(--color-text-muted)',
+                      borderLeft: '3px solid transparent',
+                      paddingLeft: '10px',
+                    }
+              }
+              aria-current={item.active ? 'page' : undefined}
+            >
+              <span aria-hidden>{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="p-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Online status */}
+        <div
+          style={{
+            padding: '12px 16px',
+            borderTop: '1px solid rgba(232,168,32,0.10)',
+          }}
+        >
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse-slow" style={{ background: '#44ff88' }} />
-            <span className="font-display text-[10px] text-text-muted uppercase tracking-widest">Sunucu Bağlı</span>
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ background: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }}
+            />
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Sunucu bağlı</span>
           </div>
         </div>
       </aside>
 
-      {/* ── Main ─────────────────────────────────────────────── */}
-      <main className="relative z-10 flex-1 overflow-auto">
+      {/* ── Main ────────────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-auto flex flex-col">
+
+        {/* ── Resource bar (Top War top-bar) ──────────────────────────── */}
         <header
-          className="sticky top-0 z-40 flex items-center justify-between px-4 py-3"
           style={{
-            background: 'rgba(8,10,16,0.9)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(20px)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            background: 'linear-gradient(180deg, #0d0f1b 0%, #080a13 100%)',
+            borderBottom: '1px solid rgba(232,168,32,0.2)',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           }}
         >
-          <div className="flex items-center gap-3">
-            <Link href="/" className="font-display text-text-muted text-xs lg:hidden">← Üs</Link>
-            <div>
-              <span className="badge badge-race mr-2 hidden sm:inline-flex">Profil</span>
-              <span className="font-display text-sm font-black text-text-primary">Komuta Merkezi</span>
+          {/* Resources row */}
+          <div
+            className="flex items-center gap-2 px-4 py-2 overflow-x-auto"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+          >
+            {resources.map((res) => (
+              <div
+                key={res.label}
+                className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded"
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  minWidth: 100,
+                }}
+              >
+                <span className="text-sm" aria-hidden>{res.icon}</span>
+                <div>
+                  <div className="text-xs leading-none" style={{ color: 'var(--color-text-muted)' }}>{res.label}</div>
+                  <div className="text-sm font-black leading-tight" style={{ color: res.color }}>{res.value}</div>
+                </div>
+              </div>
+            ))}
+
+            {/* Right side: notifications + profile */}
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <button
+                className="btn-ghost text-lg px-2 py-1.5"
+                aria-label="Bildirimler"
+                style={{ position: 'relative' }}
+              >
+                🔔
+                <span
+                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                  style={{ background: 'var(--color-danger)', boxShadow: '0 0 4px var(--color-danger)' }}
+                  aria-hidden
+                />
+              </button>
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm"
+                style={{
+                  background: 'linear-gradient(145deg, #f0c840 0%, #c88010 100%)',
+                  color: '#1a0e00',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 12px rgba(232,168,32,0.3)',
+                }}
+                aria-label="Profil"
+              >
+                K
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="btn-ghost text-sm px-2 py-1.5" aria-label="Bildirimler">🔔</button>
-            <div
-              className="w-8 h-8 rounded-full overflow-hidden border"
-              style={{ borderColor: raceColor }}
-            >
-              {!navImgError ? (
-                <Image
-                  src={primaryCommander.portrait}
-                  alt="Profil"
-                  width={32}
-                  height={32}
-                  className="w-full h-full object-cover object-top"
-                  onError={() => setNavImgError(true)}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm" style={{ background: raceDesc.bgColor }}>
-                  {raceDesc.icon}
-                </div>
-              )}
+
+          {/* Page title row */}
+          <div className="flex items-center justify-between px-5 py-2.5">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="lg:hidden mr-1">
+                <span className="text-xl" aria-hidden>🚀</span>
+              </Link>
+              <h1
+                className="font-display font-black text-base uppercase tracking-widest"
+                style={{ color: 'var(--color-brand)' }}
+              >
+                🏰 KOMUTA MERKEZİ
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="badge badge-accent text-xs"
+                style={{ fontSize: 10 }}
+              >
+                KAPALI BETA
+              </span>
             </div>
           </div>
         </header>
 
-        <div className="p-4 sm:p-6 space-y-6 max-w-6xl">
-          {/* ── Hero: Big commander portrait + identity ─────────── */}
-          <MangaPanel className="relative overflow-hidden animate-manga-appear">
+        <div className="p-5 space-y-6 max-w-5xl">
+
+          {/* ── Player power banner ──────────────────────────────────── */}
+          <section
+            style={{
+              background: 'linear-gradient(135deg, #1a1408 0%, #0e0d18 60%, #0a0c18 100%)',
+              border: '1px solid rgba(232,168,32,0.3)',
+              borderRadius: 10,
+              padding: '20px 24px',
+              position: 'relative',
+              overflow: 'hidden',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(232,168,32,0.1)',
+            }}
+            aria-labelledby="welcome-heading"
+          >
+            {/* Gold top border accent */}
             <div
-              className="absolute inset-0 pointer-events-none"
               style={{
-                background: `radial-gradient(ellipse 90% 100% at 100% 50%, ${raceDesc.glowColor} 0%, transparent 65%)`,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 3,
+                background: 'linear-gradient(90deg, #e8a820, #f0c840, #e8a820)',
               }}
               aria-hidden
             />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <h2
+                id="welcome-heading"
+                className="font-display font-black text-xl"
+                style={{ color: 'var(--color-brand)' }}
+              >
+                Hoş Geldin, Komutan! 🚀
+              </h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Nebula Dominion kapalı beta aşamasında. Savaş ve filo sistemleri yakında açılacak.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Link href="/battle" className="btn-battle" style={{ padding: '8px 20px', fontSize: 12 }}>
+                  ⚔️ SAVAŞA GEÇ
+                </Link>
+                <Link href="/" className="btn-primary" style={{ padding: '8px 20px', fontSize: 12 }}>
+                  🏆 DEMO
+                </Link>
+              </div>
+            </div>
             <div
-              className="absolute inset-y-0 right-0 w-1/3 pointer-events-none opacity-40"
               style={{
-                backgroundImage:
-                  'repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 18px)',
+                position: 'absolute',
+                right: 20,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 80,
+                opacity: 0.07,
+                pointerEvents: 'none',
               }}
               aria-hidden
-            />
-            <div className="relative z-10 flex flex-col md:flex-row gap-6 p-5 sm:p-6">
-              {/* Portrait */}
-              <div className="relative shrink-0 mx-auto md:mx-0">
+            >
+              🏰
+            </div>
+          </section>
+
+          {/* ── Player stats ────────────────────────────────────────── */}
+          <section aria-labelledby="stats-heading">
+            <h2 id="stats-heading" className="section-header">Komutan İstatistikleri</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {playerStats.map((stat) => (
                 <div
-                  className="relative w-44 h-52 sm:w-52 sm:h-60 rounded-2xl overflow-hidden"
+                  key={stat.label}
                   style={{
-                    border: `2px solid ${raceColor}`,
-                    boxShadow: `0 0 24px ${raceGlow}, inset 0 -40px 60px rgba(0,0,0,0.55)`,
-                    background: raceDesc.bgColor,
+                    background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+                    border: '1px solid rgba(232,168,32,0.18)',
+                    borderRadius: 8,
+                    padding: '14px 16px',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
                   }}
                 >
-                  {!heroImgError ? (
-                    <Image
-                      src={primaryCommander.portrait}
-                      alt={primaryCommander.name}
-                      fill
-                      sizes="208px"
-                      className="object-cover object-top"
-                      onError={() => setHeroImgError(true)}
-                      priority
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-7xl">{raceDesc.icon}</div>
-                  )}
-                  <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    <span
-                      className="font-display text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest"
-                      style={{ background: 'rgba(0,0,0,0.6)', color: raceColor, border: `1px solid ${raceColor}66` }}
-                    >
-                      Sv. {PROFILE.level}
-                    </span>
-                    <span
-                      className="font-display text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest"
-                      style={{ background: 'rgba(0,0,0,0.6)', color: '#ffc832', border: '1px solid rgba(255,200,50,0.4)' }}
-                    >
-                      {tierLabel}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Identity */}
-              <div className="flex-1 min-w-0 flex flex-col">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span className="badge badge-race">{raceDesc.icon} {raceDesc.name}</span>
-                  <span
-                    className="font-display text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest"
-                    style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-secondary)' }}
-                  >
-                    Çağ {PROFILE.age}
-                  </span>
-                </div>
-                <h1 className="font-display text-2xl sm:text-3xl font-black text-text-primary leading-tight mb-1">
-                  {PROFILE.playerName}
-                </h1>
-                <p className="text-text-secondary text-sm mb-4 max-w-md">
-                  {primaryCommander.story}
-                </p>
-
-                {/* XP bar */}
-                <div className="mb-4 max-w-md">
-                  <div className="flex justify-between font-display text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                    <span>Sonraki seviye</span>
-                    <span>
-                      {PROFILE.xpInLevel.toLocaleString('tr-TR')} / {(PROFILE.xpInLevel + PROFILE.xpToNext).toLocaleString('tr-TR')} XP
-                    </span>
-                  </div>
-                  <div
-                    className="w-full h-2 rounded-full overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.05)' }}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{
-                        width: `${xpProgressPercent}%`,
-                        background: `linear-gradient(90deg, ${raceColor}, ${raceColor}aa)`,
-                        boxShadow: `0 0 12px ${raceGlow}`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 flex-wrap mt-auto">
-                  <GlowButton
-                    size="sm"
-                    icon={<span>⚔️</span>}
-                    onClick={() => (window.location.href = '/battle?mode=pvp')}
-                    style={{ background: raceColor }}
-                  >
-                    PvP Başlat
-                  </GlowButton>
-                  <GlowButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => (window.location.href = '/commanders')}
-                  >
-                    Komutanlar
-                  </GlowButton>
-                </div>
-              </div>
-            </div>
-          </MangaPanel>
-
-          {/* ── Stats grid ──────────────────────────────────────── */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="badge badge-race">Oyuncu İstatistikleri</span>
-              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {stats.map((stat) => (
-                <MangaPanel key={stat.key} className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xl" aria-hidden>{stat.icon}</span>
-                    <span className="font-display text-[10px] uppercase tracking-widest text-text-muted">
+                    <span className="text-base" aria-hidden>{stat.icon}</span>
+                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                       {stat.label}
                     </span>
                   </div>
-                  <div className="font-display text-2xl font-black truncate" style={{ color: stat.color }}>
-                    {stat.value}
-                  </div>
-                  {stat.key === 'rate' && (
-                    <div className="mt-2 w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${winRate}%`, background: stat.color, boxShadow: `0 0 8px ${stat.color}66` }}
-                      />
-                    </div>
-                  )}
-                  {stat.key === 'pvp' && (
-                    <div className="mt-2 font-display text-[10px] text-text-muted">
-                      {PROFILE.pvpWins}G · {PROFILE.pvpMatches - PROFILE.pvpWins}M
-                    </div>
-                  )}
-                </MangaPanel>
+                  <p className="font-display text-2xl font-black" style={{ color: stat.color }}>{stat.value}</p>
+                </div>
               ))}
             </div>
           </section>
 
-          {/* ── Two-column: Recent matches + Guild ───────────────── */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Recent matches */}
-            <MangaPanel className="lg:col-span-2 p-4 sm:p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="badge badge-race">Son Maçlar</span>
-                </div>
-                <Link href="/battle" className="font-display text-[10px] uppercase tracking-widest text-text-muted hover:text-text-primary">
-                  Tümü →
-                </Link>
-              </div>
-              <ul className="space-y-2">
-                {RECENT_MATCHES.map((m) => {
-                  const myRace = RACE_DESCRIPTIONS[m.race];
-                  const oppRace = RACE_DESCRIPTIONS[m.opponentRace];
-                  const cmd = findCommander(m.commanderId);
-                  const isWin = m.result === 'win';
-                  const accent = isWin ? '#44ff88' : '#ff3355';
-                  return (
-                    <li
-                      key={m.id}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/05"
+          {/* ── Buildings / Base structures ──────────────────────────── */}
+          <section aria-labelledby="buildings-heading">
+            <h2 id="buildings-heading" className="section-header">Üs Yapıları</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {buildings.map((b) => (
+                <div
+                  key={b.title}
+                  style={{
+                    background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+                    border: '1px solid rgba(232,168,32,0.18)',
+                    borderRadius: 8,
+                    padding: '16px 18px',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 8,
+                          background: `rgba(0,0,0,0.4)`,
+                          border: `1px solid ${b.color}40`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 22,
+                          flexShrink: 0,
+                        }}
+                        aria-hidden
+                      >
+                        {b.icon}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>{b.title}</p>
+                        <p className="text-xs mt-0.5" style={{ color: b.color }}>Seviye {b.level}</p>
+                      </div>
+                    </div>
+                    <button
+                      className="shrink-0"
                       style={{
-                        background: 'rgba(255,255,255,0.02)',
-                        borderLeft: `3px solid ${accent}`,
+                        padding: '5px 12px',
+                        background: 'var(--gradient-gold-btn)',
+                        border: '1px solid #c88820',
+                        borderRadius: 5,
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: '#1a0e00',
+                        cursor: 'pointer',
+                        letterSpacing: 0.5,
+                        textTransform: 'uppercase',
                       }}
                     >
-                      {/* Result tag */}
-                      <div
-                        className="font-display text-[10px] font-black w-12 text-center py-1 rounded uppercase tracking-widest shrink-0"
-                        style={{
-                          background: `${accent}1a`,
-                          color: accent,
-                          border: `1px solid ${accent}55`,
-                        }}
-                      >
-                        {isWin ? 'Galip' : 'Mağlup'}
-                      </div>
-
-                      {/* Commander avatar */}
-                      <div
-                        className="w-10 h-10 rounded-full overflow-hidden border shrink-0"
-                        style={{ borderColor: myRace.color, background: myRace.bgColor }}
-                      >
-                        {cmd ? (
-                          <Image
-                            src={cmd.portrait}
-                            alt={cmd.name}
-                            width={40}
-                            height={40}
-                            className="w-full h-full object-cover object-top"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-base">{myRace.icon}</div>
-                        )}
-                      </div>
-
-                      {/* Match info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-display text-sm font-bold text-text-primary truncate">
-                          {cmd?.name ?? 'Komutan'}{' '}
-                          <span className="font-normal text-text-muted">vs</span>{' '}
-                          <span style={{ color: oppRace.color }}>
-                            {oppRace.icon} {oppRace.name}
-                          </span>
-                        </div>
-                        <div className="font-display text-[10px] uppercase tracking-widest text-text-muted">
-                          <span style={{ color: myRace.color }}>{myRace.icon} {myRace.name}</span>
-                          <span className="mx-1.5">·</span>
-                          <span>{m.mode}</span>
-                          <span className="mx-1.5">·</span>
-                          <span>{m.durationMin}dk</span>
-                        </div>
-                      </div>
-
-                      {/* XP & time */}
-                      <div className="text-right shrink-0">
-                        <div className="font-display text-xs font-black" style={{ color: '#cc00ff' }}>
-                          +{m.xpGained} XP
-                        </div>
-                        <div className="font-display text-[10px] text-text-muted">{m.ago}</div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </MangaPanel>
-
-            {/* Guild card */}
-            <MangaPanel className="p-4 sm:p-5 relative overflow-hidden">
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: `radial-gradient(ellipse 60% 80% at 100% 0%, ${raceColor}22 0%, transparent 70%)` }}
-                aria-hidden
-              />
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="badge badge-race">Lonca</span>
-                  <span
-                    className="font-display text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest"
-                    style={{ background: 'rgba(255,200,50,0.12)', color: '#ffc832', border: '1px solid rgba(255,200,50,0.35)' }}
-                  >
-                    #{PROFILE.guild.rank}
-                  </span>
-                </div>
-
-                <div className="mb-4">
-                  <div className="font-display text-lg font-black text-text-primary leading-tight">
-                    {PROFILE.guild.name}
+                      GELİŞTİR
+                    </button>
                   </div>
-                  <div className="font-display text-[10px] uppercase tracking-widest text-text-muted">
-                    [{PROFILE.guild.tag}] · Galaksi sıralaması
-                  </div>
-                </div>
-
-                <div className="space-y-3">
+                  {/* Progress bar */}
                   <div>
-                    <div className="flex justify-between font-display text-[10px] uppercase tracking-widest text-text-muted mb-1.5">
-                      <span>Üyeler</span>
-                      <span>
-                        {PROFILE.guild.members} / {PROFILE.guild.capacity}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        Sonraki: Lv.{b.level + 1}
                       </span>
+                      <span className="text-xs font-bold" style={{ color: b.color }}>{b.progress}%</span>
                     </div>
-                    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div
+                      style={{
+                        height: 5,
+                        background: 'rgba(255,255,255,0.07)',
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                      }}
+                    >
                       <div
-                        className="h-full rounded-full"
                         style={{
-                          width: `${guildPercent}%`,
-                          background: raceColor,
-                          boxShadow: `0 0 8px ${raceGlow}`,
+                          height: '100%',
+                          width: `${b.progress}%`,
+                          background: `linear-gradient(90deg, ${b.color} 0%, ${b.color}cc 100%)`,
+                          borderRadius: 3,
+                          transition: 'width 0.5s ease',
+                          boxShadow: `0 0 6px ${b.color}80`,
                         }}
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div
-                      className="rounded-lg p-2 text-center"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                    >
-                      <div className="font-display text-[10px] uppercase tracking-widest text-text-muted">Sıra</div>
-                      <div className="font-display text-base font-black" style={{ color: '#ffc832' }}>
-                        #{PROFILE.guild.rank}
-                      </div>
+                    <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                      Geliştirme: {b.nextUpgrade}
                     </div>
-                    <div
-                      className="rounded-lg p-2 text-center"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                    >
-                      <div className="font-display text-[10px] uppercase tracking-widest text-text-muted">Üye</div>
-                      <div className="font-display text-base font-black" style={{ color: raceColor }}>
-                        {PROFILE.guild.members}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <GlowButton size="sm" variant="ghost" className="w-full">
-                      Lonca Sayfası
-                    </GlowButton>
                   </div>
                 </div>
-              </div>
-            </MangaPanel>
-          </section>
-
-          {/* ── Race switcher ───────────────────────────────────── */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="badge badge-race">Irk Değiştir</span>
-              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
-              <Link href="/race-selection" className="font-display text-[10px] uppercase tracking-widest text-text-muted hover:text-text-primary">
-                Detaylı seçim →
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(Object.values(Race) as Race[]).map((r) => {
-                const d = RACE_DESCRIPTIONS[r];
-                const active = r === race;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setRace(r);
-                      setHeroImgError(false);
-                      setNavImgError(false);
-                    }}
-                    aria-pressed={active}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300"
-                    style={{
-                      background: active ? d.bgColor : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${active ? d.color : 'rgba(255,255,255,0.08)'}`,
-                      color: active ? d.color : 'var(--color-text-muted)',
-                      boxShadow: active ? `0 0 14px ${d.glowColor}` : 'none',
-                      transform: active ? 'scale(1.04)' : 'scale(1)',
-                    }}
-                  >
-                    <span className="text-base" aria-hidden>{d.icon}</span>
-                    <span className="font-display text-xs font-bold uppercase tracking-wide">{d.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* ── Quick links ─────────────────────────────────────── */}
-          <section className="pb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="badge badge-race">Hızlı Erişim</span>
-              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {QUICK_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className="group">
-                  <MangaPanel className="p-4 hover-glow transition-all duration-300 group-hover:border-white/15">
-                    <div className="flex items-start gap-4">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 transition-transform duration-300 group-hover:scale-110"
-                        style={{ background: 'rgba(255,255,255,0.04)' }}
-                      >
-                        {item.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-display text-xs font-bold text-text-secondary group-hover:text-text-primary transition-colors mb-0.5">
-                          {item.label}
-                        </div>
-                        <div className="text-text-muted text-[10px]">{item.desc}</div>
-                      </div>
-                      <span className="text-text-muted text-sm opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                    </div>
-                  </MangaPanel>
-                </Link>
               ))}
             </div>
           </section>
+
+          {/* ── Upcoming features ────────────────────────────────────── */}
+          <section aria-labelledby="features-heading">
+            <h2 id="features-heading" className="section-header">Yakında Gelecek</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {upcomingFeatures.map((feat) => (
+                <div
+                  key={feat.title}
+                  style={{
+                    background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+                    border: '1px solid rgba(232,168,32,0.12)',
+                    borderRadius: 8,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      background: `${feat.color}15`,
+                      border: `1px solid ${feat.color}35`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20,
+                      flexShrink: 0,
+                    }}
+                    aria-hidden
+                  >
+                    {feat.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>{feat.title}</h3>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 3,
+                          background: `${feat.color}18`,
+                          border: `1px solid ${feat.color}35`,
+                          color: feat.color,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {feat.eta}
+                      </span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{feat.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── Game area placeholder ──────────────────────────────── */}
+          <section aria-labelledby="game-heading">
+            <h2 id="game-heading" className="section-header">Savaş Alanı</h2>
+            <div
+              style={{
+                background: 'linear-gradient(160deg, #0e1020 0%, #080a14 100%)',
+                border: '1px dashed rgba(232,168,32,0.25)',
+                borderRadius: 10,
+                minHeight: 280,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: 40,
+              }}
+            >
+              <div style={{ fontSize: 60, marginBottom: 16, opacity: 0.7 }} aria-hidden>🚀</div>
+              <h3 className="font-display font-black text-lg" style={{ color: 'var(--color-brand)' }}>
+                Phaser.js Savaş Motoru
+              </h3>
+              <p className="text-sm mt-2 max-w-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                Savaş sistemi geliştirme aşamasında. Hafta 4&apos;te BattleScene burada devreye girecek.
+              </p>
+              <div className="flex gap-2 mt-4">
+                <span className="badge badge-brand">Hafta 4</span>
+                <span className="badge badge-energy">Phaser.js 3.80</span>
+              </div>
+              <Link href="/battle" className="btn-battle mt-5" style={{ padding: '10px 28px', fontSize: 13 }}>
+                ⚔️ DEMO SAVAŞI BAŞLAT
+              </Link>
+            </div>
+          </section>
+
         </div>
       </main>
     </div>

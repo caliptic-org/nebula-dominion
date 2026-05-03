@@ -3,105 +3,125 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { RegisterForm } from './RegisterForm';
 
-export const metadata: Metadata = { title: 'Kayıt Ol' };
+export const metadata: Metadata = {
+  title: 'Kayıt Ol — Nebula Dominion',
+}
 
 export default function RegisterPage() {
   return (
     <div
-      className="min-h-[100dvh] flex relative overflow-hidden"
-      style={{ background: 'var(--color-bg)' }}
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+      style={{ background: 'var(--gradient-hero)' }}
     >
-      {/* Animated nebula background */}
+      {/* Atmospheric grid overlay */}
       <div
         className="fixed inset-0 pointer-events-none"
-        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(64,200,224,0.05) 0%, transparent 55%)',
+          zIndex: 0,
+        }}
+        aria-hidden
+      />
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(64,200,224,0.025) 39px, rgba(64,200,224,0.025) 40px),
+            repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(64,200,224,0.025) 39px, rgba(64,200,224,0.025) 40px)`,
+          zIndex: 0,
+        }}
         aria-hidden
       />
 
-      {/* Left panel — form */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 lg:max-w-[480px] lg:border-r lg:border-white/06">
-        <div className="absolute inset-0 halftone-bg pointer-events-none opacity-30" aria-hidden />
-
-        <div className="relative z-10 w-full max-w-sm">
-          <div className="mb-10">
-            <Link href="/" className="inline-block mb-6" aria-label="Ana sayfaya dön">
-              <span
-                className="font-display text-xs font-bold tracking-[0.25em] uppercase"
-                style={{ color: 'var(--color-race)' }}
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Game logo */}
+        <div className="text-center mb-8">
+          <Link href="/" aria-label="Ana sayfaya dön">
+            <div className="inline-flex flex-col items-center gap-2">
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl"
+                style={{
+                  background: 'linear-gradient(145deg, #1e1a10 0%, #0d0b06 100%)',
+                  border: '2px solid rgba(232,168,32,0.5)',
+                  boxShadow: '0 0 32px rgba(232,168,32,0.25), inset 0 1px 0 rgba(255,220,80,0.2)',
+                }}
               >
-                ◆ NEBULA DOMINION ◆
-              </span>
-            </Link>
-
-            <div className="mb-4">
-              <span className="badge badge-race">Yeni Komutan</span>
+                🚀
+              </div>
+              <div>
+                <div
+                  className="font-display font-black tracking-widest text-xl uppercase"
+                  style={{
+                    background: 'linear-gradient(180deg, #f0c840 0%, #c88010 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  NEBULA DOMINION
+                </div>
+                <div className="text-xs tracking-widest mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  SPACE BATTLE STRATEGY
+                </div>
+              </div>
             </div>
+          </Link>
+        </div>
 
-            <h1 className="font-display text-3xl font-black tracking-tight text-text-primary leading-tight">
-              Evrenin<br />
-              <span className="text-gradient-race">Fatihi</span> Ol
+        {/* Register card */}
+        <div
+          style={{
+            background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
+            border: '1px solid rgba(64,200,224,0.2)',
+            borderRadius: 12,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(64,200,224,0.05)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Card header band */}
+          <div
+            style={{
+              background: 'linear-gradient(90deg, rgba(64,200,224,0.12) 0%, transparent 100%)',
+              borderBottom: '1px solid rgba(64,200,224,0.18)',
+              padding: '14px 28px',
+            }}
+          >
+            <h1 className="font-display font-black text-base uppercase tracking-widest" style={{ color: 'var(--color-energy)' }}>
+              🛸 YENİ KOMUTAN
             </h1>
-            <p className="mt-3 text-text-muted text-sm">
-              5 ırktan birini seç, imparatorluğunu kur.
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              Galaksiye katıl — ücretsiz
             </p>
           </div>
 
-          <div
-            className="manga-panel p-7"
-            style={{
-              background: 'rgba(13,17,23,0.8)',
-              borderColor: 'rgba(74,158,255,0.15)',
-            }}
-          >
+          <div className="p-7">
             <RegisterForm />
 
-            <div
-              className="mt-6 pt-5 text-center"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <p className="text-text-muted text-sm">
+            <div className="mt-5 text-center">
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 Zaten hesabın var mı?{' '}
                 <Link
                   href="/login"
-                  className="font-semibold transition-colors duration-200"
-                  style={{ color: 'var(--color-race)' }}
+                  className="font-bold transition-colors"
+                  style={{ color: 'var(--color-brand)' }}
                 >
-                  Giriş yap →
+                  Giriş Yap
                 </Link>
               </p>
             </div>
           </div>
-
-          <p className="text-center mt-6 text-text-muted text-xs">
-            Kayıt olarak{' '}
-            <a href="#" className="hover:text-text-secondary transition-colors underline underline-offset-2">Kullanım Şartları</a>
-            {' '}ve{' '}
-            <a href="#" className="hover:text-text-secondary transition-colors underline underline-offset-2">Gizlilik Politikası</a>
-            &apos;nı kabul edersin.
-          </p>
         </div>
-      </div>
 
-      {/* Right panel — character portrait (desktop) */}
-      <div className="hidden lg:flex flex-1 relative items-end justify-center overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{
-            background: 'radial-gradient(ellipse 60% 80% at 50% 90%, rgba(204,0,255,0.10) 0%, transparent 70%)',
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 w-full max-w-sm h-[70vh] flex items-end justify-center">
-          <Image
-            src="/assets/characters/seytan/malphas.png"
-            alt="Komutan Malphas"
-            fill
-            className="object-contain object-bottom"
-            priority
-            style={{ filter: 'drop-shadow(0 0 40px rgba(204,0,255,0.25))' }}
-          />
-        </div>
-        <div className="absolute inset-y-0 left-0 w-[2px] bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+        <p className="text-center mt-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          Kayıt olarak{' '}
+          <a href="#" style={{ color: 'var(--color-text-muted)', textDecoration: 'underline' }}>
+            Kullanım Şartları
+          </a>{' '}
+          ve{' '}
+          <a href="#" style={{ color: 'var(--color-text-muted)', textDecoration: 'underline' }}>
+            Gizlilik Politikası
+          </a>
+          &apos;nı kabul etmiş olursun.
+        </p>
       </div>
     </div>
   );

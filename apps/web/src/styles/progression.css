@@ -1,16 +1,30 @@
-/* ── Level Indicator ─────────────────────────────────────────────────────── */
+/* ── Level Indicator — Top War military style ────────────────────────────── */
 
 .level-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-energy-dim);
-  border-radius: 8px;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(160deg, #12141f 0%, #0c0e17 100%);
+  border: 1px solid rgba(232, 168, 32, 0.3);
+  border-radius: 10px;
   color: var(--color-text-primary);
   font-family: var(--font-body);
   user-select: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(232, 168, 32, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gold top-border accent — signature Top War element */
+.level-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #e8a820, #f0c840, #e8a820);
 }
 
 .level-badge {
@@ -18,50 +32,57 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 2px solid var(--tier-color, var(--color-energy));
-  background: radial-gradient(circle at 40% 40%, var(--color-energy-dim), transparent 70%);
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  border: 2px solid var(--tier-color, #e8a820);
+  background: linear-gradient(145deg, rgba(232, 168, 32, 0.2) 0%, rgba(0, 0, 0, 0.4) 100%);
   font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 0 16px var(--tier-color, rgba(232, 168, 32, 0.4)), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .level-badge .age-label {
   font-size: 9px;
-  letter-spacing: 0.5px;
-  color: var(--tier-color, var(--color-energy));
+  letter-spacing: 0.8px;
+  color: var(--tier-color, #e8a820);
   text-transform: uppercase;
+  font-weight: 800;
 }
 
 .level-badge .level-number {
-  font-size: 20px;
+  font-size: 26px;
   line-height: 1;
+  font-weight: 900;
   color: var(--color-text-primary);
 }
 
 .level-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 120px;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .tier-name {
-  font-size: 11px;
-  color: var(--tier-color, var(--color-energy));
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--tier-color, #e8a820);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 1.2px;
 }
 
 .xp-label {
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
-/* Tier color vars — map to semantic tokens where possible */
-.tier-1 { --tier-color: var(--color-info);   }
-.tier-2 { --tier-color: var(--color-energy); }
-.tier-3 { --tier-color: var(--color-warning);}
+/* Tier color vars */
+.tier-1 { --tier-color: #40c8e0; }
+.tier-2 { --tier-color: #e8a820; }
+.tier-3 { --tier-color: #e84030; }
 
 
 /* ── XP Progress Bar ─────────────────────────────────────────────────────── */
@@ -75,86 +96,126 @@
 
 .xp-bar-track {
   width: 100%;
-  height: 8px;
-  background: var(--color-border);
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .xp-bar-fill {
   height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--color-brand), var(--color-accent));
+  border-radius: 5px;
+  background: linear-gradient(90deg, #c88010 0%, #f0c840 50%, #e8a820 100%);
   transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  box-shadow: 0 0 8px rgba(232, 168, 32, 0.6);
+  position: relative;
 }
 
-.xp-bar-fill.tier-2 {
-  background: linear-gradient(90deg, var(--color-energy), var(--color-warning));
+.xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px 5px 0 0;
+}
+
+.xp-bar-fill.tier-1 {
+  background: linear-gradient(90deg, #1890c0 0%, #40c8e0 100%);
+  box-shadow: 0 0 8px rgba(64, 200, 224, 0.6);
 }
 
 .xp-bar-fill.tier-3 {
-  background: linear-gradient(90deg, var(--color-danger), #c92020);
+  background: linear-gradient(90deg, #c02020 0%, #e84030 100%);
+  box-shadow: 0 0 8px rgba(232, 64, 48, 0.6);
 }
 
 .xp-bar-fill.maxed {
-  background: var(--gradient-brand);
+  background: linear-gradient(90deg, #c880f0 0%, #a040d0 100%);
+  box-shadow: 0 0 8px rgba(200, 128, 240, 0.6);
 }
 
 .xp-bar-labels {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
+  font-weight: 600;
   color: var(--color-text-muted);
 }
 
-/* ── Level-Up Modal ──────────────────────────────────────────────────────── */
+
+/* ── Level-Up Modal — Top War epic level-up style ────────────────────────── */
 
 .level-up-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fade-in 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .level-up-modal {
-  background: radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
-  border: 1px solid var(--color-energy-dim);
-  border-radius: 16px;
+  background: linear-gradient(160deg, #18160a 0%, #0e0d18 100%);
+  border: 2px solid rgba(232, 168, 32, 0.55);
+  border-radius: 14px;
   padding: 40px 48px;
   text-align: center;
   color: var(--color-text-primary);
-  max-width: 400px;
+  max-width: 420px;
   width: 90%;
   animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 0 60px var(--color-brand-glow);
+  box-shadow:
+    0 0 60px rgba(232, 168, 32, 0.3),
+    0 0 120px rgba(232, 168, 32, 0.1),
+    0 20px 60px rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Top gold line */
+.level-up-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #f0c840, #e8a820, #f0c840, transparent);
 }
 
 .level-up-title {
-  font-size: 13px;
-  letter-spacing: 3px;
+  font-size: 11px;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  color: var(--color-energy);
+  font-weight: 900;
+  color: #e8a820;
   margin-bottom: 8px;
 }
 
 .level-up-number {
-  font-size: 72px;
+  font-size: 80px;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(180deg, var(--color-text-primary) 0%, var(--color-energy) 100%);
+  background: linear-gradient(180deg, #f8f0e0 0%, #f0c840 50%, #c88010 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 8px 0;
+  filter: drop-shadow(0 0 20px rgba(232, 168, 32, 0.5));
 }
 
 .level-up-subtitle {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--color-text-secondary);
   margin-bottom: 24px;
+  font-weight: 600;
 }
 
 .level-up-rewards {
@@ -166,21 +227,55 @@
 }
 
 .reward-chip {
-  padding: 4px 12px;
-  border-radius: 20px;
+  padding: 5px 14px;
+  border-radius: 4px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
-.reward-chip.gold  { background: var(--color-energy-dim); color: var(--color-energy);  border: 1px solid rgba(255,200,50,0.25); }
-.reward-chip.gems  { background: var(--color-accent-dim); color: var(--color-accent);  border: 1px solid rgba(68,217,200,0.25); }
-.reward-chip.title { background: var(--color-brand-dim);  color: var(--color-brand);   border: 1px solid rgba(123,140,222,0.25); }
-.reward-chip.badge { background: rgba(68,221,136,0.15);   color: var(--color-success); border: 1px solid rgba(68,221,136,0.25); }
+.reward-chip.gold {
+  background: rgba(232, 168, 32, 0.18);
+  color: #f0c840;
+  border: 1px solid rgba(232, 168, 32, 0.4);
+}
+
+.reward-chip.gems {
+  background: rgba(200, 128, 240, 0.18);
+  color: #c880f0;
+  border: 1px solid rgba(200, 128, 240, 0.4);
+}
+
+.reward-chip.title {
+  background: rgba(64, 200, 224, 0.18);
+  color: #40c8e0;
+  border: 1px solid rgba(64, 200, 224, 0.4);
+}
+
+.reward-chip.badge {
+  background: rgba(68, 221, 136, 0.15);
+  color: #44dd88;
+  border: 1px solid rgba(68, 221, 136, 0.35);
+}
 
 .level-up-unlocks {
   font-size: 12px;
   color: var(--color-text-muted);
   margin-bottom: 24px;
+  background: rgba(232, 168, 32, 0.06);
+  border: 1px solid rgba(232, 168, 32, 0.18);
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.level-up-unlocks strong {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #e8a820;
 }
 
 .unlock-list {
@@ -189,35 +284,47 @@
   margin: 8px 0 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+}
+
+.unlock-list li {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 .unlock-list li::before {
-  content: '✦ ';
-  color: var(--color-energy);
+  content: '▸ ';
+  color: #e8a820;
 }
 
 .level-up-close {
-  padding: 10px 32px;
-  border: 1px solid var(--color-energy-dim);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-energy);
-  font-size: 14px;
+  padding: 12px 40px;
+  border: 2px solid #c88820;
+  border-radius: 6px;
+  background: var(--gradient-gold-btn);
+  color: #1a0e00;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: filter 0.18s, transform 0.12s;
+  box-shadow: 0 4px 16px rgba(232, 168, 32, 0.4);
 }
 
 .level-up-close:hover {
-  background: var(--color-energy-dim);
+  filter: brightness(1.1);
+  transform: translateY(-1px);
 }
+
 
 /* ── Unlock Notification (toast) ─────────────────────────────────────────── */
 
 .unlock-notifications {
   position: fixed;
-  top: 24px;
-  right: 24px;
+  top: 80px;
+  right: 20px;
   z-index: 999;
   display: flex;
   flex-direction: column;
@@ -230,19 +337,21 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: var(--color-bg-surface);
-  border-left: 3px solid var(--color-energy);
+  background: linear-gradient(135deg, #12140c 0%, #0e0f18 100%);
+  border: 1px solid rgba(232, 168, 32, 0.4);
+  border-left: 3px solid #e8a820;
   border-radius: 6px;
   color: var(--color-text-primary);
   font-size: 13px;
   animation: slide-in 0.3s ease, fade-out 0.5s ease 3.5s forwards;
   pointer-events: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(232, 168, 32, 0.15);
 }
 
-.unlock-toast-icon { font-size: 18px; }
-.unlock-toast-label { font-weight: 600; color: var(--color-energy); }
+.unlock-toast-icon { font-size: 20px; }
+.unlock-toast-label { font-weight: 800; color: #e8a820; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 .unlock-toast-sub   { font-size: 11px; color: var(--color-text-muted); }
+
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 

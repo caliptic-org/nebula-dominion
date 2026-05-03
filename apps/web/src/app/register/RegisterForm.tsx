@@ -61,37 +61,112 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Kayıt formu" className="space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="px-4 py-3 rounded-lg text-sm font-medium animate-slide-up"
-          style={{
-            background: 'rgba(255,51,85,0.08)',
-            border: '1px solid rgba(255,51,85,0.3)',
-            color: 'var(--color-danger)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+    <form onSubmit={handleSubmit} noValidate aria-label="Kayıt formu">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {error && (
+          <div
+            role="alert"
+            style={{
+              padding: '10px 14px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'rgba(232,64,48,0.12)',
+              border: '1px solid rgba(232,64,48,0.35)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            ⚠️ {error}
+          </div>
+        )}
 
-      <div>
-        <label htmlFor="username" className="form-label">Kullanıcı Adı</label>
-        <input
-          id="username"
-          type="text"
-          name="username"
-          className="form-input"
-          placeholder="komutan_nova"
-          autoComplete="username"
-          required
-          minLength={3}
-          maxLength={32}
-          value={values.username}
-          onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
+        <div>
+          <label htmlFor="username" className="form-label">Komutan Adı</label>
+          <input
+            id="username"
+            type="text"
+            name="username"
+            className="form-input"
+            placeholder="komutan_nova"
+            autoComplete="username"
+            required
+            minLength={3}
+            maxLength={32}
+            value={values.username}
+            onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="reg-email" className="form-label">E-posta</label>
+          <input
+            id="reg-email"
+            type="email"
+            name="email"
+            className="form-input"
+            placeholder="komutan@galaksi.com"
+            autoComplete="email"
+            required
+            value={values.email}
+            onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="reg-password" className="form-label">Şifre</label>
+          <input
+            id="reg-password"
+            type="password"
+            name="password"
+            className="form-input"
+            placeholder="En az 8 karakter"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={values.password}
+            onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="confirm-password" className="form-label">Şifre Tekrar</label>
+          <input
+            id="confirm-password"
+            type="password"
+            name="confirmPassword"
+            className="form-input"
+            placeholder="Şifreni tekrar gir"
+            autoComplete="new-password"
+            required
+            value={values.confirmPassword}
+            onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))}
+            disabled={isLoading}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="btn-primary"
+          style={{ marginTop: 4, width: '100%' }}
           disabled={isLoading}
-        />
+          aria-busy={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <span
+                className="inline-block w-4 h-4 rounded-full animate-spin"
+                style={{ border: '2px solid rgba(0,0,0,0.2)', borderTopColor: '#1a0e00' }}
+                aria-hidden
+              />
+              Hesap oluşturuluyor…
+            </>
+          ) : (
+            '🛸 HESAP OLUŞTUR'
+          )}
+        </button>
       </div>
 
       <div>

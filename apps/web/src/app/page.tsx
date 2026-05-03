@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
@@ -68,6 +69,10 @@ export default function HomePage() {
 
   const raceDesc = RACE_DESCRIPTIONS[race];
   const primaryCommander = raceDesc.commanders[0];
+
+  const handleTileSelect = useCallback((col: number, row: number) => {
+    setSelectedTile({ col, row });
+  }, []);
 
   return (
     <>
@@ -199,7 +204,7 @@ export default function HomePage() {
                   <IsometricTilemap
                     race={race}
                     structures={STRUCTURES_ON_MAP}
-                    onTileSelect={(col, row) => setSelectedTile({ col, row })}
+                    onTileSelect={handleTileSelect}
                   />
                 </MangaPanel>
 
@@ -365,7 +370,7 @@ export default function HomePage() {
                 <IsometricTilemap
                   race={race}
                   structures={STRUCTURES_ON_MAP}
-                  onTileSelect={(col, row) => setSelectedTile({ col, row })}
+                  onTileSelect={handleTileSelect}
                 />
               </MangaPanel>
             </div>
@@ -405,9 +410,9 @@ export default function HomePage() {
           {/* ── Commanders Tab ────────────────────────────────── */}
           {activeTab === 'commanders' && (
             <div className="p-4">
-              <a href="/commanders" className="font-display text-text-muted text-xs uppercase tracking-widest hover:text-text-primary transition-colors">
+              <Link href="/commanders" className="font-display text-text-muted text-xs uppercase tracking-widest hover:text-text-primary transition-colors">
                 Tüm Komutanlar →
-              </a>
+              </Link>
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {raceDesc.commanders.map((cmd) => (
                   <div

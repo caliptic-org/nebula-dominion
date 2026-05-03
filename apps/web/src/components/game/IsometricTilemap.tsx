@@ -78,6 +78,10 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
   const offsetY = 60 * zoom;
   const raceColor = RACE_DESCRIPTIONS[race].color;
 
+  useEffect(() => {
+    setGridVisible(showGrid);
+  }, [showGrid]);
+
   // Preload structure images
   useEffect(() => {
     structures.forEach(({ structureKey }) => {
@@ -236,6 +240,7 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
           ctx.stroke();
           ctx.globalAlpha = 1;
           ctx.shadowBlur = 0;
+          ctx.shadowColor = 'transparent';
         }
       }
     }
@@ -270,6 +275,25 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
     setZoom(z => Math.min(1.8, Math.max(0.5, z - e.deltaY * 0.001)));
   }, []);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLCanvasElement>) => {
+    const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '];
+    if (!navKeys.includes(e.key)) return;
+    e.preventDefault();
+
+    setSelectedTile(prev => {
+      const start = prev ?? { col: Math.floor(MAP_COLS / 2), row: Math.floor(MAP_ROWS / 2) };
+      let { col, row } = start;
+      switch (e.key) {
+        case 'ArrowUp':    row = Math.max(0, row - 1); break;
+        case 'ArrowDown':  row = Math.min(MAP_ROWS - 1, row + 1); break;
+        case 'ArrowLeft':  col = Math.max(0, col - 1); break;
+        case 'ArrowRight': col = Math.min(MAP_COLS - 1, col + 1); break;
+      }
+      onTileSelect?.(col, row);
+      return { col, row };
+    });
+  }, [onTileSelect]);
+
   return (
     <div className="relative w-full overflow-hidden rounded-lg" style={{ background: '#080a10' }}>
       {/* Controls */}
@@ -280,6 +304,8 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
                      bg-black/60 border border-white/10 hover:border-white/25 transition-colors"
           style={{ color: gridVisible ? 'var(--color-race)' : '#555' }}
           title="Grid toggle"
+          aria-label="Toggle grid"
+          aria-pressed={gridVisible}
         >
           GRID
         </button>
@@ -288,12 +314,14 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
           className="w-7 h-7 rounded-full bg-black/60 border border-white/10 hover:border-white/25
                      flex items-center justify-center text-sm transition-colors text-text-secondary"
           title="Zoom in"
+          aria-label="Zoom in"
         >+</button>
         <button
           onClick={() => setZoom(z => Math.max(0.5, z - 0.15))}
           className="w-7 h-7 rounded-full bg-black/60 border border-white/10 hover:border-white/25
                      flex items-center justify-center text-sm transition-colors text-text-secondary"
           title="Zoom out"
+          aria-label="Zoom out"
         >−</button>
       </div>
 
@@ -317,8 +345,11 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
         height={CANVAS_H}
         onClick={handleCanvasClick}
         onWheel={handleWheel}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="application"
         style={{ display: 'block', width: '100%', cursor: 'pointer' }}
-        aria-label="İzometrik oyun haritası"
+        aria-label="İzometrik oyun haritası — ok tuşlarıyla tile seç"
       />
 
       {/* Tile type legend */}

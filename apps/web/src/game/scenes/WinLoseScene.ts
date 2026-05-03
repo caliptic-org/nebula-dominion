@@ -185,23 +185,56 @@ export class WinLoseScene extends Phaser.Scene {
     // Buttons
     const btnY = py + panelH - 56;
 
+    const goHome = () => { window.location.href = '/'; };
+
     const playAgainBtn = this.add.text(width / 2 - 80, btnY, 'PLAY AGAIN', {
       fontSize: '14px', fontStyle: 'bold', color: THEME.SUCCESS_STR,
       backgroundColor: '#0d3d1e', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
-    playAgainBtn.on('pointerdown', () => window.location.reload());
-    playAgainBtn.on('pointerover', () => playAgainBtn.setStyle({ color: THEME.ACCENT_STR }));
+    playAgainBtn.on('pointerdown', () => { cancelAutoRedirect(); window.location.reload(); });
+    playAgainBtn.on('pointerover', () => { cancelAutoRedirect(); playAgainBtn.setStyle({ color: THEME.ACCENT_STR }); });
     playAgainBtn.on('pointerout', () => playAgainBtn.setStyle({ color: THEME.SUCCESS_STR }));
 
-    const menuBtn = this.add.text(width / 2 + 80, btnY, 'MAIN MENU', {
+    const menuBtn = this.add.text(width / 2 + 80, btnY, 'ANA USSE DON', {
       fontSize: '14px', fontStyle: 'bold', color: THEME.BRAND_STR,
       backgroundColor: '#1a1a30', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
-    menuBtn.on('pointerdown', () => { window.location.href = '/'; });
+    menuBtn.on('pointerdown', () => { cancelAutoRedirect(); goHome(); });
     menuBtn.on('pointerover', () => menuBtn.setStyle({ color: THEME.TEXT_PRIMARY }));
     menuBtn.on('pointerout', () => menuBtn.setStyle({ color: THEME.BRAND_STR }));
+
+    // Auto-redirect to Ana Us after 3s, cancelled by any button interaction.
+    const AUTO_REDIRECT_SECONDS = 3;
+    let remaining = AUTO_REDIRECT_SECONDS;
+    const countdownText = this.add.text(width / 2, btnY + 44, `Ana Usse donus: ${remaining}s`, {
+      fontSize: '11px', color: THEME.TEXT_MUTED,
+    }).setOrigin(0.5, 0);
+
+    const redirectTimer = this.time.addEvent({
+      delay: 1000,
+      repeat: AUTO_REDIRECT_SECONDS - 1,
+      callback: () => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          countdownText.destroy();
+          goHome();
+        } else {
+          countdownText.setText(`Ana Usse donus: ${remaining}s`);
+        }
+      },
+    });
+
+    let cancelled = false;
+    const cancelAutoRedirect = () => {
+      if (cancelled) return;
+      cancelled = true;
+      redirectTimer.remove(false);
+      countdownText.destroy();
+    };
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cancelAutoRedirect);
   }
 
   /** "First Victory" is a one-shot celebration to make the first win feel huge. */

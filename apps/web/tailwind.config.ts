@@ -9,13 +9,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Base space theme
-        space: {
-          black: '#080a10',
-          panel: '#0d1117',
-          elevated: '#141d2b',
-          overlay: 'rgba(8,10,16,0.92)',
-        },
         // Semantic tokens backed by CSS custom properties
         bg: {
           DEFAULT: 'var(--color-bg)',
@@ -34,24 +27,6 @@ const config: Config = {
           hover: 'var(--color-brand-hover)',
           dim: 'var(--color-brand-dim)',
           glow: 'var(--color-brand-glow)',
-        },
-        // Race color tokens
-        race: {
-          zerg: '#44ff44',
-          'zerg-dim': 'rgba(68,255,68,0.12)',
-          'zerg-glow': 'rgba(68,255,68,0.4)',
-          otomat: '#00cfff',
-          'otomat-dim': 'rgba(0,207,255,0.12)',
-          'otomat-glow': 'rgba(0,207,255,0.4)',
-          canavar: '#ff6600',
-          'canavar-dim': 'rgba(255,102,0,0.12)',
-          'canavar-glow': 'rgba(255,102,0,0.4)',
-          insan: '#4a9eff',
-          'insan-dim': 'rgba(74,158,255,0.12)',
-          'insan-glow': 'rgba(74,158,255,0.4)',
-          seytan: '#cc00ff',
-          'seytan-dim': 'rgba(204,0,255,0.12)',
-          'seytan-glow': 'rgba(204,0,255,0.4)',
         },
         accent: {
           DEFAULT: 'var(--color-accent)',
@@ -84,26 +59,18 @@ const config: Config = {
         'hero-gradient': 'var(--gradient-hero)',
         'card-gradient': 'var(--gradient-card)',
         'brand-gradient': 'var(--gradient-brand)',
-        'race-gradient': 'var(--gradient-race)',
-        'halftone': "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='3' cy='3' r='1' fill='white' fill-opacity='0.06'/%3E%3C/svg%3E\")",
       },
       boxShadow: {
         'brand-glow': '0 0 20px var(--color-brand-glow)',
-        'race-glow': '0 0 24px var(--color-race), 0 0 48px var(--color-race-glow)',
-        'manga-panel': 'inset 0 0 0 3px rgba(255,255,255,0.08), 0 0 0 1px rgba(0,0,0,0.8)',
-        'card': '0 4px 24px rgba(0,0,0,0.5)',
-        'card-hover': '0 8px 40px rgba(0,0,0,0.7)',
-        'neon': '0 0 10px var(--color-race), 0 0 40px var(--color-race-glow)',
+        'accent-glow': '0 0 20px var(--color-accent-dim)',
+        'card': '0 4px 24px rgba(0, 0, 0, 0.4)',
+        'card-hover': '0 8px 40px rgba(0, 0, 0, 0.6)',
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'float': 'float 6s ease-in-out infinite',
         'star-twinkle': 'twinkle 4s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
-        'scan-line': 'scan-line 8s linear infinite',
-        'speed-line': 'speed-line 0.4s ease-out forwards',
-        'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
-        'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',
       },
       keyframes: {
         float: {
@@ -115,30 +82,9 @@ const config: Config = {
           '50%': { opacity: '1' },
         },
         'glow-pulse': {
-          '0%, 100%': { boxShadow: '0 0 10px var(--color-race-glow)' },
-          '50%': { boxShadow: '0 0 30px var(--color-race), 0 0 60px var(--color-race-glow)' },
+          '0%, 100%': { boxShadow: '0 0 10px var(--color-brand-glow)' },
+          '50%': { boxShadow: '0 0 30px var(--color-brand-glow), 0 0 60px var(--color-brand-dim)' },
         },
-        'scan-line': {
-          '0%': { transform: 'translateY(-100%)' },
-          '100%': { transform: 'translateY(100vh)' },
-        },
-        'speed-line': {
-          '0%': { opacity: '0', transform: 'scaleX(0)' },
-          '50%': { opacity: '1' },
-          '100%': { opacity: '0', transform: 'scaleX(1)' },
-        },
-        'manga-appear': {
-          '0%': { opacity: '0', transform: 'scale(0.95) translateY(16px)', filter: 'blur(4px)' },
-          '100%': { opacity: '1', transform: 'scale(1) translateY(0)', filter: 'blur(0)' },
-        },
-        'slide-up': {
-          '0%': { opacity: '0', transform: 'translateY(24px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-      },
-      transitionTimingFunction: {
-        'spring': 'cubic-bezier(0.32,0.72,0,1)',
-        'bounce-out': 'cubic-bezier(0.34,1.56,0.64,1)',
       },
     },
   },

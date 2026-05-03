@@ -17,13 +17,13 @@ import type {
 } from '@/components/game/WorldMap';
 import clsx from 'clsx';
 
-// Canvas cannot SSR — cast preserves forwardRef generic so `ref` prop typechecks
+// WebGL canvas cannot SSR — cast preserves forwardRef generic so `ref` prop typechecks
 const WorldMap = dynamic(
-  () => import('@/components/game/WorldMap'),
+  () => import('@/components/game/SphericalMap'),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center" style={{ background:'#080a10' }}>
+      <div className="w-full h-full flex items-center justify-center" style={{ background:'#04060c' }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor:'var(--color-race)', borderTopColor:'transparent' }} />
           <span className="font-display text-[10px] uppercase tracking-[0.2em] text-text-muted">Galaksi Yükleniyor…</span>
@@ -401,7 +401,7 @@ export default function WorldMapPage() {
   const toastColor  = feedback?.tone === 'error' ? '#ff8a8a' : raceColor;
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background:'#080a10' }}>
+    <div className="fixed inset-0 overflow-hidden" style={{ background:'#04060c' }}>
 
       {/* ── Full-screen world map ──────────────────────────────────────────── */}
       <div className="absolute inset-0">

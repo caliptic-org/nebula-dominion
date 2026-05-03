@@ -1,14 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   CosmeticItem,
   CosmeticCategory,
-  DEMO_COSMETICS,
   RARITY_META,
 } from '@/types/cosmetics';
+import {
+  fetchCosmetics,
+  fetchBalance,
+  equipCosmetic,
+  purchaseCosmetic,
+  newIdempotencyKey,
+} from '@/lib/cosmetics-api';
 
 // ─── Category metadata ────────────────────────────────────────────────────────
 const CATEGORIES: { id: CosmeticCategory; label: string; icon: string }[] = [
@@ -34,17 +40,25 @@ const TOKEN = {
   energy:      'var(--color-energy,     #ffc832)',
   energyDim:   'var(--color-energy-dim, rgba(255,200,50,0.12))',
   success:     'var(--color-success,    #44ff88)',
+  danger:      'var(--color-danger,     #ff4a6e)',
+  dangerDim:   'rgba(255,74,110,0.12)',
 };
+
+// ─── Toast types ──────────────────────────────────────────────────────────────
+type ToastKind = 'success' | 'error';
+interface ToastState { id: number; kind: ToastKind; message: string }
 
 // ─── CosmeticCard component ───────────────────────────────────────────────────
 function CosmeticCard({
   item,
   selected,
   onSelect,
+  pending,
 }: {
   item: CosmeticItem;
   selected: boolean;
   onSelect: (item: CosmeticItem) => void;
+  pending?: boolean;
 }) {
   const rarity = RARITY_META[item.rarity];
   const isLocked = !item.isOwned;
@@ -53,6 +67,7 @@ function CosmeticCard({
     <button
       onClick={() => onSelect(item)}
       aria-pressed={selected}
+      aria-busy={pending || undefined}
       aria-label={`${item.name}${isLocked ? ' (kilitli)' : item.isEquipped ? ' (giyili)' : ''}`}
       style={{
         position: 'relative',
@@ -129,6 +144,31 @@ function CosmeticCard({
           </span>
         )}
 
+        {/* Pending overlay */}
+        {pending && (
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(8,10,16,0.55)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-hidden
+          >
+            <span
+              style={{
+                width: 16, height: 16,
+                border: '2px solid rgba(255,255,255,0.25)',
+                borderTopColor: '#fff',
+                borderRadius: '50%',
+                display: 'inline-block',
+                animation: 'spin 0.7s linear infinite',
+              }}
+            />
+          </div>
+        )}
+
         {/* Selected glow ring */}
         {selected && (
           <div
@@ -144,7 +184,7 @@ function CosmeticCard({
         )}
 
         {/* Lock overlay */}
-        {isLocked && (
+        {isLocked && !pending && (
           <div
             style={{
               position: 'absolute', inset: 0,
@@ -222,19 +262,102 @@ function CosmeticCard({
   );
 }
 
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div
+      style={{
+        background: TOKEN.bgSurface,
+        border: `1px solid ${TOKEN.border}`,
+        borderRadius: 12,
+        overflow: 'hidden',
+        height: 132,
+      }}
+      aria-hidden
+    >
+      <div
+        style={{
+          height: 80,
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.4s linear infinite',
+        }}
+      />
+      <div style={{ padding: '8px 10px 10px' }}>
+        <div
+          style={{
+            height: 10,
+            width: '70%',
+            borderRadius: 4,
+            background: 'rgba(255,255,255,0.08)',
+            marginBottom: 6,
+          }}
+        />
+        <div
+          style={{
+            height: 8,
+            width: '40%',
+            borderRadius: 4,
+            background: 'rgba(255,255,255,0.05)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Skeleton preview ─────────────────────────────────────────────────────────
+function SkeletonPreview() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} aria-hidden>
+      <div
+        style={{
+          paddingBottom: 12,
+          borderBottom: `1px solid ${TOKEN.border}`,
+          height: 24,
+        }}
+      />
+      <div
+        style={{
+          aspectRatio: '3/4',
+          borderRadius: 16,
+          border: `1px solid ${TOKEN.border}`,
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.4s linear infinite',
+        }}
+      />
+      <div
+        style={{
+          height: 84,
+          borderRadius: 12,
+          background: TOKEN.bgElevated,
+          border: `1px solid ${TOKEN.border}`,
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── PreviewPanel component ───────────────────────────────────────────────────
 function PreviewPanel({
   item,
   equippedItems,
   onApply,
+  onPurchase,
   applying,
+  purchasing,
   justApplied,
+  balance,
 }: {
   item: CosmeticItem | null;
   equippedItems: Record<CosmeticCategory, CosmeticItem | undefined>;
   onApply: () => void;
+  onPurchase: () => void;
   applying: boolean;
+  purchasing: boolean;
   justApplied: boolean;
+  balance: number | null;
 }) {
   const equippedSkin   = equippedItems['skin'];
   const equippedFrame  = equippedItems['frame'];
@@ -242,7 +365,8 @@ function PreviewPanel({
   const equippedEffect = equippedItems['effect'];
 
   const isAlreadyEquipped = item?.isEquipped;
-  const canApply = item && item.isOwned && !isAlreadyEquipped;
+  const insufficientFunds =
+    item && !item.isOwned && typeof item.price === 'number' && balance !== null && balance < item.price;
 
   return (
     <aside
@@ -505,8 +629,8 @@ function PreviewPanel({
                 gap: 8,
                 padding: '8px 12px',
                 borderRadius: 8,
-                background: TOKEN.energyDim,
-                border: `1px solid rgba(255,200,50,0.2)`,
+                background: insufficientFunds ? TOKEN.dangerDim : TOKEN.energyDim,
+                border: `1px solid ${insufficientFunds ? `${TOKEN.danger}40` : 'rgba(255,200,50,0.2)'}`,
                 marginBottom: 12,
               }}
             >
@@ -516,12 +640,14 @@ function PreviewPanel({
                   fontFamily: 'var(--font-display, Orbitron, system-ui)',
                   fontSize: 14,
                   fontWeight: 800,
-                  color: TOKEN.energy,
+                  color: insufficientFunds ? TOKEN.danger : TOKEN.energy,
                 }}
               >
                 {item.price}
               </span>
-              <span style={{ fontSize: 11, color: TOKEN.textMuted, marginLeft: 'auto' }}>Gem gerekli</span>
+              <span style={{ fontSize: 11, color: insufficientFunds ? TOKEN.danger : TOKEN.textMuted, marginLeft: 'auto' }}>
+                {insufficientFunds ? 'Yetersiz bakiye' : 'Gem gerekli'}
+              </span>
             </div>
           )}
 
@@ -616,6 +742,8 @@ function PreviewPanel({
             </button>
           ) : (
             <button
+              onClick={onPurchase}
+              disabled={purchasing || insufficientFunds || balance === null}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -626,7 +754,11 @@ function PreviewPanel({
                 borderRadius: 9999,
                 background: TOKEN.energyDim,
                 border: `1px solid ${TOKEN.energy}40`,
-                cursor: 'pointer',
+                cursor: purchasing
+                  ? 'wait'
+                  : insufficientFunds || balance === null
+                  ? 'not-allowed'
+                  : 'pointer',
                 color: TOKEN.energy,
                 fontFamily: 'var(--font-display, Orbitron, system-ui)',
                 fontSize: 12,
@@ -634,10 +766,33 @@ function PreviewPanel({
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase' as const,
                 transition: 'all 0.3s cubic-bezier(0.32,0.72,0,1)',
+                opacity: insufficientFunds || balance === null ? 0.55 : 1,
               }}
+              aria-busy={purchasing}
             >
-              <span>💎</span>
-              <span>Satın Al — {item.price} Gem</span>
+              {purchasing ? (
+                <>
+                  <span
+                    style={{
+                      width: 14, height: 14,
+                      border: `2px solid ${TOKEN.energy}40`,
+                      borderTopColor: TOKEN.energy,
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'spin 0.7s linear infinite',
+                    }}
+                    aria-hidden
+                  />
+                  <span>Satın alınıyor…</span>
+                </>
+              ) : (
+                <>
+                  <span>💎</span>
+                  <span>
+                    {insufficientFunds ? 'Yetersiz Bakiye' : `Satın Al — ${item.price} Gem`}
+                  </span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -738,43 +893,215 @@ function PreviewPanel({
   );
 }
 
+// ─── Toast viewport ───────────────────────────────────────────────────────────
+function ToastViewport({ toasts, onDismiss }: { toasts: ToastState[]; onDismiss: (id: number) => void }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 80,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        zIndex: 100,
+        maxWidth: 420,
+        width: 'calc(100% - 32px)',
+        pointerEvents: 'none',
+      }}
+      role="region"
+      aria-live="polite"
+    >
+      {toasts.map((t) => {
+        const isError = t.kind === 'error';
+        return (
+          <div
+            key={t.id}
+            role={isError ? 'alert' : 'status'}
+            style={{
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: isError ? TOKEN.dangerDim : `${TOKEN.success}18`,
+              border: `1px solid ${isError ? TOKEN.danger : TOKEN.success}55`,
+              color: isError ? TOKEN.danger : TOKEN.success,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              fontFamily: 'var(--font-body, Rajdhani, system-ui)',
+              fontSize: 13,
+              fontWeight: 600,
+              animation: 'fadeSlideUp 0.3s cubic-bezier(0.32,0.72,0,1)',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{isError ? '⚠️' : '✓'}</span>
+            <span style={{ flex: 1 }}>{t.message}</span>
+            <button
+              onClick={() => onDismiss(t.id)}
+              aria-label="Kapat"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontSize: 14,
+                opacity: 0.7,
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CustomizationPage() {
   const [activeCategory, setActiveCategory] = useState<CosmeticCategory>('skin');
   const [selectedItem, setSelectedItem]     = useState<CosmeticItem | null>(null);
   const [applying, setApplying]             = useState(false);
+  const [purchasing, setPurchasing]         = useState(false);
   const [justApplied, setJustApplied]       = useState(false);
-  const [cosmeticState, setCosmeticState]   = useState<CosmeticItem[]>(DEMO_COSMETICS);
 
-  const filteredItems = cosmeticState.filter((c) => c.category === activeCategory);
+  const [cosmetics, setCosmetics]           = useState<CosmeticItem[] | null>(null);
+  const [balance, setBalance]               = useState<number | null>(null);
+  const [loadError, setLoadError]           = useState<string | null>(null);
+  const [toasts, setToasts]                 = useState<ToastState[]>([]);
+  const [pendingItemId, setPendingItemId]   = useState<string | null>(null);
+
+  const toastIdRef = useRef(0);
+
+  const pushToast = useCallback((kind: ToastKind, message: string) => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, kind, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [items, gems] = await Promise.all([fetchCosmetics(), fetchBalance()]);
+        if (cancelled) return;
+        setCosmetics(items);
+        setBalance(gems);
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : 'Veri yüklenemedi';
+        setLoadError(msg);
+        pushToast('error', msg);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pushToast]);
+
+  // Re-sync the selected item with the latest cosmetics list (post-update).
+  useEffect(() => {
+    if (!selectedItem || !cosmetics) return;
+    const fresh = cosmetics.find((c) => c.id === selectedItem.id);
+    if (fresh && fresh !== selectedItem) setSelectedItem(fresh);
+  }, [cosmetics, selectedItem]);
+
+  const filteredItems = (cosmetics ?? []).filter((c) => c.category === activeCategory);
 
   const equippedItems = Object.fromEntries(
     CATEGORIES.map((cat) => [
       cat.id,
-      cosmeticState.find((c) => c.category === cat.id && c.isEquipped),
+      (cosmetics ?? []).find((c) => c.category === cat.id && c.isEquipped),
     ])
   ) as Record<CosmeticCategory, CosmeticItem | undefined>;
 
-  const handleApply = useCallback(() => {
-    if (!selectedItem || !selectedItem.isOwned || selectedItem.isEquipped) return;
+  const handleApply = useCallback(async () => {
+    if (!selectedItem || !selectedItem.isOwned || selectedItem.isEquipped || !cosmetics) return;
+    if (applying) return;
+
+    const target = selectedItem;
+    const previous = cosmetics;
+
+    // Optimistic update: equip target, unequip others in same category.
+    const optimistic = cosmetics.map((c) => {
+      if (c.category === target.category) {
+        return { ...c, isEquipped: c.id === target.id };
+      }
+      return c;
+    });
 
     setApplying(true);
-    // Simulate async apply (API call in production)
-    setTimeout(() => {
-      setCosmeticState((prev) =>
-        prev.map((c) => {
-          if (c.category === selectedItem.category) {
-            return { ...c, isEquipped: c.id === selectedItem.id };
-          }
-          return c;
-        })
-      );
-      setSelectedItem((prev) => prev ? { ...prev, isEquipped: true } : prev);
-      setApplying(false);
+    setPendingItemId(target.id);
+    setCosmetics(optimistic);
+
+    try {
+      await equipCosmetic(target.id);
       setJustApplied(true);
       setTimeout(() => setJustApplied(false), 800);
-    }, 600);
-  }, [selectedItem]);
+    } catch (e) {
+      setCosmetics(previous);
+      const msg = e instanceof Error ? e.message : 'Giydirme başarısız';
+      pushToast('error', msg);
+    } finally {
+      setApplying(false);
+      setPendingItemId(null);
+    }
+  }, [selectedItem, cosmetics, applying, pushToast]);
+
+  const handlePurchase = useCallback(async () => {
+    if (!selectedItem || selectedItem.isOwned || !cosmetics) return;
+    if (purchasing) return;
+    if (balance === null) return;
+
+    const price = selectedItem.price;
+    if (typeof price !== 'number') return;
+
+    if (balance < price) {
+      pushToast('error', 'Yetersiz gem bakiyesi');
+      return;
+    }
+
+    const target = selectedItem;
+    const previousCosmetics = cosmetics;
+    const previousBalance = balance;
+
+    // Optimistic: subtract price, mark owned.
+    const optimisticCosmetics = cosmetics.map((c) =>
+      c.id === target.id ? { ...c, isOwned: true } : c,
+    );
+    const optimisticBalance = balance - price;
+
+    setPurchasing(true);
+    setPendingItemId(target.id);
+    setCosmetics(optimisticCosmetics);
+    setBalance(optimisticBalance);
+
+    try {
+      const { newBalance } = await purchaseCosmetic(target.id, newIdempotencyKey());
+      setBalance(newBalance);
+      pushToast('success', `${target.name} satın alındı`);
+    } catch (e) {
+      setCosmetics(previousCosmetics);
+      setBalance(previousBalance);
+      const msg = e instanceof Error ? e.message : 'Satın alma başarısız';
+      pushToast('error', msg);
+    } finally {
+      setPurchasing(false);
+      setPendingItemId(null);
+    }
+  }, [selectedItem, cosmetics, balance, purchasing, pushToast]);
+
+  const isLoading = cosmetics === null || balance === null;
 
   return (
     <>
@@ -795,6 +1122,10 @@ export default function CustomizationPage() {
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
         }
         .cosmetic-card-hover:hover {
           transform: translateY(-4px) !important;
@@ -920,19 +1251,40 @@ export default function CustomizationPage() {
               borderRadius: 9999,
               background: TOKEN.energyDim,
               border: `1px solid rgba(255,200,50,0.2)`,
+              minWidth: 88,
+              justifyContent: 'center',
             }}
+            aria-live="polite"
+            aria-label="Gem bakiyesi"
           >
             <span style={{ fontSize: 14 }}>💎</span>
-            <span
-              style={{
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                fontSize: 13,
-                fontWeight: 800,
-                color: TOKEN.energy,
-              }}
-            >
-              1,240
-            </span>
+            {balance === null ? (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 44,
+                  height: 12,
+                  borderRadius: 4,
+                  background: 'rgba(255,200,50,0.18)',
+                  animation: 'shimmer 1.4s linear infinite',
+                  backgroundSize: '200% 100%',
+                  backgroundImage:
+                    'linear-gradient(90deg, rgba(255,200,50,0.10), rgba(255,200,50,0.30), rgba(255,200,50,0.10))',
+                }}
+                aria-label="Bakiye yükleniyor"
+              />
+            ) : (
+              <span
+                style={{
+                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: TOKEN.energy,
+                }}
+              >
+                {balance.toLocaleString('tr-TR')}
+              </span>
+            )}
           </div>
         </header>
 
@@ -964,7 +1316,7 @@ export default function CustomizationPage() {
           >
             {CATEGORIES.map((cat) => {
               const active = cat.id === activeCategory;
-              const equippedInCat = cosmeticState.find(
+              const equippedInCat = (cosmetics ?? []).find(
                 (c) => c.category === cat.id && c.isEquipped
               );
               return (
@@ -1026,7 +1378,7 @@ export default function CustomizationPage() {
               }}
               className="lg-hide"
             >
-              {selectedItem && (
+              {selectedItem && !isLoading && (
                 <div
                   style={{
                     marginBottom: 16,
@@ -1037,8 +1389,11 @@ export default function CustomizationPage() {
                     item={selectedItem}
                     equippedItems={equippedItems}
                     onApply={handleApply}
+                    onPurchase={handlePurchase}
                     applying={applying}
+                    purchasing={purchasing}
                     justApplied={justApplied}
+                    balance={balance}
                   />
                 </div>
               )}
@@ -1091,41 +1446,77 @@ export default function CustomizationPage() {
                       background: `linear-gradient(90deg, ${TOKEN.borderHover}, transparent)`,
                     }}
                   />
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: TOKEN.textMuted,
-                      fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                    }}
-                  >
-                    {filteredItems.filter((i) => i.isOwned).length}/{filteredItems.length} Sahip
-                  </span>
+                  {!isLoading && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: TOKEN.textMuted,
+                        fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                      }}
+                    >
+                      {filteredItems.filter((i) => i.isOwned).length}/{filteredItems.length} Sahip
+                    </span>
+                  )}
                 </div>
 
                 {/* Grid */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                    gap: 12,
-                  }}
-                >
-                  {filteredItems.map((item, i) => (
-                    <div
-                      key={item.id}
-                      className="cosmetic-card-hover"
-                      style={{
-                        animation: `fadeSlideUp 0.4s cubic-bezier(0.32,0.72,0,1) ${i * 0.05}s both`,
-                      }}
-                    >
-                      <CosmeticCard
-                        item={item}
-                        selected={selectedItem?.id === item.id}
-                        onSelect={setSelectedItem}
-                      />
-                    </div>
-                  ))}
-                </div>
+                {isLoading ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gap: 12,
+                    }}
+                    role="status"
+                    aria-label="Kozmetikler yükleniyor"
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <SkeletonCard key={i} />
+                    ))}
+                  </div>
+                ) : loadError && filteredItems.length === 0 ? (
+                  <div
+                    role="alert"
+                    style={{
+                      padding: 24,
+                      borderRadius: 12,
+                      background: TOKEN.dangerDim,
+                      border: `1px solid ${TOKEN.danger}40`,
+                      color: TOKEN.danger,
+                      textAlign: 'center',
+                      fontFamily: 'var(--font-body, Rajdhani, system-ui)',
+                      fontSize: 13,
+                    }}
+                  >
+                    <p style={{ fontWeight: 700, marginBottom: 6 }}>Yüklenemedi</p>
+                    <p style={{ opacity: 0.85 }}>{loadError}</p>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    {filteredItems.map((item, i) => (
+                      <div
+                        key={item.id}
+                        className="cosmetic-card-hover"
+                        style={{
+                          animation: `fadeSlideUp 0.4s cubic-bezier(0.32,0.72,0,1) ${i * 0.05}s both`,
+                        }}
+                      >
+                        <CosmeticCard
+                          item={item}
+                          selected={selectedItem?.id === item.id}
+                          onSelect={setSelectedItem}
+                          pending={pendingItemId === item.id}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* ── Preview panel (desktop sticky sidebar) ────────── */}
@@ -1143,17 +1534,27 @@ export default function CustomizationPage() {
                 }}
                 aria-label="Seçili item önizlemesi"
               >
-                <PreviewPanel
-                  item={selectedItem}
-                  equippedItems={equippedItems}
-                  onApply={handleApply}
-                  applying={applying}
-                  justApplied={justApplied}
-                />
+                {isLoading ? (
+                  <SkeletonPreview />
+                ) : (
+                  <PreviewPanel
+                    item={selectedItem}
+                    equippedItems={equippedItems}
+                    onApply={handleApply}
+                    onPurchase={handlePurchase}
+                    applying={applying}
+                    purchasing={purchasing}
+                    justApplied={justApplied}
+                    balance={balance}
+                  />
+                )}
               </aside>
             </div>
           </div>
         </main>
+
+        {/* ── Toasts ────────────────────────────────────────────────── */}
+        <ToastViewport toasts={toasts} onDismiss={dismissToast} />
 
         {/* ── Bottom navigation ─────────────────────────────────────── */}
         <nav

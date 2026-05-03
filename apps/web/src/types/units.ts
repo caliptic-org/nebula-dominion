@@ -126,7 +126,7 @@ export const RACE_DESCRIPTIONS: Record<Race, RaceDescription> = {
     description:
       'Kovan zihniyle hareket eden Zerg ordusu, hızlı ve acımasız saldırılarıyla düşmanı ezer. Organik biyolüminesas yapıları evrende benzersizdir.',
     lore:
-      "Kadim evrimsel güçlerle şekillenmiş Zerg ırkı, kovan bilincinin yönlendirmesiyle var olur. Her birim Kovan Ana'nın iradesinin bir uzantısıdır. Işıldayan damarları ve organik yapıları ile karanlıkta parlayan ölüm.",
+      'Kadim evrimsel güçlerle şekillenmiş Zerg ırkı, kovan bilincinin yönlendirmesiyle var olur. Her birim Kovan Ana\'nın iradesinin bir uzantısıdır. Işıldayan damarları ve organik yapıları ile karanlıkta parlayan ölüm.',
     color: '#44ff44',
     bgColor: 'rgba(68,255,68,0.08)',
     glowColor: 'rgba(68,255,68,0.3)',
@@ -134,7 +134,7 @@ export const RACE_DESCRIPTIONS: Record<Race, RaceDescription> = {
     dataRace: 'zerg',
     primaryCommanderPortrait: '/assets/characters/zerg/vex_thara.png',
     commanders: [
-      { id: 'vex_thara', name: 'Vex Thara', portrait: '/assets/characters/zerg/vex_thara.png', race: Race.ZERG, level: 6, isUnlocked: true, story: "Kovan Ana'nın birincil sesi ve en güçlü yayılımcısı.", abilities: ['Kovan Sürüsü', 'Biyolüminesan Patlama', 'Mutasyon Çağrısı'] },
+      { id: 'vex_thara', name: 'Vex Thara', portrait: '/assets/characters/zerg/vex_thara.png', race: Race.ZERG, level: 6, isUnlocked: true, story: 'Kovan Ana\'nın birincil sesi ve en güçlü yayılımcısı.', abilities: ['Kovan Sürüsü', 'Biyolüminesan Patlama', 'Mutasyon Çağrısı'] },
       { id: 'morgath', name: 'Morgath', portrait: '/assets/characters/zerg/morgath.png', race: Race.ZERG, level: 4, isUnlocked: true, story: 'Savaş genetiğiyle optimize edilmiş yıkım makinesi.', abilities: ['Adrenal Salınım', 'Zırh Yırma', 'Sürü Hücumu'] },
       { id: 'threnix', name: 'Threnix', portrait: '/assets/characters/zerg/threnix.png', race: Race.ZERG, level: 3, isUnlocked: false, story: 'Zihin kontrolcüsü ve parazit ustası.', abilities: ['Zihin Kontrolü', 'Parazit Yayılımı', 'Nöral Parazit'] },
     ],
@@ -147,7 +147,7 @@ export const RACE_DESCRIPTIONS: Record<Race, RaceDescription> = {
     description:
       'Holografik HUD ve geometrik grid mimarisiyle tasarlanmış Otomat birlikleri, hesaplı ve soğukkanlı savaş stratejileriyle öne çıkar.',
     lore:
-      "Demiurge Prime'ın yaratıcı zekasından doğan Otomat ırkı, saf mantık ve mükemmel geometri ilkeleriyle savaşır. Holografik sistemleri ve enerji kalkanları onları savaş alanının mühendisleri yapar.",
+      'Demiurge Prime\'ın yaratıcı zekasından doğan Otomat ırkı, saf mantık ve mükemmel geometri ilkeleriyle savaşır. Holografik sistemleri ve enerji kalkanları onları savaş alanının mühendisleri yapar.',
     color: '#00cfff',
     bgColor: 'rgba(0,207,255,0.08)',
     glowColor: 'rgba(0,207,255,0.3)',
@@ -187,9 +187,9 @@ export const RACE_DESCRIPTIONS: Record<Race, RaceDescription> = {
     name: 'Şeytan',
     subtitle: 'Gotik Duman & Lanet',
     description:
-      "Gotik mimari ve lanet enerjisiyle beslenen Şeytan ırkı, ruh dünyasından güç alarak düşmanlarına kâbus yaşatır. Kırmızı-mor glow ve rune sembolleri onları tanımlar.",
+      'Gotik mimari ve lanet enerjisiyle beslenen Şeytan ırkı, ruh dünyasından güç alarak düşmanlarına kâbus yaşatır. Kırmızı-mor glow ve rune sembolleri onları tanımlar.',
     lore:
-      "Boyutlar arası yarıklardan geçen Şeytanlar, lanet ve büyünün en saf formunu kullanır. Malphas'ın yönetiminde duman ve karanlıkla örülü kalelerinde savaş taktiklerini mükemmelleştirirler.",
+      'Boyutlar arası yarıklardan geçen Şeytanlar, lanet ve büyünün en saf formunu kullanır. Malphas\'ın yönetiminde duman ve karanlıkla örülü kalelerinde savaş taktiklerini mükemmelleştirirler.',
     color: '#cc00ff',
     bgColor: 'rgba(204,0,255,0.08)',
     glowColor: 'rgba(204,0,255,0.3)',

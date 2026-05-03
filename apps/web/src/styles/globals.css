@@ -10,52 +10,63 @@
 
 /* ── Design Tokens ────────────────────────────────────────────────────────── */
 :root {
+  /* Base space theme */
   --color-bg:          #080a10;
   --color-bg-surface:  #0d1117;
   --color-bg-elevated: #141d2b;
   --color-bg-overlay:  rgba(8,10,16,0.92);
 
+  /* Text */
   --color-text-primary:   #e8e8f0;
   --color-text-secondary: #a0a8c0;
   --color-text-muted:     #555d7a;
   --color-text-inverse:   #080a10;
 
+  /* Brand (default: human blue) */
   --color-brand:      #4a9eff;
   --color-brand-hover:#6bb3ff;
   --color-brand-dim:  rgba(74,158,255,0.12);
   --color-brand-glow: rgba(74,158,255,0.35);
 
+  /* Accent */
   --color-accent:      #00cfff;
   --color-accent-hover:#33daff;
   --color-accent-dim:  rgba(0,207,255,0.12);
 
+  /* Energy */
   --color-energy:     #ffc832;
   --color-energy-dim: rgba(255,200,50,0.12);
 
+  /* Borders */
   --color-border:       rgba(255,255,255,0.07);
   --color-border-hover: rgba(255,255,255,0.16);
   --color-border-focus: rgba(74,158,255,0.5);
 
+  /* Status */
   --color-success: #44ff88;
   --color-danger:  #ff3355;
   --color-warning: #ffaa22;
   --color-info:    #4488ff;
 
+  /* Typography */
   --font-display: 'Orbitron', 'Segoe UI', system-ui, sans-serif;
   --font-body:    'Rajdhani', 'Segoe UI', system-ui, sans-serif;
   --font-mono:    'Cascadia Code', 'Fira Code', monospace;
 
+  /* Gradients */
   --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.12) 0%, #080a10 70%);
   --gradient-hero:   linear-gradient(160deg, #0a0f1e 0%, #080a10 50%, #0d0a1e 100%);
   --gradient-card:   linear-gradient(135deg, rgba(74,158,255,0.06) 0%, rgba(0,207,255,0.03) 100%);
   --gradient-brand:  linear-gradient(135deg, #4a9eff 0%, #00cfff 100%);
   --gradient-race:   linear-gradient(160deg, var(--color-race-dim) 0%, transparent 60%);
 
+  /* Race tokens (default: İnsan) */
   --color-race:      #4a9eff;
   --color-race-dim:  rgba(74,158,255,0.10);
   --color-race-glow: rgba(74,158,255,0.30);
   --color-race-text: #080a10;
 
+  /* Manga effects */
   --manga-border: 3px solid rgba(255,255,255,0.12);
   --manga-panel-bg: rgba(13,17,23,0.85);
   --speed-line-color: rgba(255,255,255,0.06);
@@ -138,6 +149,7 @@ body {
   overflow-x: hidden;
 }
 
+/* Starfield noise — fixed overlay, pointer-events-none */
 body::before {
   content: '';
   position: fixed;
@@ -185,6 +197,21 @@ body::before {
     inset 0 0 0 1px rgba(255,255,255,0.06),
     0 8px 48px rgba(0,0,0,0.7),
     0 0 0 1px rgba(0,0,0,0.6);
+}
+
+/* Double-Bezel card architecture */
+.doppelrand {
+  padding: 2px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1.25rem;
+}
+
+.doppelrand > .doppelrand-inner {
+  background: var(--color-bg-surface);
+  border-radius: calc(1.25rem - 2px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+  overflow: hidden;
 }
 
 /* ── Glass Card ─────────────────────────────────────────────────────────── */
@@ -348,7 +375,7 @@ body::before {
   border: 1px solid rgba(255,200,50,0.25);
 }
 
-/* ── Stat Card ──────────────────────────────────────────────────────────── */
+/* ── Stat card ──────────────────────────────────────────────────────────── */
 .stat-card {
   background: var(--color-bg-elevated);
   border: 1px solid rgba(255,255,255,0.07);
@@ -368,7 +395,28 @@ body::before {
   background-size: 6px 6px;
 }
 
-/* ── Text Utilities ─────────────────────────────────────────────────────── */
+/* ── Manga Speed Lines ──────────────────────────────────────────────────── */
+.speed-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.speed-lines::before,
+.speed-lines::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 300%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  transform-origin: left center;
+}
+
+/* ── Text utilities ─────────────────────────────────────────────────────── */
 .text-gradient-brand {
   background: var(--gradient-brand);
   -webkit-background-clip: text;
@@ -491,7 +539,31 @@ body::before {
   opacity: 0.6;
 }
 
-/* ── Animate on enter ───────────────────────────────────────────────────── */
+/* ── Progression Timeline ───────────────────────────────────────────────── */
+.progression-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progression-node::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 4rem;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  transform: translateY(-50%);
+}
+
+.progression-node:last-child::after {
+  display: none;
+}
+
+/* ── Scroll entry animation trigger ────────────────────────────────────── */
 .animate-on-enter {
   opacity: 0;
   transform: translateY(20px);
@@ -505,10 +577,23 @@ body::before {
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}
 
 /* ── Focus visible ──────────────────────────────────────────────────────── */
 :focus-visible {
@@ -525,40 +610,4 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-
-/* ── Keyframe Animations ────────────────────────────────────────────────── */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-12px); }
-}
-
-@keyframes twinkle {
-  0%, 100% { opacity: 0.3; }
-  50%       { opacity: 1; }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 10px var(--color-race-glow); }
-  50%       { box-shadow: 0 0 30px var(--color-race), 0 0 60px var(--color-race-glow); }
-}
-
-@keyframes scan-line {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-@keyframes manga-appear {
-  0%   { opacity: 0; transform: scale(0.95) translateY(16px); filter: blur(4px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
-}
-
-@keyframes slide-up {
-  0%   { opacity: 0; transform: translateY(24px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }

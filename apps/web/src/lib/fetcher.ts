@@ -11,10 +11,11 @@ export class FetchError extends Error {
   }
 }
 
-export async function fetcher<T>(path: string): Promise<T> {
+export async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
 
   if (!res.ok) {

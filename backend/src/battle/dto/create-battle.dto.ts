@@ -1,6 +1,6 @@
-import { IsUUID, IsArray, IsNotEmpty, ValidateNested, IsString, IsNumber, IsBoolean, Min } from 'class-validator';
+import { IsUUID, IsArray, IsNotEmpty, IsOptional, ValidateNested, IsString, IsNumber, IsBoolean, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UnitSnapshotDto {
   @ApiProperty()
@@ -63,4 +63,14 @@ export class CreateBattleDto {
   @ValidateNested({ each: true })
   @Type(() => UnitSnapshotDto)
   defenderUnits: UnitSnapshotDto[];
+
+  @ApiPropertyOptional({ description: 'Whether the opponent is a bot (PvE)' })
+  @IsOptional()
+  @IsBoolean()
+  isBotOpponent?: boolean;
+
+  @ApiPropertyOptional({ description: "Caller's current session ID for analytics tracking" })
+  @IsOptional()
+  @IsString()
+  attackerSessionId?: string;
 }

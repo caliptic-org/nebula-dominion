@@ -28,6 +28,8 @@ export interface CreateBattleDto {
   defenderId: string;
   attackerUnits: UnitSnapshot[];
   defenderUnits: UnitSnapshot[];
+  isBotOpponent?: boolean;
+  attackerSessionId?: string;
 }
 
 export interface ExecuteTurnDto {
@@ -87,8 +89,8 @@ export class BattleService {
     void this.analytics.trackServer({
       event_type: 'pvp.match_started',
       user_id: dto.attackerId,
-      session_id: saved.id,
-      properties: { battle_id: saved.id, defender_id: dto.defenderId, is_bot: false },
+      session_id: dto.attackerSessionId ?? dto.attackerId,
+      properties: { battle_id: saved.id, defender_id: dto.defenderId, is_bot: dto.isBotOpponent ?? false },
     });
 
     return saved;
@@ -192,7 +194,7 @@ export class BattleService {
       void this.analytics.trackServer({
         event_type: 'pvp.match_ended',
         user_id: playerId,
-        session_id: battle.id,
+        session_id: playerId,
         properties: {
           battle_id: battle.id,
           result,
@@ -364,7 +366,7 @@ export class BattleService {
     void this.analytics.trackServer({
       event_type: 'pvp.match_ended',
       user_id: playerId,
-      session_id: battleId,
+      session_id: playerId,
       properties: { battle_id: battleId, result: 'abandoned' },
     });
 

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsDateString,
   IsIn,
@@ -103,6 +104,7 @@ export class TrackEventDto {
 
 export class BatchTrackEventDto {
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => TrackEventDto)
   events: TrackEventDto[];

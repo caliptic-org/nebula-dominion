@@ -76,7 +76,6 @@ export class AnalyticsService {
       await this.eventRepo.save(entities);
     } catch (err) {
       this.logger.error(`Failed to persist ${dtos.length} analytics event(s)`, err);
-      throw err;
     }
   }
 }

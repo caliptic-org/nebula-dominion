@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { InventoryItem, RARITY_CONFIG, CATEGORY_CONFIG } from '@/types/inventory';
+import { InventoryItem, ItemRarity, RARITY_CONFIG, CATEGORY_CONFIG } from '@/types/inventory';
 
 interface InventoryItemCardProps {
   item: InventoryItem;
@@ -12,7 +12,7 @@ interface InventoryItemCardProps {
 export function InventoryItemCard({ item, selected, onClick }: InventoryItemCardProps) {
   const rarity = RARITY_CONFIG[item.rarity];
   const category = CATEGORY_CONFIG[item.category];
-  const isHighRarity = item.rarity === 'efsanevi' || item.rarity === 'destansi';
+  const isHighRarity = item.rarity === ItemRarity.EFSANEVI || item.rarity === ItemRarity.DESTANSI;
 
   return (
     <button

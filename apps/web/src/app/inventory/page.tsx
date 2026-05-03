@@ -17,7 +17,7 @@ import { ItemDetailPanel } from '@/components/ui/ItemDetailPanel';
 import clsx from 'clsx';
 
 const CAPACITY_MAX = 200;
-const CAPACITY_USED = 87;
+const CAPACITY_USED = 170;
 const CAPACITY_WARN_THRESHOLD = 0.8;
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
@@ -38,7 +38,6 @@ export default function InventoryPage() {
   const [activeCategory, setActiveCategory] = useState<ItemCategory>(ItemCategory.TUMSU);
   const [sortMode, setSortMode] = useState<SortMode>(SortMode.NADIR);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(DEMO_INVENTORY[4]);
-  const [detailOpen, setDetailOpen] = useState(true);
 
   const categories = Object.values(ItemCategory) as ItemCategory[];
 
@@ -64,7 +63,6 @@ export default function InventoryPage() {
 
   function handleItemClick(item: InventoryItem) {
     setSelectedItem(item);
-    setDetailOpen(true);
   }
 
   return (
@@ -262,7 +260,7 @@ export default function InventoryPage() {
           <MangaPanel className="h-full min-h-[320px]">
             <ItemDetailPanel
               item={selectedItem}
-              onClose={() => { setSelectedItem(null); setDetailOpen(false); }}
+              onClose={() => setSelectedItem(null)}
               onUse={(item) => alert(`Kullanıldı: ${item.name}`)}
               onSell={(item) => alert(`Satıldı: ${item.name} — 💎 ${item.sellValue}`)}
             />

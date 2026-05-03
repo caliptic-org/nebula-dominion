@@ -124,7 +124,21 @@ export default function HomePage() {
         {/* Halftone */}
         <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
 
-        {/* Next-session hook — only shown after a player has finished onboarding. */}
+        {/* First-victory badge + next-session hook — only shown after a player has finished onboarding. */}
+        {shouldShowNextSessionHook && (
+          <div
+            data-testid="first-victory-badge"
+            className="relative z-40 flex items-center justify-center gap-2 px-3 py-1"
+            style={{
+              background: `linear-gradient(90deg, ${raceColor}22 0%, transparent 100%)`,
+              borderBottom: `1px solid ${raceColor}30`,
+            }}
+          >
+            <span style={{ color: raceColor }} className="font-display text-[10px] font-black uppercase tracking-widest">
+              ★ İlk Zafer
+            </span>
+          </div>
+        )}
         {shouldShowNextSessionHook && <NextSessionHookBanner />}
 
         {/* ── Resource Bar (Top) ────────────────────────────── */}

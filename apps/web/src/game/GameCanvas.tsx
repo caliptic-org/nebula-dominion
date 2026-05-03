@@ -16,15 +16,18 @@ interface Props {
   mode: string;
   userId: string;
   tutorial?: boolean;
+  onTutorialComplete?: (reason: 'completed' | 'skipped') => void;
 }
 
 const GAME_W = BattleScene.WIDTH;
 const GAME_H = BattleScene.HEIGHT;
 
-export default function GameCanvas({ race, mode, userId, tutorial = false }: Props) {
+export default function GameCanvas({ race, mode, userId, tutorial = false, onTutorialComplete }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const socketRef = useRef<GameSocket | null>(null);
+  const onTutorialCompleteRef = useRef(onTutorialComplete);
+  useEffect(() => { onTutorialCompleteRef.current = onTutorialComplete; }, [onTutorialComplete]);
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -57,6 +60,15 @@ export default function GameCanvas({ race, mode, userId, tutorial = false }: Pro
     };
 
     gameRef.current = new Phaser.Game(config);
+
+    if (tutorial) {
+      gameRef.current.events.on(
+        'tutorial:battle_completed',
+        ({ reason }: { reason: 'completed' | 'skipped' }) => {
+          onTutorialCompleteRef.current?.(reason);
+        },
+      );
+    }
 
     return () => {
       socketRef.current?.destroy();

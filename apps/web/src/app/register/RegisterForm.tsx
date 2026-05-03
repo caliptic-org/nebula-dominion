@@ -60,7 +60,7 @@ export function RegisterForm() {
         }
       }
 
-      router.push('/dashboard');
+      router.push('/race-select');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {

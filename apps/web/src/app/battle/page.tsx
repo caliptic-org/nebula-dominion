@@ -1,19 +1,30 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { RACE_DESCRIPTIONS } from '@/types/units';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 const GameCanvas = dynamic(() => import('@/game/GameCanvas'), { ssr: false });
 
 function BattleContent() {
   const params = useSearchParams();
+  const router = useRouter();
   const race = params.get('race') ?? 'insan';
   const mode = params.get('mode') ?? 'pve';
   const userId = params.get('userId') ?? 'player_demo';
   const tutorial = params.get('tutorial') === '1';
+  const { markTutorialCompleted } = useOnboarding();
+
+  const handleTutorialComplete = useCallback(
+    (reason: 'completed' | 'skipped') => {
+      if (reason === 'completed') markTutorialCompleted();
+      router.push('/');
+    },
+    [markTutorialCompleted, router],
+  );
 
   const raceKey = (race in RACE_DESCRIPTIONS) ? race as keyof typeof RACE_DESCRIPTIONS : 'insan' as keyof typeof RACE_DESCRIPTIONS;
   const raceDesc = RACE_DESCRIPTIONS[raceKey as keyof typeof RACE_DESCRIPTIONS];
@@ -112,7 +123,13 @@ function BattleContent() {
             boxShadow: `0 0 40px ${raceDesc?.glowColor ?? 'rgba(74,158,255,0.15)'}`,
           }}
         >
-          <GameCanvas race={race} mode={mode} userId={userId} tutorial={tutorial} />
+          <GameCanvas
+            race={race}
+            mode={mode}
+            userId={userId}
+            tutorial={tutorial}
+            onTutorialComplete={tutorial ? handleTutorialComplete : undefined}
+          />
         </div>
       </main>
 

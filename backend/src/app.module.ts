@@ -20,6 +20,10 @@ import { XpSourceEvent } from './progression/entities/xp-source-event.entity';
 import { XpSourceWeight } from './progression/entities/xp-source-weight.entity';
 import { VipSubscription } from './vip/entities/vip-subscription.entity';
 import { VipDailyClaim } from './vip/entities/vip-daily-claim.entity';
+import { AnalyticsEvent } from './analytics/entities/event.entity';
+import { PlayerBuff } from './stats/entities/player-buff.entity';
+import { PlayerResource as StatsPlayerResource } from './stats/entities/player-resource.entity';
+import { PlayerPower } from './stats/entities/player-power.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -29,12 +33,16 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { ResourcesModule } from './resources/resources.module';
 import { ProgressionModule } from './progression/progression.module';
 import { VipModule } from './vip/vip.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { StatsModule } from './stats/stats.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { ResourceSchema1746400000000 } from './database/migrations/1746400000000-ResourceSchema';
 import { ProgressionSchema1746500000000 } from './database/migrations/1746500000000-ProgressionSchema';
 import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipSchema';
+import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
+import { StatsSchema1746500000000 } from './database/migrations/1746500000000-StatsSchema';
 
 @Module({
   imports: [
@@ -54,6 +62,10 @@ import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipS
           ResourceConfig, PlayerResource, FeatureFlag, PlayerSegment,
           XpLevelThreshold, PlayerProgression, XpSourceEvent, XpSourceWeight,
           VipSubscription, VipDailyClaim,
+          AnalyticsEvent,
+          PlayerBuff,
+          StatsPlayerResource,
+          PlayerPower,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -62,6 +74,8 @@ import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipS
           ResourceSchema1746400000000,
           ProgressionSchema1746500000000,
           VipSchema1746700000000,
+          AnalyticsSchema1746400000000,
+          StatsSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -78,6 +92,8 @@ import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipS
     ResourcesModule,
     ProgressionModule,
     VipModule,
+    AnalyticsModule,
+    StatsModule,
   ],
 })
 export class AppModule {}

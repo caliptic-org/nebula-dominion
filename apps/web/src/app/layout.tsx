@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
+import { Orbitron, Rajdhani } from 'next/font/google';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
+import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import '@/styles/globals.css';
 
 const orbitron = Orbitron({
@@ -32,10 +34,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" data-race="insan">
+    <html lang="tr" data-race="insan" className={`${orbitron.variable} ${rajdhani.variable}`}>
       <body>
         <RaceThemeProvider>
-          {children}
+          <GuildTutorialProvider>
+            {children}
+          </GuildTutorialProvider>
         </RaceThemeProvider>
       </body>
     </html>

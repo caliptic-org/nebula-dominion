@@ -15,6 +15,7 @@ import {
   FORMATION_LIMITS,
 } from './types';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { Race } from '@/types/units';
 import {
   fetchPlayerUnits,
   fetchTemplates,
@@ -251,7 +252,7 @@ export function FormationScreen({ playerId }: FormationScreenProps) {
     const dominant = synergies[0]?.race ?? null;
     if (dominant && dominant !== prevDominantRef.current) {
       prevDominantRef.current = dominant;
-      setRace(dominant);
+      setRace(dominant as unknown as Race);
     }
   }, [synergies, setRace]);
 

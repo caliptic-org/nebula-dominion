@@ -1,15 +1,23 @@
 import Phaser from 'phaser';
 import { GameSocket, GameRoom, UnitState } from '../socket/GameSocket';
-import { THEME } from '../theme';
+import { THEME, getRaceVisual, RaceVisual } from '../theme';
+import { HeroSkillsPanel } from '../objects/HeroSkillsPanel';
+import { BattleLogPanel, BattleEventData, BattleEventType } from '../objects/BattleLogPanel';
 
 const PANEL_H = 100;
 const SCENE_W = 656; // matches BattleScene width
 const LOG_W = 200;
 const TOP_BAR_H = 56;
-const SKILL_PANEL_H = HeroSkillsPanel.PANEL_HEIGHT;
 const SKILL_PANEL_OFFSET_FROM_BOTTOM = PANEL_H + 12;
 
 type RaceKey = keyof typeof THEME.RACE;
+
+interface UISceneInitData {
+  socket: GameSocket;
+  room: GameRoom;
+  playerRace?: string;
+  enemyRace?: string;
+}
 
 const RACE_ICONS: Record<string, string[]> = {
   insan:   ['⚡', '🔫', '💥', '🛡'],
@@ -29,11 +37,15 @@ export class UIScene extends Phaser.Scene {
   private manaBar!: Phaser.GameObjects.Graphics;
   private manaValueText!: Phaser.GameObjects.Text;
   private unitInfoText!: Phaser.GameObjects.Text;
-  private endTurnBtn!: Phaser.GameObjects.Container;
-  private surrenderBtn!: Phaser.GameObjects.Container;
+  private endTurnBtn!: Phaser.GameObjects.Text;
+  private surrenderBtn!: Phaser.GameObjects.Text;
   private notifText!: Phaser.GameObjects.Text;
   private skillsPanel!: HeroSkillsPanel;
   private logPanel!: BattleLogPanel;
+  private playerVisual!: RaceVisual;
+  private enemyVisual!: RaceVisual;
+  private timerEvent?: Phaser.Time.TimerEvent;
+  private turnLabel!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -55,9 +67,10 @@ export class UIScene extends Phaser.Scene {
     topBar.fillStyle(THEME.HUD_BG, 0.92);
     topBar.fillRect(0, 0, SCENE_W, 56);
 
-    this.turnText = this.add.text(16, 8, 'Turn 1', {
+    this.turnLabel = this.add.text(16, 8, 'Turn 1', {
       fontSize: '18px', color: THEME.BRAND_STR, fontStyle: 'bold',
     });
+    this.turnText = this.turnLabel;
     this.phaseText = this.add.text(16, 30, 'Phase: action', {
       fontSize: '12px', color: THEME.TEXT_MUTED,
     });
@@ -194,8 +207,28 @@ export class UIScene extends Phaser.Scene {
     this.skillsPanel?.update(time, deltaMs);
   }
 
-  update(time: number, deltaMs: number) {
-    this.skillsPanel?.update(time, deltaMs);
+  private refreshTeamHp() {
+    // TODO: wire up team HP overlay; currently no-op
+  }
+
+  private flashSpeedLines(_fromX: number, _fromY: number, _toX: number, _toY: number) {
+    // TODO: implement speed lines effect
+  }
+
+  private showNotif(text: string) {
+    if (!this.notifText) return;
+    this.notifText.setText(text);
+    this.notifText.setAlpha(1);
+    this.tweens.add({ targets: this.notifText, alpha: 0, duration: 1500, delay: 500 });
+  }
+
+  private startTimer() {
+    this.timerEvent = this.time.addEvent({ delay: 1000, loop: true, callback: () => undefined });
+  }
+
+  private resetTimer() {
+    this.timerEvent?.remove();
+    this.startTimer();
   }
 
   private refresh() {

@@ -13,7 +13,7 @@ export default function RaceSelectionPage() {
     <RaceSelectionScreen
       selectedRace={selectedRace}
       onSelect={setSelectedRace}
-      onConfirm={(race) => router.push(`/?race=${race}`)}
+      onConfirm={(race: Race) => router.push(`/?race=${race}`)}
     />
   );
 }

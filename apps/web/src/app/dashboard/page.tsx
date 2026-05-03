@@ -1,16 +1,11 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Dashboard',
-};
-
-const resources = [
-  { icon: '💰', label: 'Altın',   value: '124,800', color: '#e8a820' },
-  { icon: '⚡', label: 'Enerji',  value: '8,420',   color: '#40c8e0' },
-  { icon: '🔩', label: 'Maden',   value: '32,550',  color: '#a8c8e0' },
-  { icon: '💎', label: 'Taş',     value: '240',     color: '#c880f0' },
-]
+import Image from 'next/image';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { RACE_DESCRIPTIONS } from '@/types/units';
+import { TIER_NAMES } from '@/types/progression';
 
 const navItems = [
   { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
@@ -31,11 +26,22 @@ const playerStats = [
 ];
 
 const upcomingFeatures = [
-  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3'  },
-  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5'  },
-  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4'    },
-  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5'    },
+  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3', color: '#4a9eff' },
+  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5', color: '#ff6644' },
+  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4',   color: '#44ff88' },
+  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5',   color: '#cc00ff' },
 ];
+
+const PROFILE = {
+  age: 'I',
+  tier: 1,
+  totalXp: 0,
+  xpInLevel: 0,
+  xpToNext: 100,
+  pvpMatches: 0,
+  pvpWins: 0,
+  guild: { members: 0, capacity: 30 },
+};
 
 export default function DashboardPage() {
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();

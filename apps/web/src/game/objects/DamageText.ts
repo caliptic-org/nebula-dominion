@@ -7,13 +7,8 @@ import { THEME } from '../theme';
  */
 export function spawnDamageText(scene: Phaser.Scene, x: number, y: number, value: number) {
   const isCrit = value > 12;
-  const text = scene.add.text(x, y - 10, `-${value}`, {
-    fontSize: isCrit ? '22px' : '16px',
-    fontStyle: 'bold',
-    color: isCrit ? THEME.DANGER_STR : THEME.ENERGY_STR,
-    stroke: '#000000',
-    strokeThickness: 3,
-  }).setOrigin(0.5, 1).setDepth(100);
+  const tilt = isCrit ? Phaser.Math.Between(-12, 12) : Phaser.Math.Between(-4, 4);
+  const driftX = Phaser.Math.Between(-18, 18);
 
   if (isCrit) drawImpactHalo(scene, x, y, THEME.ENERGY);
 

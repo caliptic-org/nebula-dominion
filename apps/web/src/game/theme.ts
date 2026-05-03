@@ -61,11 +61,11 @@ export const THEME = {
   LOSE_BORDER:   0xff3355,
 
   // Rewards
-  REWARD_MINERAL: '#4a9eff',
-  REWARD_GAS:     '#44ff88',
-  REWARD_XP:      '#ffc832',
+  REWARD_MINERAL: '#60aaff',
+  REWARD_GAS:     '#88ffaa',
+  REWARD_XP:      '#ffcc44',
 
-  // Race colors (for dynamic theming in scenes)
+  // Race colors — used for race-adaptive UI accents (skill panel ring, log border)
   RACE: {
     insan:   { num: 0x4a9eff, str: '#4a9eff', glow: '#4a9eff44' },
     zerg:    { num: 0x44ff44, str: '#44ff44', glow: '#44ff4444' },

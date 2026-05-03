@@ -41,6 +41,7 @@ const STATE_RING_COLORS: Record<Exclude<SkillState, 'ready' | 'activating'>, num
 export class HeroSkillsPanel extends Phaser.GameObjects.Container {
   private buttons: ButtonAssets[] = [];
   private raceColor: number;
+  private boundKeys: Phaser.Input.Keyboard.Key[] = [];
 
   constructor(scene: Phaser.Scene, x: number, y: number, raceColor: number, icons: string[] = DEFAULT_ICONS) {
     super(scene, x, y);
@@ -184,6 +185,7 @@ export class HeroSkillsPanel extends Phaser.GameObjects.Container {
     keys.forEach((k, i) => {
       const key = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes[k]);
       key.on('down', () => this.onActivate(i));
+      this.boundKeys.push(key);
     });
   }
 
@@ -293,6 +295,16 @@ export class HeroSkillsPanel extends Phaser.GameObjects.Container {
     this.scene.time.delayedCall(80, () => {
       this.scene.cameras.main.flash(120, 255, 255, 255, false);
     });
+  }
+
+  destroy(fromScene?: boolean) {
+    const keyboard = this.scene?.input?.keyboard;
+    this.boundKeys.forEach((key) => {
+      key.off('down');
+      keyboard?.removeKey(key, true);
+    });
+    this.boundKeys = [];
+    super.destroy(fromScene);
   }
 
   static get PANEL_WIDTH() { return PANEL_W; }

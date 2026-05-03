@@ -37,13 +37,6 @@ export class UIScene extends Phaser.Scene {
   private skillsPanel!: HeroSkillsPanel;
   private logPanel!: BattleLogPanel;
 
-  // Speed-lines overlay layer
-  private speedLines!: Phaser.GameObjects.Container;
-
-  // Round timer
-  private timeLeft = ROUND_TIME_SECONDS;
-  private timerEvent?: Phaser.Time.TimerEvent;
-
   constructor() {
     super({ key: 'UIScene' });
   }
@@ -198,6 +191,10 @@ export class UIScene extends Phaser.Scene {
     this.refresh();
     this.refreshTeamHp();
     this.startTimer();
+  }
+
+  update(time: number, deltaMs: number) {
+    this.skillsPanel?.update(time, deltaMs);
   }
 
   update(time: number, deltaMs: number) {

@@ -181,7 +181,6 @@ export class BattleLogPanel extends Phaser.GameObjects.Container {
       const ty = text.height / 2;
       const tx = PADDING_X + 26;
       const tw = text.width;
-      const stepLeft = tx / 6;
       for (let i = 0; i < 6; i++) {
         const ly = ty - 6 + (i % 3) * 6;
         lines.lineBetween(0, ly, tx - 4, ly);
@@ -189,7 +188,6 @@ export class BattleLogPanel extends Phaser.GameObjects.Container {
       }
       entryContainer.add(lines);
       this.playCritEffect();
-      void stepLeft;
     }
 
     const entryHeight = Math.max(text.height, stamp.height) + ENTRY_GAP;
@@ -271,7 +269,10 @@ export class BattleLogPanel extends Phaser.GameObjects.Container {
       ease: 'Power2',
     });
 
-    this.scene.cameras.main.shake(200, 0.004);
+    const camera = this.scene.cameras.main;
+    if (!camera.shakeEffect?.isRunning) {
+      camera.shake(200, 0.004);
+    }
   }
 
   private toHexString(num: number): string {

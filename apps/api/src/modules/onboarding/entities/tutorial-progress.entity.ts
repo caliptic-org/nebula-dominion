@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -27,7 +27,7 @@ export class TutorialProgress {
   @Column({ name: 'current_step', length: 100, default: 'welcome' })
   currentStep: string;
 
-  @Column({ name: 'selected_race', length: 50, nullable: true })
+  @Column({ type: 'varchar', name: 'selected_race', length: 50, nullable: true })
   selectedRace: string | null;
 
   @Column({ name: 'is_completed', default: false })

@@ -1,4 +1,4 @@
-import { Race } from '@/types/units';
+﻿import { Race } from '@/types/units';
 
 export interface QuizOption {
   id: string;
@@ -15,85 +15,85 @@ export interface QuizQuestion {
 export const RACE_QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'tempo',
-    prompt: 'Savaş tempon nasıl?',
+    prompt: 'SavaÅŸ tempon nasÄ±l?',
     options: [
       {
         id: 'fast-rush',
-        label: 'Hızlı saldırı, erken baskın',
-        scores: { [Race.ZERG]: 3, [Race.HUMAN]: 1 },
+        label: 'HÄ±zlÄ± saldÄ±rÄ±, erken baskÄ±n',
+        scores: { [Race.ZERG]: 3, [Race.INSAN]: 1 },
       },
       {
         id: 'slow-power',
-        label: 'Yavaş ama güçlü kuşatma',
-        scores: { [Race.AUTOMATON]: 3, [Race.HUMAN]: 2 },
+        label: 'YavaÅŸ ama gÃ¼Ã§lÃ¼ kuÅŸatma',
+        scores: { [Race.OTOMAT]: 3, [Race.INSAN]: 2 },
       },
       {
         id: 'balanced',
-        label: 'Duruma göre uyum sağlarım',
-        scores: { [Race.HUMAN]: 3, [Race.ZERG]: 1, [Race.AUTOMATON]: 1 },
+        label: 'Duruma gÃ¶re uyum saÄŸlarÄ±m',
+        scores: { [Race.INSAN]: 3, [Race.ZERG]: 1, [Race.OTOMAT]: 1 },
       },
     ],
   },
   {
     id: 'army',
-    prompt: 'Tercih ettiğin ordu yapısı?',
+    prompt: 'Tercih ettiÄŸin ordu yapÄ±sÄ±?',
     options: [
       {
         id: 'swarm',
-        label: 'Kalabalık ve ucuz birimler',
+        label: 'KalabalÄ±k ve ucuz birimler',
         scores: { [Race.ZERG]: 3 },
       },
       {
         id: 'elite-tech',
-        label: 'Az sayıda ileri teknoloji birimi',
-        scores: { [Race.HUMAN]: 2, [Race.AUTOMATON]: 3 },
+        label: 'Az sayÄ±da ileri teknoloji birimi',
+        scores: { [Race.INSAN]: 2, [Race.OTOMAT]: 3 },
       },
       {
         id: 'mixed',
-        label: 'Karma — özel yetenekli birimler',
-        scores: { [Race.HUMAN]: 3, [Race.ZERG]: 1 },
+        label: 'Karma â€” Ã¶zel yetenekli birimler',
+        scores: { [Race.INSAN]: 3, [Race.ZERG]: 1 },
       },
     ],
   },
   {
     id: 'risk',
-    prompt: 'Risk iştahın nasıl?',
+    prompt: 'Risk iÅŸtahÄ±n nasÄ±l?',
     options: [
       {
         id: 'aggressive',
-        label: 'Cesur, agresif — hata yapmayı göze alırım',
-        scores: { [Race.ZERG]: 3, [Race.HUMAN]: 1 },
+        label: 'Cesur, agresif â€” hata yapmayÄ± gÃ¶ze alÄ±rÄ±m',
+        scores: { [Race.ZERG]: 3, [Race.INSAN]: 1 },
       },
       {
         id: 'turtle',
-        label: 'Sağlam savunma, sonra karşı saldırı',
-        scores: { [Race.AUTOMATON]: 3 },
+        label: 'SaÄŸlam savunma, sonra karÅŸÄ± saldÄ±rÄ±',
+        scores: { [Race.OTOMAT]: 3 },
       },
       {
         id: 'tactical',
-        label: 'Planlı, taktiksel ilerleme',
-        scores: { [Race.HUMAN]: 3, [Race.AUTOMATON]: 1 },
+        label: 'PlanlÄ±, taktiksel ilerleme',
+        scores: { [Race.INSAN]: 3, [Race.OTOMAT]: 1 },
       },
     ],
   },
   {
     id: 'aesthetic',
-    prompt: 'Hangi estetik seni daha çok çekiyor?',
+    prompt: 'Hangi estetik seni daha Ã§ok Ã§ekiyor?',
     options: [
       {
         id: 'organic',
-        label: 'Organik, biyolüminesan, yaşayan ordular',
+        label: 'Organik, biyolÃ¼minesan, yaÅŸayan ordular',
         scores: { [Race.ZERG]: 3 },
       },
       {
         id: 'mechanical',
         label: 'Geometrik, holografik, mekanik',
-        scores: { [Race.AUTOMATON]: 3 },
+        scores: { [Race.OTOMAT]: 3 },
       },
       {
         id: 'military',
         label: 'Askeri, teknolojik, klasik',
-        scores: { [Race.HUMAN]: 3 },
+        scores: { [Race.INSAN]: 3 },
       },
     ],
   },
@@ -107,9 +107,11 @@ export interface QuizResult {
 
 export function scoreQuiz(answers: Record<string, string>): QuizResult | null {
   const scores: Record<Race, number> = {
-    [Race.HUMAN]: 0,
+    [Race.INSAN]: 0,
     [Race.ZERG]: 0,
-    [Race.AUTOMATON]: 0,
+    [Race.OTOMAT]: 0,
+    [Race.CANAVAR]: 0,
+    [Race.SEYTAN]: 0,
   };
 
   let answered = 0;

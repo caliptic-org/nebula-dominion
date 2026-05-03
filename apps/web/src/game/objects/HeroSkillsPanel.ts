@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 
 export type SkillState = 'ready' | 'cooling' | 'no_mana' | 'activating';
 
@@ -31,7 +31,7 @@ const PANEL_W = 4 * BTN_SIZE + 3 * BTN_GAP; // 4 buttons, 3 gaps = 274
 const PANEL_H = 68;
 
 const SHORTCUTS: Array<'Q' | 'W' | 'E' | 'R'> = ['Q', 'W', 'E', 'R'];
-const DEFAULT_ICONS = ['⚡', '🔥', '❄', '☄'];
+const DEFAULT_ICONS = ['âš¡', 'ğŸ”¥', 'â„', 'â˜„'];
 
 const STATE_RING_COLORS: Record<Exclude<SkillState, 'ready' | 'activating'>, number> = {
   cooling: 0x333355,
@@ -87,7 +87,7 @@ export class HeroSkillsPanel extends Phaser.GameObjects.Container {
       color: '#ffffff',
     }).setOrigin(0.5, 0.5);
 
-    const lockText = this.scene.add.text(x + BTN_SIZE / 2, y + 14, '🔒', {
+    const lockText = this.scene.add.text(x + BTN_SIZE / 2, y + 14, 'ğŸ”’', {
       fontSize: '12px',
       color: '#aaccff',
     }).setOrigin(0.5, 0.5).setVisible(false);

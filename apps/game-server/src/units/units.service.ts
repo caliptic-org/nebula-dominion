@@ -125,15 +125,15 @@ export class UnitsService {
   async completeTraining(playerId?: string): Promise<number> {
     const now = new Date();
 
-    const where: Parameters<typeof this.queueRepo.find>[0]['where'] = {
+    const whereClause: Record<string, unknown> = {
       isComplete: false,
       completesAt: LessThanOrEqual(now),
     };
     if (playerId) {
-      (where as Record<string, unknown>).playerId = playerId;
+      whereClause.playerId = playerId;
     }
 
-    const overdue = await this.queueRepo.find({ where });
+    const overdue = await this.queueRepo.find({ where: whereClause as any });
     if (overdue.length === 0) return 0;
 
     for (const entry of overdue) {

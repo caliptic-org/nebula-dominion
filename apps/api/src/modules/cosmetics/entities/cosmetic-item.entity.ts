@@ -1,10 +1,12 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  OneToMany,
   UpdateDateColumn,
 } from 'typeorm';
+import { UserCosmetic } from './user-cosmetic.entity';
 
 export type CosmeticCategory = 'skin' | 'frame' | 'title' | 'effect';
 export type CosmeticRarity = 'common' | 'rare' | 'epic' | 'legendary';
@@ -32,7 +34,7 @@ export class CosmeticItem {
   @Column({ type: 'text', default: '' })
   description: string;
 
-  @Column({ name: 'preview_image', length: 500, nullable: true })
+  @Column({ type: 'varchar', name: 'preview_image', length: 500, nullable: true })
   previewImage: string | null;
 
   @Column({ name: 'is_active', default: true })
@@ -46,4 +48,7 @@ export class CosmeticItem {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => UserCosmetic, (uc) => uc.cosmeticItem)
+  userCosmetics: UserCosmetic[];
 }

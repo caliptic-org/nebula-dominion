@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { PremiumPass } from './premium-pass.entity';
 
 @Entity('user_premium_passes')
@@ -37,10 +37,10 @@ export class UserPremiumPass {
   @Column({ name: 'claimed_rewards', type: 'jsonb', default: [] })
   claimedRewards: Record<string, unknown>[];
 
-  @Column({ name: 'payment_provider', length: 20, nullable: true })
+  @Column({ type: 'varchar', name: 'payment_provider', length: 20, nullable: true })
   paymentProvider: string | null;
 
-  @Column({ name: 'subscription_id', length: 200, nullable: true })
+  @Column({ type: 'varchar', name: 'subscription_id', length: 200, nullable: true })
   subscriptionId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

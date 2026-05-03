@@ -98,7 +98,7 @@ export function FormationScreen() {
     const dominant = synergies[0]?.race ?? null;
     if (dominant && dominant !== prevDominantRef.current) {
       prevDominantRef.current = dominant;
-      setRace(dominant);
+      setRace(dominant as import('@/types/units').Race);
     }
   }, [synergies, setRace]);
 

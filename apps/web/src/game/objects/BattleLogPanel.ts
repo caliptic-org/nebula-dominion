@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 
 export type BattleEventType =
   | 'damage'
@@ -29,17 +29,17 @@ interface EntryStyle {
 }
 
 const STYLE_BY_TYPE: Record<BattleEventType, EntryStyle> = {
-  damage:     { prefix: '⚔', color: '#ffb830', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
-  heal:       { prefix: '♥', color: '#44ff88', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
-  ability:    { prefix: '✦', color: '#cc88ff', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
-  death:      { prefix: '✕', color: '#555d7a', fontSize: '10px', fontFamily: 'Rajdhani, sans-serif', fontStyle: 'italic' },
-  turn_start: { prefix: '▶', color: '#00cfff', fontSize: '10px', fontFamily: 'Orbitron, sans-serif' },
-  buff:       { prefix: '↑', color: '#4488ff', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
-  debuff:     { prefix: '↓', color: '#ff6622', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
+  damage:     { prefix: 'âš”', color: '#ffb830', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
+  heal:       { prefix: 'â™¥', color: '#44ff88', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
+  ability:    { prefix: 'âœ¦', color: '#cc88ff', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
+  death:      { prefix: 'âœ•', color: '#555d7a', fontSize: '10px', fontFamily: 'Rajdhani, sans-serif', fontStyle: 'italic' },
+  turn_start: { prefix: 'â–¶', color: '#00cfff', fontSize: '10px', fontFamily: 'Orbitron, sans-serif' },
+  buff:       { prefix: 'â†‘', color: '#4488ff', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
+  debuff:     { prefix: 'â†“', color: '#ff6622', fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' },
 };
 
 const CRIT_STYLE: EntryStyle = {
-  prefix: '💥 CRITICAL!',
+  prefix: 'ğŸ’¥ CRITICAL!',
   color: '#ff3355',
   fontSize: '14px',
   fontFamily: 'Orbitron, sans-serif',
@@ -95,7 +95,7 @@ export class BattleLogPanel extends Phaser.GameObjects.Container {
     this.leftBorder.lineStyle(2, this.raceColor, 0.6);
     this.leftBorder.lineBetween(0, 0, 0, this.panelH);
 
-    this.header = this.scene.add.text(PADDING_X, 6, 'SAVAŞ KAYDI', {
+    this.header = this.scene.add.text(PADDING_X, 6, 'SAVAÅ KAYDI', {
       fontSize: '9px',
       fontFamily: 'Orbitron, sans-serif',
       color: this.toHexString(this.raceColor),
@@ -209,13 +209,13 @@ export class BattleLogPanel extends Phaser.GameObjects.Container {
 
     switch (evt.type) {
       case 'damage':
-        return `${prefix} ${evt.actorName ?? '?'} → ${evt.targetName ?? '?'}  -${evt.value ?? 0}`;
+        return `${prefix} ${evt.actorName ?? '?'} â†’ ${evt.targetName ?? '?'}  -${evt.value ?? 0}`;
       case 'heal':
         return `${prefix} ${evt.targetName ?? '?'}  +${evt.value ?? 0}`;
       case 'ability':
         return `${prefix} ${evt.actorName ?? '?'} ${evt.abilityName ?? 'ability'}`;
       case 'death':
-        return `${prefix} ${evt.targetName ?? evt.actorName ?? '?'} düştü`;
+        return `${prefix} ${evt.targetName ?? evt.actorName ?? '?'} dÃ¼ÅŸtÃ¼`;
       case 'turn_start':
         return `${prefix} TUR ${evt.turn ?? '?'}`;
       case 'buff':

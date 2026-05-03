@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 import { GameSocket, GameRoom } from '../socket/GameSocket';
 import { Race } from '../types';
 import { THEME } from '../theme';
@@ -70,7 +70,7 @@ export class BootScene extends Phaser.Scene {
 
       this.socket.startPve();
     } else {
-      // PvP matchmaking — join matchmaking namespace
+      // PvP matchmaking â€” join matchmaking namespace
       this.setStatus('Looking for opponent...');
       // PvP matchmaking handled by MatchmakingGateway (separate integration)
     }

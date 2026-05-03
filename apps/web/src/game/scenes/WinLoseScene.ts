@@ -1,6 +1,7 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 import { BattleRewards } from '../socket/GameSocket';
 import { THEME } from '../theme';
+import { getRaceVisual } from '../raceVisuals';
 
 interface WinLoseData {
   winner: string;
@@ -9,7 +10,7 @@ interface WinLoseData {
   eloDelta: Record<string, number>;
   newElo: Record<string, number>;
   rewards: Record<string, BattleRewards>;
-  /** Optional — winner's race for race-coloured glow border. */
+  /** Optional â€” winner's race for race-coloured glow border. */
   winnerRace?: string;
   room?: GameRoom;
 }
@@ -33,7 +34,7 @@ export class WinLoseScene extends Phaser.Scene {
     const rewards: BattleRewards | undefined = this.winLoseData.rewards?.[this.myId];
     const eloDelta = this.winLoseData.eloDelta?.[this.myId] ?? 0;
 
-    // Winner-race glow color — defaults to success/danger if race unavailable
+    // Winner-race glow color â€” defaults to success/danger if race unavailable
     const winnerRace = this.winLoseData.winnerRace
       ?? this.winLoseData.room?.players?.[this.winLoseData.winner]?.race;
     const winnerVisual = getRaceVisual(winnerRace);
@@ -99,7 +100,7 @@ export class WinLoseScene extends Phaser.Scene {
     // ELO change
     const eloDeltaStr = eloDelta >= 0 ? `+${eloDelta}` : `${eloDelta}`;
     const eloColor = eloDelta >= 0 ? THEME.SUCCESS_STR : THEME.DANGER_STR;
-    this.add.text(width / 2, py + 120, `ELO: ${this.data.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
+    this.add.text(width / 2, py + 120, `ELO: ${this.data.newElo?.[this.myId] ?? 'â€”'}  (${eloDeltaStr})`, {
       fontSize: '16px', fontStyle: 'bold', color: eloColor,
     }).setOrigin(0.5, 0);
 
@@ -111,9 +112,9 @@ export class WinLoseScene extends Phaser.Scene {
       }).setOrigin(0.5, 0);
 
       const rewardItems = [
-        { label: 'Minerals', value: rewards.minerals, color: THEME.REWARD_MINERAL, icon: '◆' },
-        { label: 'Gas', value: rewards.gas, color: THEME.REWARD_GAS, icon: '◈' },
-        { label: 'XP', value: rewards.xp, color: THEME.REWARD_XP, icon: '★' },
+        { label: 'Minerals', value: rewards.minerals, color: THEME.REWARD_MINERAL, icon: 'â—†' },
+        { label: 'Gas', value: rewards.gas, color: THEME.REWARD_GAS, icon: 'â—ˆ' },
+        { label: 'XP', value: rewards.xp, color: THEME.REWARD_XP, icon: 'â˜…' },
       ];
 
       rewardItems.forEach((item, i) => {
@@ -156,9 +157,9 @@ export class WinLoseScene extends Phaser.Scene {
 
       if (rewards.bonuses.length > 0) {
         const bonusLabels: Record<string, string> = {
-          quick_victory: '⚡ Hizli Zafer',
-          epic_battle:   '⚔ Epik Savas',
-          upset_victory: '★ Surpriz Zafer',
+          quick_victory: 'âš¡ Hizli Zafer',
+          epic_battle:   'âš” Epik Savas',
+          upset_victory: 'â˜… Surpriz Zafer',
         };
         const badgeText = rewards.bonuses.map((b) => bonusLabels[b] ?? b).join('  ');
         this.add.text(width / 2, py + 290, badgeText, {

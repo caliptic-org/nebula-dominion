@@ -1,8 +1,9 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 import { GameSocket, UnitState, GameRoom } from '../socket/GameSocket';
 import { UnitSprite } from '../objects/UnitSprite';
 import { spawnDamageText, spawnAbilityText } from '../objects/DamageText';
 import { THEME } from '../theme';
+import { getRaceVisual } from '../raceVisuals';
 
 const GRID_COLS = 8;
 const GRID_ROWS = 6;
@@ -69,7 +70,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawHalftoneBackdrop() {
-    // Halftone dot pattern — manga texture
+    // Halftone dot pattern â€” manga texture
     const g = this.add.graphics();
     g.fillStyle(THEME.HALFTONE_DOT, 0.04);
     const step = 18;
@@ -101,7 +102,7 @@ export class BattleScene extends Phaser.Scene {
     this.gridGraphics.lineStyle(4, THEME.PANEL_INK, 1);
     this.gridGraphics.strokeRect(gridX, gridY, gridW, gridH);
 
-    // Dividing line (player left, enemy right) — manga split
+    // Dividing line (player left, enemy right) â€” manga split
     const midX = MARGIN_X + (GRID_COLS / 2) * CELL_SIZE;
     this.gridGraphics.lineStyle(2, THEME.GRID_DIVIDER, 0.5);
     this.gridGraphics.lineBetween(midX, MARGIN_Y, midX, MARGIN_Y + GRID_ROWS * CELL_SIZE);

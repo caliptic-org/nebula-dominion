@@ -1,6 +1,16 @@
-import Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 import { GameSocket, GameRoom, UnitState } from '../socket/GameSocket';
 import { THEME } from '../theme';
+import { getRaceVisual, RaceVisual } from '../raceVisuals';
+import { HeroSkillsPanel } from '../objects/HeroSkillsPanel';
+import { BattleLogPanel } from '../objects/BattleLogPanel';
+
+interface UISceneInitData {
+  socket: GameSocket;
+  room: GameRoom;
+  playerRace: string;
+  enemyRace: string;
+}
 
 const PANEL_H = 100;
 const SCENE_W = 656; // matches BattleScene width
@@ -12,11 +22,11 @@ const SKILL_PANEL_OFFSET_FROM_BOTTOM = PANEL_H + 12;
 type RaceKey = keyof typeof THEME.RACE;
 
 const RACE_ICONS: Record<string, string[]> = {
-  insan:   ['⚡', '🔫', '💥', '🛡'],
-  zerg:    ['🦷', '🩸', '🕸', '🦠'],
-  otomat:  ['⚡', '🔧', '🛰', '☄'],
-  canavar: ['🔥', '💢', '🌀', '☄'],
-  seytan:  ['💀', '🔥', '🌑', '⛧'],
+  insan:   ['âš¡', 'ğŸ”«', 'ğŸ’¥', 'ğŸ›¡'],
+  zerg:    ['ğŸ¦·', 'ğŸ©¸', 'ğŸ•¸', 'ğŸ¦ '],
+  otomat:  ['âš¡', 'ğŸ”§', 'ğŸ›°', 'â˜„'],
+  canavar: ['ğŸ”¥', 'ğŸ’¢', 'ğŸŒ€', 'â˜„'],
+  seytan:  ['ğŸ’€', 'ğŸ”¥', 'ğŸŒ‘', 'â›§'],
 };
 
 export class UIScene extends Phaser.Scene {
@@ -29,11 +39,13 @@ export class UIScene extends Phaser.Scene {
   private manaBar!: Phaser.GameObjects.Graphics;
   private manaValueText!: Phaser.GameObjects.Text;
   private unitInfoText!: Phaser.GameObjects.Text;
-  private endTurnBtn!: Phaser.GameObjects.Container;
-  private surrenderBtn!: Phaser.GameObjects.Container;
+  private endTurnBtn!: Phaser.GameObjects.Text;
+  private surrenderBtn!: Phaser.GameObjects.Text;
   private notifText!: Phaser.GameObjects.Text;
   private skillsPanel!: HeroSkillsPanel;
   private logPanel!: BattleLogPanel;
+  private playerVisual!: RaceVisual;
+  private enemyVisual!: RaceVisual;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -112,7 +124,7 @@ export class UIScene extends Phaser.Scene {
       fontSize: '16px', color: THEME.ENERGY_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 0.5).setAlpha(0);
 
-    // Hero skills panel — bottom-left, above the bottom panel
+    // Hero skills panel â€” bottom-left, above the bottom panel
     const icons = RACE_ICONS[this.socket.myRace] ?? RACE_ICONS.insan;
     this.skillsPanel = new HeroSkillsPanel(this, 12, sceneH - SKILL_PANEL_OFFSET_FROM_BOTTOM, raceColor, icons);
     this.skillsPanel.on('skill_activate', (data: { skillIndex: number }) => {
@@ -121,7 +133,7 @@ export class UIScene extends Phaser.Scene {
       }
     });
 
-    // Battle log panel — right edge, between top bar and bottom panel
+    // Battle log panel â€” right edge, between top bar and bottom panel
     const logH = sceneH - PANEL_H - TOP_BAR_H - 4;
     this.logPanel = new BattleLogPanel(this, SCENE_W - LOG_W, TOP_BAR_H + 2, LOG_W, logH, raceColor);
 

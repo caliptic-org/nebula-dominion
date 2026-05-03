@@ -75,6 +75,7 @@ export const AGE_XP_THRESHOLDS: Record<number, { start: number; end: number; f2p
 
 // Intra-age XP growth factor: XP(L) = base_age × 1.18^(intra_level_index)
 export const XP_GROWTH_FACTOR = 1.18;
+export const ERA_CATCH_UP_PRODUCTION_MULTIPLIER = 2.0;
 
 export const MAX_AGE = 6;
 export const LEVELS_PER_AGE = 9;

@@ -17,7 +17,7 @@ interface PreviewBeat {
 }
 
 const PREVIEW_BEATS: Record<Race, PreviewBeat[]> = {
-  [Race.HUMAN]: [
+  [Race.INSAN]: [
     { label: 'Komutan', caption: 'Komutan Voss üs köprüsünden bölgeyi tarıyor.' },
     { label: 'Birim', caption: 'Marines + Medic karma takım baskına çıkıyor.' },
     { label: 'Üs', caption: 'Modüler askeri üs — Siege Tank hattı kuşatma alıyor.' },
@@ -27,10 +27,20 @@ const PREVIEW_BEATS: Record<Race, PreviewBeat[]> = {
     { label: 'Birim', caption: 'Zergling sürüsü düşman hattına dalıyor.' },
     { label: 'Üs', caption: 'Yaşayan üs — Queen larva kuluçkasını başlatıyor.' },
   ],
-  [Race.AUTOMATON]: [
+  [Race.OTOMAT]: [
     { label: 'Komutan', caption: 'Demiurge Prime holografik harita üzerinde komut veriyor.' },
     { label: 'Birim', caption: 'Geometrik mekanik birimler senkronize ilerliyor.' },
     { label: 'Üs', caption: 'Kristal-mavi enerji üssünden yapay zeka çekirdeği yükseliyor.' },
+  ],
+  [Race.CANAVAR]: [
+    { label: 'Komutan', caption: 'Dev canavar ordusu savaş alanına iniyor.' },
+    { label: 'Birim', caption: 'Güçlü yakın dövüş birimleri düşmanı eziyor.' },
+    { label: 'Üs', caption: 'Kemikten yapılmış kaleler düşmanı korkutuyor.' },
+  ],
+  [Race.SEYTAN]: [
+    { label: 'Komutan', caption: 'Karanlık büyücü orduya güç veriyor.' },
+    { label: 'Birim', caption: 'Şeytan birimleri düşman saflarını dağıtıyor.' },
+    { label: 'Üs', caption: 'Kara büyü kalesi tehditkâr bir güç yayıyor.' },
   ],
 };
 
@@ -372,7 +382,7 @@ function PreviewStage({ race, elapsed }: { race: Race; elapsed: number }) {
     );
   }
 
-  if (race === Race.AUTOMATON) {
+  if (race === Race.OTOMAT) {
     return (
       <div
         style={{
@@ -456,9 +466,11 @@ interface RaceAudioProfile {
 }
 
 const RACE_AUDIO: Record<Race, RaceAudioProfile> = {
-  [Race.HUMAN]: { freqs: [196, 246.94, 293.66], type: 'sine', gain: 0.04 },
-  [Race.ZERG]: { freqs: [110, 138.59, 164.81, 207.65], type: 'sawtooth', gain: 0.025 },
-  [Race.AUTOMATON]: { freqs: [261.63, 392, 523.25], type: 'square', gain: 0.02 },
+  [Race.INSAN]:   { freqs: [196, 246.94, 293.66], type: 'sine', gain: 0.04 },
+  [Race.ZERG]:    { freqs: [110, 138.59, 164.81, 207.65], type: 'sawtooth', gain: 0.025 },
+  [Race.OTOMAT]:  { freqs: [261.63, 392, 523.25], type: 'square', gain: 0.02 },
+  [Race.CANAVAR]: { freqs: [82.41, 110, 164.81], type: 'sawtooth', gain: 0.03 },
+  [Race.SEYTAN]:  { freqs: [130.81, 174.61, 261.63], type: 'sine', gain: 0.03 },
 };
 
 function playRaceTheme(ctx: AudioContext, race: Race): { stop: () => void } {

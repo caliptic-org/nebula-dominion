@@ -19,7 +19,7 @@ export class SubspaceBattle {
   @Column({ name: 'attacker_id' })
   attackerId: string;
 
-  @Column({ name: 'defender_id', nullable: true })
+  @Column({ name: 'defender_id', type: 'varchar', nullable: true })
   defenderId: string | null;
 
   @Column({ length: 20, default: 'pending' })
@@ -34,7 +34,7 @@ export class SubspaceBattle {
   @Column({ type: 'jsonb', nullable: true })
   result: Record<string, unknown> | null;
 
-  @Column({ name: 'winner_id', nullable: true })
+  @Column({ name: 'winner_id', type: 'varchar', nullable: true })
   winnerId: string | null;
 
   @Column({ name: 'subspace_effects', type: 'jsonb', default: [] })

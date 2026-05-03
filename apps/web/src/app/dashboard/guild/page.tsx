@@ -9,13 +9,13 @@ import { GuildCreatePanel } from '@/components/guild/GuildCreatePanel';
 import { GuildDashboard } from '@/components/guild/GuildDashboard';
 import { TutorialOverlay } from '@/components/guild/TutorialOverlay';
 import { GuildView } from './GuildView';
-import { useGuildTutorial } from '@/hooks/useGuildTutorial';
+import { useGuildTutorial, GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { GuildSummary } from '@/types/guild';
 
 type Tab = 'search' | 'create';
 
-export default function GuildHubPage() {
+function GuildHubPageInner() {
   const router = useRouter();
   const { state, advance, resetForDemo, openOverlay } = useGuildTutorial();
   const { race } = useRaceTheme();
@@ -169,5 +169,13 @@ export default function GuildHubPage() {
 
       <TutorialOverlay />
     </div>
+  );
+}
+
+export default function GuildHubPage() {
+  return (
+    <GuildTutorialProvider>
+      <GuildHubPageInner />
+    </GuildTutorialProvider>
   );
 }

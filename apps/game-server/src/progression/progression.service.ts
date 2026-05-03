@@ -18,13 +18,18 @@ import {
   MAX_AGE,
   MAX_LEVEL,
   ContentUnlock,
-  MAX_AGE,
   ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
 } from './config/level-config';
-import { ProgressionConfigService } from './config/progression-config.service';
-import { AwardXpDto } from './dto/award-xp.dto';
-import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
 import { ProgressionConfigService } from './progression-config.service';
+import { AwardXpDto } from './dto/award-xp.dto';
+import { AgeTransitionEvent, LevelUpEvent, PlayerProgressDto, XpGainedEvent, XpTelemetryEvent } from './dto/player-progress.dto';
+import { ActiveBoostDto, EraTransitionEvent, EraTransitionPackage } from './dto/era-transition.dto';
+
+const AGE_BADGE_LABELS: Record<AgeTierBadge, string> = {
+  [AgeTierBadge.ACEMI]: 'Acemi',
+  [AgeTierBadge.DENEYIMLI]: 'Deneyimli',
+  [AgeTierBadge.SAMPIYON]: 'Şampiyon',
+};
 
 @Injectable()
 export class ProgressionService {
@@ -151,7 +156,7 @@ export class ProgressionService {
 
     const fromAge = record.currentAge;
     const toAge = fromAge + 1;
-    const firstLevel = getFirstLevelForAge(toAge);
+    const firstLevel = getFirstLevel(toAge);
     const newLevelDef = getLevelDef(firstLevel, toAge);
 
     if (!newLevelDef) {
@@ -369,7 +374,27 @@ export class ProgressionService {
     dto.unlockedContent = record.unlockedContent;
     dto.tierBonusMultiplier = levelDef?.xpMultiplier ?? 1.0;
     dto.isMaxLevel = isMaxLevel;
-    dto.canAdvanceAge = canAdvanceAge;
+    dto.canAdvanceAge = record.currentLevel >= getMaxLevel(record.currentAge) && record.currentAge < MAX_AGE;
     return dto;
+  }
+
+  private emitTelemetry(
+    userId: string,
+    source: XpSource,
+    baseAmount: number,
+    finalAmount: number,
+    record: PlayerLevel,
+  ): void {
+    const event: XpTelemetryEvent = {
+      userId,
+      source,
+      baseAmount,
+      finalAmount,
+      level: record.currentLevel,
+      age: record.currentAge,
+      totalXp: record.totalXp,
+      timestamp: new Date().toISOString(),
+    };
+    this.emitter.emit('xp.telemetry', event);
   }
 }

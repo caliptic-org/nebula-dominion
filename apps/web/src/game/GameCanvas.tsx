@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef } from 'react';
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { GameSocket } from './socket/GameSocket';
 import { BootScene } from './scenes/BootScene';
 import { BattleScene } from './scenes/BattleScene';

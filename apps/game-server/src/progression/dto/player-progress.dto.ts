@@ -1,4 +1,5 @@
 import { AgeTierBadge, ContentUnlock } from '../config/level-config';
+import { EraTransitionPackage } from './era-transition.dto';
 
 export interface LevelUpEvent {
   userId: string;

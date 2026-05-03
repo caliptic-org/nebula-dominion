@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 export enum ChannelType {
   GLOBAL = 'global',
@@ -20,7 +20,7 @@ export class ChatMessage {
   @Index()
   channelType: ChannelType;
 
-  @Column({ name: 'channel_id', length: 100, nullable: true })
+  @Column({ type: 'varchar', name: 'channel_id', length: 100, nullable: true })
   channelId: string | null;
 
   @Column({ type: 'text' })

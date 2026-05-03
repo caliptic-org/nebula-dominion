@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AGE_XP_THRESHOLDS } from './level-config';
@@ -24,7 +24,7 @@ export class ProgressionConfigService {
   private thresholds: Map<number, AgeThresholdConfig> = new Map();
 
   constructor(
-    @InjectRepository('xp_threshold_config', { optional: true } as any)
+    @Optional()
     private readonly rawRepo?: Repository<any>,
   ) {
     this.loadDefaults();

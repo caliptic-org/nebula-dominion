@@ -5,10 +5,11 @@
  */
 export const THEME = {
   // Backgrounds
-  BG:          0x07090f,
-  BG_SURFACE:  0x0d1020,
-  BG_ELEVATED: 0x141828,
-  BG_PANEL:    0x0d0d22,
+  BG:           0x07090f,
+  BG_SURFACE:   0x0d1020,
+  BG_ELEVATED:  0x141828,
+  BG_PANEL:     0x0d0d22,
+  HALFTONE_DOT: 0x4a9eff,
 
   // Text (string form for Phaser text objects)
   TEXT_PRIMARY:   '#e8e8f0',
@@ -65,6 +66,18 @@ export const THEME = {
   REWARD_MINERAL: '#60aaff',
   REWARD_GAS:     '#88ffaa',
   REWARD_XP:      '#ffcc44',
+
+  // Manga ink border
+  PANEL_INK: 0x000000,
+
+  // Race-specific numeric colors
+  RACE: {
+    insan:   { num: 0x4a9eff },
+    zerg:    { num: 0x44dd44 },
+    otomat:  { num: 0xff8800 },
+    canavar: { num: 0xff3344 },
+    seytan:  { num: 0xaa44ff },
+  },
 } as const;
 
 /** Unit body colors keyed by unit type string */

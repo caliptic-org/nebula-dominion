@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Orbitron, Rajdhani } from 'next/font/google';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
 import '@/styles/globals.css';
 

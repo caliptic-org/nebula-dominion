@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('shop_items')
 export class ShopItem {
@@ -43,7 +43,7 @@ export class ShopItem {
   @Column({ type: 'jsonb', default: {} })
   content: Record<string, unknown>;
 
-  @Column({ name: 'preview_asset', length: 500, nullable: true })
+  @Column({ type: 'varchar', name: 'preview_asset', length: 500, nullable: true })
   previewAsset: string | null;
 
   @Column({ name: 'is_limited', default: false })

@@ -1,8 +1,21 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Dashboard',
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { RACE_DESCRIPTIONS } from '@/types/units';
+import { TIER_NAMES } from '@/types/progression';
+
+const PROFILE = {
+  pvpMatches: 0,
+  pvpWins: 0,
+  totalXp: 0,
+  xpInLevel: 0,
+  xpToNext: 100,
+  age: 1,
+  tier: 1,
+  guild: { members: 0, capacity: 50 },
 };
 
 const resources = [
@@ -31,10 +44,10 @@ const playerStats = [
 ];
 
 const upcomingFeatures = [
-  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3'  },
-  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5'  },
-  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4'    },
-  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5'    },
+  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3', color: '#4a9eff' },
+  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5', color: '#ff4a4a' },
+  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4',  color: '#a855f7' },
+  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5',  color: '#e8a820' },
 ];
 
 export default function DashboardPage() {

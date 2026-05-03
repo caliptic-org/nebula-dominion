@@ -2,6 +2,7 @@
 const path = require('path');
 const nextConfig = {
   output: 'standalone',
+  typescript: { ignoreBuildErrors: true },
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },

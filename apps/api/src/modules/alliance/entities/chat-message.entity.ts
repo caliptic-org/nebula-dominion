@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -18,7 +18,7 @@ export class ChatMessage {
   @Column({ name: 'channel_type', length: 20 })
   channelType: string;
 
-  @Column({ name: 'channel_id', length: 100, nullable: true })
+  @Column({ type: 'varchar', name: 'channel_id', length: 100, nullable: true })
   channelId: string | null;
 
   @Column({ type: 'text' })

@@ -147,7 +147,8 @@ services:
       DB_RUN_MIGRATIONS: ${DB_RUN_MIGRATIONS:-true}
       DB_LOGGING: ${DB_LOGGING:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+      JWT_SECRET: ${JWT_SECRET:-nebula-dominion-dev-jwt-secret-32chars}
+      GAME_SERVER_JWT_SECRET: ${GAME_SERVER_JWT_SECRET:-nebula-dominion-gs-jwt-secret-32chars}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       MATCHMAKING_INITIAL_ELO_RANGE: ${MATCHMAKING_INITIAL_ELO_RANGE:-100}
       MATCHMAKING_ELO_EXPANSION_RATE: ${MATCHMAKING_ELO_EXPANSION_RATE:-50}

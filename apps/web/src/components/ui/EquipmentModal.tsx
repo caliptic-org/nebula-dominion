@@ -28,6 +28,7 @@ interface EquipmentModalProps {
   onRetry?: () => void;
   raceColor: string;
   raceGlow: string;
+  mutating?: boolean;
   onSelect: (item: EquipmentItem) => void;
   onClose: () => void;
   onUnequip?: () => void;
@@ -42,6 +43,7 @@ export function EquipmentModal({
   onRetry,
   raceColor,
   raceGlow,
+  mutating = false,
   onSelect,
   onClose,
   onUnequip,
@@ -214,7 +216,8 @@ export function EquipmentModal({
                   return (
                     <button
                       key={item.id}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-150 group"
+                      disabled={mutating || isCurrent}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-150 group disabled:cursor-not-allowed"
                       style={{
                         background: isCurrent
                           ? `${rc.border}15`
@@ -223,6 +226,7 @@ export function EquipmentModal({
                           ? `1.5px solid ${rc.border}80`
                           : '1px solid rgba(255,255,255,0.05)',
                         boxShadow: isCurrent ? `0 0 10px ${rc.glow}` : 'none',
+                        opacity: mutating && !isCurrent ? 0.5 : 1,
                       }}
                       onMouseEnter={() => setHovered(item)}
                       onMouseLeave={() => setHovered(null)}
@@ -230,6 +234,7 @@ export function EquipmentModal({
                       onBlur={() => setHovered(null)}
                       onClick={() => onSelect(item)}
                       aria-pressed={isCurrent}
+                      aria-busy={mutating || undefined}
                     >
                       {/* Icon */}
                       <div
@@ -305,14 +310,17 @@ export function EquipmentModal({
           >
             <button
               onClick={onUnequip}
-              className="w-full font-display text-xs uppercase tracking-widest py-2.5 rounded-xl transition-colors"
+              disabled={mutating}
+              aria-busy={mutating || undefined}
+              className="w-full font-display text-xs uppercase tracking-widest py-2.5 rounded-xl transition-colors disabled:cursor-not-allowed"
               style={{
                 background: 'rgba(255,51,85,0.08)',
                 border: '1px solid rgba(255,51,85,0.25)',
                 color: '#ff3355',
+                opacity: mutating ? 0.5 : 1,
               }}
             >
-              Ekipmanı Çıkar
+              {mutating ? 'İşleniyor…' : 'Ekipmanı Çıkar'}
             </button>
           </div>
         )}

@@ -8,7 +8,11 @@ import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { GlowButton } from '@/components/ui/GlowButton';
 import { CommanderCard } from '@/components/ui/CommanderCard';
-import clsx from 'clsx';
+import { EquipmentSlots } from '@/components/ui/EquipmentSlots';
+import {
+  useCommanderEquipment,
+  useEquipmentInventory,
+} from '@/hooks/useEquipment';
 
 export default function CommandersPage() {
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();
@@ -16,6 +20,26 @@ export default function CommandersPage() {
     RACE_DESCRIPTIONS[Race.INSAN].commanders[0]
   );
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
+
+  const showEquipmentPanel =
+    !!selectedCommander && selectedCommander.isUnlocked;
+
+  const {
+    equipment,
+    loading: equipmentLoading,
+    error: equipmentError,
+    mutating: equipmentMutating,
+    equip,
+    unequip,
+    reload: reloadEquipment,
+  } = useCommanderEquipment(showEquipmentPanel ? selectedCommander!.id : null);
+
+  const {
+    inventory,
+    loading: inventoryLoading,
+    error: inventoryError,
+    reload: reloadInventory,
+  } = useEquipmentInventory(showEquipmentPanel);
 
   const races = Object.values(Race) as Race[];
   const raceDesc = RACE_DESCRIPTIONS[race];
@@ -272,10 +296,107 @@ export default function CommandersPage() {
                   </GlowButton>
                 )}
               </div>
+
+              {/* Equipment Slots */}
+              {showEquipmentPanel && (
+                <div
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  {equipmentLoading && !equipment ? (
+                    <EquipmentSlotsSkeleton />
+                  ) : equipmentError && !equipment ? (
+                    <EquipmentLoadError
+                      message={equipmentError}
+                      raceColor={RACE_DESCRIPTIONS[selectedCommander.race].color}
+                      onRetry={reloadEquipment}
+                    />
+                  ) : equipment ? (
+                    <EquipmentSlots
+                      equipment={equipment}
+                      raceColor={RACE_DESCRIPTIONS[selectedCommander.race].color}
+                      raceGlow={RACE_DESCRIPTIONS[selectedCommander.race].glowColor}
+                      inventory={inventory}
+                      inventoryLoading={inventoryLoading}
+                      inventoryError={inventoryError}
+                      onInventoryRetry={reloadInventory}
+                      onEquip={equip}
+                      onUnequip={unequip}
+                      mutating={equipmentMutating}
+                    />
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function EquipmentSlotsSkeleton() {
+  return (
+    <div className="p-4" aria-busy="true" aria-label="Ekipman yükleniyor">
+      <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-3">
+        Ekipman Slotları
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl animate-pulse"
+            style={{
+              height: 76,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px dashed rgba(255,255,255,0.08)',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EquipmentLoadError({
+  message,
+  raceColor,
+  onRetry,
+}: {
+  message: string;
+  raceColor: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="p-4" role="alert">
+      <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-3">
+        Ekipman Slotları
+      </div>
+      <div
+        className="flex flex-col items-center text-center p-4 rounded-xl"
+        style={{
+          background: 'rgba(255,51,85,0.06)',
+          border: '1px solid rgba(255,51,85,0.25)',
+        }}
+      >
+        <span className="text-2xl mb-2">⚠️</span>
+        <div className="font-display text-[10px] uppercase tracking-widest text-text-muted mb-1">
+          Ekipman yüklenemedi
+        </div>
+        <div className="text-text-secondary text-[11px] mb-3 break-words">
+          {message}
+        </div>
+        <button
+          onClick={onRetry}
+          className="font-display text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition-colors"
+          style={{
+            background: `${raceColor}18`,
+            border: `1px solid ${raceColor}40`,
+            color: raceColor,
+          }}
+        >
+          Tekrar Dene
+        </button>
+      </div>
     </div>
   );
 }

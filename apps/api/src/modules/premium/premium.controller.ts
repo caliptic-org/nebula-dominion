@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PremiumService } from './premium.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Premium')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/premium')
 export class PremiumController {
   constructor(private readonly premiumService: PremiumService) {}
@@ -23,23 +26,20 @@ export class PremiumController {
 
   @Get('status')
   @ApiOperation({ summary: 'Kullanıcının premium durumu' })
-  getStatus() {
-    const userId = 'demo-user-id';
-    return this.premiumService.checkPremiumStatus(userId);
+  getStatus(@CurrentUser() currentUserId: string) {
+    return this.premiumService.checkPremiumStatus(currentUserId);
   }
 
   @Get('my-passes')
   @ApiOperation({ summary: 'Kullanıcının aktif passları' })
-  getMyPasses() {
-    const userId = 'demo-user-id';
-    return this.premiumService.getUserActivePasses(userId);
+  getMyPasses(@CurrentUser() currentUserId: string) {
+    return this.premiumService.getUserActivePasses(currentUserId);
   }
 
   @Post('battle-pass/xp')
   @ApiOperation({ summary: 'Battle pass XP ekle (oyun sunucusu çağrısı)' })
-  addBattlePassXp(@Body() body: { xpAmount: number }) {
-    const userId = 'demo-user-id';
-    return this.premiumService.addBattlePassXp(userId, body.xpAmount);
+  addBattlePassXp(@CurrentUser() currentUserId: string, @Body() body: { xpAmount: number }) {
+    return this.premiumService.addBattlePassXp(currentUserId, body.xpAmount);
   }
 
   @Post('passes/:userPassId/claim-tier/:tier')
@@ -47,18 +47,17 @@ export class PremiumController {
   @ApiParam({ name: 'userPassId', description: 'Kullanıcı pass ID' })
   @ApiParam({ name: 'tier', description: 'Tier numarası (1-50)' })
   claimTierReward(
+    @CurrentUser() currentUserId: string,
     @Param('userPassId') userPassId: string,
     @Param('tier', ParseIntPipe) tier: number,
   ) {
-    const userId = 'demo-user-id';
-    return this.premiumService.claimTierReward(userId, userPassId, tier);
+    return this.premiumService.claimTierReward(currentUserId, userPassId, tier);
   }
 
   @Patch('passes/:userPassId/cancel')
   @ApiOperation({ summary: 'Premium pass iptal et' })
   @ApiParam({ name: 'userPassId', description: 'Kullanıcı pass ID' })
-  cancelPass(@Param('userPassId') userPassId: string) {
-    const userId = 'demo-user-id';
-    return this.premiumService.cancelPass(userId, userPassId);
+  cancelPass(@CurrentUser() currentUserId: string, @Param('userPassId') userPassId: string) {
+    return this.premiumService.cancelPass(currentUserId, userPassId);
   }
 }

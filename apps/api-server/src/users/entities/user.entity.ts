@@ -32,6 +32,9 @@ export class User {
   @Column({ name: 'bio', length: 500, nullable: true })
   bio: string;
 
+  @Column({ name: 'role', default: 'player', length: 20 })
+  role: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

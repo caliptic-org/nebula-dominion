@@ -11,6 +11,8 @@ import { SelectRaceDto } from './dto/select-race.dto';
 import { CollectResourcesDto } from './dto/collect-resources.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
 @ApiTags('game-state')
 @ApiBearerAuth('access-token')
@@ -57,8 +59,11 @@ export class GameStateController {
   }
 
   @Get('summary/admin')
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Aggregate game state stats (internal)' })
   @ApiResponse({ status: 200, description: 'Summary stats' })
+  @ApiResponse({ status: 403, description: 'Forbidden — admin role required' })
   adminSummary() {
     return this.gameStateService.adminSummary();
   }

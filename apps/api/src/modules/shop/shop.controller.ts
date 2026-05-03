@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ShopService } from './shop.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Shop')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/shop')
 export class ShopController {
   constructor(private readonly shopService: ShopService) {}
@@ -45,6 +48,7 @@ export class ShopController {
   @Post('purchase')
   @ApiOperation({ summary: 'Item satın al (oyun içi para birimi ile)' })
   purchase(
+    @CurrentUser() currentUserId: string,
     @Body()
     body: {
       sku: string;
@@ -52,31 +56,27 @@ export class ShopController {
       quantity?: number;
     },
   ) {
-    const userId = 'demo-user-id';
-    return this.shopService.purchaseWithInGameCurrency(userId, body);
+    return this.shopService.purchaseWithInGameCurrency(currentUserId, body);
   }
 
   @Get('inventory')
   @ApiOperation({ summary: 'Kullanıcı envanteri' })
   @ApiQuery({ name: 'category', required: false })
-  getInventory(@Query('category') category?: string) {
-    const userId = 'demo-user-id';
-    return this.shopService.getUserInventory(userId, category);
+  getInventory(@CurrentUser() currentUserId: string, @Query('category') category?: string) {
+    return this.shopService.getUserInventory(currentUserId, category);
   }
 
   @Patch('inventory/:inventoryId/equip')
   @ApiOperation({ summary: 'Item koy (equip)' })
   @ApiParam({ name: 'inventoryId', description: 'Envanter ID' })
-  equipItem(@Param('inventoryId') inventoryId: string) {
-    const userId = 'demo-user-id';
-    return this.shopService.equipItem(userId, inventoryId);
+  equipItem(@CurrentUser() currentUserId: string, @Param('inventoryId') inventoryId: string) {
+    return this.shopService.equipItem(currentUserId, inventoryId);
   }
 
   @Patch('inventory/:inventoryId/unequip')
   @ApiOperation({ summary: 'Item çıkar (unequip)' })
   @ApiParam({ name: 'inventoryId', description: 'Envanter ID' })
-  unequipItem(@Param('inventoryId') inventoryId: string) {
-    const userId = 'demo-user-id';
-    return this.shopService.unequipItem(userId, inventoryId);
+  unequipItem(@CurrentUser() currentUserId: string, @Param('inventoryId') inventoryId: string) {
+    return this.shopService.unequipItem(currentUserId, inventoryId);
   }
 }

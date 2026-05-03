@@ -42,7 +42,7 @@ export class AuthService {
     await this.gameStateRepo.save(this.gameStateRepo.create({ userId: user.id }));
     await this.scoreRepo.save(this.scoreRepo.create({ userId: user.id, username: user.username }));
 
-    const accessToken = this.jwtService.sign({ sub: user.id, username: user.username });
+    const accessToken = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
     return { accessToken, userId: user.id };
   }
 
@@ -60,7 +60,7 @@ export class AuthService {
     user.lastLoginAt = new Date();
     await this.userRepo.save(user);
 
-    const accessToken = this.jwtService.sign({ sub: user.id, username: user.username });
+    const accessToken = this.jwtService.sign({ sub: user.id, username: user.username, role: user.role });
     return { accessToken, userId: user.id };
   }
 }

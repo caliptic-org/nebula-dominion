@@ -19,6 +19,8 @@ import {
   ApiExcludeEndpoint,
 } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Payment')
 @Controller('api/v1/payment')
@@ -30,9 +32,11 @@ export class PaymentController {
   // ------------------------------------------
 
   @Post('stripe/create-intent')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Stripe ödeme niyeti oluştur (USD veya diğer)' })
   createStripeIntent(
+    @CurrentUser() currentUserId: string,
     @Body()
     body: {
       itemSku?: string;
@@ -41,8 +45,7 @@ export class PaymentController {
     },
     @Req() req: Request & { ip: string; headers: Record<string, string> },
   ) {
-    const userId = 'demo-user-id';
-    return this.paymentService.createStripePaymentIntent(userId, {
+    return this.paymentService.createStripePaymentIntent(currentUserId, {
       ...body,
       provider: 'stripe',
       userIp: req.ip,
@@ -68,9 +71,11 @@ export class PaymentController {
   // ------------------------------------------
 
   @Post('iyzico/create-payment')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'iyzico ödeme formu oluştur (TRY - Türkiye)' })
   createIyzicoPayment(
+    @CurrentUser() currentUserId: string,
     @Body()
     body: {
       itemSku?: string;
@@ -83,8 +88,7 @@ export class PaymentController {
     },
     @Req() req: Request & { ip: string; headers: Record<string, string> },
   ) {
-    const userId = 'demo-user-id';
-    return this.paymentService.createIyzicoPayment(userId, {
+    return this.paymentService.createIyzicoPayment(currentUserId, {
       ...body,
       currencyCode: 'TRY',
       provider: 'iyzico',
@@ -116,11 +120,11 @@ export class PaymentController {
   // ------------------------------------------
 
   @Get('transactions')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kullanıcı ödeme geçmişi' })
-  getTransactions() {
-    const userId = 'demo-user-id';
-    return this.paymentService.getUserTransactions(userId);
+  getTransactions(@CurrentUser() currentUserId: string) {
+    return this.paymentService.getUserTransactions(currentUserId);
   }
 
   // ------------------------------------------
@@ -128,9 +132,11 @@ export class PaymentController {
   // ------------------------------------------
 
   @Post('consent')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'KVKK onay kaydet (açık rıza)' })
   recordConsent(
+    @CurrentUser() currentUserId: string,
     @Body()
     body: {
       consentType: string;
@@ -139,9 +145,8 @@ export class PaymentController {
     },
     @Req() req: Request & { ip: string; headers: Record<string, string> },
   ) {
-    const userId = 'demo-user-id';
     return this.paymentService.recordConsent(
-      userId,
+      currentUserId,
       body.consentType,
       body.granted,
       req.ip,
@@ -151,28 +156,29 @@ export class PaymentController {
   }
 
   @Get('consents')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kullanıcının KVKK onay geçmişi' })
-  getConsents() {
-    const userId = 'demo-user-id';
-    return this.paymentService.getUserConsents(userId);
+  getConsents(@CurrentUser() currentUserId: string) {
+    return this.paymentService.getUserConsents(currentUserId);
   }
 
   @Post('gdpr/revoke-all-consents')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'GDPR/KVKK - Tüm onayları geri al' })
   revokeAllConsents(
+    @CurrentUser() currentUserId: string,
     @Req() req: Request & { ip: string },
   ) {
-    const userId = 'demo-user-id';
-    return this.paymentService.revokeAllConsents(userId, req.ip);
+    return this.paymentService.revokeAllConsents(currentUserId, req.ip);
   }
 
   @Post('gdpr/anonymize')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'GDPR/KVKK - Ödeme verilerini anonimleştir (unutulma hakkı)' })
-  anonymizeData() {
-    const userId = 'demo-user-id';
-    return this.paymentService.anonymizeUserPaymentData(userId);
+  anonymizeData(@CurrentUser() currentUserId: string) {
+    return this.paymentService.anonymizeUserPaymentData(currentUserId);
   }
 }

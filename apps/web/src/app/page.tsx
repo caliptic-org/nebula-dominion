@@ -12,8 +12,6 @@ import { MangaPanel } from '@/components/ui/MangaPanel';
 import { LevelUpModal } from '@/components/progression/LevelUpModal';
 import { UnlockNotification } from '@/components/progression/UnlockNotification';
 import { LevelUpPayload, ContentUnlock } from '@/types/progression';
-import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
-import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
 import clsx from 'clsx';
 
 const IsometricTilemap = dynamic(
@@ -456,16 +454,6 @@ export default function HomePage() {
             </div>
           )}
         </main>
-
-        {/* ── HUD: Shortcut Buttons (right side) ───────────── */}
-        <ShortcutButtons
-          unreadMessages={3}
-          activeMissions={2}
-          inventoryStatus="full"
-        />
-
-        {/* ── HUD: Unit Production Queue (bottom left) ──────── */}
-        <UnitProductionQueue />
 
         {/* ── Bottom Navigation ─────────────────────────────── */}
         <nav

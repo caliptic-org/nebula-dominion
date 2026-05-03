@@ -50,7 +50,10 @@ import { DonateRequest } from './guild/entities/donate-request.entity';
 import { DonateFulfillment } from './guild/entities/donate-fulfillment.entity';
 import { ContributionDaily } from './guild/entities/contribution-daily.entity';
 import { ProfanityWord } from './guild/entities/profanity-word.entity';
+import { Mail } from './mail/entities/mail.entity';
+import { MailModule } from './mail/mail.module';
 import { GuildSchema1746800000000 } from './database/migrations/1746800000000-GuildSchema';
+import { MailSchema1746900000000 } from './database/migrations/1746900000000-MailSchema';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
@@ -97,6 +100,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           DonateFulfillment,
           ContributionDaily,
           ProfanityWord,
+          Mail,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -110,6 +114,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           LeaderboardSchema1746500000000,
           FormationsSchema1746500000000,
           GuildSchema1746800000000,
+          MailSchema1746900000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -130,6 +135,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
     StatsModule,
     FormationsModule,
     GuildModule,
+    MailModule,
   ],
 })
 export class AppModule {}

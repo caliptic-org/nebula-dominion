@@ -31,6 +31,10 @@ export interface UnitState {
   abilities?: string[];
   /** IDs of mutations applied to this unit, in application order */
   appliedMutations?: string[];
+  /** Remaining cooldown turns per skill slot (index 0-3) */
+  skillCooldowns?: number[];
+  /** Original cooldown duration per skill slot, used for ability_ready payload */
+  skillCooldownMax?: number[];
 }
 
 export interface PlayerState {

@@ -5,7 +5,7 @@ import { XpTransaction } from './entities/xp-transaction.entity';
 import { XpThresholdConfig } from './entities/xp-threshold-config.entity';
 import { EraPackage } from './entities/era-package.entity';
 import { ProgressionService } from './progression.service';
-import { ProgressionConfigService } from './progression-config.service';
+import { ProgressionConfigService } from './config/progression-config.service';
 import { ProgressionController } from './progression.controller';
 import { ProgressionGateway } from './progression.gateway';
 import { AuthModule } from '../auth/auth.module';

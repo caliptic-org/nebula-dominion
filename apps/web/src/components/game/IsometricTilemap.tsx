@@ -42,13 +42,6 @@ function screenToIso(screenX: number, screenY: number, offsetX: number, offsetY:
   return { col, row };
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 const TILE_COLORS: Record<TileType, { fill: string; stroke: string; top: string }> = {
   empty:    { fill: '#0d1420', stroke: 'rgba(255,255,255,0.08)', top: '#111a2a' },
   asteroid: { fill: '#1a1612', stroke: 'rgba(255,102,0,0.25)', top: '#22201a' },
@@ -59,7 +52,7 @@ const TILE_COLORS: Record<TileType, { fill: string; stroke: string; top: string 
 
 function generateMap(): Tile[][] {
   const map: Tile[][] = [];
-  const tileTypes: TileType[] = ['empty', 'empty', 'empty', 'empty', 'asteroid', 'planet', 'nebula', 'battle'];
+  const tileTypes: TileType[] = ['empty', 'empty', 'empty', 'empty', 'asteroid', 'planet', 'nebula'];
   for (let r = 0; r < MAP_ROWS; r++) {
     map[r] = [];
     for (let c = 0; c < MAP_COLS; c++) {
@@ -123,7 +116,7 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
     // Animated nebula glow at background
     const nebulaGrad = ctx.createRadialGradient(CANVAS_W * 0.3, CANVAS_H * 0.2, 0, CANVAS_W * 0.3, CANVAS_H * 0.2, 200);
     const alpha = 0.04 + 0.02 * Math.sin(timeRef.current * 0.5);
-    nebulaGrad.addColorStop(0, hexToRgba(raceColor, alpha));
+    nebulaGrad.addColorStop(0, raceColor.replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#', 'rgba(') ?? `${raceColor}0a`);
     nebulaGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = nebulaGrad;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);

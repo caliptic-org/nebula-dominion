@@ -3,6 +3,7 @@ import { GameSocket, UnitState, GameRoom } from '../socket/GameSocket';
 import { UnitSprite } from '../objects/UnitSprite';
 import { spawnDamageText, spawnAbilityText } from '../objects/DamageText';
 import { THEME } from '../theme';
+import { getRaceVisual } from '../raceVisuals';
 
 const GRID_COLS = 8;
 const GRID_ROWS = 6;
@@ -48,47 +49,87 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(THEME.BG);
+    this.drawHalftoneBackdrop();
     this.drawGrid();
     this.reachableGraphics = this.add.graphics();
     this.spawnAllUnits();
     this.registerSocketEvents();
     this.input.on('pointerdown', this.handlePointerDown, this);
 
-    // Launch UI overlay
-    this.scene.launch('UIScene', { socket: this.socket, room: this.room });
+    // Launch UI overlay with race context
+    const myId = this.socket.myUserId;
+    const enemyId = Object.keys(this.room.players).find((id) => id !== myId) ?? myId;
+    const playerRace = this.room.players[myId]?.race ?? this.socket.myRace;
+    const enemyRace = this.room.players[enemyId]?.race ?? 'canavar';
+
+    this.scene.launch('UIScene', {
+      socket: this.socket,
+      room: this.room,
+      playerRace,
+      enemyRace,
+    });
+  }
+
+  private drawHalftoneBackdrop() {
+    // Halftone dot pattern — manga texture
+    const g = this.add.graphics();
+    g.fillStyle(THEME.HALFTONE_DOT, 0.04);
+    const step = 18;
+    for (let y = 0; y < SCENE_H; y += step) {
+      for (let x = ((y / step) % 2 === 0 ? 0 : step / 2); x < SCENE_W; x += step) {
+        g.fillCircle(x, y, 1.2);
+      }
+    }
+    g.setDepth(-10);
   }
 
   private drawGrid() {
     this.gridGraphics = this.add.graphics();
 
+    const playerVisual = getRaceVisual(this.room.players[this.socket.myUserId]?.race);
+    const enemyId = Object.keys(this.room.players).find((id) => id !== this.socket.myUserId);
+    const enemyVisual = getRaceVisual(enemyId ? this.room.players[enemyId]?.race : undefined);
+
+    const gridX = MARGIN_X - 4;
+    const gridY = MARGIN_Y - 4;
+    const gridW = GRID_COLS * CELL_SIZE + 8;
+    const gridH = GRID_ROWS * CELL_SIZE + 8;
+
     // Background panel
     this.gridGraphics.fillStyle(THEME.BG_PANEL, 1);
-    this.gridGraphics.fillRect(MARGIN_X - 4, MARGIN_Y - 4, GRID_COLS * CELL_SIZE + 8, GRID_ROWS * CELL_SIZE + 8);
+    this.gridGraphics.fillRect(gridX, gridY, gridW, gridH);
 
-    // Dividing line (player left, enemy right)
+    // Manga ink border (thick black outline)
+    this.gridGraphics.lineStyle(4, THEME.PANEL_INK, 1);
+    this.gridGraphics.strokeRect(gridX, gridY, gridW, gridH);
+
+    // Dividing line (player left, enemy right) — manga split
     const midX = MARGIN_X + (GRID_COLS / 2) * CELL_SIZE;
-    this.gridGraphics.lineStyle(2, THEME.GRID_DIVIDER, 0.5);
-    this.gridGraphics.lineBetween(midX, MARGIN_Y, midX, MARGIN_Y + GRID_ROWS * CELL_SIZE);
+    this.gridGraphics.lineStyle(3, THEME.PANEL_INK, 0.9);
+    this.gridGraphics.lineBetween(midX, gridY, midX, gridY + gridH);
 
-    // Grid cells
+    // Grid cells with race-tinted halves
     for (let c = 0; c < GRID_COLS; c++) {
       for (let r = 0; r < GRID_ROWS; r++) {
         const x = MARGIN_X + c * CELL_SIZE;
         const y = MARGIN_Y + r * CELL_SIZE;
         const isPlayerSide = c < GRID_COLS / 2;
-        this.gridGraphics.lineStyle(1, isPlayerSide ? THEME.GRID_PLAYER_SIDE : THEME.GRID_ENEMY_SIDE, 0.4);
+        const tint = isPlayerSide ? playerVisual.hex : enemyVisual.hex;
+        this.gridGraphics.lineStyle(1, tint, 0.35);
         this.gridGraphics.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
       }
     }
 
-    // Labels
-    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.25, MARGIN_Y - 24, 'YOUR FORCES', {
-      fontSize: '12px', color: THEME.INFO_STR, fontStyle: 'bold',
-    }).setOrigin(0.5, 1);
+    // Race labels above each half (manga panel header style)
+    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.25, MARGIN_Y - 14, `${playerVisual.icon} ${playerVisual.label}`, {
+      fontSize: '11px', color: playerVisual.str, fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5, 1).setDepth(5);
 
-    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.75, MARGIN_Y - 24, 'ENEMY FORCES', {
-      fontSize: '12px', color: THEME.DANGER_STR, fontStyle: 'bold',
-    }).setOrigin(0.5, 1);
+    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.75, MARGIN_Y - 14, `${enemyVisual.icon} ${enemyVisual.label}`, {
+      fontSize: '11px', color: enemyVisual.str, fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5, 1).setDepth(5);
   }
 
   private spawnAllUnits() {
@@ -241,10 +282,15 @@ export class BattleScene extends Phaser.Scene {
       const target = this.unitSprites.get(targetUnitId);
       if (!attacker || !target) return;
 
+      // Speed lines fire as the attacker lunges
+      const ui = this.scene.get('UIScene');
+      ui.events.emit('speed_lines', { fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y });
+
       attacker.playAttackAnim(target.x, target.y, () => {
         target.unitState.hp = targetHp;
         target.applyState(target.unitState);
         spawnDamageText(this, target.x, target.y, damage);
+        ui.events.emit('hp_changed');
       });
     });
 
@@ -253,6 +299,7 @@ export class BattleScene extends Phaser.Scene {
       const sprite = this.unitSprites.get(unitId);
       if (sprite) {
         sprite.playDeathAnim(() => this.unitSprites.delete(unitId));
+        this.scene.get('UIScene').events.emit('hp_changed');
       }
     });
 
@@ -292,11 +339,17 @@ export class BattleScene extends Phaser.Scene {
       this.unitSprites.forEach((s) => s.destroy());
       this.unitSprites.clear();
       this.spawnAllUnits();
+      this.scene.get('UIScene').events.emit('hp_changed');
     });
 
     this.socket.on('game_over', (data) => {
       this.time.delayedCall(600, () => {
-        this.scene.launch('WinLoseScene', { data, myId: this.socket.myUserId });
+        const winnerId = (data as { winner?: string }).winner;
+        const winnerRace = winnerId ? this.room.players[winnerId]?.race : undefined;
+        this.scene.launch('WinLoseScene', {
+          data: { ...data, winnerRace, room: this.room },
+          myId: this.socket.myUserId,
+        });
         this.scene.pause();
       });
     });

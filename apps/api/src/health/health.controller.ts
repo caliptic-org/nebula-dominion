@@ -3,23 +3,16 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import * as net from 'net';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
-  private redis: Redis;
-
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
-  ) {
-    this.redis = new Redis(config.get<string>('redis.url', 'redis://localhost:6379'), {
-      lazyConnect: true,
-      connectTimeout: 3000,
-    });
-  }
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Full health check (DB + Redis)' })
@@ -54,12 +47,29 @@ export class HealthController {
     }
   }
 
-  private async redisCheck(): Promise<string> {
-    try {
-      await this.redis.ping();
-      return 'up';
-    } catch {
-      return 'down';
-    }
+  private redisCheck(): Promise<string> {
+    return new Promise((resolve) => {
+      const redisUrl = this.config.get<string>('REDIS_URL', 'redis://localhost:6379');
+      const url = new URL(redisUrl);
+      const host = url.hostname;
+      const port = parseInt(url.port || '6379', 10);
+
+      const socket = net.createConnection({ host, port });
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve('down');
+      }, 3000);
+
+      socket.once('connect', () => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve('up');
+      });
+
+      socket.once('error', () => {
+        clearTimeout(timer);
+        resolve('down');
+      });
+    });
   }
 }

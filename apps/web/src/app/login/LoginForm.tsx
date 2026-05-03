@@ -8,7 +8,7 @@ export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [values, setValues] = useState({ email: '', password: '' });
+  const [values, setValues] = useState({ username: '', password: '' });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -16,7 +16,7 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -36,7 +36,7 @@ export function LoginForm() {
         }
       }
 
-      router.push('/dashboard');
+      router.push('/race-select');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -65,17 +65,17 @@ export function LoginForm() {
         )}
 
         <div>
-          <label htmlFor="email" className="form-label">E-posta</label>
+          <label htmlFor="username" className="form-label">Komutan Adı</label>
           <input
-            id="email"
-            type="email"
-            name="email"
+            id="username"
+            type="text"
+            name="username"
             className="form-input"
-            placeholder="komutan@galaksi.com"
-            autoComplete="email"
+            placeholder="komutan_nova"
+            autoComplete="username"
             required
-            value={values.email}
-            onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
+            value={values.username}
+            onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
             disabled={isLoading}
           />
         </div>

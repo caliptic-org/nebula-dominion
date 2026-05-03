@@ -45,6 +45,8 @@ export default function GameCanvas({ race, mode, userId, tutorial = false }: Pro
       },
       callbacks: {
         postBoot: (game) => {
+          // Expose game for E2E tests via postBoot (avoids React StrictMode lifecycle issues)
+          (window as typeof window & { __phaserGame?: Phaser.Game }).__phaserGame = game;
           game.scene.start('BootScene', {
             socket,
             race: race as Race,
@@ -59,6 +61,7 @@ export default function GameCanvas({ race, mode, userId, tutorial = false }: Pro
     gameRef.current = new Phaser.Game(config);
 
     return () => {
+      delete (window as typeof window & { __phaserGame?: Phaser.Game }).__phaserGame;
       socketRef.current?.destroy();
       gameRef.current?.destroy(true);
       gameRef.current = null;

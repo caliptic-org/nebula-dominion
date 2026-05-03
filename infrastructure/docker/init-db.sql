@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
     current_level   SMALLINT    NOT NULL DEFAULT 1 CHECK (current_level BETWEEN 1 AND 9),
     premium_until   TIMESTAMPTZ,
     is_banned       BOOLEAN     NOT NULL DEFAULT FALSE,
+    is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
+    last_login_at   TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -88,6 +90,7 @@ CREATE TABLE IF NOT EXISTS matchmaking_queue (
 -- ───────────── Indexes ─────────────
 CREATE INDEX IF NOT EXISTS idx_users_elo            ON users(elo_rating);
 CREATE INDEX IF NOT EXISTS idx_users_email          ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_is_active      ON users(is_active);
 CREATE INDEX IF NOT EXISTS idx_game_sessions_p1     ON game_sessions(player1_id);
 CREATE INDEX IF NOT EXISTS idx_game_sessions_p2     ON game_sessions(player2_id);
 CREATE INDEX IF NOT EXISTS idx_game_sessions_status ON game_sessions(status);

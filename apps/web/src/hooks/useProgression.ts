@@ -19,7 +19,7 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProgressionEvent[]>([]);
   const socketRef = useRef<Socket | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
   const fetchProgress = useCallback(async () => {
     try {

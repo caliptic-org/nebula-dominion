@@ -15,7 +15,7 @@ steps:
     image: node:20-alpine
     commands:
       - npm install -g pnpm
-      - pnpm install --frozen-lockfile
+      - pnpm install
 
   - name: typecheck
     image: node:20-alpine
@@ -46,13 +46,14 @@ steps:
     image: docker:27-cli
     commands:
       - apk add --no-cache bash curl postgresql-client redis
-      - docker compose -f docker-compose.test.yml up -d
+      - docker compose -f docker-compose.yml up -d
       - bash ./scripts/wait-for-healthy.sh 180
       - bash ./scripts/smoke-test.sh
     environment:
       PG_USER: nebula
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      GAME_PORT: "4001"
     volumes:
       - name: dockersock
         path: /var/run/docker.sock
@@ -184,7 +185,7 @@ steps:
     image: node:20-alpine
     commands:
       - npm install -g pnpm
-      - pnpm install --frozen-lockfile
+      - pnpm install
 
   - name: typecheck
     image: node:20-alpine
@@ -215,13 +216,14 @@ steps:
     image: docker:27-cli
     commands:
       - apk add --no-cache bash curl postgresql-client redis
-      - docker compose -f docker-compose.test.yml up -d
+      - docker compose -f docker-compose.yml up -d
       - bash ./scripts/wait-for-healthy.sh 180
       - bash ./scripts/smoke-test.sh
     environment:
       PG_USER: nebula
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      GAME_PORT: "4001"
     volumes:
       - name: dockersock
         path: /var/run/docker.sock

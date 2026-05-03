@@ -5,6 +5,9 @@
   "workspaces": ["apps/*"],
   "packageManager": "pnpm@9.0.0",
   "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck --if-present",
+    "test": "pnpm -r run test --if-present",
     "build:game-server": "npm --workspace apps/game-server run build",
     "start:game-server": "npm --workspace apps/game-server run start",
     "start:dev:game-server": "npm --workspace apps/game-server run start:dev",

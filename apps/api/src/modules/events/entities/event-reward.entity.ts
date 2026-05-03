@@ -22,12 +22,12 @@ export class EventReward {
   @Column({ type: 'int' })
   rank: number;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   prize: string;
 
-  @Column({ name: 'prize_detail', length: 300, nullable: true })
+  @Column({ name: 'prize_detail', type: 'varchar', length: 300, nullable: true })
   prizeDetail: string;
 
-  @Column({ name: 'badge_type', length: 50, nullable: true })
+  @Column({ name: 'badge_type', type: 'varchar', length: 50, nullable: true })
   badgeType: string;
 }

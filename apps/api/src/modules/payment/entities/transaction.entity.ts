@@ -41,10 +41,10 @@ export class Transaction {
   @Column({ name: 'premium_gems_delta', type: 'int', default: 0 })
   premiumGemsDelta: number;
 
-  @Column({ name: 'provider_payment_id', length: 300, nullable: true, unique: true })
+  @Column({ name: 'provider_payment_id', type: 'varchar', length: 300, nullable: true, unique: true })
   providerPaymentId: string | null;
 
-  @Column({ name: 'provider_order_id', length: 300, nullable: true })
+  @Column({ name: 'provider_order_id', type: 'varchar', length: 300, nullable: true })
   providerOrderId: string | null;
 
   @Column({ name: 'provider_response', type: 'jsonb', nullable: true })

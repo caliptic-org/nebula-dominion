@@ -16,7 +16,7 @@ export class UserPremiumPass {
   @JoinColumn({ name: 'premium_pass_id' })
   premiumPass: PremiumPass;
 
-  @Column({ length: 20, default: 'active' })
+  @Column({ type: 'varchar', length: 20, default: 'active' })
   status: string;
 
   @Column({ name: 'started_at', type: 'timestamptz', default: () => 'NOW()' })
@@ -37,10 +37,10 @@ export class UserPremiumPass {
   @Column({ name: 'claimed_rewards', type: 'jsonb', default: [] })
   claimedRewards: Record<string, unknown>[];
 
-  @Column({ name: 'payment_provider', length: 20, nullable: true })
+  @Column({ name: 'payment_provider', type: 'varchar', length: 20, nullable: true })
   paymentProvider: string | null;
 
-  @Column({ name: 'subscription_id', length: 200, nullable: true })
+  @Column({ name: 'subscription_id', type: 'varchar', length: 200, nullable: true })
   subscriptionId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

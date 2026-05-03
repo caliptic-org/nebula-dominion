@@ -13,7 +13,7 @@ export class TutorialProgress {
   id: string;
 
   @Index({ unique: true })
-  @Column({ name: 'user_id', length: 255 })
+  @Column({ name: 'user_id', type: 'varchar', length: 255 })
   userId: string;
 
   @Column({
@@ -24,10 +24,10 @@ export class TutorialProgress {
   })
   completedSteps: string[];
 
-  @Column({ name: 'current_step', length: 100, default: 'welcome' })
+  @Column({ name: 'current_step', type: 'varchar', length: 100, default: 'welcome' })
   currentStep: string;
 
-  @Column({ name: 'selected_race', length: 50, nullable: true })
+  @Column({ name: 'selected_race', type: 'varchar', length: 50, nullable: true })
   selectedRace: string | null;
 
   @Column({ name: 'is_completed', default: false })

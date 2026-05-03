@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { UserCosmetic } from './user-cosmetic.entity';
 
 export type CosmeticCategory = 'skin' | 'frame' | 'title' | 'effect';
 export type CosmeticRarity = 'common' | 'rare' | 'epic' | 'legendary';
@@ -14,7 +16,7 @@ export class CosmeticItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   name: string;
 
   @Column({ type: 'enum', enum: ['skin', 'frame', 'title', 'effect'] })
@@ -26,13 +28,13 @@ export class CosmeticItem {
   @Column({ name: 'price_gems', type: 'int', nullable: true })
   priceGems: number | null;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   icon: string;
 
   @Column({ type: 'text', default: '' })
   description: string;
 
-  @Column({ name: 'preview_image', length: 500, nullable: true })
+  @Column({ name: 'preview_image', type: 'varchar', length: 500, nullable: true })
   previewImage: string | null;
 
   @Column({ name: 'is_active', default: true })
@@ -46,4 +48,7 @@ export class CosmeticItem {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => UserCosmetic, (uc) => uc.cosmeticItem)
+  userCosmetics: UserCosmetic[];
 }

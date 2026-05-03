@@ -5,10 +5,10 @@ export class ShopItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100, unique: true })
   sku: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   name: string;
 
   @Column({ type: 'text', nullable: true })
@@ -22,7 +22,7 @@ export class ShopItem {
   ]})
   category: string;
 
-  @Column({ length: 20, default: 'common' })
+  @Column({ type: 'varchar', length: 20, default: 'common' })
   rarity: string;
 
   @Column({ name: 'price_nebula_coins', type: 'int', nullable: true })
@@ -43,7 +43,7 @@ export class ShopItem {
   @Column({ type: 'jsonb', default: {} })
   content: Record<string, unknown>;
 
-  @Column({ name: 'preview_asset', length: 500, nullable: true })
+  @Column({ name: 'preview_asset', type: 'varchar', length: 500, nullable: true })
   previewAsset: string | null;
 
   @Column({ name: 'is_limited', default: false })

@@ -8,6 +8,15 @@ import { User } from '../user/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthResult extends AuthTokens {
+  user: Omit<User, 'password'>;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -17,7 +26,7 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{ accessToken: string; user: Omit<User, 'password'> }> {
+  async register(dto: RegisterDto): Promise<AuthResult> {
     const existing = await this.userRepo.findOne({
       where: [{ email: dto.email }, { username: dto.username }],
     });
@@ -35,15 +44,15 @@ export class AuthService {
     });
     await this.userRepo.save(user);
 
-    const { password: _, ...safeUser } = user;
-    return {
-      accessToken: this.signToken(user),
-      user: safeUser as Omit<User, 'password'>,
-    };
+    return this.buildAuthResult(user);
   }
 
-  async login(dto: LoginDto): Promise<{ accessToken: string; user: Omit<User, 'password'> }> {
-    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+  async login(dto: LoginDto): Promise<AuthResult> {
+    const isEmail = dto.identifier.includes('@');
+    const where = isEmail
+      ? { email: dto.identifier.toLowerCase() }
+      : { username: dto.identifier };
+    const user = await this.userRepo.findOne({ where });
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -54,18 +63,56 @@ export class AuthService {
     user.lastLoginAt = new Date();
     await this.userRepo.save(user);
 
-    const { password: _, ...safeUser } = user;
-    return {
-      accessToken: this.signToken(user),
-      user: safeUser as Omit<User, 'password'>,
-    };
+    return this.buildAuthResult(user);
   }
 
-  private signToken(user: User): string {
-    return this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      username: user.username,
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    let payload: { sub: string; type?: string };
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.config.get<string>('jwt.refreshSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const user = await this.userRepo.findOne({ where: { id: payload.sub, isActive: true } });
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return this.signTokens(user);
+  }
+
+  async getProfile(userId: string): Promise<Omit<User, 'password'>> {
+    const user = await this.userRepo.findOne({ where: { id: userId, isActive: true } });
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const { password: _, ...safe } = user;
+    return safe as Omit<User, 'password'>;
+  }
+
+  private buildAuthResult(user: User): AuthResult {
+    const tokens = this.signTokens(user);
+    const { password: _, ...safeUser } = user;
+    return { ...tokens, user: safeUser as Omit<User, 'password'> };
+  }
+
+  private signTokens(user: User): AuthTokens {
+    const basePayload = { sub: user.id, email: user.email, username: user.username };
+    const accessToken = this.jwtService.sign(basePayload, {
+      secret: this.config.get<string>('jwt.secret'),
+      expiresIn: this.config.get<string>('jwt.expiresIn'),
     });
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, type: 'refresh' },
+      {
+        secret: this.config.get<string>('jwt.refreshSecret'),
+        expiresIn: this.config.get<string>('jwt.refreshExpiresIn'),
+      },
+    );
+    return { accessToken, refreshToken };
   }
 }

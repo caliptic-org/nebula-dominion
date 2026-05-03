@@ -4,7 +4,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
@@ -19,19 +18,19 @@ export class User {
   @Column({ unique: true })
   username: string;
 
-  @Column()
+  @Column({ name: 'password_hash' })
   @Exclude()
   password: string;
 
-  @Column({ default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

@@ -20,7 +20,7 @@ function BattleContent() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-hidden"
       style={{ background: '#07090f' }}
       data-race={raceDesc?.dataRace ?? 'insan'}
     >
@@ -87,31 +87,17 @@ function BattleContent() {
         </div>
       </header>
 
-      {/* Speed lines decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-px"
-            style={{
-              top: `${15 + i * 14}%`,
-              left: 0,
-              right: 0,
-              background: `linear-gradient(90deg, transparent 0%, ${raceDesc?.color ?? '#4a9eff'}08 50%, transparent 100%)`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Manga speed lines + halftone — active battle overlay */}
+      <div className="speed-lines-battle-active" aria-hidden />
+      <span
+        className="manga-halftone-overlay"
+        style={{ color: raceDesc?.color ?? '#4a9eff' }}
+        aria-hidden
+      />
 
       {/* Phaser Game Canvas */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-2">
-        <div
-          className="w-full rounded-lg overflow-hidden"
-          style={{
-            border: `1px solid ${raceDesc?.color ?? '#4a9eff'}20`,
-            boxShadow: `0 0 40px ${raceDesc?.glowColor ?? 'rgba(74,158,255,0.15)'}`,
-          }}
-        >
+        <div className="w-full ink-border-race overflow-hidden">
           <GameCanvas race={race} mode={mode} userId={userId} tutorial={tutorial} />
         </div>
       </main>
@@ -136,7 +122,7 @@ export default function BattlePage() {
   return (
     <Suspense fallback={
       <div
-        className="min-h-[100dvh] flex items-center justify-center"
+        className="h-dvh flex items-center justify-center"
         style={{ background: '#07090f' }}
       >
         <div className="text-center">

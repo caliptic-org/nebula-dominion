@@ -25,10 +25,10 @@ export function InventoryItemCard({ item, selected, onClick }: InventoryItemCard
       )}
       style={{
         background: selected ? rarity.dimColor : 'rgba(13,17,23,0.88)',
-        border: `1px solid ${selected ? rarity.color : rarity.borderColor}`,
+        border: `2px solid ${selected ? rarity.color : rarity.borderColor}`,
         boxShadow: selected
-          ? `0 0 18px ${rarity.glowColor}, inset 0 0 0 1px ${rarity.color}40`
-          : `0 2px 8px rgba(0,0,0,0.4)`,
+          ? `2px 2px 0 rgba(0,0,0,0.85), 0 0 18px ${rarity.glowColor}, inset 0 0 0 1px ${rarity.color}40`
+          : `2px 2px 0 rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)`,
         backdropFilter: 'blur(8px)',
       }}
       aria-label={item.name}
@@ -49,6 +49,12 @@ export function InventoryItemCard({ item, selected, onClick }: InventoryItemCard
           aria-hidden
         />
       )}
+
+      <span
+        className="manga-halftone-overlay"
+        style={{ color: rarity.color }}
+        aria-hidden
+      />
 
       <span
         className="text-2xl sm:text-3xl leading-none z-10 transition-transform duration-200 group-hover:scale-110"

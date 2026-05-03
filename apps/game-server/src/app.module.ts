@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'path';
 import configuration from './config/configuration';
 import { AuthModule } from './auth/auth.module';
 import { PlayersModule } from './players/players.module';
@@ -36,6 +37,9 @@ import { GuildsModule } from './guilds/guilds.module';
         synchronize: config.get<boolean>('database.synchronize'),
         logging: config.get<boolean>('database.logging'),
         ssl: config.get<boolean>('database.ssl') ? { rejectUnauthorized: false } : false,
+        migrations: [join(__dirname, 'database', 'typeorm-migrations', '*.{ts,js}')],
+        migrationsTableName: 'typeorm_migrations',
+        migrationsRun: config.get<boolean>('database.runMigrations'),
       }),
     }),
     AuthModule,

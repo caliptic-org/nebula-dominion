@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { GlowButton } from '@/components/ui/GlowButton';
+import { setTokens } from '@/lib/session';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -36,10 +36,9 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           username: values.username,
           email: values.email,
@@ -52,7 +51,10 @@ export function RegisterForm() {
         throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
       }
 
-      router.push('/dashboard');
+      const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
+      setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+
+      router.push('/race-select');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -168,64 +170,6 @@ export function RegisterForm() {
           )}
         </button>
       </div>
-
-      <div>
-        <label htmlFor="reg-email" className="form-label">E-posta</label>
-        <input
-          id="reg-email"
-          type="email"
-          name="email"
-          className="form-input"
-          placeholder="komutan@galaksi.com"
-          autoComplete="email"
-          required
-          value={values.email}
-          onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-          disabled={isLoading}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="reg-password" className="form-label">Şifre</label>
-        <input
-          id="reg-password"
-          type="password"
-          name="password"
-          className="form-input"
-          placeholder="En az 8 karakter"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={values.password}
-          onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-          disabled={isLoading}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="confirm-password" className="form-label">Şifre Tekrar</label>
-        <input
-          id="confirm-password"
-          type="password"
-          name="confirmPassword"
-          className="form-input"
-          placeholder="Şifreni tekrar gir"
-          autoComplete="new-password"
-          required
-          value={values.confirmPassword}
-          onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))}
-          disabled={isLoading}
-        />
-      </div>
-
-      <GlowButton
-        type="submit"
-        className="w-full mt-2"
-        loading={isLoading}
-        icon={!isLoading ? <span>→</span> : undefined}
-      >
-        Galaksiye Katıl
-      </GlowButton>
     </form>
   );
 }

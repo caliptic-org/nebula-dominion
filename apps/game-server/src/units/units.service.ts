@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { FindOptionsWhere, LessThanOrEqual, Repository } from 'typeorm';
 import { PlayerUnit } from './entities/player-unit.entity';
 import { TrainingQueue } from './entities/training-queue.entity';
 import {
@@ -125,12 +125,12 @@ export class UnitsService {
   async completeTraining(playerId?: string): Promise<number> {
     const now = new Date();
 
-    const where: Parameters<typeof this.queueRepo.find>[0]['where'] = {
+    const where: FindOptionsWhere<TrainingQueue> = {
       isComplete: false,
       completesAt: LessThanOrEqual(now),
     };
     if (playerId) {
-      (where as Record<string, unknown>).playerId = playerId;
+      where.playerId = playerId;
     }
 
     const overdue = await this.queueRepo.find({ where });

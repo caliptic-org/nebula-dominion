@@ -357,7 +357,7 @@ export default function EventsPage() {
 
   return (
     <div
-      className="min-h-[100dvh]"
+      className="h-dvh overflow-y-auto"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* ── Header ─────────────────────────────────────────────── */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { Race, RACE_DESCRIPTIONS } from '@/types/units';
+import { Race, RACE_DESCRIPTIONS, RaceDescription } from '@/types/units';
 
 interface RaceThemeContext {
   race: Race;
@@ -9,6 +9,7 @@ interface RaceThemeContext {
   raceColor: string;
   raceDim: string;
   raceGlow: string;
+  meta: RaceDescription;
 }
 
 const RaceThemeCtx = createContext<RaceThemeContext>({
@@ -17,6 +18,7 @@ const RaceThemeCtx = createContext<RaceThemeContext>({
   raceColor: '#4a9eff',
   raceDim: 'rgba(74,158,255,0.10)',
   raceGlow: 'rgba(74,158,255,0.30)',
+  meta: RACE_DESCRIPTIONS[Race.INSAN],
 });
 
 export function RaceThemeProvider({ children }: { children: ReactNode }) {
@@ -42,6 +44,7 @@ export function RaceThemeProvider({ children }: { children: ReactNode }) {
       raceColor: desc.color,
       raceDim: desc.bgColor,
       raceGlow: desc.glowColor,
+      meta: desc,
     }}>
       {children}
     </RaceThemeCtx.Provider>

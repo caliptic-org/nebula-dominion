@@ -6,19 +6,19 @@ export class WebhookEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 20 })
+  @Column({ type: 'varchar', length: 20 })
   provider: string;
 
-  @Column({ name: 'event_id', length: 300 })
+  @Column({ name: 'event_id', type: 'varchar', length: 300 })
   eventId: string;
 
-  @Column({ name: 'event_type', length: 100 })
+  @Column({ name: 'event_type', type: 'varchar', length: 100 })
   eventType: string;
 
   @Column({ type: 'jsonb' })
   payload: Record<string, unknown>;
 
-  @Column({ length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   signature: string | null;
 
   @Column({ name: 'is_verified', default: false })
@@ -33,7 +33,7 @@ export class WebhookEvent {
   @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
   processedAt: Date | null;
 
-  @Column({ name: 'transaction_id', nullable: true })
+  @Column({ name: 'transaction_id', type: 'varchar', nullable: true })
   transactionId: string | null;
 
   @CreateDateColumn({ name: 'received_at' })

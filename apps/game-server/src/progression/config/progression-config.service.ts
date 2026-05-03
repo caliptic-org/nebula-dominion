@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager } from 'typeorm';
 import { AGE_XP_THRESHOLDS } from './level-config';
 
 export interface AgeThresholdConfig {
@@ -24,8 +24,9 @@ export class ProgressionConfigService {
   private thresholds: Map<number, AgeThresholdConfig> = new Map();
 
   constructor(
-    @InjectRepository('xp_threshold_config', { optional: true } as any)
-    private readonly rawRepo?: Repository<any>,
+    @Optional()
+    @InjectEntityManager()
+    private readonly entityManager?: EntityManager,
   ) {
     this.loadDefaults();
   }
@@ -61,10 +62,10 @@ export class ProgressionConfigService {
    * Rows missing from DB keep their compiled defaults.
    * Safe to call at runtime — updates are atomic via Map swap.
    */
-  async reloadFromDb(): Promise<void> {
-    if (!this.rawRepo) {
-      this.logger.warn('No xp_threshold_config repository injected; skipping DB reload');
-      return;
+  async reloadFromDb(): Promise<{ success: boolean; reason?: string }> {
+    if (!this.entityManager) {
+      this.logger.warn('No entity manager injected; skipping DB reload');
+      return { success: false, reason: 'No entity manager available' };
     }
 
     try {
@@ -74,7 +75,7 @@ export class ProgressionConfigService {
         xp_end: number;
         f2p_days_from: number;
         f2p_days_to: number;
-      }> = await this.rawRepo.query('SELECT age, xp_start, xp_end, f2p_days_from, f2p_days_to FROM xp_threshold_config WHERE active = true ORDER BY age');
+      }> = await this.entityManager.query('SELECT age, xp_start, xp_end, f2p_days_from, f2p_days_to FROM xp_threshold_config WHERE active = true ORDER BY age');
 
       const updated = new Map<number, AgeThresholdConfig>(this.thresholds);
       for (const row of rows) {
@@ -88,8 +89,10 @@ export class ProgressionConfigService {
       }
       this.thresholds = updated;
       this.logger.log(`Hot-reloaded XP thresholds from DB: ${rows.length} overrides applied`);
+      return { success: true };
     } catch (err) {
       this.logger.error('Failed to reload XP thresholds from DB', err);
+      return { success: false, reason: String(err) };
     }
   }
 }

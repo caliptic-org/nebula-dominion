@@ -15,10 +15,10 @@ export class ChatMessage {
   @Column({ name: 'sender_id' })
   senderId: string;
 
-  @Column({ name: 'channel_type', length: 20 })
+  @Column({ name: 'channel_type', type: 'varchar', length: 20 })
   channelType: string;
 
-  @Column({ name: 'channel_id', length: 100, nullable: true })
+  @Column({ name: 'channel_id', type: 'varchar', length: 100, nullable: true })
   channelId: string | null;
 
   @Column({ type: 'text' })

@@ -53,33 +53,28 @@ export function PowerBar({ current, max, raceColor, raceGlow }: PowerBarProps) {
         </div>
       </div>
 
-      {/* Bar track */}
+      {/* Bar track — HUD telemetry style */}
       <div
-        className="relative h-3 rounded-full overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)' }}
+        className="hud-progress-bar hud-progress-bar--lg hud-progress-bar--scanning"
+        style={
+          {
+            ['--hud-track-bg' as string]: 'rgba(255,255,255,0.04)',
+            ['--hud-track-border' as string]: `${raceColor}33`,
+            ['--hud-tick-color' as string]: `${raceColor}26`,
+            ['--hud-fill-gradient' as string]: `linear-gradient(90deg, ${raceColor}66 0%, ${raceColor} 60%, #ffffff40 100%)`,
+            ['--hud-fill-glow' as string]: raceGlow,
+            ['--hud-edge-glow' as string]: raceColor,
+          } as React.CSSProperties
+        }
         role="progressbar"
         aria-valuenow={current}
         aria-valuemax={max}
         aria-label="Savaş gücü"
       >
-        {/* Fill */}
         <div
-          className="power-bar-fill h-full rounded-full"
-          style={{
-            width: `${pct}%`,
-            background: `linear-gradient(90deg, ${raceColor}88 0%, ${raceColor} 60%, #ffffff40 100%)`,
-            boxShadow: `0 0 8px ${raceGlow}`,
-          }}
+          className="hud-progress-fill"
+          style={{ width: `${pct}%` }}
         />
-
-        {/* Segment ticks */}
-        {[25, 50, 75].map((p) => (
-          <div
-            key={p}
-            className="absolute top-0 bottom-0 w-px"
-            style={{ left: `${p}%`, background: 'rgba(0,0,0,0.4)' }}
-          />
-        ))}
       </div>
 
       {/* Manga-style sub-labels */}

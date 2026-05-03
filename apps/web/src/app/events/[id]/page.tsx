@@ -330,7 +330,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const bg = sanitizeGradient(event.raceGradient, SAFE_BG);
 
   return (
-    <div className="min-h-[100dvh]" style={{ background: 'var(--color-bg)' }}>
+    <div className="h-dvh overflow-y-auto" style={{ background: 'var(--color-bg)' }}>
 
       {/* ── Hero banner ─────────────────────────────────────────── */}
       <div

@@ -19,9 +19,13 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProgressionEvent[]>([]);
   const socketRef = useRef<Socket | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
   const fetchProgress = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`${apiBase}/progression/${userId}`);
       if (res.ok) setProgress(await res.json());
@@ -35,6 +39,7 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
   }, [fetchProgress]);
 
   useEffect(() => {
+    if (!userId) return;
     const socket = io(`${process.env.NEXT_PUBLIC_GAME_SERVER_URL}/game`, {
       auth: { userId },
       transports: ['websocket'],

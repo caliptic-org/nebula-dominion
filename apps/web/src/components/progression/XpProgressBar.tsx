@@ -11,25 +11,32 @@ interface XpProgressBarProps {
   isMaxLevel?: boolean;
 }
 
+const TIER_VARIANT: Record<number, string> = {
+  1: 'hud-progress-bar--brand',
+  2: 'hud-progress-bar--energy',
+  3: 'hud-progress-bar--xp',
+};
+
 export function XpProgressBar({ currentXp, xpToNext, progressPercent, tier, isMaxLevel }: XpProgressBarProps) {
-  const fillClass = clsx({
-    'xp-bar-fill': true,
-    'tier-2': tier === 2,
-    'tier-3': tier === 3,
-    maxed: isMaxLevel,
-  });
+  const variantClass = isMaxLevel
+    ? 'hud-progress-bar--xp'
+    : TIER_VARIANT[tier] ?? 'hud-progress-bar--brand';
 
   return (
     <div className="xp-bar-container">
-      <div className="xp-bar-track">
+      <div
+        className={clsx('hud-progress-bar', 'hud-progress-bar--md', variantClass, {
+          'hud-progress-bar--scanning': !isMaxLevel,
+        })}
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="XP İlerlemesi"
+      >
         <div
-          className={fillClass}
+          className="hud-progress-fill"
           style={{ width: `${isMaxLevel ? 100 : progressPercent}%` }}
-          role="progressbar"
-          aria-valuenow={progressPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="XP İlerlemesi"
         />
       </div>
       <div className="xp-bar-labels">

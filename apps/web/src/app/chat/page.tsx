@@ -515,7 +515,7 @@ export default function ChatPage() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-hidden"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* Nebula bg */}
@@ -734,7 +734,7 @@ export default function ChatPage() {
           <div
             className="absolute left-3 right-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer"
             style={{
-              bottom: activeTab === 'dm' && !activeDM ? 8 : 72,
+              bottom: 72,
               background: `${raceColor}18`,
               border: `1px solid ${raceColor}40`,
               backdropFilter: 'blur(12px)',

@@ -34,7 +34,7 @@ export default function CommandersPage() {
   const totalUnlocked = COMMANDERS.filter((c) => c.isUnlocked).length;
 
   return (
-    <div className="commanders-screen min-h-[100dvh] flex flex-col text-text-primary">
+    <div className="commanders-screen h-dvh flex flex-col text-text-primary overflow-hidden">
       <div className="commanders-bg" aria-hidden />
       <div className="commanders-halftone" aria-hidden />
 
@@ -49,7 +49,7 @@ export default function CommandersPage() {
         </Link>
         <div className="h-4 w-px bg-border" />
         <div className="flex items-baseline gap-2">
-          <h1 className="font-display text-base font-black tracking-wide uppercase">
+          <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
             Komutanlar
           </h1>
           <span className="text-[11px] text-text-muted">
@@ -199,7 +199,8 @@ function CommanderCard({
       aria-pressed={selected}
       className={[
         'commander-card group relative text-left rounded-xl overflow-hidden border transition-all duration-200 focus:outline-none focus-visible:ring-2',
-        selected ? 'is-selected' : 'hover:-translate-y-0.5',
+        'speed-lines-hover',
+        selected ? 'is-selected ink-border-race' : 'hover:-translate-y-0.5',
       ].join(' ')}
       style={
         {
@@ -520,28 +521,42 @@ function DetailPanel({
           </ul>
         </section>
 
-        {/* CTA */}
-        <button
-          type="button"
-          disabled={locked}
-          className="w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm transition-all"
-          style={{
-            background: locked
-              ? 'rgba(255,200,50,0.18)'
-              : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 60%, #000) 100%)`,
-            color: locked ? 'var(--color-energy)' : '#07090f',
-            border: locked
-              ? '1px solid rgba(255,200,50,0.4)'
-              : `1px solid ${theme.color}`,
-            boxShadow: locked
-              ? '0 0 16px rgba(255,200,50,0.25)'
-              : `0 0 24px ${theme.glowColor}`,
-            cursor: locked ? 'not-allowed' : 'pointer',
-            opacity: locked ? 0.9 : 1,
-          }}
-        >
-          {locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}
-        </button>
+        {/* CTAs */}
+        <div className="flex flex-col gap-2">
+          <Link
+            href={`/commanders/${commander.id}`}
+            className="block w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm text-center transition-all"
+            style={{
+              background: `${theme.bgTint}`,
+              color: theme.color,
+              border: `1px solid ${theme.color}55`,
+              boxShadow: `0 0 14px ${theme.color}20`,
+            }}
+          >
+            ◈  Detay Sayfası
+          </Link>
+          <button
+            type="button"
+            disabled={locked}
+            className="w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm transition-all"
+            style={{
+              background: locked
+                ? 'rgba(255,200,50,0.18)'
+                : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 60%, #000) 100%)`,
+              color: locked ? 'var(--color-energy)' : '#07090f',
+              border: locked
+                ? '1px solid rgba(255,200,50,0.4)'
+                : `1px solid ${theme.color}`,
+              boxShadow: locked
+                ? '0 0 16px rgba(255,200,50,0.25)'
+                : `0 0 24px ${theme.glowColor}`,
+              cursor: locked ? 'not-allowed' : 'pointer',
+              opacity: locked ? 0.9 : 1,
+            }}
+          >
+            {locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}
+          </button>
+        </div>
       </div>
     </div>
   );

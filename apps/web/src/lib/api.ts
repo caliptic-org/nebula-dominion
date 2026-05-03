@@ -1,4 +1,8 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
+import { getAccessToken } from './session'
+
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+const NORMALIZED = RAW_API_URL.replace(/\/+$/, '')
+const BASE_URL = /\/api\/v1$/.test(NORMALIZED) ? NORMALIZED : `${NORMALIZED}/api/v1`
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
@@ -20,12 +24,14 @@ export class FetchError extends Error {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, ...rest } = options
+  const token = getAccessToken()
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...rest,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...rest.headers,
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),

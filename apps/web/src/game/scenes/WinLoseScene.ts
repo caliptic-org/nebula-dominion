@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { BattleRewards } from '../socket/GameSocket';
-import { THEME } from '../theme';
+import { BattleRewards, GameRoom } from '../socket/GameSocket';
+import { THEME, getRaceVisual } from '../theme';
 
 interface WinLoseData {
   winner: string;
@@ -42,8 +42,8 @@ export class WinLoseScene extends Phaser.Scene {
     const winnerRace = this.winLoseData.winnerRace
       ?? this.winLoseData.room?.players?.[this.winLoseData.winner]?.race;
     const winnerVisual = getRaceVisual(winnerRace);
-    const accentHex = isWinner ? winnerVisual.hex : THEME.DANGER;
-    const accentStr = isWinner ? winnerVisual.str : THEME.DANGER_STR;
+    const accentHex = isWinner ? winnerVisual.color : THEME.DANGER;
+    const accentStr = isWinner ? winnerVisual.colorStr : THEME.DANGER_STR;
 
     // Dim overlay
     const overlay = this.add.graphics();
@@ -83,9 +83,10 @@ export class WinLoseScene extends Phaser.Scene {
     });
 
     if (isWinner) {
-      this.addVictoryParticles(width / 2, py + 64, accentHex);
+      this.addVictoryParticles(width / 2, py + 64);
       // Subtitle: race name
-      this.add.text(width / 2, py + 100, `${winnerVisual.icon}  ${winnerVisual.label}  ${winnerVisual.icon}`, {
+      const raceLabel = (winnerRace ?? '').toString().toUpperCase();
+      this.add.text(width / 2, py + 100, `★  ${raceLabel}  ★`, {
         fontSize: '13px', fontStyle: 'bold', color: accentStr,
         stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5, 0);
@@ -106,14 +107,14 @@ export class WinLoseScene extends Phaser.Scene {
       surrender: 'Rakip teslim oldu',
       timeout: 'Sure doldu',
     };
-    this.add.text(width / 2, py + 90, reasonLabel[this.data.endReason] ?? '', {
+    this.add.text(width / 2, py + 90, reasonLabel[this.winLoseData.endReason] ?? '', {
       fontSize: '14px', color: THEME.TEXT_SECONDARY,
     }).setOrigin(0.5, 0);
 
     // ELO change
     const eloDeltaStr = eloDelta >= 0 ? `+${eloDelta}` : `${eloDelta}`;
     const eloColor = eloDelta >= 0 ? THEME.SUCCESS_STR : THEME.DANGER_STR;
-    this.add.text(width / 2, py + 120, `ELO: ${this.data.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
+    this.add.text(width / 2, py + 120, `ELO: ${this.winLoseData.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
       fontSize: '16px', fontStyle: 'bold', color: eloColor,
     }).setOrigin(0.5, 0);
 
@@ -184,23 +185,56 @@ export class WinLoseScene extends Phaser.Scene {
     // Buttons
     const btnY = py + panelH - 56;
 
+    const goHome = () => { window.location.href = '/'; };
+
     const playAgainBtn = this.add.text(width / 2 - 80, btnY, 'PLAY AGAIN', {
       fontSize: '14px', fontStyle: 'bold', color: THEME.SUCCESS_STR,
       backgroundColor: '#0d3d1e', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
-    playAgainBtn.on('pointerdown', () => window.location.reload());
-    playAgainBtn.on('pointerover', () => playAgainBtn.setStyle({ color: THEME.ACCENT_STR }));
+    playAgainBtn.on('pointerdown', () => { cancelAutoRedirect(); window.location.reload(); });
+    playAgainBtn.on('pointerover', () => { cancelAutoRedirect(); playAgainBtn.setStyle({ color: THEME.ACCENT_STR }); });
     playAgainBtn.on('pointerout', () => playAgainBtn.setStyle({ color: THEME.SUCCESS_STR }));
 
-    const menuBtn = this.add.text(width / 2 + 80, btnY, 'MAIN MENU', {
+    const menuBtn = this.add.text(width / 2 + 80, btnY, 'ANA USSE DON', {
       fontSize: '14px', fontStyle: 'bold', color: THEME.BRAND_STR,
       backgroundColor: '#1a1a30', padding: { x: 16, y: 10 },
     }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
 
-    menuBtn.on('pointerdown', () => { window.location.href = '/'; });
+    menuBtn.on('pointerdown', () => { cancelAutoRedirect(); goHome(); });
     menuBtn.on('pointerover', () => menuBtn.setStyle({ color: THEME.TEXT_PRIMARY }));
     menuBtn.on('pointerout', () => menuBtn.setStyle({ color: THEME.BRAND_STR }));
+
+    // Auto-redirect to Ana Us after 3s, cancelled by any button interaction.
+    const AUTO_REDIRECT_SECONDS = 3;
+    let remaining = AUTO_REDIRECT_SECONDS;
+    const countdownText = this.add.text(width / 2, btnY + 44, `Ana Usse donus: ${remaining}s`, {
+      fontSize: '11px', color: THEME.TEXT_MUTED,
+    }).setOrigin(0.5, 0);
+
+    const redirectTimer = this.time.addEvent({
+      delay: 1000,
+      repeat: AUTO_REDIRECT_SECONDS - 1,
+      callback: () => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          countdownText.destroy();
+          goHome();
+        } else {
+          countdownText.setText(`Ana Usse donus: ${remaining}s`);
+        }
+      },
+    });
+
+    let cancelled = false;
+    const cancelAutoRedirect = () => {
+      if (cancelled) return;
+      cancelled = true;
+      redirectTimer.remove(false);
+      countdownText.destroy();
+    };
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cancelAutoRedirect);
   }
 
   /** "First Victory" is a one-shot celebration to make the first win feel huge. */
@@ -346,6 +380,23 @@ export class WinLoseScene extends Phaser.Scene {
         onComplete: () => dot.destroy(),
       });
     }
+  }
+
+  private drawRadialSpeedLines(cx: number, cy: number, color: number) {
+    const g = this.add.graphics();
+    const lines = 24;
+    for (let i = 0; i < lines; i++) {
+      const angle = (i / lines) * Math.PI * 2;
+      const r1 = 60;
+      const r2 = 480;
+      g.lineStyle(2, color, 0.18);
+      g.beginPath();
+      g.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+      g.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+      g.strokePath();
+    }
+    g.setAlpha(0);
+    this.tweens.add({ targets: g, alpha: 1, duration: 400, delay: 200 });
   }
 
   private addVictoryParticles(cx: number, cy: number) {

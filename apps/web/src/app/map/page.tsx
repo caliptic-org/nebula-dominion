@@ -17,13 +17,13 @@ import type {
 } from '@/components/game/WorldMap';
 import clsx from 'clsx';
 
-// Canvas cannot SSR — cast preserves forwardRef generic so `ref` prop typechecks
+// WebGL canvas cannot SSR — cast preserves forwardRef generic so `ref` prop typechecks
 const WorldMap = dynamic(
-  () => import('@/components/game/WorldMap'),
+  () => import('@/components/game/SphericalMap'),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center" style={{ background:'#080a10' }}>
+      <div className="w-full h-full flex items-center justify-center" style={{ background:'#04060c' }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor:'var(--color-race)', borderTopColor:'transparent' }} />
           <span className="font-display text-[10px] uppercase tracking-[0.2em] text-text-muted">Galaksi Yükleniyor…</span>
@@ -401,7 +401,7 @@ export default function WorldMapPage() {
   const toastColor  = feedback?.tone === 'error' ? '#ff8a8a' : raceColor;
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ background:'#080a10' }}>
+    <div className="fixed inset-0 overflow-hidden" style={{ background:'#04060c' }}>
 
       {/* ── Full-screen world map ──────────────────────────────────────────── */}
       <div className="absolute inset-0">
@@ -459,8 +459,8 @@ export default function WorldMapPage() {
             </svg>
           </a>
           <div className="hidden xs:block">
-            <div className="font-display text-[10px] font-black tracking-[0.18em] uppercase" style={{ color:raceColor, textShadow:`0 0 12px ${raceGlow}` }}>◆ NEBULA</div>
-            <div className="font-display text-[8px] tracking-widest text-text-muted uppercase leading-none">Galaksi Haritası</div>
+            <div className="manga-title" style={{ fontSize: '0.7rem', letterSpacing: '0.18em' }}>◆ NEBULA</div>
+            <div className="manga-label leading-none">Galaksi Haritası</div>
           </div>
         </div>
 
@@ -485,18 +485,18 @@ export default function WorldMapPage() {
       {/* ── Territory legend (bottom-left) ───────────────────────────────── */}
       <div className="absolute bottom-20 left-3 z-30 flex flex-col gap-1.5 pointer-events-none">
         {LEGEND.map(l=>(
-          <div key={l.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:`${l.color}12`, border:`1px solid ${l.color}35` }}>
+          <div key={l.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:`${l.color}12`, borderColor: `${l.color}55` }}>
             <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:l.color, boxShadow:`0 0 5px ${l.color}` }} />
-            <span className="font-display text-[9px] uppercase tracking-widest" style={{ color:l.color }}>{l.label}</span>
+            <span className="manga-label" style={{ color:l.color, opacity: 1 }}>{l.label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:'rgba(255,50,50,0.10)', border:'1px solid rgba(255,50,50,0.30)' }}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:'rgba(255,50,50,0.10)', borderColor:'rgba(255,50,50,0.55)' }}>
           <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:'#ff3333', boxShadow:'0 0 5px #ff3333' }} />
-          <span className="font-display text-[9px] uppercase tracking-widest text-red-400">Düşman</span>
+          <span className="manga-label" style={{ color: '#ff8a8a', opacity: 1 }}>Düşman</span>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:'rgba(255,200,50,0.10)', border:'1px solid rgba(255,200,50,0.30)' }}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:'rgba(255,200,50,0.10)', borderColor:'rgba(255,200,50,0.55)' }}>
           <div className="w-1.5 h-1.5 rounded-full" style={{ background:'#ffc832', boxShadow:'0 0 4px #ffc832' }} />
-          <span className="font-display text-[9px] uppercase tracking-widest text-yellow-400">Kaynak</span>
+          <span className="manga-label" style={{ color: '#ffc832', opacity: 1 }}>Kaynak</span>
         </div>
       </div>
 
@@ -531,13 +531,14 @@ export default function WorldMapPage() {
       <nav
         className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-around px-2 py-3"
         style={{ background:'rgba(8,10,16,0.96)', borderTop:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(24px)' }}
+        aria-label="Ana navigasyon"
       >
         {([
           { href:'/',           icon:'🏰', label:'Ana Üs'    },
           { href:'/map',        icon:'🌌', label:'Harita', active:true },
           { href:'/battle',     icon:'⚔️', label:'Savaş'     },
           { href:'/commanders', icon:'🤝', label:'Komutanlar' },
-          { href:'/dashboard',  icon:'💎', label:'Mağaza'    },
+          { href:'/shop',       icon:'💎', label:'Mağaza'    },
         ] as const).map(tab=>(
           <a
             key={tab.href}

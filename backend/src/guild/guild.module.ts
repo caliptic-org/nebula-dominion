@@ -12,7 +12,11 @@ import { ContributionDaily } from './entities/contribution-daily.entity';
 import { ProfanityWord } from './entities/profanity-word.entity';
 import { ResourceConfig } from '../resources/entities/resource-config.entity';
 import { PlayerResource } from '../resources/entities/player-resource.entity';
+import { PlayerProgression } from '../progression/entities/player-progression.entity';
+import { PlayerPower } from '../stats/entities/player-power.entity';
 import { GuildMembershipService } from './guild-membership.service';
+import { GuildSuggestionService } from './guild-suggestion.service';
+import { GuildSuggestionController } from './guild-suggestion.controller';
 import { ProfanityService } from './profanity.service';
 import { ContributionService } from './contribution.service';
 import { GuildChatService } from './guild-chat.service';
@@ -40,12 +44,15 @@ import { AnalyticsModule } from '../analytics/analytics.module';
       ProfanityWord,
       ResourceConfig,
       PlayerResource,
+      PlayerProgression,
+      PlayerPower,
     ]),
     ResourcesModule,
     AnalyticsModule,
   ],
   providers: [
     GuildMembershipService,
+    GuildSuggestionService,
     ProfanityService,
     ContributionService,
     GuildChatService,
@@ -53,7 +60,18 @@ import { AnalyticsModule } from '../analytics/analytics.module';
     GuildModerationService,
     GuildDonateService,
   ],
-  controllers: [GuildChatController, GuildModerationController, GuildDonateController],
-  exports: [GuildMembershipService, GuildChatService, GuildDonateService, ContributionService],
+  controllers: [
+    GuildChatController,
+    GuildModerationController,
+    GuildDonateController,
+    GuildSuggestionController,
+  ],
+  exports: [
+    GuildMembershipService,
+    GuildSuggestionService,
+    GuildChatService,
+    GuildDonateService,
+    ContributionService,
+  ],
 })
 export class GuildModule {}

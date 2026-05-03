@@ -31,6 +31,9 @@ export class Guild {
   @Column({ name: 'member_count', type: 'int', default: 1 })
   memberCount: number;
 
+  @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
+  archivedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

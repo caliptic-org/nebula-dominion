@@ -116,16 +116,16 @@ export default function GuildHubPage() {
   const callout = inGuild ? stepCallouts[state.step] : undefined;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
+    <div className="h-dvh flex flex-col overflow-y-auto" style={{ background: 'var(--color-bg)' }}>
       <header
-        className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border"
+        className="panel-accent-bar sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border"
         style={{ background: 'rgba(7,11,22,0.85)', backdropFilter: 'blur(12px)' }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pl-2">
           <Link href="/dashboard" className="btn-ghost text-xs px-3 py-1.5" aria-label="Dashboard">
             ← Komuta
           </Link>
-          <h1 className="font-display text-base sm:text-lg font-bold tracking-widest uppercase text-gradient-race">
+          <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
             Lonca Merkezi
           </h1>
         </div>
@@ -200,12 +200,13 @@ export default function GuildHubPage() {
           <>
             <GuildDashboard guildId={activeGuildId} />
 
-            <GuildView me={me} />
+            <div className="panel-divider-bold" aria-hidden />
+
+            <GuildView guildId={activeGuildId} me={me} />
 
             {callout && state.step !== 'completed' && (
               <div
-                className="glass-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                style={{ borderColor: 'var(--color-race)', boxShadow: '0 0 24px var(--color-race-glow)' }}
+                className="glass-card ink-border-race p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 role="status"
               >
                 <div>

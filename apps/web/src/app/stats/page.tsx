@@ -295,7 +295,7 @@ export default function StatsPage() {
 
   return (
     <div
-      className="min-h-[100dvh] relative"
+      className="h-dvh relative overflow-y-auto"
       style={{ background: 'var(--color-bg, #080a10)' }}
     >
       {/* Background nebula */}

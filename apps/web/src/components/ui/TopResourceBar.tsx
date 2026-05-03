@@ -57,7 +57,31 @@ function ResourceCell({
       title={label}
       aria-label={`${label}: ${value.toLocaleString('tr-TR')}`}
     >
-      <ResourceIcon type={type} size={18} />
+      <span
+        className="relative inline-flex items-center justify-center"
+        style={{ width: 22, height: 22 }}
+        aria-hidden
+      >
+        <span
+          className="hud-ring"
+          style={
+            {
+              ['--hud-ring-color' as string]: `${color}66`,
+              ['--hud-ring-shadow-outer' as string]: `${color}22`,
+              ['--hud-ring-shadow-inner' as string]: `${color}1A`,
+            } as React.CSSProperties
+          }
+        />
+        <span
+          className="hud-ring hud-ring-dashed hud-ring-inset"
+          style={
+            {
+              ['--hud-ring-color' as string]: `${color}40`,
+            } as React.CSSProperties
+          }
+        />
+        <ResourceIcon type={type} size={18} />
+      </span>
       <span
         style={{
           fontFamily: 'var(--font-display)',

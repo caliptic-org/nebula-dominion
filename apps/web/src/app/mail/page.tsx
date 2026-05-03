@@ -9,7 +9,8 @@ export default function MailPage() {
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--color-bg)',
@@ -23,7 +24,7 @@ export default function MailPage() {
           maxWidth: 900,
           width: '100%',
           margin: '0 auto',
-          height: '100dvh',
+          minHeight: 0,
         }}
       >
         <MailScreen />

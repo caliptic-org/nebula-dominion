@@ -3,9 +3,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { useSession } from '@/hooks/useSession';
+import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { STRUCTURE_ASSETS } from '@/lib/assets';
 import { BottomNav } from '@/components/ui/BottomNav';
@@ -27,11 +30,6 @@ const IsometricTilemap = dynamic(
   )}
 );
 
-// TODO(auth): replace DEMO_USER_ID with the authenticated session's userId.
-// The /battle route should also resolve the user from session/cookie rather
-// than receiving it via query string (avoids leaking IDs to logs / referrers).
-const DEMO_USER_ID = 'demo-player-001';
-
 const STRUCTURES_ON_MAP = [
   { col: 3, row: 2, structureKey: 'kovan_kalbi' as keyof typeof STRUCTURE_ASSETS },
   { col: 7, row: 4, structureKey: 'yutucu_yildiz_akademisi' as keyof typeof STRUCTURE_ASSETS },
@@ -46,9 +44,10 @@ const RESOURCES = [
   { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
 ];
 
-type Tab = 'base' | 'map' | 'battle' | 'commanders' | 'shop';
+type Tab = 'base' | 'commanders';
+type NavTabId = Tab | 'map' | 'battle' | 'shop';
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
+const TABS: { id: NavTabId; icon: string; label: string }[] = [
   { id: 'base', icon: '🏰', label: 'Ana Üs' },
   { id: 'map', icon: '🌌', label: 'Harita' },
   { id: 'battle', icon: '⚔️', label: 'Savaş' },
@@ -57,6 +56,7 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
 ];
 
 export default function HomePage() {
+  const router = useRouter();
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();
   const [activeTab, setActiveTab] = useState<Tab>('base');
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
@@ -65,8 +65,19 @@ export default function HomePage() {
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [portraitImgError, setPortraitImgError] = useState(false);
 
+  const { userId, loading: sessionLoading } = useSession();
+  const { committed: committedRace } = useRaceCommitment();
+
+  // Auth flow: signed-in users without a race land on race-select before the base.
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (userId && committedRace === null) {
+      router.replace('/race-select');
+    }
+  }, [sessionLoading, userId, committedRace, router]);
+
   const { progress, loading } = useProgression({
-    userId: DEMO_USER_ID,
+    userId: userId ?? '',
     onLevelUp: (payload) => {
       setPendingLevelUp(payload);
       if (payload.newUnlocks.length) setPendingUnlocks(payload.newUnlocks);
@@ -87,6 +98,10 @@ export default function HomePage() {
   const raceDesc = RACE_DESCRIPTIONS[race];
   const primaryCommander = raceDesc.commanders[0];
   const tutorialBattleHref = `/battle?race=${race}&mode=pve&tutorial=1`;
+  const battleHref =
+    onboardingHydrated && !shouldShowNextSessionHook
+      ? tutorialBattleHref
+      : `/battle?race=${race}&mode=pve`;
 
   return (
     <>
@@ -105,7 +120,7 @@ export default function HomePage() {
       )}
 
       <div
-        className="min-h-[100dvh] flex flex-col relative"
+        className="h-dvh flex flex-col relative overflow-hidden"
         style={{ background: 'var(--color-bg)' }}
       >
         {/* Nebula background */}
@@ -383,60 +398,6 @@ export default function HomePage() {
               </div>
             </div>
 
-          {/* ── Map Tab ───────────────────────────────────────── */}
-          <div className={clsx('p-4', activeTab === 'map' ? 'block' : 'hidden')} aria-hidden={activeTab !== 'map'}>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="badge badge-race">Galaksi Haritası</span>
-                <h2 className="font-display text-lg font-black text-text-primary">
-                  Nebula <span style={{ color: raceColor }}>Sektörü</span>
-                </h2>
-              </div>
-              <MangaPanel className="overflow-hidden rounded-lg">
-                <IsometricTilemap
-                  race={race}
-                  structures={STRUCTURES_ON_MAP}
-                  onTileSelect={(col, row) => setSelectedTile({ col, row })}
-                />
-              </MangaPanel>
-            </div>
-
-          {/* ── Battle Tab ────────────────────────────────────── */}
-          {activeTab === 'battle' && (
-            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="text-center max-w-sm mx-auto">
-                <div
-                  className="text-6xl mb-6 animate-float inline-block"
-                  style={{ filter: `drop-shadow(0 0 20px ${raceGlow})` }}
-                >
-                  ⚔️
-                </div>
-                <div className="mb-3">
-                  <span className="badge badge-race">Savaş Modu</span>
-                </div>
-                <h2 className="font-display text-2xl font-black text-text-primary mb-3">
-                  Savaşa <span style={{ color: raceColor }}>Hazır mısın?</span>
-                </h2>
-                <p className="text-text-muted text-sm mb-8">
-                  Phaser.js ile güçlendirilmiş gerçek zamanlı savaş sahneleri yakında.
-                </p>
-                <a
-                  href={
-                    onboardingHydrated && !shouldShowNextSessionHook
-                      ? tutorialBattleHref
-                      : `/battle?race=${race}&mode=pve`
-                  }
-                  className="btn-primary inline-flex items-center gap-2"
-                  style={{ background: raceColor }}
-                >
-                  <span>
-                    {onboardingHydrated && !shouldShowNextSessionHook ? 'Eğitim Savaşı' : 'Savaşa Gir'}
-                  </span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/20 text-xs">→</span>
-                </a>
-              </div>
-            </div>
-          )}
-
           {/* ── Commanders Tab ────────────────────────────────── */}
           {activeTab === 'commanders' && (
             <div className="p-4">
@@ -479,15 +440,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ── Shop Tab ──────────────────────────────────────── */}
-          {activeTab === 'shop' && (
-            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <div className="text-6xl mb-4 animate-float">💎</div>
-              <div className="mb-3"><span className="badge badge-race">Premium Mağaza</span></div>
-              <h2 className="font-display text-2xl font-black text-text-primary mb-2">Yakında</h2>
-              <p className="text-text-muted text-sm">Kozmetik item&apos;lar ve premium içerikler geliyor.</p>
-            </div>
-          )}
         </main>
 
         {/* ── Bottom Navigation ─────────────────────────────── */}
@@ -500,11 +452,23 @@ export default function HomePage() {
           }}
         >
           {TABS.map((tab) => {
-            const active = activeTab === tab.id;
+            const active =
+              (tab.id === 'base' || tab.id === 'commanders') && activeTab === tab.id;
+            const handleClick = () => {
+              if (tab.id === 'map') {
+                router.push('/map');
+              } else if (tab.id === 'battle') {
+                router.push(battleHref);
+              } else if (tab.id === 'shop') {
+                router.push('/shop');
+              } else {
+                setActiveTab(tab.id);
+              }
+            };
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={handleClick}
                 className={clsx(
                   'bottom-nav-item transition-all duration-300',
                   active && 'active',

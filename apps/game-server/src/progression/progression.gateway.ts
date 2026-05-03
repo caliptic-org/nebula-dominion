@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { AgeTransitionEvent, LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
+import { AgeTransitionEvent, EraTransitionEvent, LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
 
 @WebSocketGateway({ namespace: '/game' })
 export class ProgressionGateway {

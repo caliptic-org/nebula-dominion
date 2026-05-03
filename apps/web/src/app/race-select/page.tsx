@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { RACES, RACE_BY_ID, RaceId, RaceConfig } from './races';
+import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
+import { Race } from '@/types/units';
 
 const STAT_LABELS: Array<{ key: keyof RaceConfig['stats']; label: string }> = [
   { key: 'attack', label: 'Saldırı' },
@@ -42,9 +44,15 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 
 export default function RaceSelectPage() {
   const router = useRouter();
+  const { commit } = useRaceCommitment();
   const [selectedId, setSelectedId] = useState<RaceId>('insan');
   const [hoveredId, setHoveredId] = useState<RaceId | null>(null);
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
+
+  const handleStart = () => {
+    commit(selected.id as Race);
+    router.push(`/?race=${selected.id}`);
+  };
 
   const activeId = hoveredId ?? selectedId;
   const active = RACE_BY_ID[activeId];
@@ -62,7 +70,7 @@ export default function RaceSelectPage() {
 
   return (
     <div
-      className="min-h-[100dvh] relative overflow-hidden flex flex-col text-text-primary"
+      className="h-dvh relative overflow-hidden flex flex-col text-text-primary"
       style={{ background: 'var(--color-bg, #07090f)' }}
     >
       {/* Race-themed atmosphere */}
@@ -75,13 +83,11 @@ export default function RaceSelectPage() {
         aria-hidden
       />
 
-      {/* Halftone dot texture */}
+      {/* Race-tinted manga halftone texture */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-[0.18]"
+        className="manga-halftone-race fixed inset-0 pointer-events-none transition-all duration-700"
         style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1.5px)',
-          backgroundSize: '14px 14px',
+          opacity: 0.18,
           maskImage:
             'radial-gradient(ellipse 90% 80% at 50% 50%, black 30%, transparent 80%)',
           WebkitMaskImage:
@@ -183,7 +189,7 @@ export default function RaceSelectPage() {
                 onFocus={() => setHoveredId(race.id)}
                 onBlur={() => setHoveredId(null)}
                 aria-pressed={isSelected}
-                className="relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
+                className="speed-lines-hover relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
                 style={{
                   background: isSelected
                     ? race.bg
@@ -294,14 +300,12 @@ export default function RaceSelectPage() {
 
           {/* Race name plate at bottom */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center pointer-events-none">
-            <div
-              className="text-[10px] uppercase tracking-[0.4em] text-text-muted mb-0.5 transition-colors duration-500"
-            >
+            <div className="manga-label mb-0.5 transition-colors duration-500" style={{ letterSpacing: '0.4em', opacity: 0.8 }}>
               {active.subtitle}
             </div>
             <div
-              className="text-xl md:text-2xl font-black tracking-widest transition-colors duration-500"
-              style={{ color: active.color, textShadow: `0 0 18px ${active.glow}` }}
+              className="manga-title transition-colors duration-500"
+              style={{ fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)', color: active.color, textShadow: `0 0 18px ${active.glow}` }}
             >
               {active.name.toUpperCase()}
             </div>
@@ -426,7 +430,7 @@ export default function RaceSelectPage() {
           {/* CTA */}
           <div className="mt-auto pt-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <button
-              onClick={() => router.push(`/?race=${selected.id}`)}
+              onClick={handleStart}
               className="w-full py-3 px-4 rounded-xl font-extrabold text-sm tracking-wider uppercase transition-all duration-200 hover:brightness-110 active:scale-[0.99] outline-none focus-visible:ring-2"
               style={{
                 background: `linear-gradient(135deg, ${selected.color}cc 0%, ${selected.color} 100%)`,

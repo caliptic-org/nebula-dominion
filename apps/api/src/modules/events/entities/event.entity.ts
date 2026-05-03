@@ -28,10 +28,10 @@ export class Event {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   title: string;
 
-  @Column({ length: 300, nullable: true })
+  @Column({ type: 'varchar', length: 300, nullable: true })
   subtitle: string;
 
   @Column({ type: 'enum', enum: EventType })
@@ -40,13 +40,13 @@ export class Event {
   @Column({ type: 'enum', enum: EventStatus, default: EventStatus.UPCOMING })
   status: EventStatus;
 
-  @Column({ name: 'race_color', length: 20, default: '#ffffff' })
+  @Column({ name: 'race_color', type: 'varchar', length: 20, default: '#ffffff' })
   raceColor: string;
 
   @Column({ name: 'race_gradient', type: 'text', default: 'linear-gradient(135deg, #0a0a12 0%, #07090f 100%)' })
   raceGradient: string;
 
-  @Column({ name: 'race_label', length: 50, default: '' })
+  @Column({ name: 'race_label', type: 'varchar', length: 50, default: '' })
   raceLabel: string;
 
   @Column({ type: 'text', nullable: true })
@@ -61,7 +61,7 @@ export class Event {
   @Column({ name: 'max_participants', nullable: true, type: 'int' })
   maxParticipants: number;
 
-  @Column({ name: 'top_prize', length: 200, default: '' })
+  @Column({ name: 'top_prize', type: 'varchar', length: 200, default: '' })
   topPrize: string;
 
   @Column({ default: false })

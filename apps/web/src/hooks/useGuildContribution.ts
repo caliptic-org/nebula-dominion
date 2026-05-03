@@ -4,20 +4,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { getGuildClient } from '@/lib/guild-client'
 import type { ContributionEntry, MyContributionSummary } from '@/types/guild'
 
+interface UseGuildContributionOptions {
+  guildId: string | null
+  me: { id: string }
+}
+
 export interface UseGuildContribution {
   leaderboard: ContributionEntry[]
   summary: MyContributionSummary | null
   loading: boolean
 }
 
-export function useGuildContribution(): UseGuildContribution {
-  const client = useMemo(() => getGuildClient(), [])
+export function useGuildContribution({ guildId, me }: UseGuildContributionOptions): UseGuildContribution {
+  const client = useMemo(
+    () => (guildId ? getGuildClient({ guildId, userId: me.id }) : getGuildClient()),
+    [guildId, me.id],
+  )
   const [leaderboard, setLeaderboard] = useState<ContributionEntry[]>([])
   const [summary, setSummary] = useState<MyContributionSummary | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     Promise.all([client.getContributionLeaderboard(), client.getMyContributionSummary()]).then(([l, s]) => {
       if (cancelled) return
       setLeaderboard(l)

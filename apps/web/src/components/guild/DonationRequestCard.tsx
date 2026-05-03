@@ -28,6 +28,7 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
   const limitExhausted = donatesRemaining <= 0
   const fullyFulfilled = remaining === 0
   const disabled = isOwn || cooldownActive || limitExhausted || fullyFulfilled || busy
+  const ttlUrgent = new Date(request.expiresAt).getTime() - Date.now() < 3600_000
 
   const reasonLabel = (() => {
     if (isOwn) return 'Kendi talebine bağış yapamazsın'
@@ -85,7 +86,13 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
             {resourceLabel(request.resource)} talep ediyor
           </p>
         </div>
-        <span className="text-[10px] font-mono text-text-muted shrink-0" aria-label="Talep süresi">
+        <span
+          className={clsx(
+            'text-[10px] font-mono shrink-0',
+            ttlUrgent ? 'text-status-danger font-bold animate-pulse-slow' : 'text-text-muted',
+          )}
+          aria-label="Talep süresi"
+        >
           ⏱ {formatCountdown(request.expiresAt)}
         </span>
       </header>
@@ -140,7 +147,7 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
             {fullyFulfilled ? 'Karşılandı' : 'Yardım Gönder'}
           </button>
           {reasonLabel && (
-            <p id={`req-${request.id}-reason`} className="text-[11px] text-text-muted text-center" role="status">
+            <p id={`req-${request.id}-reason`} className="text-[11px] text-text-secondary text-center" role="status">
               {reasonLabel}
             </p>
           )}

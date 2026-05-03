@@ -8,12 +8,13 @@ import { MessageItem } from './MessageItem'
 import type { GuildMember } from '@/types/guild'
 
 interface GuildChatPanelProps {
+  guildId: string | null
   me: { id: string; name: string; role: GuildMember['role'] }
 }
 
-export function GuildChatPanel({ me }: GuildChatPanelProps) {
+export function GuildChatPanel({ guildId, me }: GuildChatPanelProps) {
   const { messages, loading, send, mute, report, isOfficer, cooldownMs, perMinuteRemaining, perMinuteCap, lastError } =
-    useGuildChat({ me })
+    useGuildChat({ guildId, me })
   const listRef = useRef<HTMLOListElement>(null)
   const stickToBottom = useRef(true)
 

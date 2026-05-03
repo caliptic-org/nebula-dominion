@@ -17,6 +17,10 @@ export default () => {
       synchronize: process.env.DB_SYNCHRONIZE === 'true',
       logging: process.env.DB_LOGGING === 'true',
       ssl: process.env.DB_SSL === 'true',
+      // Auto-run pending migrations on bootstrap. Defaults to true so the
+      // game-server schema is provisioned without an external init step;
+      // set DB_RUN_MIGRATIONS=false to opt out (e.g. in tests).
+      runMigrations: process.env.DB_RUN_MIGRATIONS !== 'false',
     },
     jwt: {
       secret: jwtSecret,

@@ -23,6 +23,8 @@ export const GUILD_AID_STORAGE_CONTRIB_RATE = 0.02;
  */
 export const TELEMETRY_GUILD_LIFECYCLE = 'guild_lifecycle';
 export const TELEMETRY_GUILD_PROGRESSION = 'guild_progression';
+/** CAL-240: raid + research activity stream. */
+export const TELEMETRY_GUILD_ACTIVITY = 'guild_activity';
 
 /**
  * Internal event: total_xp crossed GUILD_TUTORIAL_XP_THRESHOLD.

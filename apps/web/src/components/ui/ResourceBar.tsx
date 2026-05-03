@@ -45,23 +45,48 @@ export function ResourceBar(props: ResourceBarProps) {
             key={r.label}
             className="resource-bar"
             title={r.label}
+            style={
+              {
+                ['--hud-ring-color' as string]: `${r.color ?? 'rgba(0,207,255,0.35)'}55`,
+                ['--hud-ring-shadow-outer' as string]: `${r.color ?? 'rgba(0,207,255,0.2)'}22`,
+                ['--hud-ring-shadow-inner' as string]: `${r.color ?? 'rgba(0,207,255,0.1)'}33`,
+              } as React.CSSProperties
+            }
           >
-            <span aria-hidden>{r.icon}</span>
+            <span className="relative inline-flex items-center justify-center w-5 h-5 text-[0.85em]" aria-hidden>
+              <span className="hud-ring" />
+              <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+              {r.icon}
+            </span>
             <span style={{ color: r.color ?? 'var(--color-text-primary)' }}>
               {typeof r.value === 'number' ? r.value.toLocaleString('tr-TR') : r.value}
             </span>
           </div>
         ))}
 
-        {/* XP Mini bar */}
+        {/* XP Mini bar — HUD telemetry */}
         {props.xpMax !== undefined && (
           <div className="resource-bar gap-2">
             <span aria-hidden>✨</span>
-            <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${xpPct}%`, background: 'var(--color-race)' }}
-              />
+            <div
+              className="hud-progress-bar hud-progress-bar--xs w-16"
+              style={
+                {
+                  ['--hud-track-border' as string]: 'rgba(var(--color-race-rgb,0,207,255),0.18)',
+                  ['--hud-tick-color' as string]: 'transparent',
+                  ['--hud-fill-gradient' as string]:
+                    'linear-gradient(90deg, var(--color-race-dim), var(--color-race))',
+                  ['--hud-fill-glow' as string]: 'var(--color-race-glow)',
+                  ['--hud-edge-glow' as string]: 'var(--color-race)',
+                } as React.CSSProperties
+              }
+              role="progressbar"
+              aria-valuenow={xpPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="XP"
+            >
+              <div className="hud-progress-fill" style={{ width: `${xpPct}%` }} />
             </div>
             <span className="text-text-muted">{xpPct}%</span>
           </div>

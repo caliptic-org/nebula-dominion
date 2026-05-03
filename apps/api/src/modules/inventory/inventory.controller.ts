@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -34,7 +35,7 @@ export class InventoryController {
   @ApiOperation({ summary: 'Kullanıcının envanter listesi' })
   @ApiResponse({ status: 200, description: 'Sayfalandırılmış envanter listesi' })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama gerekli' })
-  listInventory(@Request() req, @Query() query: InventoryQueryDto) {
+  listInventory(@Request() req: ExpressRequest & { user: { id: string } }, @Query() query: InventoryQueryDto) {
     return this.inventoryService.listInventory(req.user.id, query);
   }
 
@@ -42,7 +43,7 @@ export class InventoryController {
   @ApiOperation({ summary: 'Depo kapasite bilgisi (used/max)' })
   @ApiResponse({ status: 200, description: 'Kapasite bilgisi' })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama gerekli' })
-  getCapacity(@Request() req) {
+  getCapacity(@Request() req: ExpressRequest & { user: { id: string } }) {
     return this.inventoryService.getCapacity(req.user.id);
   }
 
@@ -54,7 +55,7 @@ export class InventoryController {
   @ApiResponse({ status: 403, description: 'Bu item size ait değil' })
   @ApiResponse({ status: 404, description: 'Item bulunamadı' })
   getItem(
-    @Request() req,
+    @Request() req: ExpressRequest & { user: { id: string } },
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ) {
     return this.inventoryService.getItem(req.user.id, itemId);
@@ -70,7 +71,7 @@ export class InventoryController {
   @ApiResponse({ status: 404, description: 'Item bulunamadı' })
   @ApiResponse({ status: 409, description: 'Item kullanılamaz veya yetersiz miktar' })
   useItem(
-    @Request() req,
+    @Request() req: ExpressRequest & { user: { id: string } },
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: UseItemDto,
   ) {
@@ -87,7 +88,7 @@ export class InventoryController {
   @ApiResponse({ status: 404, description: 'Item bulunamadı' })
   @ApiResponse({ status: 409, description: 'Item satılamaz veya yetersiz miktar' })
   sellItem(
-    @Request() req,
+    @Request() req: ExpressRequest & { user: { id: string } },
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() dto: SellItemDto,
   ) {

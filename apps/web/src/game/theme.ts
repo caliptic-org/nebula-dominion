@@ -65,7 +65,38 @@ export const THEME = {
   REWARD_MINERAL: '#60aaff',
   REWARD_GAS:     '#88ffaa',
   REWARD_XP:      '#ffcc44',
+
+  // Manga texture / panel ink
+  HALFTONE_DOT: 0xffffff,
+  PANEL_INK:    0x000000,
+
+  // Race-tinted palette (numeric for Phaser, str for text)
+  RACE: {
+    insan:   { num: 0x4a9eff, str: '#4a9eff', dim: 0x1a3460, glow: '#4a9eff66' },
+    zerg:    { num: 0x44ff44, str: '#44ff44', dim: 0x113f11, glow: '#44ff4466' },
+    otomat:  { num: 0x00cfff, str: '#00cfff', dim: 0x004060, glow: '#00cfff66' },
+    canavar: { num: 0xff6600, str: '#ff6600', dim: 0x562000, glow: '#ff660066' },
+    seytan:  { num: 0xcc00ff, str: '#cc00ff', dim: 0x440055, glow: '#cc00ff66' },
+  },
 } as const;
+
+export interface RaceVisual {
+  color: number;
+  colorStr: string;
+  dim: number;
+  glow: string;
+}
+
+export function getRaceVisual(race?: string | null): RaceVisual {
+  const key = (race ?? 'insan') as keyof typeof THEME.RACE;
+  const entry = THEME.RACE[key] ?? THEME.RACE.insan;
+  return {
+    color: entry.num,
+    colorStr: entry.str,
+    dim: entry.dim,
+    glow: entry.glow,
+  };
+}
 
 /** Unit body colors keyed by unit type string */
 export const UNIT_COLORS: Record<string, number> = {

@@ -1,6 +1,7 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { VipService } from './vip.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('VIP')
 @Controller('api/v1/vip')
@@ -8,11 +9,11 @@ export class VipController {
   constructor(private readonly vipService: VipService) {}
 
   @Get('status')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mevcut kullanıcının VIP durumu ve kümülatif harcaması' })
-  getMyVipStatus() {
-    const userId = 'demo-user-id';
-    return this.vipService.getVipStatus(userId);
+  getMyVipStatus(@Request() req: { user: { id: string } }) {
+    return this.vipService.getVipStatus(req.user.id);
   }
 
   @Get('tiers')
@@ -29,6 +30,7 @@ export class VipController {
   }
 
   @Get('analytics/arppu-cohorts')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'VIP kademesi bazında ARPPU cohort analizi' })
   getArppuCohorts() {
@@ -36,10 +38,10 @@ export class VipController {
   }
 
   @Get('history')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kullanıcı satın alma geçmişi (telemetri)' })
-  getPurchaseHistory() {
-    const userId = 'demo-user-id';
-    return this.vipService.getUserPurchaseHistory(userId);
+  getPurchaseHistory(@Request() req: { user: { id: string } }) {
+    return this.vipService.getUserPurchaseHistory(req.user.id);
   }
 }

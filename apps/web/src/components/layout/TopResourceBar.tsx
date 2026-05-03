@@ -65,11 +65,15 @@ export function TopResourceBar({
           <span className="font-display text-xs font-bold text-energy whitespace-nowrap">
             Çağ {age} · Sv {level}
           </span>
-          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-            <div
-              className="h-full rounded-full progress-fill-energy"
-              style={{ width: `${xpPercent}%` }}
-            />
+          <div
+            className="hud-progress-bar hud-progress-bar--xs hud-progress-bar--energy w-16"
+            role="progressbar"
+            aria-valuenow={xpPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`XP: %${xpPercent}`}
+          >
+            <div className="hud-progress-fill" style={{ width: `${xpPercent}%` }} />
           </div>
         </div>
       </div>

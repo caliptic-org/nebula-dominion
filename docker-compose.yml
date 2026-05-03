@@ -109,8 +109,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-nebula_dev_password}
       DB_NAME: ${POSTGRES_DB:-nebula_dominion}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+      JWT_SECRET: ${JWT_SECRET:-nebula-dominion-dev-jwt-secret-32chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-nebula-dominion-dev-refresh-secret-32}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
@@ -136,12 +138,17 @@ services:
       context: .
       dockerfile: apps/game-server/Dockerfile
     ports:
-      - "${GAME_SERVER_PORT:-4001}:4001"
+      - "${GAME_SERVER_PORT:-3001}:3001"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      PORT: 4001
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nebula:nebula_dev_password@postgres:5432/nebula_dominion}
+      DB_SYNCHRONIZE: "false"
+      DB_RUN_MIGRATIONS: ${DB_RUN_MIGRATIONS:-true}
+      DB_LOGGING: ${DB_LOGGING:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+      JWT_SECRET: ${JWT_SECRET:-nebula-dominion-dev-jwt-secret-32chars}
+      GAME_SERVER_JWT_SECRET: ${GAME_SERVER_JWT_SECRET:-nebula-dominion-gs-jwt-secret-32chars}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       MATCHMAKING_INITIAL_ELO_RANGE: ${MATCHMAKING_INITIAL_ELO_RANGE:-100}
       MATCHMAKING_ELO_EXPANSION_RATE: ${MATCHMAKING_ELO_EXPANSION_RATE:-50}
@@ -153,10 +160,12 @@ services:
       MAX_ACTIONS_PER_SECOND: ${MAX_ACTIONS_PER_SECOND:-10}
       MAX_ROUND_DURATION_MS: ${MAX_ROUND_DURATION_MS:-30000}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:4001/api/health/live"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health/live"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -174,12 +183,12 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-      NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL:-http://localhost:4001}
+      NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL:-http://localhost:3001}
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

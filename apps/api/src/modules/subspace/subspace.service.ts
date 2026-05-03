@@ -153,7 +153,7 @@ export class SubspaceService {
     battle.defenderUnits = defenderUnits;
     battle.result = result;
     battle.winnerId = result.winnerId as string;
-    battle.startedAt = new Date(Date.now() - result.durationMs as number);
+    battle.startedAt = new Date(Date.now() - (result.durationMs as number));
     battle.endedAt = new Date();
 
     return this.battleRepository.save(battle);

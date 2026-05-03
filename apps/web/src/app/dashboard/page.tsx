@@ -1,16 +1,11 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Dashboard',
-};
-
-const resources = [
-  { icon: '💰', label: 'Altın',   value: '124,800', color: '#e8a820' },
-  { icon: '⚡', label: 'Enerji',  value: '8,420',   color: '#40c8e0' },
-  { icon: '🔩', label: 'Maden',   value: '32,550',  color: '#a8c8e0' },
-  { icon: '💎', label: 'Taş',     value: '240',     color: '#c880f0' },
-]
+import Image from 'next/image';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { RACE_DESCRIPTIONS } from '@/types/units';
+import { TIER_NAMES } from '@/types/progression';
 
 const navItems = [
   { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
@@ -20,7 +15,7 @@ const navItems = [
   { href: '/dashboard/guild',     label: 'Lonca',      icon: '🛡️' },
   { href: '/dashboard/sectors',   label: 'Sektörler',  icon: '🌍' },
   { href: '/dashboard/shop',      label: 'Mağaza',     icon: '🛍️' },
-  { href: '/dashboard/settings',  label: 'Ayarlar',    icon: '⚙️' },
+  { href: '/settings',            label: 'Ayarlar',    icon: '⚙️' },
 ]
 
 const playerStats = [
@@ -31,11 +26,22 @@ const playerStats = [
 ];
 
 const upcomingFeatures = [
-  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3'  },
-  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5'  },
-  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4'    },
-  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5'    },
+  { title: 'Filo Yönetimi',    description: 'Birimlerini oluştur ve yönet',         icon: '🚀', eta: 'Hafta 3', color: '#4a9eff' },
+  { title: 'PvP Savaşları',    description: 'Gerçek zamanlı rakip eşleştirme',      icon: '⚔️', eta: 'Hafta 5', color: '#ff6644' },
+  { title: 'Sektör Kontrolü',  description: 'Çok oyunculu bölge savaşları',         icon: '🌌', eta: 'Çağ 4',   color: '#44ff88' },
+  { title: 'Premium Mağaza',   description: 'Kozmetik itemler ve premium pass',     icon: '💎', eta: 'Çağ 5',   color: '#cc00ff' },
 ];
+
+const PROFILE = {
+  age: 'I',
+  tier: 1,
+  totalXp: 0,
+  xpInLevel: 0,
+  xpToNext: 100,
+  pvpMatches: 0,
+  pvpWins: 0,
+  guild: { members: 0, capacity: 30 },
+};
 
 export default function DashboardPage() {
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();
@@ -67,9 +73,15 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="min-h-screen flex"
+      className="h-dvh flex overflow-hidden relative"
       style={{ background: 'var(--color-bg)' }}
     >
+      {/* Race-tinted halftone overlay — manga atmosphere */}
+      <div
+        className="manga-halftone-race absolute inset-0 pointer-events-none"
+        style={{ zIndex: 0, opacity: 0.12 }}
+        aria-hidden
+      />
       {/* ─── Sidebar ───────────────────────────────── */}
       <aside
         className="hidden lg:flex flex-col w-64 shrink-0"
@@ -185,7 +197,7 @@ export default function DashboardPage() {
             <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Ana sayfa">
               <span aria-hidden>🌌</span>
             </Link>
-            <h1 className="font-display text-base font-black text-text-primary tracking-widest" style={{ letterSpacing: '1px' }}>
+            <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
               KOMUTA MERKEZİ
             </h1>
           </div>
@@ -239,6 +251,8 @@ export default function DashboardPage() {
             </span>
           </section>
 
+          <div className="panel-divider" aria-hidden />
+
           {/* ── Player stats ────────────────────────────────────────── */}
           <section aria-labelledby="stats-heading">
             <h2
@@ -252,17 +266,33 @@ export default function DashboardPage() {
               {playerStats.map((stat) => (
                 <div
                   key={stat.label}
-                  className="glass-card p-4 transition-all hover-glow"
+                  className="stat-card ink-border-race p-4 transition-all hover-glow"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg" aria-hidden>{stat.icon}</span>
-                    <span className="font-display text-xs text-text-muted uppercase tracking-wider">{stat.label}</span>
+                    <span
+                      className="relative inline-flex items-center justify-center w-7 h-7 text-lg"
+                      aria-hidden
+                      style={
+                        {
+                          ['--hud-ring-color' as string]: `${stat.color}55`,
+                          ['--hud-ring-shadow-outer' as string]: `${stat.color}26`,
+                          ['--hud-ring-shadow-inner' as string]: `${stat.color}1A`,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className="hud-ring" />
+                      <span className="hud-ring hud-ring-dashed hud-ring-inset" />
+                      {stat.icon}
+                    </span>
+                    <span className="manga-label">{stat.label}</span>
                   </div>
-                  <p className="font-display text-2xl font-black" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="manga-number" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', color: stat.color }}>{stat.value}</p>
                 </div>
               ))}
             </div>
           </section>
+
+          <div className="panel-divider" aria-hidden />
 
           {/* Upcoming features */}
           <section aria-labelledby="features-heading">
@@ -307,6 +337,8 @@ export default function DashboardPage() {
               ))}
             </div>
           </section>
+
+          <div className="panel-divider" aria-hidden />
 
           {/* ── Game area placeholder ──────────────────────────────── */}
           <section aria-labelledby="game-heading">

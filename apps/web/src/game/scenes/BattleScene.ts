@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GameSocket, UnitState, GameRoom } from '../socket/GameSocket';
 import { UnitSprite } from '../objects/UnitSprite';
 import { spawnDamageText, spawnAbilityText } from '../objects/DamageText';
-import { THEME } from '../theme';
+import { THEME, getRaceVisual } from '../theme';
 
 const GRID_COLS = 8;
 const GRID_ROWS = 6;

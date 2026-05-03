@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useCallback, useRef, useState } from 'react';
 import { useProgression } from '@/hooks/useProgression';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { useSession } from '@/hooks/useSession';
 import { MangaPanel } from '@/components/ui/MangaPanel';
-import { UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
+import { AgeTransitionScreen } from '@/components/progression/AgeTransitionScreen';
+import { ContentUnlock, LevelUpPayload, UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
 
 const AGES = [
   { num: 1, label: 'Kuruluş Çağı', scene: 'Galaksinin uçlarında ilk kaleler yükseliyor…', unlocked: true },
@@ -15,13 +18,42 @@ const AGES = [
   { num: 6, label: 'Nebula Hâkimi', scene: 'Yalnızca bir ırk evrenin efendisi olacak.', unlocked: false },
 ];
 
+interface AgeTransitionState {
+  toAge: number;
+  newUnlocks: ContentUnlock[];
+}
+
 export default function ProgressionPage() {
-  const { raceColor, raceGlow } = useRaceTheme();
-  const { progress, loading } = useProgression({ userId: 'demo-player-001' });
+  const { raceColor, raceGlow, meta } = useRaceTheme();
+  const lastSeenAgeRef = useRef<number | null>(null);
+  const [ageTransition, setAgeTransition] = useState<AgeTransitionState | null>(null);
+
+  const { userId } = useSession();
+
+  const handleLevelUp = useCallback((payload: LevelUpPayload) => {
+    const previousAge = lastSeenAgeRef.current;
+    if (previousAge !== null && payload.age > previousAge) {
+      setAgeTransition({ toAge: payload.age, newUnlocks: payload.newUnlocks });
+    }
+    lastSeenAgeRef.current = payload.age;
+  }, []);
+
+  const { progress, loading } = useProgression({
+    userId: userId ?? '',
+    onLevelUp: handleLevelUp,
+  });
+
+  if (lastSeenAgeRef.current === null && progress) {
+    lastSeenAgeRef.current = progress.age;
+  }
+
+  const handleTransitionComplete = useCallback(() => {
+    setAgeTransition(null);
+  }, []);
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-y-auto"
       style={{ background: 'var(--color-bg)' }}
     >
       <div
@@ -29,7 +61,7 @@ export default function ProgressionPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.15 }} aria-hidden />
 
       {/* Header */}
       <header
@@ -64,10 +96,13 @@ export default function ProgressionPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
               <div>
                 <div className="mb-2"><span className="badge badge-race">Oyuncu Profili</span></div>
-                <h1 className="font-display text-2xl font-black text-text-primary">
-                  Seviye <span style={{ color: raceColor, textShadow: `0 0 16px ${raceGlow}` }}>{progress.level}</span>
-                  <span className="text-text-muted text-base ml-2">/ 9</span>
-                </h1>
+                <div className="manga-label mb-1">Seviye</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="manga-number" style={{ fontSize: 'clamp(2.5rem, 6vw, 3.5rem)', color: raceColor }}>
+                    {progress.level}
+                  </span>
+                  <span className="text-text-muted font-display text-base">/ 9</span>
+                </div>
               </div>
               <div className="text-right">
                 <div className="font-display text-[10px] uppercase tracking-widest text-text-muted mb-1">Tier</div>
@@ -121,6 +156,8 @@ export default function ProgressionPage() {
             </div>
           </MangaPanel>
         )}
+
+        <div className="panel-divider-diagonal mb-4" aria-hidden />
 
         {/* Age Timeline */}
         <div className="mb-8">
@@ -217,6 +254,7 @@ export default function ProgressionPage() {
         {/* Unlocked Content */}
         {progress && progress.unlockedContent.length > 0 && (
           <div>
+            <div className="panel-divider-diagonal mb-4" aria-hidden />
             <div className="flex items-center gap-2 mb-4">
               <span className="badge badge-race">Açık İçerikler</span>
               <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
@@ -231,6 +269,17 @@ export default function ProgressionPage() {
           </div>
         )}
       </main>
+
+      {ageTransition && (
+        <AgeTransitionScreen
+          toAge={ageTransition.toAge}
+          race={meta.dataRace}
+          raceColor={raceColor}
+          raceGlow={raceGlow}
+          newUnlocks={ageTransition.newUnlocks}
+          onComplete={handleTransitionComplete}
+        />
+      )}
     </div>
   );
 }

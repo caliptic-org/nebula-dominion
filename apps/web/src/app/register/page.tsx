@@ -19,7 +19,7 @@ export default function RegisterPage() {
       />
 
       {/* Left panel — form */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 lg:max-w-[480px] lg:border-r lg:border-white/06">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 lg:max-w-[480px] lg:border-r lg:border-white/[0.06]">
         <div className="absolute inset-0 halftone-bg pointer-events-none opacity-30" aria-hidden />
 
         <div className="relative z-10 w-full max-w-sm">
@@ -82,7 +82,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Right panel — character portrait (desktop) */}
+      {/* Right panel — Malphas portrait (desktop) */}
       <div className="hidden lg:flex flex-1 relative items-end justify-center overflow-hidden">
         <div
           className="absolute inset-0"
@@ -91,6 +91,23 @@ export default function RegisterPage() {
           }}
           aria-hidden
         />
+        {/* Speed lines */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          {[...Array(12)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute h-px"
+              style={{
+                top: `${10 + i * 7}%`,
+                left: 0,
+                right: 0,
+                background: `linear-gradient(90deg, transparent 0%, rgba(204,0,255,${0.03 + i * 0.005}) 50%, transparent 100%)`,
+                transform: `rotate(${-2 + i * 0.3}deg)`,
+              }}
+            />
+          ))}
+        </div>
+
         <div className="relative z-10 w-full max-w-sm h-[70vh] flex items-end justify-center">
           <Image
             src="/assets/characters/seytan/malphas.png"

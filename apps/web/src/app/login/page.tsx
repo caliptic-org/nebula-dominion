@@ -20,7 +20,7 @@ export default function LoginPage() {
 
       {/* Left panel — character portrait (desktop) */}
       <div className="hidden lg:flex flex-1 relative items-end justify-center overflow-hidden">
-        {/* Race atmosphere bg */}
+        {/* Race atmosphere */}
         <div
           className="absolute inset-0"
           style={{
@@ -57,12 +57,12 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Manga panel border lines */}
+        {/* Panel border */}
         <div className="absolute inset-y-0 right-0 w-[2px] bg-gradient-to-b from-transparent via-white/10 to-transparent" />
       </div>
 
       {/* Right panel — form */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 lg:max-w-[480px] lg:border-l lg:border-white/06">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 lg:max-w-[480px] lg:border-l lg:border-white/[0.06]">
         {/* Halftone dots texture */}
         <div className="absolute inset-0 halftone-bg pointer-events-none opacity-30" aria-hidden />
 

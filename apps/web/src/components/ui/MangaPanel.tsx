@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, CSSProperties } from 'react';
 import clsx from 'clsx';
 
 interface MangaPanelProps {
@@ -9,7 +9,7 @@ interface MangaPanelProps {
   thick?: boolean;
   halftone?: boolean;
   glow?: boolean;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }
 
 export function MangaPanel({ children, className, thick, halftone, glow, style }: MangaPanelProps) {
@@ -24,7 +24,7 @@ export function MangaPanel({ children, className, thick, halftone, glow, style }
       )}
       style={style}
     >
-      {/* Speed line corner accents */}
+      {/* Corner accent — top-left */}
       <div className="absolute top-0 left-0 w-8 h-8 pointer-events-none" aria-hidden>
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
           <path d="M0 0 L32 0 L0 32 Z" fill="rgba(255,255,255,0.03)" />
@@ -32,6 +32,7 @@ export function MangaPanel({ children, className, thick, halftone, glow, style }
           <path d="M0 0 L0 16" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
         </svg>
       </div>
+      {/* Corner accent — top-right */}
       <div className="absolute top-0 right-0 w-8 h-8 pointer-events-none" style={{ transform: 'scaleX(-1)' }} aria-hidden>
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
           <path d="M0 0 L32 0 L0 32 Z" fill="rgba(255,255,255,0.03)" />

@@ -1,38 +1,39 @@
-'use client'
+'use client';
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { GlowButton } from '@/components/ui/GlowButton';
 
 export function RegisterForm() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState({
     username: '',
     email: '',
     password: '',
     confirmPassword: '',
-  })
+  });
 
   function validate() {
-    if (values.username.length < 3) return 'Kullanıcı adı en az 3 karakter olmalı'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return 'Geçerli bir e-posta gir'
-    if (values.password.length < 8) return 'Şifre en az 8 karakter olmalı'
-    if (values.password !== values.confirmPassword) return 'Şifreler eşleşmiyor'
-    return null
+    if (values.username.length < 3) return 'Kullanıcı adı en az 3 karakter olmalı';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return 'Geçerli bir e-posta gir';
+    if (values.password.length < 8) return 'Şifre en az 8 karakter olmalı';
+    if (values.password !== values.confirmPassword) return 'Şifreler eşleşmiyor';
+    return null;
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
-    const validationError = validate()
+    const validationError = validate();
     if (validationError) {
-      setError(validationError)
-      return
+      setError(validationError);
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
@@ -44,129 +45,112 @@ export function RegisterForm() {
           email: values.email,
           password: values.password,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.')
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
       }
 
-      router.push('/dashboard')
+      router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu')
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Kayıt formu">
-      <div className="space-y-4">
-        {error && (
-          <div
-            role="alert"
-            className="px-4 py-3 rounded-lg text-sm font-medium"
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: 'var(--color-danger)',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="username" className="form-label">
-            Kullanıcı Adı
-          </label>
-          <input
-            id="username"
-            type="text"
-            name="username"
-            className="form-input"
-            placeholder="komutan_nova"
-            autoComplete="username"
-            required
-            minLength={3}
-            maxLength={32}
-            value={values.username}
-            onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="reg-email" className="form-label">
-            E-posta
-          </label>
-          <input
-            id="reg-email"
-            type="email"
-            name="email"
-            className="form-input"
-            placeholder="komutan@galaksi.com"
-            autoComplete="email"
-            required
-            value={values.email}
-            onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="reg-password" className="form-label">
-            Şifre
-          </label>
-          <input
-            id="reg-password"
-            type="password"
-            name="password"
-            className="form-input"
-            placeholder="En az 8 karakter"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={values.password}
-            onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="confirm-password" className="form-label">
-            Şifre Tekrar
-          </label>
-          <input
-            id="confirm-password"
-            type="password"
-            name="confirmPassword"
-            className="form-input"
-            placeholder="Şifreni tekrar gir"
-            autoComplete="new-password"
-            required
-            value={values.confirmPassword}
-            onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))}
-            disabled={isLoading}
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="btn-primary w-full mt-2"
-          disabled={isLoading}
-          aria-busy={isLoading}
+    <form onSubmit={handleSubmit} noValidate aria-label="Kayıt formu" className="space-y-4">
+      {error && (
+        <div
+          role="alert"
+          className="px-4 py-3 rounded-lg text-sm font-medium animate-slide-up"
+          style={{
+            background: 'rgba(255,51,85,0.08)',
+            border: '1px solid rgba(255,51,85,0.3)',
+            color: 'var(--color-danger)',
+          }}
         >
-          {isLoading ? (
-            <>
-              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
-              Hesap oluşturuluyor…
-            </>
-          ) : (
-            'Hesap Oluştur'
-          )}
-        </button>
+          {error}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="username" className="form-label">Kullanıcı Adı</label>
+        <input
+          id="username"
+          type="text"
+          name="username"
+          className="form-input"
+          placeholder="komutan_nova"
+          autoComplete="username"
+          required
+          minLength={3}
+          maxLength={32}
+          value={values.username}
+          onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
+          disabled={isLoading}
+        />
       </div>
+
+      <div>
+        <label htmlFor="reg-email" className="form-label">E-posta</label>
+        <input
+          id="reg-email"
+          type="email"
+          name="email"
+          className="form-input"
+          placeholder="komutan@galaksi.com"
+          autoComplete="email"
+          required
+          value={values.email}
+          onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="reg-password" className="form-label">Şifre</label>
+        <input
+          id="reg-password"
+          type="password"
+          name="password"
+          className="form-input"
+          placeholder="En az 8 karakter"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={values.password}
+          onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="confirm-password" className="form-label">Şifre Tekrar</label>
+        <input
+          id="confirm-password"
+          type="password"
+          name="confirmPassword"
+          className="form-input"
+          placeholder="Şifreni tekrar gir"
+          autoComplete="new-password"
+          required
+          value={values.confirmPassword}
+          onChange={(e) => setValues((v) => ({ ...v, confirmPassword: e.target.value }))}
+          disabled={isLoading}
+        />
+      </div>
+
+      <GlowButton
+        type="submit"
+        className="w-full mt-2"
+        loading={isLoading}
+        icon={!isLoading ? <span>→</span> : undefined}
+      >
+        Galaksiye Katıl
+      </GlowButton>
     </form>
-  )
+  );
 }

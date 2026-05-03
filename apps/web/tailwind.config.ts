@@ -16,6 +16,24 @@ const config: Config = {
           elevated: '#141d2b',
           overlay: 'rgba(8,10,16,0.92)',
         },
+        // Race color tokens
+        race: {
+          zerg: '#44ff44',
+          'zerg-dim': 'rgba(68,255,68,0.12)',
+          'zerg-glow': 'rgba(68,255,68,0.4)',
+          otomat: '#00cfff',
+          'otomat-dim': 'rgba(0,207,255,0.12)',
+          'otomat-glow': 'rgba(0,207,255,0.4)',
+          canavar: '#ff6600',
+          'canavar-dim': 'rgba(255,102,0,0.12)',
+          'canavar-glow': 'rgba(255,102,0,0.4)',
+          insan: '#4a9eff',
+          'insan-dim': 'rgba(74,158,255,0.12)',
+          'insan-glow': 'rgba(74,158,255,0.4)',
+          seytan: '#cc00ff',
+          'seytan-dim': 'rgba(204,0,255,0.12)',
+          'seytan-glow': 'rgba(204,0,255,0.4)',
+        },
         // Semantic tokens backed by CSS custom properties
         bg: {
           DEFAULT: 'var(--color-bg)',
@@ -101,7 +119,6 @@ const config: Config = {
         'star-twinkle': 'twinkle 4s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'scan-line': 'scan-line 8s linear infinite',
-        'speed-line': 'speed-line 0.4s ease-out forwards',
         'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
         'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',
       },
@@ -121,11 +138,6 @@ const config: Config = {
         'scan-line': {
           '0%': { transform: 'translateY(-100%)' },
           '100%': { transform: 'translateY(100vh)' },
-        },
-        'speed-line': {
-          '0%': { opacity: '0', transform: 'scaleX(0)' },
-          '50%': { opacity: '1' },
-          '100%': { opacity: '0', transform: 'scaleX(1)' },
         },
         'manga-appear': {
           '0%': { opacity: '0', transform: 'scale(0.95) translateY(16px)', filter: 'blur(4px)' },

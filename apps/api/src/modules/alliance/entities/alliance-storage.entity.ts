@@ -24,6 +24,9 @@ export class AllianceStorage {
   minerals: number;
 
   @Column({ type: 'bigint', default: 0 })
+  gas: number;
+
+  @Column({ type: 'bigint', default: 0 })
   energy: number;
 
   @Column({ name: 'premium_gems', type: 'int', default: 0 })

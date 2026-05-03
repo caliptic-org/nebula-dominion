@@ -100,20 +100,21 @@ export class StatsService {
       await Promise.all([
         this.battleRepo
           .createQueryBuilder('b')
-          .where('(b.attacker_id = :pid OR b.defender_id = :pid)', { pid: playerId })
+          .where('(b.attackerId = :pid OR b.defenderId = :pid)', { pid: playerId })
           .andWhere('b.status = :status', { status: BattleStatus.COMPLETED })
+          .take(10000)
           .getMany(),
         this.battleRepo
           .createQueryBuilder('b')
-          .where('(b.attacker_id = :pid OR b.defender_id = :pid)', { pid: playerId })
+          .where('(b.attackerId = :pid OR b.defenderId = :pid)', { pid: playerId })
           .andWhere('b.status = :status', { status: BattleStatus.COMPLETED })
-          .andWhere('b.ended_at >= :from', { from: thirtyDaysAgo })
+          .andWhere('b.endedAt >= :from', { from: thirtyDaysAgo })
           .getMany(),
         this.battleRepo
           .createQueryBuilder('b')
-          .where('(b.attacker_id = :pid OR b.defender_id = :pid)', { pid: playerId })
+          .where('(b.attackerId = :pid OR b.defenderId = :pid)', { pid: playerId })
           .andWhere('b.status = :status', { status: BattleStatus.COMPLETED })
-          .andWhere('b.ended_at >= :from AND b.ended_at < :to', {
+          .andWhere('b.endedAt >= :from AND b.endedAt < :to', {
             from: sixtyDaysAgo,
             to: thirtyDaysAgo,
           })

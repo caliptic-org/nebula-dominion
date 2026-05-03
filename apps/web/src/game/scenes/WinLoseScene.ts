@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
-import { BattleRewards, GameRoom } from '../socket/GameSocket';
+import { BattleRewards } from '../socket/GameSocket';
 import { THEME } from '../theme';
-import { getRaceVisual } from '../raceVisuals';
 
 interface WinLoseData {
   winner: string;
@@ -57,45 +56,20 @@ export class WinLoseScene extends Phaser.Scene {
     const py = (height - panelH) / 2;
 
     const panel = this.add.graphics();
-    // Drop-shadow ink
-    panel.fillStyle(THEME.PANEL_INK, 0.95);
-    panel.fillRoundedRect(px + 5, py + 5, panelW, panelH, 12);
-    // Panel body
     panel.fillStyle(isWinner ? THEME.WIN_PANEL : THEME.LOSE_PANEL, 0.97);
-    panel.fillRoundedRect(px, py, panelW, panelH, 12);
-    // Heavy ink stroke
-    panel.lineStyle(3, THEME.PANEL_INK, 1);
-    panel.strokeRoundedRect(px, py, panelW, panelH, 12);
-    // Inner race-colored glow border
-    panel.lineStyle(2, accentHex, 0.95);
-    panel.strokeRoundedRect(px + 4, py + 4, panelW - 8, panelH - 8, 10);
-    panel.lineStyle(1, accentHex, 0.4);
-    panel.strokeRoundedRect(px + 8, py + 8, panelW - 16, panelH - 16, 8);
+    panel.lineStyle(3, isWinner ? THEME.WIN_BORDER : THEME.LOSE_BORDER, 1);
+    panel.fillRoundedRect(px, py, panelW, panelH, 16);
+    panel.strokeRoundedRect(px, py, panelW, panelH, 16);
     panel.setAlpha(0);
     this.tweens.add({ targets: panel, alpha: 1, duration: 350, delay: 200 });
 
-    // Race ribbon strip across the top
-    const ribbon = this.add.graphics();
-    ribbon.fillStyle(accentHex, 0.95);
-    ribbon.fillRect(px + 12, py + 18, panelW - 24, 6);
-    ribbon.fillStyle(THEME.PANEL_INK, 1);
-    for (let i = 0; i < 18; i++) {
-      const sx = px + 12 + i * ((panelW - 24) / 18);
-      ribbon.fillRect(sx + 2, py + 18, 2, 6);
-    }
-    ribbon.setAlpha(0);
-    this.tweens.add({ targets: ribbon, alpha: 1, duration: 250, delay: 300 });
-
-    // Title — manga impact text
-    const titleText = isWinner ? 'ZAFER!' : 'YENILGI';
-    const title = this.add.text(width / 2, py + 64, titleText, {
-      fontSize: '52px',
-      fontFamily: 'Impact, "Arial Black", system-ui, sans-serif',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      stroke: accentStr,
-      strokeThickness: 8,
-    }).setOrigin(0.5, 0.5).setAlpha(0).setScale(0.4).setAngle(-4);
+    // Title
+    const titleText = isWinner ? 'VICTORY!' : 'DEFEAT';
+    const titleColor = isWinner ? THEME.SUCCESS_STR : THEME.DANGER_STR;
+    const title = this.add.text(width / 2, py + 44, titleText, {
+      fontSize: '48px', fontStyle: 'bold', color: titleColor,
+      stroke: '#000000', strokeThickness: 6,
+    }).setOrigin(0.5, 0.5).setAlpha(0).setScale(0.5);
 
     this.tweens.add({
       targets: title,
@@ -118,29 +92,28 @@ export class WinLoseScene extends Phaser.Scene {
       surrender: 'Rakip teslim oldu',
       timeout: 'Sure doldu',
     };
-    this.add.text(width / 2, py + 130, reasonLabel[this.winLoseData.endReason] ?? '', {
-      fontSize: '13px', color: THEME.TEXT_MUTED,
+    this.add.text(width / 2, py + 90, reasonLabel[this.data.endReason] ?? '', {
+      fontSize: '14px', color: THEME.TEXT_SECONDARY,
     }).setOrigin(0.5, 0);
 
     // ELO change
     const eloDeltaStr = eloDelta >= 0 ? `+${eloDelta}` : `${eloDelta}`;
     const eloColor = eloDelta >= 0 ? THEME.SUCCESS_STR : THEME.DANGER_STR;
-    this.add.text(width / 2, py + 152, `ELO ${this.winLoseData.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
-      fontSize: '15px', fontStyle: 'bold', color: eloColor,
-      stroke: '#000000', strokeThickness: 3,
+    this.add.text(width / 2, py + 120, `ELO: ${this.data.newElo?.[this.myId] ?? '—'}  (${eloDeltaStr})`, {
+      fontSize: '16px', fontStyle: 'bold', color: eloColor,
     }).setOrigin(0.5, 0);
 
     // Rewards
     if (rewards) {
-      const cy = py + 192;
-      this.add.text(width / 2, cy, 'ODULLER', {
-        fontSize: '12px', color: THEME.TEXT_SECONDARY, fontStyle: 'bold',
+      const cy = py + 165;
+      this.add.text(width / 2, cy, 'REWARDS', {
+        fontSize: '13px', color: THEME.TEXT_SECONDARY, fontStyle: 'bold',
       }).setOrigin(0.5, 0);
 
       const rewardItems = [
-        { label: 'Mineral',  value: rewards.minerals, color: THEME.REWARD_MINERAL, icon: '◆' },
-        { label: 'Gaz',      value: rewards.gas,      color: THEME.REWARD_GAS,     icon: '◈' },
-        { label: 'XP',       value: rewards.xp,       color: THEME.REWARD_XP,      icon: '★' },
+        { label: 'Minerals', value: rewards.minerals, color: THEME.REWARD_MINERAL, icon: '◆' },
+        { label: 'Gas', value: rewards.gas, color: THEME.REWARD_GAS, icon: '◈' },
+        { label: 'XP', value: rewards.xp, color: THEME.REWARD_XP, icon: '★' },
       ];
 
       rewardItems.forEach((item, i) => {
@@ -187,85 +160,37 @@ export class WinLoseScene extends Phaser.Scene {
           epic_battle:   '⚔ Epik Savas',
           upset_victory: '★ Surpriz Zafer',
         };
-        const badgeText = rewards.bonuses.map((b) => bonusLabels[b] ?? b).join('   ');
-        this.add.text(width / 2, py + 308, badgeText, {
-          fontSize: '12px', fontStyle: 'bold', color: THEME.WARNING_STR,
-          stroke: '#000000', strokeThickness: 3,
+        const badgeText = rewards.bonuses.map((b) => bonusLabels[b] ?? b).join('  ');
+        this.add.text(width / 2, py + 290, badgeText, {
+          fontSize: '12px', color: THEME.WARNING_STR,
         }).setOrigin(0.5, 0);
       }
     }
 
-    // Buttons — manga style
-    const btnY = py + panelH - 52;
-    this.makeMangaButton(width / 2 - 90, btnY, 'TEKRAR OYNA', accentHex, accentStr, () => window.location.reload());
-    this.makeMangaButton(width / 2 + 90, btnY, 'ANA EKRAN',   THEME.BRAND, THEME.BRAND_STR, () => { window.location.href = '/'; });
+    // Buttons
+    const btnY = py + panelH - 56;
+
+    const playAgainBtn = this.add.text(width / 2 - 80, btnY, 'PLAY AGAIN', {
+      fontSize: '14px', fontStyle: 'bold', color: THEME.SUCCESS_STR,
+      backgroundColor: '#0d3d1e', padding: { x: 16, y: 10 },
+    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+
+    playAgainBtn.on('pointerdown', () => window.location.reload());
+    playAgainBtn.on('pointerover', () => playAgainBtn.setStyle({ color: THEME.ACCENT_STR }));
+    playAgainBtn.on('pointerout', () => playAgainBtn.setStyle({ color: THEME.SUCCESS_STR }));
+
+    const menuBtn = this.add.text(width / 2 + 80, btnY, 'MAIN MENU', {
+      fontSize: '14px', fontStyle: 'bold', color: THEME.BRAND_STR,
+      backgroundColor: '#1a1a30', padding: { x: 16, y: 10 },
+    }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+
+    menuBtn.on('pointerdown', () => { window.location.href = '/'; });
+    menuBtn.on('pointerover', () => menuBtn.setStyle({ color: THEME.TEXT_PRIMARY }));
+    menuBtn.on('pointerout', () => menuBtn.setStyle({ color: THEME.BRAND_STR }));
   }
 
-  private makeMangaButton(
-    x: number, y: number, label: string,
-    accentHex: number, accentStr: string,
-    onClick: () => void,
-  ) {
-    const padX = 14;
-    const padY = 9;
-    const text = this.add.text(0, 0, label, {
-      fontSize: '13px', fontStyle: 'bold', color: '#ffffff',
-      stroke: '#000000', strokeThickness: 3,
-    });
-    const tw = text.width + padX * 2;
-    const th = text.height + padY * 2;
-    text.setPosition(padX, padY);
-
-    const bg = this.add.graphics();
-    const draw = (down = false) => {
-      bg.clear();
-      bg.fillStyle(THEME.PANEL_INK, 1);
-      bg.fillRoundedRect(2, 2, tw, th, 4);
-      bg.fillStyle(accentHex, down ? 0.6 : 0.85);
-      bg.fillRoundedRect(0, 0, tw, th, 4);
-      bg.lineStyle(2, THEME.PANEL_INK, 1);
-      bg.strokeRoundedRect(0, 0, tw, th, 4);
-      bg.lineStyle(1, 0xffffff, 0.25);
-      bg.strokeRoundedRect(2, 2, tw - 4, th - 4, 3);
-    };
-    draw(false);
-
-    const c = this.add.container(x - tw / 2, y, [bg, text]).setDepth(60);
-    c.setSize(tw, th);
-    c.setInteractive(new Phaser.Geom.Rectangle(0, 0, tw, th), Phaser.Geom.Rectangle.Contains);
-    c.on('pointerover', () => text.setColor(accentStr));
-    c.on('pointerout', () => { text.setColor('#ffffff'); draw(false); });
-    c.on('pointerdown', () => { draw(true); onClick(); });
-    c.on('pointerup', () => draw(false));
-    return c;
-  }
-
-  private drawRadialSpeedLines(cx: number, cy: number, color: number) {
-    const g = this.add.graphics();
-    const lineCount = 28;
-    for (let i = 0; i < lineCount; i++) {
-      const angle = (i / lineCount) * Math.PI * 2 + (Math.random() * 0.06);
-      const r1 = 110 + Math.random() * 30;
-      const r2 = 360 + Math.random() * 80;
-      g.lineStyle(2 + Math.random() * 2, color, 0.6);
-      g.beginPath();
-      g.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-      g.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
-      g.strokePath();
-    }
-    g.setAlpha(0);
-    this.tweens.add({
-      targets: g,
-      alpha: 1,
-      duration: 250,
-      yoyo: true,
-      hold: 600,
-      onComplete: () => g.destroy(),
-    });
-  }
-
-  private addVictoryParticles(cx: number, cy: number, color: number) {
-    const colors = [color, THEME.ENERGY, 0xffffff];
+  private addVictoryParticles(cx: number, cy: number) {
+    const colors = [THEME.ENERGY, THEME.SUCCESS, THEME.BRAND, THEME.INFO];
     for (let i = 0; i < 24; i++) {
       const angle = (i / 24) * Math.PI * 2;
       const dist = 60 + Math.random() * 80;

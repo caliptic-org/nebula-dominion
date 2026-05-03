@@ -55,9 +55,9 @@ export class UnitSprite extends Phaser.GameObjects.Container {
     const shape = UNIT_SHAPES[this.unitState.type] ?? 'circle';
     const alpha = this.unitState.actionUsed ? 0.45 : 1;
 
-    this.unitBody.clear();
-    this.unitBody.fillStyle(color, alpha);
-    this.unitBody.lineStyle(2, this.isEnemy ? 0xff4444 : 0x4444ff, alpha);
+    this.body.clear();
+    this.body.fillStyle(color, alpha);
+    this.body.lineStyle(2, this.isEnemy ? THEME.DANGER : THEME.INFO, alpha);
 
     if (shape === 'circle') {
       this.unitBody.fillCircle(0, 0, 16);

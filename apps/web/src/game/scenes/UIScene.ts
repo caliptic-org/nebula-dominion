@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import { GameSocket, GameRoom, UnitState } from '../socket/GameSocket';
 import { THEME } from '../theme';
-import { HeroSkillsPanel } from '../objects/HeroSkillsPanel';
-import { BattleLogPanel, BattleEventData, BattleEventType } from '../objects/BattleLogPanel';
 
 const PANEL_H = 100;
 const SCENE_W = 656; // matches BattleScene width
@@ -55,7 +53,7 @@ export class UIScene extends Phaser.Scene {
     // Top bar
     const topBar = this.add.graphics();
     topBar.fillStyle(THEME.HUD_BG, 0.92);
-    topBar.fillRect(0, 0, SCENE_W, TOP_BAR_H);
+    topBar.fillRect(0, 0, SCENE_W, 56);
 
     this.turnText = this.add.text(16, 8, 'Turn 1', {
       fontSize: '18px', color: THEME.BRAND_STR, fontStyle: 'bold',
@@ -82,10 +80,8 @@ export class UIScene extends Phaser.Scene {
       fontSize: '12px', color: THEME.TEXT_SECONDARY,
     });
 
-    // End Turn / Surrender — moved left to clear the log panel on the right
-    const buttonRightX = SCENE_W - 220;
-
-    this.endTurnBtn = this.add.text(buttonRightX, sceneH - PANEL_H + 20, 'END TURN', {
+    // End Turn button
+    this.endTurnBtn = this.add.text(SCENE_W - 20, sceneH - PANEL_H + 20, 'END TURN', {
       fontSize: '14px', color: THEME.HUD_END_TURN, fontStyle: 'bold',
       backgroundColor: '#0d3d1e', padding: { x: 12, y: 8 },
     }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
@@ -99,7 +95,8 @@ export class UIScene extends Phaser.Scene {
     this.endTurnBtn.on('pointerover', () => this.endTurnBtn.setStyle({ color: THEME.SUCCESS_STR }));
     this.endTurnBtn.on('pointerout', () => this.endTurnBtn.setStyle({ color: THEME.HUD_END_TURN }));
 
-    this.surrenderBtn = this.add.text(buttonRightX, sceneH - PANEL_H + 56, 'SURRENDER', {
+    // Surrender button
+    this.surrenderBtn = this.add.text(SCENE_W - 20, sceneH - PANEL_H + 52, 'SURRENDER', {
       fontSize: '11px', color: THEME.HUD_SURRENDER,
       backgroundColor: '#3d0d0d', padding: { x: 10, y: 6 },
     }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
@@ -205,8 +202,11 @@ export class UIScene extends Phaser.Scene {
     this.turnLabel.setText(`TUR ${this.room.currentTurn}`);
 
     const isMyTurn = this.room.currentPlayerId === this.socket.myUserId;
-    this.activeBanner.setText(isMyTurn ? 'SIRA SENDE' : 'RAKIBIN SIRASI');
-    this.activeBanner.setColor(isMyTurn ? THEME.SUCCESS_STR : THEME.DANGER_STR);
+    this.activeText.setText(isMyTurn ? 'YOUR TURN' : 'OPPONENT\'S TURN');
+    this.activeText.setStyle({ color: isMyTurn ? THEME.SUCCESS_STR : THEME.DANGER_STR });
+
+    const myState = this.room.players[this.socket.myUserId];
+    if (myState) this.drawMana(myState.mana);
 
     this.endTurnBtn.setAlpha(isMyTurn ? 1 : 0.4);
     this.surrenderBtn.setAlpha(isMyTurn ? 1 : 0.4);

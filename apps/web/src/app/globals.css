@@ -1,0 +1,149 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Space-theme design tokens (dark mode only) ─────────────────────────── */
+:root {
+  /* Legacy aliases kept for backward-compat */
+  --bg-dark: #0a0a14;
+  --bg-card: rgba(20, 22, 40, 0.9);
+  --text-primary: #e8e8f0;
+  --text-muted: #888;
+  --border: rgba(255, 255, 255, 0.08);
+
+  /* ── Backgrounds ─────────────────────────────────── */
+  --color-bg:          #07090f;
+  --color-bg-surface:  #0d1020;
+  --color-bg-elevated: #141828;
+  --color-bg-overlay:  rgba(7, 9, 15, 0.85);
+
+  /* ── Text ────────────────────────────────────────── */
+  --color-text-primary:   #e8e8f0;
+  --color-text-secondary: #a8a8c0;
+  --color-text-muted:     #666882;
+  --color-text-inverse:   #07090f;
+
+  /* ── Brand (purple-blue) ─────────────────────────── */
+  --color-brand:      #7b8cde;
+  --color-brand-hover:#9aaae8;
+  --color-brand-dim:  rgba(123, 140, 222, 0.15);
+  --color-brand-glow: rgba(123, 140, 222, 0.4);
+
+  /* ── Accent (teal) ───────────────────────────────── */
+  --color-accent:      #44d9c8;
+  --color-accent-hover:#66e6d8;
+  --color-accent-dim:  rgba(68, 217, 200, 0.15);
+
+  /* ── Energy (amber/gold) ─────────────────────────── */
+  --color-energy:     #ffc832;
+  --color-energy-dim: rgba(255, 200, 50, 0.15);
+
+  /* ── Borders ─────────────────────────────────────── */
+  --color-border:       rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.18);
+  --color-border-focus: rgba(123, 140, 222, 0.6);
+
+  /* ── Status ──────────────────────────────────────── */
+  --color-success: #44dd88;
+  --color-danger:  #ff4444;
+  --color-warning: #ffaa22;
+  --color-info:    #4488ff;
+
+  /* ── Typography ──────────────────────────────────── */
+  --font-display: 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'Cascadia Code', 'Fira Code', monospace;
+
+  /* ── Gradients ───────────────────────────────────── */
+  --gradient-nebula: radial-gradient(ellipse at top, #1a1a3a 0%, #07090f 70%);
+  --gradient-hero:   linear-gradient(135deg, #0d0d2a 0%, #07090f 50%, #0d0a20 100%);
+  --gradient-card:   linear-gradient(135deg, rgba(123,140,222,0.08) 0%, rgba(68,217,200,0.04) 100%);
+  --gradient-brand:  linear-gradient(135deg, #7b8cde 0%, #44d9c8 100%);
+}
+
+/* ── Base styles ───────────────────────────────────────────────────────── */
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+/* ── Utility component classes ─────────────────────────────────────────── */
+
+.glass-card {
+  background: rgba(20, 24, 44, 0.7);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.stat-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.badge-brand {
+  background: var(--color-brand-dim);
+  color: var(--color-brand);
+  border: 1px solid rgba(123, 140, 222, 0.3);
+}
+
+.badge-accent {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  border: 1px solid rgba(68, 217, 200, 0.3);
+}
+
+.badge-energy {
+  background: var(--color-energy-dim);
+  color: var(--color-energy);
+  border: 1px solid rgba(255, 200, 50, 0.3);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-ghost:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.hover-glow {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px var(--color-brand-glow);
+  border-color: var(--color-border-hover);
+}
+
+.text-gradient-brand {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

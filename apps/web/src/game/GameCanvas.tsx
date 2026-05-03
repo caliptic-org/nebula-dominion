@@ -61,10 +61,8 @@ export default function GameCanvas({ race, mode, userId }: Props) {
     <div
       style={{
         width: '100%',
-        height: '100%',
+        maxWidth: GAME_W,
         aspectRatio: `${GAME_W} / ${GAME_H}`,
-        maxWidth: '100%',
-        maxHeight: '100%',
         margin: '0 auto',
         position: 'relative',
       }}

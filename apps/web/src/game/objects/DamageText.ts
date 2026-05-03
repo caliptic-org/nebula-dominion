@@ -7,8 +7,13 @@ import { THEME } from '../theme';
  */
 export function spawnDamageText(scene: Phaser.Scene, x: number, y: number, value: number) {
   const isCrit = value > 12;
-  const tilt = (Math.random() * 16 - 8) + (isCrit ? 12 : 0);
-  const driftX = (Math.random() - 0.5) * 20;
+  const text = scene.add.text(x, y - 10, `-${value}`, {
+    fontSize: isCrit ? '22px' : '16px',
+    fontStyle: 'bold',
+    color: isCrit ? THEME.DANGER_STR : THEME.ENERGY_STR,
+    stroke: '#000000',
+    strokeThickness: 3,
+  }).setOrigin(0.5, 1).setDepth(100);
 
   if (isCrit) drawImpactHalo(scene, x, y, THEME.ENERGY);
 
@@ -97,7 +102,7 @@ export function spawnAbilityText(scene: Phaser.Scene, x: number, y: number, unit
     fontSize: '14px',
     fontFamily: 'Impact, "Arial Black", system-ui, sans-serif',
     fontStyle: 'bold',
-    color: '#cc88ff',
+    color: '#cc88ff', // ability purple — intentional, not in core palette
     stroke: '#000000',
     strokeThickness: 3,
   }).setOrigin(0.5, 1).setDepth(120).setAngle(-6).setScale(0.5);

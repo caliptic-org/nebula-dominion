@@ -84,11 +84,11 @@ export default function HomePage() {
         />
       )}
 
-      <div
-        className="min-h-[100dvh] flex flex-col relative"
-        style={{ background: 'var(--color-bg)' }}
-      >
-        {/* Nebula background */}
+      <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
+        {/* Title */}
+        <h1 style={{ fontSize: 22, marginBottom: 24, color: 'var(--color-energy)' }}>Nebula Dominion</h1>
+
+        {/* Tabs */}
         <div
           className="fixed inset-0 pointer-events-none transition-all duration-700"
           style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
@@ -101,16 +101,28 @@ export default function HomePage() {
         <header
           className="relative z-40 sticky top-0"
           style={{
-            background: 'rgba(8,10,16,0.9)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            gap: 4,
+            borderBottom: '1px solid var(--color-border)',
+            marginBottom: 32,
           }}
         >
-          <div className="flex items-center justify-between px-3 py-2 gap-2">
-            {/* Logo */}
-            <span
-              className="font-display text-[10px] font-black tracking-[0.2em] uppercase shrink-0 hidden sm:block"
-              style={{ color: raceColor }}
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '10px 20px',
+                fontSize: 13,
+                fontWeight: activeTab === tab.id ? 700 : 400,
+                color: activeTab === tab.id ? 'var(--color-energy)' : 'var(--color-text-muted)',
+                background: 'none',
+                border: 'none',
+                borderBottom: `2px solid ${activeTab === tab.id ? 'var(--color-energy)' : 'transparent'}`,
+                cursor: 'pointer',
+                transition: 'color 0.2s, border-color 0.2s',
+                marginBottom: -1,
+              }}
             >
               ◆ NEBULA
             </span>
@@ -170,119 +182,56 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* ── Main Content ──────────────────────────────────── */}
-        <main className="relative z-10 flex-1 overflow-auto pb-24">
-
-          {/* ── Base Tab ──────────────────────────────────────── */}
-          {activeTab === 'base' && (
-            <div className="flex flex-col lg:flex-row gap-4 p-4 h-full">
-
-              {/* Left: Tilemap */}
-              <div className="flex-1 flex flex-col gap-4 min-w-0">
-                {/* Tilemap header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="badge badge-race">Ana Üs</span>
-                    </div>
-                    <h2 className="font-display text-lg font-black text-text-primary">
-                      {raceDesc.name} <span style={{ color: raceColor }}>İmparatorluğu</span>
-                    </h2>
-                  </div>
-                  {selectedTile && (
-                    <span
-                      className="font-display text-[10px] uppercase tracking-widest px-3 py-1 rounded-full"
-                      style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}30` }}
-                    >
-                      [{selectedTile.col}, {selectedTile.row}] seçili
-                    </span>
-                  )}
-                </div>
-
-                {/* Isometric Tilemap */}
-                <MangaPanel className="overflow-hidden rounded-lg">
-                  <IsometricTilemap
-                    race={race}
-                    structures={STRUCTURES_ON_MAP}
-                    onTileSelect={handleTileSelect}
-                  />
-                </MangaPanel>
-
-                {/* Left production stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: 'Mineral/dk', value: '+120', color: '#4a9eff' },
-                    { label: 'Gas/dk', value: '+45', color: '#44ff88' },
-                    { label: 'Enerji/dk', value: '+80', color: '#ffc832' },
-                    { label: 'Yapı', value: `${STRUCTURES_ON_MAP.length}/12`, color: raceColor },
-                  ].map((s) => (
-                    <MangaPanel key={s.label} className="p-3">
-                      <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-1">{s.label}</div>
-                      <div className="font-display text-lg font-black" style={{ color: s.color }}>{s.value}</div>
-                    </MangaPanel>
-                  ))}
-                </div>
+        {/* ─── Tab: İlerleme ──────────────────────────────────────────────────── */}
+        {activeTab === 'progression' && (
+          <>
+            {loading && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                <p style={{ color: 'var(--color-text-secondary)' }}>Yükleniyor…</p>
               </div>
+            )}
+            {!loading && !progress && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                <p style={{ color: 'var(--color-danger)' }}>İlerleme yüklenemedi.</p>
+              </div>
+            )}
+            {!loading && progress && (
+              <>
+                <LevelIndicator progress={progress} />
 
-              {/* Right: Commander Card + Structures */}
-              <div className="lg:w-72 shrink-0 flex flex-col gap-4">
-                {/* Commander card */}
-                <MangaPanel className="overflow-hidden" glow>
-                  <div className="relative h-52 overflow-hidden">
-                    {!imgError ? (
-                      <Image
-                        src={primaryCommander.portrait}
-                        alt={primaryCommander.name}
-                        fill
-                        className="object-cover object-top"
-                        onError={() => setImgError(true)}
-                        style={{ filter: `drop-shadow(0 4px 12px ${raceGlow})` }}
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center text-6xl"
-                        style={{ background: raceDesc.bgColor }}
-                      >
-                        {raceDesc.icon}
-                      </div>
-                    )}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: `linear-gradient(to top, ${raceDesc.bgColor.replace('0.08', '0.9')} 0%, transparent 50%)`,
-                      }}
-                    />
-                    <div className="absolute bottom-3 left-3 right-3">
-                      <div
-                        className="font-display text-base font-black"
-                        style={{ color: raceColor, textShadow: `0 0 12px ${raceGlow}` }}
-                      >
-                        {primaryCommander.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className="badge text-[9px]"
-                          style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}40` }}
-                        >
-                          Lv.{primaryCommander.level}
-                        </span>
-                        <span className="text-text-muted text-[10px]">{raceDesc.name}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-2">Yetenekler</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {primaryCommander.abilities.map((ab) => (
-                        <span
-                          key={ab}
-                          className="px-2 py-0.5 rounded text-[10px] font-display"
-                          style={{ background: `${raceColor}12`, color: raceColor, border: `1px solid ${raceColor}25` }}
-                        >
-                          {ab}
+                <section style={{ marginTop: 32 }}>
+                  <h2 style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Açık İçerikler
+                  </h2>
+                  {progress.unlockedContent.length === 0 ? (
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Henüz içerik açılmadı.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {progress.unlockedContent.map((unlock) => (
+                        <span key={unlock} className="badge badge-energy">
+                          {unlock.replace(/_/g, ' ')}
                         </span>
                       ))}
                     </div>
+                  )}
+                </section>
+
+                <section style={{ marginTop: 32 }}>
+                  <h2 style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    İstatistikler
+                  </h2>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                    {[
+                      { label: 'Toplam XP', value: progress.totalXp.toLocaleString('tr-TR') },
+                      { label: 'Tier Bonusu', value: `×${progress.tierBonusMultiplier.toFixed(2)}` },
+                      { label: 'Yaş', value: `Çağ ${progress.age}` },
+                      { label: 'Seviye', value: `${progress.level} / 9` },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="stat-card">
+                        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase' }}>{label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div>
+                      </div>
+                    ))}
                   </div>
                 </MangaPanel>
 
@@ -327,32 +276,108 @@ export default function HomePage() {
                   </div>
                 </MangaPanel>
 
-                {/* Race switcher */}
-                <MangaPanel className="p-4">
-                  <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-3">
-                    Irk Değiştir
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(Object.values(Race) as Race[]).map((r) => {
-                      const d = RACE_DESCRIPTIONS[r];
-                      const active = r === race;
-                      return (
-                        <button
-                          key={r}
-                          onClick={() => setRace(r)}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-display font-bold transition-all duration-200"
-                          style={{
-                            background: active ? d.bgColor : 'rgba(255,255,255,0.03)',
-                            border: `1px solid ${active ? d.color : 'rgba(255,255,255,0.08)'}`,
-                            color: active ? d.color : '#555',
-                          }}
-                        >
-                          {d.icon} {d.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </MangaPanel>
+        {/* ─── Tab: Birimler ──────────────────────────────────────────────────── */}
+        {activeTab === 'units' && (
+          <div>
+            {/* Race switcher bar */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginBottom: 24,
+                padding: '12px 16px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.06)',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 8 }}>Irk:</span>
+              {(Object.values(Race) as Race[]).map((race) => {
+                const desc = RACE_DESCRIPTIONS[race];
+                const active = selectedRace === race;
+                return (
+                  <button
+                    key={race}
+                    onClick={() => handleRaceSelect(race)}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: active ? 700 : 400,
+                      background: active ? desc.bgColor : 'transparent',
+                      border: `1px solid ${active ? desc.color : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 20,
+                      color: active ? desc.color : '#666',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {desc.icon} {desc.name}
+                  </button>
+                );
+              })}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                Demo modu • {demoUnits.length} birim
+              </span>
+            </div>
+
+            {/* Map + Stats Panel */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 240px',
+                gap: 20,
+                alignItems: 'start',
+              }}
+            >
+              <GameMap
+                units={demoUnits}
+                selectedUnitId={selectedUnitId}
+                onSelectUnit={handleSelectUnit}
+                onMoveUnit={handleMoveUnit}
+              />
+              <UnitStatsPanel unit={selectedUnit} />
+            </div>
+
+            {/* Unit list below map */}
+            <div style={{ marginTop: 20 }}>
+              <h3
+                style={{
+                  fontSize: 13,
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                  marginBottom: 12,
+                }}
+              >
+                Birim Listesi
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {demoUnits.length === 0 && (
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Bu ırk için demo birim yok.</p>
+                )}
+                {demoUnits.map((unit) => {
+                  const desc = RACE_DESCRIPTIONS[unit.race];
+                  const isSelected = unit.id === selectedUnitId;
+                  return (
+                    <button
+                      key={unit.id}
+                      onClick={() => handleSelectUnit(isSelected ? null : unit)}
+                      style={{
+                        padding: '8px 14px',
+                        background: isSelected ? desc.bgColor : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${isSelected ? desc.color : 'rgba(255,255,255,0.08)'}`,
+                        borderRadius: 8,
+                        color: isSelected ? desc.color : '#aaa',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {desc.icon} {unit.type.replace(/_/g, ' ')} ({unit.positionX},{unit.positionY})
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

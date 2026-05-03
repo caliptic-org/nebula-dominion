@@ -3,7 +3,6 @@ import { GameSocket, UnitState, GameRoom } from '../socket/GameSocket';
 import { UnitSprite } from '../objects/UnitSprite';
 import { spawnDamageText, spawnAbilityText } from '../objects/DamageText';
 import { THEME } from '../theme';
-import { getRaceVisual } from '../raceVisuals';
 
 const GRID_COLS = 8;
 const GRID_ROWS = 6;
@@ -49,7 +48,6 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(THEME.BG);
-    this.drawHalftoneBackdrop();
     this.drawGrid();
     this.reachableGraphics = this.add.graphics();
     this.spawnAllUnits();
@@ -97,7 +95,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Background panel
     this.gridGraphics.fillStyle(THEME.BG_PANEL, 1);
-    this.gridGraphics.fillRect(gridX, gridY, gridW, gridH);
+    this.gridGraphics.fillRect(MARGIN_X - 4, MARGIN_Y - 4, GRID_COLS * CELL_SIZE + 8, GRID_ROWS * CELL_SIZE + 8);
 
     // Manga ink border (thick black outline)
     this.gridGraphics.lineStyle(4, THEME.PANEL_INK, 1);
@@ -105,8 +103,8 @@ export class BattleScene extends Phaser.Scene {
 
     // Dividing line (player left, enemy right) — manga split
     const midX = MARGIN_X + (GRID_COLS / 2) * CELL_SIZE;
-    this.gridGraphics.lineStyle(3, THEME.PANEL_INK, 0.9);
-    this.gridGraphics.lineBetween(midX, gridY, midX, gridY + gridH);
+    this.gridGraphics.lineStyle(2, THEME.GRID_DIVIDER, 0.5);
+    this.gridGraphics.lineBetween(midX, MARGIN_Y, midX, MARGIN_Y + GRID_ROWS * CELL_SIZE);
 
     // Grid cells with race-tinted halves
     for (let c = 0; c < GRID_COLS; c++) {
@@ -114,22 +112,19 @@ export class BattleScene extends Phaser.Scene {
         const x = MARGIN_X + c * CELL_SIZE;
         const y = MARGIN_Y + r * CELL_SIZE;
         const isPlayerSide = c < GRID_COLS / 2;
-        const tint = isPlayerSide ? playerVisual.hex : enemyVisual.hex;
-        this.gridGraphics.lineStyle(1, tint, 0.35);
+        this.gridGraphics.lineStyle(1, isPlayerSide ? THEME.GRID_PLAYER_SIDE : THEME.GRID_ENEMY_SIDE, 0.4);
         this.gridGraphics.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
       }
     }
 
-    // Race labels above each half (manga panel header style)
-    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.25, MARGIN_Y - 14, `${playerVisual.icon} ${playerVisual.label}`, {
-      fontSize: '11px', color: playerVisual.str, fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 1).setDepth(5);
+    // Labels
+    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.25, MARGIN_Y - 24, 'YOUR FORCES', {
+      fontSize: '12px', color: THEME.INFO_STR, fontStyle: 'bold',
+    }).setOrigin(0.5, 1);
 
-    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.75, MARGIN_Y - 14, `${enemyVisual.icon} ${enemyVisual.label}`, {
-      fontSize: '11px', color: enemyVisual.str, fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 1).setDepth(5);
+    this.add.text(MARGIN_X + GRID_COLS * CELL_SIZE * 0.75, MARGIN_Y - 24, 'ENEMY FORCES', {
+      fontSize: '12px', color: THEME.DANGER_STR, fontStyle: 'bold',
+    }).setOrigin(0.5, 1);
   }
 
   private spawnAllUnits() {

@@ -79,7 +79,8 @@ export class GameSocket {
     };
 
     ['state_update', 'unit_attacked', 'unit_died', 'unit_moved', 'unit_deployed',
-      'ability_used', 'turn_ended', 'game_over', 'player_surrendered',
+      'ability_ready', 'ability_used', 'battle_event', 'turn_ended',
+      'game_over', 'player_surrendered',
       'player_disconnected', 'player_reconnected'].forEach(passThrough);
 
     this.pveSocket.on('pve_game_ready', async (data: Record<string, unknown>) => {

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -19,6 +20,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   app.enableVersioning({
     type: VersioningType.URI,
@@ -41,7 +44,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Nebula Dominion API')
-    .setDescription('REST API for Nebula Dominion game — user profiles, game state, scoreboard')
+    .setDescription('REST API for Nebula Dominion game — user profiles, game state, scoreboard, chat')
     .setVersion('1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -51,6 +54,7 @@ async function bootstrap() {
     .addTag('users', 'User profile management')
     .addTag('game-state', 'Game state management')
     .addTag('scoreboard', 'Leaderboard and rankings')
+    .addTag('chat', 'Global/guild chat and DM messaging')
     .addTag('health', 'Health checks')
     .build();
 

@@ -4,6 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { User } from '../users/entities/user.entity';
 import { GameState } from '../game-state/entities/game-state.entity';
 import { PlayerScore } from '../scoreboard/entities/player-score.entity';
+import { ChatMessage } from '../chat/entities/chat-message.entity';
+import { DmConversation } from '../chat/entities/dm-conversation.entity';
+import { DmMessage } from '../chat/entities/dm-message.entity';
+import { DmBlock } from '../chat/entities/dm-block.entity';
+import { GuildMembership } from '../chat/entities/guild-membership.entity';
 
 @Module({
   imports: [
@@ -18,7 +23,7 @@ import { PlayerScore } from '../scoreboard/entities/player-score.entity';
           password: db.password,
           database: db.database,
           ssl: db.ssl ? { rejectUnauthorized: false } : false,
-          entities: [User, GameState, PlayerScore],
+          entities: [User, GameState, PlayerScore, ChatMessage, DmConversation, DmMessage, DmBlock, GuildMembership],
           // Migrations are managed separately — never auto-synchronize in production
           synchronize: process.env.NODE_ENV !== 'production',
           migrationsRun: false,

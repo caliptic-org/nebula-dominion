@@ -74,8 +74,12 @@
 
   /* Manga effects */
   --manga-border: 3px solid rgba(255,255,255,0.12);
+  --manga-border-ink: 3px solid rgba(255,255,255,0.22);
   --manga-panel-bg: rgba(13,17,23,0.85);
+  --manga-panel-bg-deep: rgba(8,10,16,0.92);
   --speed-line-color: rgba(255,255,255,0.06);
+  --manga-halftone-size: 8px;
+  --manga-halftone-opacity: 0.13;
 }
 
 /* ── Race Theme Overrides ───────────────────────────────────────────────── */
@@ -312,8 +316,9 @@ body::after {
 }
 
 .manga-panel-thick {
-  border-width: 1.5px;
-  border-color: rgba(0, 207, 255, 0.35);
+  border-width: 2px;
+  border-color: rgba(0, 207, 255, 0.5);
+  box-shadow: 0 0 12px rgba(0,207,255,0.15), inset 0 0 20px rgba(0,0,0,0.25);
 }
 
 /* Double-Bezel card architecture */
@@ -633,13 +638,54 @@ body::after {
   filter: drop-shadow(0 0 12px var(--color-accent-soft));
 }
 
-/* ── Halftone Background ────────────────────────────────────────────────── */
+/* ── Halftone Backgrounds ───────────────────────────────────────────────── */
+/* Base halftone — neutral white dots, 12% opacity */
 .halftone-bg {
   background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
   background-size: 6px 6px;
 }
 
-/* ── Manga Speed Lines ──────────────────────────────────────────────────── */
+/* Manga halftone — slightly denser, richer dot pattern */
+.manga-halftone {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Race-aware halftone — inherits --color-race */
+.manga-halftone-race {
+  background-image: radial-gradient(circle, var(--color-race) 1px, transparent 1px);
+  background-size: 8px 8px;
+  opacity: 0.13;
+}
+
+/* Per-race halftone variants (can be used without data-race context) */
+.manga-halftone-zerg {
+  background-image: radial-gradient(circle, rgba(68,255,68,0.14) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.manga-halftone-otomat {
+  background-image: radial-gradient(circle, rgba(0,207,255,0.14) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.manga-halftone-canavar {
+  background-image: radial-gradient(circle, rgba(255,102,0,0.14) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.manga-halftone-insan {
+  background-image: radial-gradient(circle, rgba(74,158,255,0.14) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.manga-halftone-seytan {
+  background-image: radial-gradient(circle, rgba(204,0,255,0.14) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* ── Speed Lines ────────────────────────────────────────────────────────── */
+/* Legacy – kept for backward compat */
 .speed-lines {
   position: absolute;
   inset: 0;
@@ -658,6 +704,535 @@ body::after {
   height: 1px;
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
   transform-origin: left center;
+}
+
+/* Radial burst speed lines — conic gradient from center */
+.speed-lines-radial {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    rgba(255,255,255,0.025) 1deg,
+    transparent 2deg,
+    transparent 10deg,
+    rgba(255,255,255,0.020) 11deg,
+    transparent 12deg,
+    transparent 22deg,
+    rgba(255,255,255,0.018) 23deg,
+    transparent 24deg,
+    transparent 36deg,
+    rgba(255,255,255,0.022) 37deg,
+    transparent 38deg,
+    transparent 50deg,
+    rgba(255,255,255,0.015) 51deg,
+    transparent 52deg,
+    transparent 62deg,
+    rgba(255,255,255,0.020) 63deg,
+    transparent 64deg,
+    transparent 74deg,
+    rgba(255,255,255,0.025) 75deg,
+    transparent 76deg,
+    transparent 88deg,
+    rgba(255,255,255,0.018) 89deg,
+    transparent 90deg,
+    transparent 100deg,
+    rgba(255,255,255,0.022) 101deg,
+    transparent 102deg,
+    transparent 114deg,
+    rgba(255,255,255,0.015) 115deg,
+    transparent 116deg,
+    transparent 128deg,
+    rgba(255,255,255,0.020) 129deg,
+    transparent 130deg,
+    transparent 142deg,
+    rgba(255,255,255,0.025) 143deg,
+    transparent 144deg,
+    transparent 156deg,
+    rgba(255,255,255,0.018) 157deg,
+    transparent 158deg,
+    transparent 170deg,
+    rgba(255,255,255,0.022) 171deg,
+    transparent 172deg,
+    transparent 184deg,
+    rgba(255,255,255,0.015) 185deg,
+    transparent 186deg,
+    transparent 198deg,
+    rgba(255,255,255,0.020) 199deg,
+    transparent 200deg,
+    transparent 212deg,
+    rgba(255,255,255,0.025) 213deg,
+    transparent 214deg,
+    transparent 226deg,
+    rgba(255,255,255,0.018) 227deg,
+    transparent 228deg,
+    transparent 240deg,
+    rgba(255,255,255,0.022) 241deg,
+    transparent 242deg,
+    transparent 252deg,
+    rgba(255,255,255,0.015) 253deg,
+    transparent 254deg,
+    transparent 264deg,
+    rgba(255,255,255,0.020) 265deg,
+    transparent 266deg,
+    transparent 278deg,
+    rgba(255,255,255,0.025) 279deg,
+    transparent 280deg,
+    transparent 292deg,
+    rgba(255,255,255,0.018) 293deg,
+    transparent 294deg,
+    transparent 306deg,
+    rgba(255,255,255,0.022) 307deg,
+    transparent 308deg,
+    transparent 320deg,
+    rgba(255,255,255,0.015) 321deg,
+    transparent 322deg,
+    transparent 334deg,
+    rgba(255,255,255,0.020) 335deg,
+    transparent 336deg,
+    transparent 348deg,
+    rgba(255,255,255,0.025) 349deg,
+    transparent 360deg
+  );
+}
+
+/* Race-tinted radial speed lines for battle screen */
+.speed-lines-battle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    var(--color-race-glow) 1.5deg,
+    transparent 3deg,
+    transparent 14deg,
+    var(--color-race-glow) 15.5deg,
+    transparent 17deg,
+    transparent 30deg,
+    var(--color-race-glow) 31.5deg,
+    transparent 33deg,
+    transparent 46deg,
+    var(--color-race-glow) 47.5deg,
+    transparent 49deg,
+    transparent 62deg,
+    var(--color-race-glow) 63.5deg,
+    transparent 65deg,
+    transparent 80deg,
+    var(--color-race-glow) 81.5deg,
+    transparent 83deg,
+    transparent 98deg,
+    var(--color-race-glow) 99.5deg,
+    transparent 101deg,
+    transparent 116deg,
+    var(--color-race-glow) 117.5deg,
+    transparent 119deg,
+    transparent 134deg,
+    var(--color-race-glow) 135.5deg,
+    transparent 137deg,
+    transparent 152deg,
+    var(--color-race-glow) 153.5deg,
+    transparent 155deg,
+    transparent 170deg,
+    var(--color-race-glow) 171.5deg,
+    transparent 173deg,
+    transparent 188deg,
+    var(--color-race-glow) 189.5deg,
+    transparent 191deg,
+    transparent 206deg,
+    var(--color-race-glow) 207.5deg,
+    transparent 209deg,
+    transparent 224deg,
+    var(--color-race-glow) 225.5deg,
+    transparent 227deg,
+    transparent 242deg,
+    var(--color-race-glow) 243.5deg,
+    transparent 245deg,
+    transparent 260deg,
+    var(--color-race-glow) 261.5deg,
+    transparent 263deg,
+    transparent 278deg,
+    var(--color-race-glow) 279.5deg,
+    transparent 281deg,
+    transparent 296deg,
+    var(--color-race-glow) 297.5deg,
+    transparent 299deg,
+    transparent 314deg,
+    var(--color-race-glow) 315.5deg,
+    transparent 317deg,
+    transparent 332deg,
+    var(--color-race-glow) 333.5deg,
+    transparent 335deg,
+    transparent 350deg,
+    var(--color-race-glow) 351.5deg,
+    transparent 353deg,
+    transparent 360deg
+  );
+  opacity: 0.5;
+}
+
+/* Horizontal sweep speed lines (for modal open / screen transition) */
+.speed-lines-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 18px,
+    rgba(255,255,255,0.03) 18px,
+    rgba(255,255,255,0.03) 19px,
+    transparent 19px,
+    transparent 36px,
+    rgba(255,255,255,0.02) 36px,
+    rgba(255,255,255,0.02) 37px
+  );
+}
+
+/* Hover-triggered speed lines overlay (attach to a parent, activate via JS adding .active) */
+.speed-lines-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.speed-lines-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    rgba(255,255,255,0.04) 1deg,
+    transparent 2deg,
+    transparent 18deg,
+    rgba(255,255,255,0.03) 19deg,
+    transparent 20deg,
+    transparent 38deg,
+    rgba(255,255,255,0.04) 39deg,
+    transparent 40deg,
+    transparent 58deg,
+    rgba(255,255,255,0.03) 59deg,
+    transparent 60deg,
+    transparent 78deg,
+    rgba(255,255,255,0.04) 79deg,
+    transparent 80deg,
+    transparent 98deg,
+    rgba(255,255,255,0.03) 99deg,
+    transparent 100deg,
+    transparent 118deg,
+    rgba(255,255,255,0.04) 119deg,
+    transparent 120deg,
+    transparent 138deg,
+    rgba(255,255,255,0.03) 139deg,
+    transparent 140deg,
+    transparent 158deg,
+    rgba(255,255,255,0.04) 159deg,
+    transparent 160deg,
+    transparent 178deg,
+    rgba(255,255,255,0.03) 179deg,
+    transparent 180deg,
+    transparent 198deg,
+    rgba(255,255,255,0.04) 199deg,
+    transparent 200deg,
+    transparent 218deg,
+    rgba(255,255,255,0.03) 219deg,
+    transparent 220deg,
+    transparent 238deg,
+    rgba(255,255,255,0.04) 239deg,
+    transparent 240deg,
+    transparent 258deg,
+    rgba(255,255,255,0.03) 259deg,
+    transparent 260deg,
+    transparent 278deg,
+    rgba(255,255,255,0.04) 279deg,
+    transparent 280deg,
+    transparent 298deg,
+    rgba(255,255,255,0.03) 299deg,
+    transparent 300deg,
+    transparent 318deg,
+    rgba(255,255,255,0.04) 319deg,
+    transparent 320deg,
+    transparent 338deg,
+    rgba(255,255,255,0.03) 339deg,
+    transparent 340deg,
+    transparent 358deg,
+    rgba(255,255,255,0.04) 359deg,
+    transparent 360deg
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.speed-lines-hover:hover::after {
+  opacity: 1;
+}
+
+/* ── Ink Borders (manga thick outline) ─────────────────────────────────── */
+/* Neutral 2px ink border */
+.ink-border {
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);
+}
+
+/* Race-colored 3px ink border + outer glow */
+.ink-border-race {
+  border: 3px solid var(--color-race);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.6),
+    0 0 12px var(--color-race-glow),
+    inset 0 0 0 1px rgba(0,0,0,0.4);
+}
+
+/* Dark manga outline (for hover/selected states) */
+.ink-border-dark {
+  border: 2px solid rgba(0,0,0,0.8);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* Brand/accent colored ink border */
+.ink-border-accent {
+  border: 2px solid var(--color-accent);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.6),
+    0 0 10px var(--color-accent-glow);
+}
+
+/* ── Manga Panel Race Variant ───────────────────────────────────────────── */
+/* manga-panel but with race-colored border + corner accents */
+.manga-panel-race {
+  position: relative;
+  background: var(--manga-panel-bg);
+  border: 2px solid var(--color-race);
+  clip-path: polygon(
+    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
+    100% calc(100% - 12px), calc(100% - 12px) 100%,
+    12px 100%, 0 calc(100% - 12px)
+  );
+  box-shadow: 0 0 16px var(--color-race-glow), inset 0 0 24px rgba(0,0,0,0.3);
+}
+
+.manga-panel-race::before,
+.manga-panel-race::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.manga-panel-race::before {
+  top: 8px;
+  left: 8px;
+  border-top: 3px solid var(--color-race);
+  border-left: 3px solid var(--color-race);
+}
+
+.manga-panel-race::after {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 3px solid var(--color-race);
+  border-right: 3px solid var(--color-race);
+}
+
+/* ── Enhanced Corner Accents (all four corners) ─────────────────────────── */
+/* Add .manga-corners-full to any positioned element for 4-corner L-brackets */
+.manga-corners-full {
+  position: relative;
+}
+
+.manga-corners-full::before,
+.manga-corners-full::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.manga-corners-full::before {
+  top: 6px;
+  left: 6px;
+  border-top: 3px solid var(--color-race);
+  border-left: 3px solid var(--color-race);
+  filter: drop-shadow(0 0 4px var(--color-race-glow));
+}
+
+.manga-corners-full::after {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 3px solid var(--color-race);
+  border-right: 3px solid var(--color-race);
+  filter: drop-shadow(0 0 4px var(--color-race-glow));
+}
+
+/* Two extra pseudo-elements via a wrapper child for all 4 corners */
+.manga-corners-full > .manga-corner-tl::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  border-top: 3px solid var(--color-race);
+  border-left: 3px solid var(--color-race);
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 0 4px var(--color-race-glow));
+}
+
+.manga-corners-full > .manga-corner-br::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  border-bottom: 3px solid var(--color-race);
+  border-right: 3px solid var(--color-race);
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 0 4px var(--color-race-glow));
+}
+
+/* ── Manga Typography ────────────────────────────────────────────────────── */
+/* Dramatic Orbitron Black heading for screen titles */
+.manga-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+  text-shadow:
+    0 0 20px var(--color-race-glow),
+    0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* Large dramatic stat number display */
+.manga-number {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(2rem, 8vw, 4rem);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: var(--color-race);
+  text-shadow:
+    0 0 24px var(--color-race-glow),
+    0 0 48px var(--color-race-glow),
+    0 2px 8px rgba(0,0,0,0.9);
+}
+
+/* Section label — small Orbitron caps above a panel */
+.manga-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-race);
+  opacity: 0.85;
+}
+
+/* ── Panel Dividers ──────────────────────────────────────────────────────── */
+/* Sharp horizontal manga panel border */
+.panel-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-race) 20%,
+    var(--color-race) 80%,
+    transparent 100%
+  );
+  opacity: 0.45;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Thick 2px accent divider */
+.panel-divider-bold {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-race) 15%,
+    rgba(255,255,255,0.9) 50%,
+    var(--color-race) 85%,
+    transparent 100%
+  );
+  opacity: 0.5;
+  box-shadow: 0 0 8px var(--color-race-glow);
+  flex-shrink: 0;
+}
+
+/* Diagonal slash panel divider (parallelogram cut effect) */
+.panel-divider-diagonal {
+  width: 100%;
+  height: 24px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.panel-divider-diagonal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--color-race) 30%,
+    var(--color-race) 70%,
+    transparent 100%
+  );
+  clip-path: polygon(2% 45%, 98% 45%, 100% 55%, 0% 55%);
+  opacity: 0.4;
+}
+
+.panel-divider-diagonal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255,255,255,0.6) 40%,
+    rgba(255,255,255,0.6) 60%,
+    transparent 100%
+  );
+  clip-path: polygon(5% 48%, 95% 48%, 97% 52%, 3% 52%);
+  opacity: 0.25;
+}
+
+/* Vertical side accent bar (left edge of a panel section) */
+.panel-accent-bar {
+  position: relative;
+}
+
+.panel-accent-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  background: linear-gradient(180deg, transparent 0%, var(--color-race) 30%, var(--color-race) 70%, transparent 100%);
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--color-race-glow);
 }
 
 /* ── Text utilities ─────────────────────────────────────────────────────── */

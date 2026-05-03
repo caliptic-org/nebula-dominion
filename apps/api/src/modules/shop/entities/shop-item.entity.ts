@@ -43,7 +43,7 @@ export class ShopItem {
   @Column({ type: 'jsonb', default: {} })
   content: Record<string, unknown>;
 
-  @Column({ name: 'preview_asset', type: 'varchar', length: 500, nullable: true })
+  @Column({ name: 'preview_asset', length: 500, nullable: true })
   previewAsset: string | null;
 
   @Column({ name: 'is_limited', default: false })

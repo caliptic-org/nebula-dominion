@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { BossService } from './boss.service';
 
@@ -18,31 +18,6 @@ export class BossController {
   @ApiOperation({ summary: 'Yutucu Kurt boss bilgileri (tüm fazlar)' })
   getDevoringWorm() {
     return this.bossService.getDevoringWormEncounters();
-  }
-
-  @Get('age2')
-  @ApiOperation({ summary: 'Çağ 2 boss karşılaşmaları (Hidra ve Titan)' })
-  getAge2Bosses() {
-    return this.bossService.getAge2Bosses();
-  }
-
-  @Get('hydra')
-  @ApiOperation({ summary: 'Hidra boss bilgileri (tüm fazlar)' })
-  getHydra() {
-    return this.bossService.getHydraEncounters();
-  }
-
-  @Get('titan')
-  @ApiOperation({ summary: 'Titan boss bilgileri (tüm fazlar)' })
-  getTitan() {
-    return this.bossService.getTitanEncounters();
-  }
-
-  @Post('age2/seed')
-  @ApiOperation({ summary: 'Çağ 2 boss\'larını seed et (Hidra ve Titan)' })
-  seedAge2Bosses(@Body() body: { ageId: string }) {
-    if (!body.ageId) throw new BadRequestException('ageId zorunludur');
-    return this.bossService.seedAge2Bosses(body.ageId);
   }
 
   @Get(':code')

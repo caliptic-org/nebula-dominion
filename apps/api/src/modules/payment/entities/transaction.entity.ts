@@ -14,13 +14,13 @@ export class Transaction {
   @Column({ default: 'pending' })
   status: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ nullable: true })
   provider: string | null;
 
-  @Column({ name: 'shop_item_id', type: 'varchar', nullable: true })
+  @Column({ name: 'shop_item_id', nullable: true })
   shopItemId: string | null;
 
-  @Column({ name: 'premium_pass_id', type: 'varchar', nullable: true })
+  @Column({ name: 'premium_pass_id', nullable: true })
   premiumPassId: string | null;
 
   @Column({ name: 'amount_usd', type: 'decimal', precision: 10, scale: 2, nullable: true })
@@ -41,10 +41,10 @@ export class Transaction {
   @Column({ name: 'premium_gems_delta', type: 'int', default: 0 })
   premiumGemsDelta: number;
 
-  @Column({ name: 'provider_payment_id', type: 'varchar', length: 300, nullable: true, unique: true })
+  @Column({ name: 'provider_payment_id', length: 300, nullable: true, unique: true })
   providerPaymentId: string | null;
 
-  @Column({ name: 'provider_order_id', type: 'varchar', length: 300, nullable: true })
+  @Column({ name: 'provider_order_id', length: 300, nullable: true })
   providerOrderId: string | null;
 
   @Column({ name: 'provider_response', type: 'jsonb', nullable: true })
@@ -68,7 +68,7 @@ export class Transaction {
   @Column({ name: 'refund_reason', type: 'text', nullable: true })
   refundReason: string | null;
 
-  @Column({ name: 'parent_transaction_id', type: 'varchar', nullable: true })
+  @Column({ name: 'parent_transaction_id', nullable: true })
   parentTransactionId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useCallback, useRef, useState } from 'react';
 import { useProgression } from '@/hooks/useProgression';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { MangaPanel } from '@/components/ui/MangaPanel';
-import { UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
+import { AgeTransitionScreen } from '@/components/progression/AgeTransitionScreen';
+import { ContentUnlock, LevelUpPayload, UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
 
 const AGES = [
   { num: 1, label: 'Kuruluş Çağı', scene: 'Galaksinin uçlarında ilk kaleler yükseliyor…', unlocked: true },
@@ -15,9 +17,36 @@ const AGES = [
   { num: 6, label: 'Nebula Hâkimi', scene: 'Yalnızca bir ırk evrenin efendisi olacak.', unlocked: false },
 ];
 
+interface AgeTransitionState {
+  toAge: number;
+  newUnlocks: ContentUnlock[];
+}
+
 export default function ProgressionPage() {
-  const { raceColor, raceGlow } = useRaceTheme();
-  const { progress, loading } = useProgression({ userId: 'demo-player-001' });
+  const { raceColor, raceGlow, meta } = useRaceTheme();
+  const lastSeenAgeRef = useRef<number | null>(null);
+  const [ageTransition, setAgeTransition] = useState<AgeTransitionState | null>(null);
+
+  const handleLevelUp = useCallback((payload: LevelUpPayload) => {
+    const previousAge = lastSeenAgeRef.current;
+    if (previousAge !== null && payload.age > previousAge) {
+      setAgeTransition({ toAge: payload.age, newUnlocks: payload.newUnlocks });
+    }
+    lastSeenAgeRef.current = payload.age;
+  }, []);
+
+  const { progress, loading } = useProgression({
+    userId: 'demo-player-001',
+    onLevelUp: handleLevelUp,
+  });
+
+  if (lastSeenAgeRef.current === null && progress) {
+    lastSeenAgeRef.current = progress.age;
+  }
+
+  const handleTransitionComplete = useCallback(() => {
+    setAgeTransition(null);
+  }, []);
 
   return (
     <div
@@ -231,6 +260,17 @@ export default function ProgressionPage() {
           </div>
         )}
       </main>
+
+      {ageTransition && (
+        <AgeTransitionScreen
+          toAge={ageTransition.toAge}
+          race={meta.dataRace}
+          raceColor={raceColor}
+          raceGlow={raceGlow}
+          newUnlocks={ageTransition.newUnlocks}
+          onComplete={handleTransitionComplete}
+        />
+      )}
     </div>
   );
 }

@@ -3,8 +3,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AnalyticsService } from './analytics/analytics.service';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { initSentry } from './common/sentry.init';
 
 async function bootstrap() {
+  // Must run before NestFactory so Sentry captures bootstrap errors too
+  initSentry();
+
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
@@ -16,11 +22,16 @@ async function bootstrap() {
     }),
   );
 
+  // Global crash filter — resolves AnalyticsService from DI container
+  const analyticsService = app.get(AnalyticsService);
+  app.useGlobalFilters(new AllExceptionsFilter(analyticsService));
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Nebula Dominion Battle API')
     .setDescription('Battle Engine REST API — turn-based combat, anti-cheat, replay system')
     .setVersion('1.0')
     .addTag('battles')
+    .addTag('analytics')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);

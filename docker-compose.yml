@@ -140,6 +140,10 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 4001
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nebula:nebula_dev_password@postgres:5432/nebula_dominion}
+      DB_SYNCHRONIZE: "false"
+      DB_RUN_MIGRATIONS: ${DB_RUN_MIGRATIONS:-true}
+      DB_LOGGING: ${DB_LOGGING:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
@@ -153,6 +157,8 @@ services:
       MAX_ACTIONS_PER_SECOND: ${MAX_ACTIONS_PER_SECOND:-10}
       MAX_ROUND_DURATION_MS: ${MAX_ROUND_DURATION_MS:-30000}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:

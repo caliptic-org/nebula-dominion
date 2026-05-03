@@ -180,6 +180,62 @@ body::before {
     radial-gradient(1px 1px at 75% 90%, rgba(255,255,255,0.09) 0%, transparent 100%);
 }
 
+/* HUD grid + tech scan overlay — fixed, pointer-events-none, GPU-safe */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 207, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 207, 255, 0.025) 1px, transparent 1px),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 207, 255, 0.035) 2px,
+      rgba(0, 207, 255, 0.035) 3px
+    );
+  background-size: 40px 40px, 40px 40px, 100% 3px;
+  opacity: 0.55;
+}
+
+/* Animated scan beam — sweeps top → bottom across the viewport */
+.hud-scan-beam {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 207, 255, 0.06) 46%,
+    rgba(0, 207, 255, 0.18) 50%,
+    rgba(0, 207, 255, 0.06) 54%,
+    transparent 100%
+  );
+  background-size: 100% 220px;
+  background-repeat: no-repeat;
+  background-position: 0 -220px;
+  animation: hud-scan-sweep 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes hud-scan-sweep {
+  0%   { background-position: 0 -240px; opacity: 0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.9; }
+  100% { background-position: 0 100dvh; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-scan-beam {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* ── HUD Panel Frame System ─────────────────────────────────────────────── */
 /* Angular sci-fi HUD frame with corner-cut clip-path + bracket accents.
    Apply `.hud-panel` for the frame shape, `.hud-panel-corners` for bracket

@@ -102,7 +102,7 @@ const config: Config = {
         'float': 'float 6s ease-in-out infinite',
         'star-twinkle': 'twinkle 4s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
-        'scan-line': 'scan-line 8s linear infinite',
+        'scan-line': 'scan-line 4s cubic-bezier(0.45,0,0.55,1) infinite',
         'speed-line': 'speed-line 0.4s ease-out forwards',
         'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
         'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',

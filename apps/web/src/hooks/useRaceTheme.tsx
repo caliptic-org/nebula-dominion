@@ -1,32 +1,53 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 
-export type RaceKey = 'insan' | 'zerg' | 'otomat' | 'canavar' | 'seytan';
+interface RaceThemeContext {
+  race: Race;
+  setRace: (race: Race) => void;
+  raceColor: string;
+  raceDim: string;
+  raceGlow: string;
+}
 
-export const RACE_META: Record<RaceKey, {
-  name: string;
-  color: string;
-  glowColor: string;
-  dimColor: string;
-  icon: string;
-}> = {
-  insan:   { name: 'İnsan',   color: '#4a9eff', glowColor: 'rgba(74,158,255,0.35)',  dimColor: 'rgba(74,158,255,0.12)',  icon: '⚔️' },
-  zerg:    { name: 'Zerg',    color: '#44ff44', glowColor: 'rgba(68,255,68,0.35)',   dimColor: 'rgba(68,255,68,0.12)',   icon: '🧬' },
-  otomat:  { name: 'Otomat',  color: '#00cfff', glowColor: 'rgba(0,207,255,0.35)',   dimColor: 'rgba(0,207,255,0.12)',   icon: '⚡' },
-  canavar: { name: 'Canavar', color: '#ff6600', glowColor: 'rgba(255,102,0,0.35)',   dimColor: 'rgba(255,102,0,0.12)',   icon: '🔥' },
-  seytan:  { name: 'Şeytan',  color: '#cc00ff', glowColor: 'rgba(204,0,255,0.35)',   dimColor: 'rgba(204,0,255,0.12)',   icon: '💀' },
-};
+const RaceThemeCtx = createContext<RaceThemeContext>({
+  race: Race.INSAN,
+  setRace: () => {},
+  raceColor: '#4a9eff',
+  raceDim: 'rgba(74,158,255,0.10)',
+  raceGlow: 'rgba(74,158,255,0.30)',
+});
 
-export function useRaceTheme() {
-  const [race, setRace] = useState<RaceKey>('insan');
+export function RaceThemeProvider({ children }: { children: ReactNode }) {
+  const [race, setRaceState] = useState<Race>(Race.INSAN);
+
+  const setRace = useCallback((r: Race) => {
+    setRaceState(r);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-race', RACE_DESCRIPTIONS[r].dataRace);
+    }
+  }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-race', race);
-    return () => {
-      document.documentElement.removeAttribute('data-race');
-    };
+    document.documentElement.setAttribute('data-race', RACE_DESCRIPTIONS[race].dataRace);
   }, [race]);
 
-  return { race, setRace, meta: RACE_META[race] };
+  const desc = RACE_DESCRIPTIONS[race];
+
+  return (
+    <RaceThemeCtx.Provider value={{
+      race,
+      setRace,
+      raceColor: desc.color,
+      raceDim: desc.bgColor,
+      raceGlow: desc.glowColor,
+    }}>
+      {children}
+    </RaceThemeCtx.Provider>
+  );
+}
+
+export function useRaceTheme() {
+  return useContext(RaceThemeCtx);
 }

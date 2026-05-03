@@ -42,6 +42,13 @@ function screenToIso(screenX: number, screenY: number, offsetX: number, offsetY:
   return { col, row };
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const TILE_COLORS: Record<TileType, { fill: string; stroke: string; top: string }> = {
   empty:    { fill: '#0d1420', stroke: 'rgba(255,255,255,0.08)', top: '#111a2a' },
   asteroid: { fill: '#1a1612', stroke: 'rgba(255,102,0,0.25)', top: '#22201a' },
@@ -52,7 +59,7 @@ const TILE_COLORS: Record<TileType, { fill: string; stroke: string; top: string 
 
 function generateMap(): Tile[][] {
   const map: Tile[][] = [];
-  const tileTypes: TileType[] = ['empty', 'empty', 'empty', 'empty', 'asteroid', 'planet', 'nebula'];
+  const tileTypes: TileType[] = ['empty', 'empty', 'empty', 'empty', 'asteroid', 'planet', 'nebula', 'battle'];
   for (let r = 0; r < MAP_ROWS; r++) {
     map[r] = [];
     for (let c = 0; c < MAP_COLS; c++) {
@@ -73,16 +80,14 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
   const [zoom, setZoom] = useState(1.0);
   const animFrameRef = useRef<number>(0);
   const timeRef = useRef(0);
+  const bgGradientRef = useRef<CanvasGradient | null>(null);
+  const nebulaGradientRef = useRef<{ gradient: CanvasGradient; raceColor: string; alphaBucket: number } | null>(null);
 
   const offsetX = CANVAS_W / 2;
   const offsetY = 60 * zoom;
   const raceColor = RACE_DESCRIPTIONS[race].color;
 
-  useEffect(() => {
-    setGridVisible(showGrid);
-  }, [showGrid]);
-
-  // Preload structure images
+  // Preload structure images and sync structures onto the tile map
   useEffect(() => {
     structures.forEach(({ structureKey }) => {
       const src = STRUCTURE_ASSETS[structureKey];
@@ -92,13 +97,25 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
         imagesRef.current[structureKey] = img;
       }
     });
-    // Place structures on map
+    // Clear stale structures left from a previous prop value before placing the new set
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (mapRef.current[r]?.[c]) {
+          mapRef.current[r][c].structure = undefined;
+        }
+      }
+    }
     structures.forEach(({ col, row, structureKey }) => {
       if (mapRef.current[row]?.[col]) {
         mapRef.current[row][col].structure = structureKey;
       }
     });
   }, [structures]);
+
+  // Invalidate the cached nebula gradient when raceColor changes (race switch)
+  useEffect(() => {
+    nebulaGradientRef.current = null;
+  }, [raceColor]);
 
   const draw = useCallback((timestamp: number) => {
     const canvas = canvasRef.current;
@@ -110,19 +127,27 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
 
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Background
-    const bg = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 3, 0, CANVAS_W / 2, CANVAS_H / 3, CANVAS_W * 0.8);
-    bg.addColorStop(0, 'rgba(8,15,30,1)');
-    bg.addColorStop(1, 'rgba(8,10,16,1)');
-    ctx.fillStyle = bg;
+    // Background — static gradient, build once and reuse to avoid per-frame heap allocation
+    if (!bgGradientRef.current) {
+      const bg = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 3, 0, CANVAS_W / 2, CANVAS_H / 3, CANVAS_W * 0.8);
+      bg.addColorStop(0, 'rgba(8,15,30,1)');
+      bg.addColorStop(1, 'rgba(8,10,16,1)');
+      bgGradientRef.current = bg;
+    }
+    ctx.fillStyle = bgGradientRef.current;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Animated nebula glow at background
-    const nebulaGrad = ctx.createRadialGradient(CANVAS_W * 0.3, CANVAS_H * 0.2, 0, CANVAS_W * 0.3, CANVAS_H * 0.2, 200);
+    // Animated nebula glow — quantize alpha so we only rebuild the gradient when it visibly changes
     const alpha = 0.04 + 0.02 * Math.sin(timeRef.current * 0.5);
-    nebulaGrad.addColorStop(0, raceColor.replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#', 'rgba(') ?? `${raceColor}0a`);
-    nebulaGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = nebulaGrad;
+    const alphaBucket = Math.round(alpha * 200);
+    const cachedNebula = nebulaGradientRef.current;
+    if (!cachedNebula || cachedNebula.raceColor !== raceColor || cachedNebula.alphaBucket !== alphaBucket) {
+      const nebulaGrad = ctx.createRadialGradient(CANVAS_W * 0.3, CANVAS_H * 0.2, 0, CANVAS_W * 0.3, CANVAS_H * 0.2, 200);
+      nebulaGrad.addColorStop(0, hexToRgba(raceColor, alphaBucket / 200));
+      nebulaGrad.addColorStop(1, 'transparent');
+      nebulaGradientRef.current = { gradient: nebulaGrad, raceColor, alphaBucket };
+    }
+    ctx.fillStyle = nebulaGradientRef.current!.gradient;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
     ctx.save();
@@ -240,7 +265,6 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
           ctx.stroke();
           ctx.globalAlpha = 1;
           ctx.shadowBlur = 0;
-          ctx.shadowColor = 'transparent';
         }
       }
     }
@@ -275,25 +299,6 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
     setZoom(z => Math.min(1.8, Math.max(0.5, z - e.deltaY * 0.001)));
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLCanvasElement>) => {
-    const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '];
-    if (!navKeys.includes(e.key)) return;
-    e.preventDefault();
-
-    setSelectedTile(prev => {
-      const start = prev ?? { col: Math.floor(MAP_COLS / 2), row: Math.floor(MAP_ROWS / 2) };
-      let { col, row } = start;
-      switch (e.key) {
-        case 'ArrowUp':    row = Math.max(0, row - 1); break;
-        case 'ArrowDown':  row = Math.min(MAP_ROWS - 1, row + 1); break;
-        case 'ArrowLeft':  col = Math.max(0, col - 1); break;
-        case 'ArrowRight': col = Math.min(MAP_COLS - 1, col + 1); break;
-      }
-      onTileSelect?.(col, row);
-      return { col, row };
-    });
-  }, [onTileSelect]);
-
   return (
     <div className="relative w-full overflow-hidden rounded-lg" style={{ background: '#080a10' }}>
       {/* Controls */}
@@ -304,8 +309,6 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
                      bg-black/60 border border-white/10 hover:border-white/25 transition-colors"
           style={{ color: gridVisible ? 'var(--color-race)' : '#555' }}
           title="Grid toggle"
-          aria-label="Toggle grid"
-          aria-pressed={gridVisible}
         >
           GRID
         </button>
@@ -314,14 +317,12 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
           className="w-7 h-7 rounded-full bg-black/60 border border-white/10 hover:border-white/25
                      flex items-center justify-center text-sm transition-colors text-text-secondary"
           title="Zoom in"
-          aria-label="Zoom in"
         >+</button>
         <button
           onClick={() => setZoom(z => Math.max(0.5, z - 0.15))}
           className="w-7 h-7 rounded-full bg-black/60 border border-white/10 hover:border-white/25
                      flex items-center justify-center text-sm transition-colors text-text-secondary"
           title="Zoom out"
-          aria-label="Zoom out"
         >−</button>
       </div>
 
@@ -345,11 +346,8 @@ export function IsometricTilemap({ race, structures = [], onTileSelect, showGrid
         height={CANVAS_H}
         onClick={handleCanvasClick}
         onWheel={handleWheel}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
-        role="application"
         style={{ display: 'block', width: '100%', cursor: 'pointer' }}
-        aria-label="İzometrik oyun haritası — ok tuşlarıyla tile seç"
+        aria-label="İzometrik oyun haritası"
       />
 
       {/* Tile type legend */}

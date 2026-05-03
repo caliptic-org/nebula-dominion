@@ -1,6 +1,6 @@
-import type { Metadata } from 'next';
-import { Orbitron, Rajdhani } from 'next/font/google';
-import './globals.css';
+import type { Metadata, Viewport } from 'next';
+import { RaceThemeProvider } from '@/hooks/useRaceTheme';
+import '@/styles/globals.css';
 
 const orbitron = Orbitron({
   subsets: ['latin'],
@@ -17,14 +17,27 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: 'Nebula Dominion',
-  description: 'Uzay strateji oyunu — çağ bazlı ilerleme sistemi',
+  title: {
+    template: '%s | Nebula Dominion',
+    default: 'Nebula Dominion',
+  },
+  description: 'Karanlık Sci-Fi Manga Strateji Oyunu — 5 Irk, 3D Tilemap, Epik Savaşlar',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#080a10',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={`${orbitron.variable} ${rajdhani.variable}`}>
-      <body className="stars-bg">{children}</body>
+    <html lang="tr" data-race="insan">
+      <body>
+        <RaceThemeProvider>
+          {children}
+        </RaceThemeProvider>
+      </body>
     </html>
   );
 }

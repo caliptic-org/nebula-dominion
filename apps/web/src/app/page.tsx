@@ -1,299 +1,66 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { TopResourceBar } from '@/components/ui/TopResourceBar';
-import { BottomNav, type GameTab } from '@/components/ui/BottomNav';
-import { GlassPanel } from '@/components/ui/GlassPanel';
-import { ProgressBar } from '@/components/ui/ProgressBar';
-import { Button } from '@/components/ui/Button';
-import { ResourceIcon } from '@/components/ui/ResourceIcon';
+import { useState, useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
+import { Race, RACE_DESCRIPTIONS } from '@/types/units';
+import { STRUCTURE_ASSETS } from '@/lib/assets';
+import { BottomNav } from '@/components/ui/BottomNav';
+import { MangaPanel } from '@/components/ui/MangaPanel';
 import { LevelUpModal } from '@/components/progression/LevelUpModal';
 import { UnlockNotification } from '@/components/progression/UnlockNotification';
-import { LevelIndicator } from '@/components/progression/LevelIndicator';
-import { RaceSelectionScreen } from '@/components/race-selection/RaceSelectionScreen';
-import { GameMap } from '@/components/game/GameMap';
-import { UnitStatsPanel } from '@/components/units/UnitStatsPanel';
-import { Race, PlayerUnit, DEMO_UNITS, RACE_DESCRIPTIONS } from '@/types/units';
 import { LevelUpPayload, ContentUnlock } from '@/types/progression';
+import clsx from 'clsx';
 
+const IsometricTilemap = dynamic(
+  () => import('@/components/game/IsometricTilemap').then(m => m.IsometricTilemap),
+  { ssr: false, loading: () => (
+    <div className="w-full h-[400px] rounded-lg animate-pulse flex items-center justify-center"
+         style={{ background: 'rgba(13,17,23,0.8)' }}>
+      <span className="font-display text-xs text-text-muted uppercase tracking-widest">Harita Yükleniyor…</span>
+    </div>
+  )}
+);
+
+// TODO(auth): replace DEMO_USER_ID with the authenticated session's userId.
+// The /battle route should also resolve the user from session/cookie rather
+// than receiving it via query string (avoids leaking IDs to logs / referrers).
 const DEMO_USER_ID = 'demo-player-001';
 
-/* ── Tab panels ─────────────────────────────────────────────────────────── */
+const STRUCTURES_ON_MAP = [
+  { col: 3, row: 2, structureKey: 'kovan_kalbi' as keyof typeof STRUCTURE_ASSETS },
+  { col: 7, row: 4, structureKey: 'yutucu_yildiz_akademisi' as keyof typeof STRUCTURE_ASSETS },
+  { col: 5, row: 7, structureKey: 'sonsuzluk_cekirdegi' as keyof typeof STRUCTURE_ASSETS },
+  { col: 11, row: 3, structureKey: 'atalar_magarasi' as keyof typeof STRUCTURE_ASSETS },
+];
 
-function HomeTab({
-  progress,
-  loading,
-  selectedRace,
-}: {
-  progress: ReturnType<typeof useProgression>['progress'];
-  loading: boolean;
-  selectedRace: Race;
-}) {
-  const raceDesc = RACE_DESCRIPTIONS[selectedRace];
+const RESOURCES = [
+  { icon: '💎', label: 'Mineral', value: 2400, color: '#4a9eff' },
+  { icon: '⚗️', label: 'Gas', value: 840, color: '#44ff88' },
+  { icon: '⚡', label: 'Enerji', value: 1200, color: '#ffc832' },
+  { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
+];
 
-  const buildings = [
-    { id: 'command',  icon: '🏰', label: 'Komuta Merkezi', level: 3, prod: '+12/dk', color: 'var(--color-brand)' },
-    { id: 'mineral',  icon: '⛏️',  label: 'Mineral Çıkarıcı', level: 2, prod: '+45/dk', color: 'var(--race-human)' },
-    { id: 'refinery', icon: '⚗️',  label: 'Gaz Rafinerisi',   level: 1, prod: '+20/dk', color: 'var(--color-accent)' },
-    { id: 'reactor',  icon: '⚡', label: 'Enerji Reaktörü',  level: 2, prod: '+30/dk', color: 'var(--color-energy)' },
-    { id: 'barracks', icon: '⚔️', label: 'Kışla',            level: 1, prod: '—',      color: 'var(--color-danger)' },
-    { id: 'lab',      icon: '🔬', label: 'Araştırma Lab',    level: 1, prod: '—',      color: 'var(--color-accent)' },
-  ];
+type Tab = 'base' | 'map' | 'battle' | 'commanders' | 'shop';
 
-  return (
-    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Race identity header */}
-      <GlassPanel
-        padding="md"
-        raceColor={raceDesc.color}
-        glow
-        style={{
-          background: `linear-gradient(135deg, ${raceDesc.bgColor} 0%, rgba(7,9,15,0.6) 100%)`,
-          borderColor: `${raceDesc.color}40`,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 36, filter: `drop-shadow(0 0 8px ${raceDesc.color})` }} aria-hidden>
-            {raceDesc.icon}
-          </span>
-          <div>
-            <p style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2, fontFamily: 'var(--font-display)' }}>
-              Aktif Irk
-            </p>
-            <h2 style={{ fontSize: 20, fontWeight: 900, color: raceDesc.color, fontFamily: 'var(--font-display)', letterSpacing: '1px' }}>
-              {raceDesc.name}
-            </h2>
-            <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 1 }}>{raceDesc.subtitle}</p>
-          </div>
-          {loading ? null : progress && (
-            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--color-energy)', fontFamily: 'var(--font-display)' }}>
-                {progress.level}
-              </div>
-              <div style={{ fontSize: 9, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Seviye
-              </div>
-            </div>
-          )}
-        </div>
-
-        {!loading && progress && (
-          <div style={{ marginTop: 14 }}>
-            <ProgressBar value={progress.currentXp} max={progress.xpToNextLevel ?? 1000} variant="xp" size="sm" glow animated label="XP" showValue />
-          </div>
-        )}
-      </GlassPanel>
-
-      {/* Resource summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        {[
-          { type: 'mineral' as const, label: 'Mineral', value: 2450, color: 'var(--race-human)', rate: '+45/dk' },
-          { type: 'gas' as const,     label: 'Gas',     value: 1280, color: 'var(--color-accent)', rate: '+20/dk' },
-          { type: 'energy' as const,  label: 'Enerji',  value: 870,  color: 'var(--color-energy)', rate: '+30/dk' },
-        ].map(({ type, label, value, color, rate }) => (
-          <GlassPanel key={type} padding="sm" style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-              <ResourceIcon type={type} size={22} />
-            </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color }}>
-              {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>{label}</div>
-            <div style={{ fontSize: 9, color: color, opacity: 0.7, marginTop: 1, fontFamily: 'var(--font-display)' }}>{rate}</div>
-          </GlassPanel>
-        ))}
-      </div>
-
-      {/* Buildings grid */}
-      <div>
-        <h3 style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10, fontFamily: 'var(--font-display)' }}>
-          Binalar
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {buildings.map((b) => (
-            <GlassPanel
-              key={b.id}
-              padding="sm"
-              className="hover-glow"
-              style={{ cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.32,0.72,0,1)' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 22 }} aria-hidden>{b.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {b.label}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
-                    <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-display)' }}>
-                      Lv.{b.level}
-                    </span>
-                    <span style={{ fontSize: 10, color: b.color, fontFamily: 'var(--font-display)' }}>
-                      {b.prod}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </GlassPanel>
-          ))}
-        </div>
-      </div>
-
-      {/* Progression section */}
-      {!loading && progress && (
-        <div>
-          <h3 style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10, fontFamily: 'var(--font-display)' }}>
-            İlerleme
-          </h3>
-          <LevelIndicator progress={progress} />
-        </div>
-      )}
-
-      {/* Unlocked content */}
-      {!loading && progress && progress.unlockedContent.length > 0 && (
-        <GlassPanel padding="md">
-          <h3 style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10, fontFamily: 'var(--font-display)' }}>
-            Açık İçerikler
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {progress.unlockedContent.map((u) => (
-              <span key={u} className="badge badge-energy">{u.replace(/_/g, ' ')}</span>
-            ))}
-          </div>
-        </GlassPanel>
-      )}
-    </div>
-  );
-}
-
-function MapTab({
-  selectedRace,
-  demoUnits,
-  selectedUnitId,
-  onSelectUnit,
-  onMoveUnit,
-  onRaceSelect,
-}: {
-  selectedRace: Race;
-  demoUnits: PlayerUnit[];
-  selectedUnitId: string | null;
-  onSelectUnit: (u: PlayerUnit | null) => void;
-  onMoveUnit: (id: string, x: number, y: number) => void;
-  onRaceSelect: (race: Race) => void;
-}) {
-  const selectedUnit = demoUnits.find((u) => u.id === selectedUnitId) ?? null;
-
-  return (
-    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Race switcher */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-        {(Object.values(Race) as Race[]).map((race) => {
-          const desc = RACE_DESCRIPTIONS[race];
-          const active = selectedRace === race;
-          return (
-            <Button
-              key={race}
-              variant="race"
-              size="sm"
-              raceColor={desc.color}
-              glow={active}
-              onClick={() => onRaceSelect(race)}
-              style={{ flexShrink: 0 }}
-            >
-              {desc.icon} {desc.name}
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Map + Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12, alignItems: 'start' }}>
-        <GameMap
-          units={demoUnits}
-          selectedUnitId={selectedUnitId}
-          onSelectUnit={onSelectUnit}
-          onMoveUnit={onMoveUnit}
-        />
-        <UnitStatsPanel unit={selectedUnit} />
-      </div>
-
-      {/* Unit list */}
-      <GlassPanel padding="md">
-        <h3 style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 10, fontFamily: 'var(--font-display)' }}>
-          Birim Listesi · {demoUnits.length} birim
-        </h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {demoUnits.length === 0 && (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Bu ırk için demo birim yok.</p>
-          )}
-          {demoUnits.map((unit) => {
-            const desc = RACE_DESCRIPTIONS[unit.race];
-            const isSelected = unit.id === selectedUnitId;
-            return (
-              <Button
-                key={unit.id}
-                variant="race"
-                size="sm"
-                raceColor={desc.color}
-                glow={isSelected}
-                onClick={() => onSelectUnit(isSelected ? null : unit)}
-              >
-                {desc.icon} {unit.type.replace(/_/g, ' ')} ({unit.positionX},{unit.positionY})
-              </Button>
-            );
-          })}
-        </div>
-      </GlassPanel>
-    </div>
-  );
-}
-
-function RaceTab({ selectedRace, onSelect }: { selectedRace: Race; onSelect: (r: Race) => void }) {
-  return (
-    <div className="animate-slide-up">
-      <RaceSelectionScreen selectedRace={selectedRace} onSelect={onSelect} />
-    </div>
-  );
-}
-
-function PlaceholderTab({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
-  return (
-    <div
-      className="animate-slide-up"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 300,
-        gap: 16,
-        textAlign: 'center',
-      }}
-    >
-      <span style={{ fontSize: 56, filter: 'drop-shadow(0 0 16px var(--color-brand-glow))', animation: 'float 6s ease-in-out infinite' }} aria-hidden>
-        {icon}
-      </span>
-      <div>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-          {title}
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--color-text-muted)', maxWidth: 280, lineHeight: 1.6 }}>
-          {subtitle}
-        </p>
-      </div>
-      <span className="badge badge-brand">Yakında</span>
-    </div>
-  );
-}
-
-/* ── Root page ───────────────────────────────────────────────────────────── */
+const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'base', icon: '🏰', label: 'Ana Üs' },
+  { id: 'map', icon: '🌌', label: 'Harita' },
+  { id: 'battle', icon: '⚔️', label: 'Savaş' },
+  { id: 'commanders', icon: '🤝', label: 'Komutanlar' },
+  { id: 'shop', icon: '💎', label: 'Mağaza' },
+];
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<GameTab>('home');
+  const { race, setRace, raceColor, raceGlow } = useRaceTheme();
+  const [activeTab, setActiveTab] = useState<Tab>('base');
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
   const [pendingUnlocks, setPendingUnlocks] = useState<ContentUnlock[]>([]);
   const [selectedTile, setSelectedTile] = useState<{ col: number; row: number } | null>(null);
-  const [imgError, setImgError] = useState(false);
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const [portraitImgError, setPortraitImgError] = useState(false);
 
   const { progress, loading } = useProgression({
     userId: DEMO_USER_ID,
@@ -306,16 +73,6 @@ export default function HomePage() {
   const raceDesc = RACE_DESCRIPTIONS[race];
   const primaryCommander = raceDesc.commanders[0];
 
-  const handleTileSelect = useCallback((col: number, row: number) => {
-    setSelectedTile({ col, row });
-  }, []);
-
-  const handleMoveUnit = useCallback((unitId: string, toX: number, toY: number) => {
-    setDemoUnits((prev) =>
-      prev.map((u) => (u.id === unitId ? { ...u, positionX: toX, positionY: toY } : u)),
-    );
-  }, []);
-
   return (
     <>
       <UnlockNotification newUnlocks={pendingUnlocks} />
@@ -326,53 +83,411 @@ export default function HomePage() {
         />
       )}
 
-      {/* Fixed UI chrome */}
-      <TopResourceBar
-        level={progress?.level ?? 1}
-        age={progress?.age ?? 1}
-        currentXp={progress?.currentXp ?? 0}
-        maxXp={progress?.xpToNextLevel ?? 1000}
-      />
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Scrollable content area between bars */}
-      <main
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          paddingTop: 60,
-          paddingBottom: 72,
-          minHeight: '100dvh',
-          maxWidth: 640,
-          margin: '0 auto',
-          padding: '60px 14px 80px',
-        }}
+      <div
+        className="min-h-[100dvh] flex flex-col relative"
+        style={{ background: 'var(--color-bg)' }}
       >
-        {activeTab === 'home' && (
-          <HomeTab progress={progress} loading={loading} selectedRace={selectedRace} />
-        )}
-        {activeTab === 'map' && (
-          <MapTab
-            selectedRace={selectedRace}
-            demoUnits={demoUnits}
-            selectedUnitId={selectedUnitId}
-            onSelectUnit={handleSelectUnit}
-            onMoveUnit={handleMoveUnit}
-            onRaceSelect={handleRaceSelect}
-          />
-        )}
-        {activeTab === 'battle' && (
-          <PlaceholderTab icon="⚔️" title="Savaş Alanı" subtitle="Gerçek zamanlı PvP savaşlar yakında geliyor. Phaser.js battle engine entegrasyonu devam ediyor." />
-        )}
-        {activeTab === 'guild' && (
-          <PlaceholderTab icon="🤝" title="Lonca" subtitle="Lonca kurma, üye yönetimi ve Sektör Savaşları özelliği geliştirme aşamasında." />
-        )}
-        {activeTab === 'shop' && (
-          <PlaceholderTab icon="💎" title="Mağaza" subtitle="Kozmetik itemler, hız boostları ve premium pass yakında burada olacak." />
-        )}
-      </main>
+        {/* Nebula background */}
+        <div
+          className="fixed inset-0 pointer-events-none transition-all duration-700"
+          style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
+          aria-hidden
+        />
+        {/* Halftone */}
+        <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
 
-      <BottomNav />
+        {/* ── Resource Bar (Top) ────────────────────────────── */}
+        <header
+          className="relative z-40 sticky top-0"
+          style={{
+            background: 'rgba(8,10,16,0.9)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 gap-2">
+            {/* Logo */}
+            <span
+              className="font-display text-[10px] font-black tracking-[0.2em] uppercase shrink-0 hidden sm:block"
+              style={{ color: raceColor }}
+            >
+              ◆ NEBULA
+            </span>
+
+            {/* Resources */}
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap overflow-x-auto">
+              {RESOURCES.map((r) => (
+                <div key={r.label} className="resource-bar shrink-0" title={r.label}>
+                  <span aria-hidden>{r.icon}</span>
+                  <span style={{ color: r.color }}>
+                    {typeof r.value === 'number' ? r.value.toLocaleString('tr-TR') : r.value}
+                  </span>
+                </div>
+              ))}
+              {/* XP bar */}
+              {progress && (
+                <div className="resource-bar shrink-0 gap-2">
+                  <span aria-hidden>✨</span>
+                  <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${progress.xpProgressPercent}%`,
+                        background: raceColor,
+                      }}
+                    />
+                  </div>
+                  <span className="text-text-muted text-[10px]">Lv.{progress.level}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Commander mini avatar */}
+            <button
+              className="shrink-0 w-9 h-9 rounded-full border-2 overflow-hidden transition-all duration-300 hover:scale-110"
+              style={{ borderColor: raceColor, boxShadow: `0 0 10px ${raceGlow}` }}
+              title={primaryCommander.name}
+            >
+              {!avatarImgError ? (
+                <Image
+                  src={primaryCommander.portrait}
+                  alt={primaryCommander.name}
+                  width={36}
+                  height={36}
+                  className="w-full h-full object-cover object-top"
+                  onError={() => setAvatarImgError(true)}
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center text-sm"
+                  style={{ background: raceDesc.bgColor, color: raceColor }}
+                >
+                  {raceDesc.icon}
+                </div>
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* ── Main Content ──────────────────────────────────── */}
+        <main className="relative z-10 flex-1 overflow-auto pb-24">
+
+          {/* ── Base Tab ──────────────────────────────────────── */}
+          {/* Kept mounted (hidden when inactive) so the IsometricTilemap canvas
+              survives tab switches without remount + re-init + image reload. */}
+          <div
+            className={clsx('flex-col lg:flex-row gap-4 p-4 h-full', activeTab === 'base' ? 'flex' : 'hidden')}
+            aria-hidden={activeTab !== 'base'}
+          >
+
+              {/* Left: Tilemap */}
+              <div className="flex-1 flex flex-col gap-4 min-w-0">
+                {/* Tilemap header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="badge badge-race">Ana Üs</span>
+                    </div>
+                    <h2 className="font-display text-lg font-black text-text-primary">
+                      {raceDesc.name} <span style={{ color: raceColor }}>İmparatorluğu</span>
+                    </h2>
+                  </div>
+                  {selectedTile && (
+                    <span
+                      className="font-display text-[10px] uppercase tracking-widest px-3 py-1 rounded-full"
+                      style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}30` }}
+                    >
+                      [{selectedTile.col}, {selectedTile.row}] seçili
+                    </span>
+                  )}
+                </div>
+
+                {/* Isometric Tilemap */}
+                <MangaPanel className="overflow-hidden rounded-lg">
+                  <IsometricTilemap
+                    race={race}
+                    structures={STRUCTURES_ON_MAP}
+                    onTileSelect={(col, row) => setSelectedTile({ col, row })}
+                  />
+                </MangaPanel>
+
+                {/* Left production stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Mineral/dk', value: '+120', color: '#4a9eff' },
+                    { label: 'Gas/dk', value: '+45', color: '#44ff88' },
+                    { label: 'Enerji/dk', value: '+80', color: '#ffc832' },
+                    { label: 'Yapı', value: `${STRUCTURES_ON_MAP.length}/12`, color: raceColor },
+                  ].map((s) => (
+                    <MangaPanel key={s.label} className="p-3">
+                      <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-1">{s.label}</div>
+                      <div className="font-display text-lg font-black" style={{ color: s.color }}>{s.value}</div>
+                    </MangaPanel>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right: Commander Card + Structures */}
+              <div className="lg:w-72 shrink-0 flex flex-col gap-4">
+                {/* Commander card */}
+                <MangaPanel className="overflow-hidden" glow>
+                  <div className="relative h-52 overflow-hidden">
+                    {!portraitImgError ? (
+                      <Image
+                        src={primaryCommander.portrait}
+                        alt={primaryCommander.name}
+                        fill
+                        className="object-cover object-top"
+                        onError={() => setPortraitImgError(true)}
+                        style={{ filter: `drop-shadow(0 4px 12px ${raceGlow})` }}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-6xl"
+                        style={{ background: raceDesc.bgColor }}
+                      >
+                        {raceDesc.icon}
+                      </div>
+                    )}
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: `linear-gradient(to top, ${raceDesc.bgColor.replace('0.08', '0.9')} 0%, transparent 50%)`,
+                      }}
+                    />
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <div
+                        className="font-display text-base font-black"
+                        style={{ color: raceColor, textShadow: `0 0 12px ${raceGlow}` }}
+                      >
+                        {primaryCommander.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="badge text-[9px]"
+                          style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}40` }}
+                        >
+                          Lv.{primaryCommander.level}
+                        </span>
+                        <span className="text-text-muted text-[10px]">{raceDesc.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-2">Yetenekler</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {primaryCommander.abilities.map((ab) => (
+                        <span
+                          key={ab}
+                          className="px-2 py-0.5 rounded text-[10px] font-display"
+                          style={{ background: `${raceColor}12`, color: raceColor, border: `1px solid ${raceColor}25` }}
+                        >
+                          {ab}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </MangaPanel>
+
+                {/* Active structures list */}
+                <MangaPanel className="p-4">
+                  <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-3">
+                    Aktif Yapılar
+                  </div>
+                  <div className="space-y-2">
+                    {raceDesc.structures.map((sk) => {
+                      const structureKey = sk as keyof typeof STRUCTURE_ASSETS;
+                      return (
+                        <div
+                          key={sk}
+                          className="flex items-center gap-3 p-2 rounded-lg"
+                          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                        >
+                          <div
+                            className="relative w-10 h-10 rounded overflow-hidden shrink-0"
+                            style={{ background: raceDesc.bgColor }}
+                          >
+                            <Image
+                              src={STRUCTURE_ASSETS[structureKey]}
+                              alt={sk}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-display text-xs font-bold text-text-primary capitalize">
+                              {sk.replace(/_/g, ' ')}
+                            </div>
+                            <div className="text-text-muted text-[10px]">Seviye 1</div>
+                          </div>
+                          <div
+                            className="ml-auto w-2 h-2 rounded-full animate-pulse"
+                            style={{ background: raceColor }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </MangaPanel>
+
+                {/* Race switcher */}
+                <MangaPanel className="p-4">
+                  <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-3">
+                    Irk Değiştir
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(Object.values(Race) as Race[]).map((r) => {
+                      const d = RACE_DESCRIPTIONS[r];
+                      const active = r === race;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => setRace(r)}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-display font-bold transition-all duration-200"
+                          style={{
+                            background: active ? d.bgColor : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${active ? d.color : 'rgba(255,255,255,0.08)'}`,
+                            color: active ? d.color : '#555',
+                          }}
+                        >
+                          {d.icon} {d.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </MangaPanel>
+              </div>
+            </div>
+
+          {/* ── Map Tab ───────────────────────────────────────── */}
+          <div className={clsx('p-4', activeTab === 'map' ? 'block' : 'hidden')} aria-hidden={activeTab !== 'map'}>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="badge badge-race">Galaksi Haritası</span>
+                <h2 className="font-display text-lg font-black text-text-primary">
+                  Nebula <span style={{ color: raceColor }}>Sektörü</span>
+                </h2>
+              </div>
+              <MangaPanel className="overflow-hidden rounded-lg">
+                <IsometricTilemap
+                  race={race}
+                  structures={STRUCTURES_ON_MAP}
+                  onTileSelect={(col, row) => setSelectedTile({ col, row })}
+                />
+              </MangaPanel>
+            </div>
+
+          {/* ── Battle Tab ────────────────────────────────────── */}
+          {activeTab === 'battle' && (
+            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="text-center max-w-sm mx-auto">
+                <div
+                  className="text-6xl mb-6 animate-float inline-block"
+                  style={{ filter: `drop-shadow(0 0 20px ${raceGlow})` }}
+                >
+                  ⚔️
+                </div>
+                <div className="mb-3">
+                  <span className="badge badge-race">Savaş Modu</span>
+                </div>
+                <h2 className="font-display text-2xl font-black text-text-primary mb-3">
+                  Savaşa <span style={{ color: raceColor }}>Hazır mısın?</span>
+                </h2>
+                <p className="text-text-muted text-sm mb-8">
+                  Phaser.js ile güçlendirilmiş gerçek zamanlı savaş sahneleri yakında.
+                </p>
+                <a
+                  href={`/battle?race=${race}&mode=pve`}
+                  className="btn-primary inline-flex items-center gap-2"
+                  style={{ background: raceColor }}
+                >
+                  <span>Savaşa Gir</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/20 text-xs">→</span>
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* ── Commanders Tab ────────────────────────────────── */}
+          {activeTab === 'commanders' && (
+            <div className="p-4">
+              <a href="/commanders" className="font-display text-text-muted text-xs uppercase tracking-widest hover:text-text-primary transition-colors">
+                Tüm Komutanlar →
+              </a>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {raceDesc.commanders.map((cmd) => (
+                  <div
+                    key={cmd.id}
+                    className={clsx(
+                      'commander-card overflow-hidden',
+                      !cmd.isUnlocked && 'locked',
+                    )}
+                  >
+                    <div className="relative h-36 overflow-hidden">
+                      <Image
+                        src={cmd.portrait}
+                        alt={cmd.name}
+                        fill
+                        className="object-cover object-top"
+                      />
+                      <div
+                        className="absolute inset-0"
+                        style={{ background: `linear-gradient(to top, ${raceDesc.bgColor.replace('0.08', '0.8')} 0%, transparent 50%)` }}
+                      />
+                      {!cmd.isUnlocked && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <span className="text-2xl">🔒</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <div className="font-display text-xs font-bold" style={{ color: raceColor }}>{cmd.name}</div>
+                      <div className="text-text-muted text-[10px]">Lv.{cmd.level}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Shop Tab ──────────────────────────────────────── */}
+          {activeTab === 'shop' && (
+            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center">
+              <div className="text-6xl mb-4 animate-float">💎</div>
+              <div className="mb-3"><span className="badge badge-race">Premium Mağaza</span></div>
+              <h2 className="font-display text-2xl font-black text-text-primary mb-2">Yakında</h2>
+              <p className="text-text-muted text-sm">Kozmetik item&apos;lar ve premium içerikler geliyor.</p>
+            </div>
+          )}
+        </main>
+
+        {/* ── Bottom Navigation ─────────────────────────────── */}
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 py-3"
+          style={{
+            background: 'rgba(8,10,16,0.96)',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(24px)',
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={clsx(
+                  'bottom-nav-item transition-all duration-300',
+                  active && 'active',
+                )}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span className="text-lg leading-none" aria-hidden>{tab.icon}</span>
+                <span className="font-display text-[9px] uppercase tracking-wide">{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
     </>
   );
 }

@@ -1,13 +1,13 @@
-/* ── Level Indicator — Top War military style ────────────────────────────── */
+/* ── Level Indicator ──────────────────────────────────────────────────────── */
 
 .level-indicator {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  background: linear-gradient(160deg, #12141f 0%, #0c0e17 100%);
-  border: 1px solid rgba(232, 168, 32, 0.3);
-  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  border: 1px solid rgba(255, 206, 58, 0.18);
+  border-radius: 14px;
   color: var(--color-text-primary);
   font-family: var(--font-body);
   user-select: none;
@@ -32,29 +32,28 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  border: 2px solid var(--tier-color, #e8a820);
-  background: linear-gradient(145deg, rgba(232, 168, 32, 0.2) 0%, rgba(0, 0, 0, 0.4) 100%);
-  font-weight: 700;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--gradient-energy);
   flex-shrink: 0;
-  box-shadow: 0 0 16px var(--tier-color, rgba(232, 168, 32, 0.4)), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.level-badge .age-label {
+.age-label {
   font-size: 9px;
-  letter-spacing: 0.8px;
-  color: var(--tier-color, #e8a820);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(0, 0, 0, 0.7);
   text-transform: uppercase;
-  font-weight: 800;
+  font-family: var(--font-display);
 }
 
-.level-badge .level-number {
-  font-size: 26px;
-  line-height: 1;
+.level-number {
+  font-size: 24px;
   font-weight: 900;
-  color: var(--color-text-primary);
+  line-height: 1;
+  color: #000;
+  font-family: var(--font-display);
 }
 
 .level-info {
@@ -66,26 +65,30 @@
 }
 
 .tier-name {
-  font-size: 10px;
-  font-weight: 900;
-  color: var(--tier-color, #e8a820);
+  font-size: 12px;
+  color: var(--tier-color, var(--color-energy));
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 .xp-label {
   font-size: 11px;
   color: var(--color-text-muted);
-  font-weight: 600;
+  font-family: var(--font-body);
 }
 
 /* Tier color vars */
-.tier-1 { --tier-color: #40c8e0; }
-.tier-2 { --tier-color: #e8a820; }
-.tier-3 { --tier-color: #e84030; }
+.tier-1 { --tier-color: var(--color-brand);  }
+.tier-2 { --tier-color: var(--color-energy); }
+.tier-3 { --tier-color: var(--color-danger);  }
 
+.tier-1 .level-badge { background: var(--gradient-brand); }
+.tier-2 .level-badge { background: var(--gradient-energy); }
+.tier-3 .level-badge { background: linear-gradient(135deg, #c04aff 0%, #ff3344 100%); }
 
-/* ── XP Progress Bar ─────────────────────────────────────────────────────── */
+/* ── XP Progress Bar ──────────────────────────────────────────────────────── */
 
 .xp-bar-container {
   display: flex;
@@ -96,41 +99,31 @@
 
 .xp-bar-track {
   width: 100%;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  border-radius: 5px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .xp-bar-fill {
   height: 100%;
-  border-radius: 5px;
-  background: linear-gradient(90deg, #c88010 0%, #f0c840 50%, #e8a820 100%);
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-brand), var(--color-accent));
+  box-shadow: 0 0 6px var(--color-brand-glow);
   transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
   box-shadow: 0 0 8px rgba(232, 168, 32, 0.6);
   position: relative;
 }
 
-.xp-bar-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 5px 5px 0 0;
-}
-
-.xp-bar-fill.tier-1 {
-  background: linear-gradient(90deg, #1890c0 0%, #40c8e0 100%);
-  box-shadow: 0 0 8px rgba(64, 200, 224, 0.6);
+.xp-bar-fill.tier-2 {
+  background: linear-gradient(90deg, var(--color-energy), #ff9c30);
+  box-shadow: 0 0 6px var(--color-energy-glow);
 }
 
 .xp-bar-fill.tier-3 {
-  background: linear-gradient(90deg, #c02020 0%, #e84030 100%);
-  box-shadow: 0 0 8px rgba(232, 64, 48, 0.6);
+  background: linear-gradient(90deg, #c04aff, #ff3344);
+  box-shadow: 0 0 6px rgba(192, 74, 255, 0.4);
 }
 
 .xp-bar-fill.maxed {
@@ -144,10 +137,10 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--color-text-muted);
+  font-family: var(--font-body);
 }
 
-
-/* ── Level-Up Modal — Top War epic level-up style ────────────────────────── */
+/* ── Level-Up Modal ───────────────────────────────────────────────────────── */
 
 .level-up-overlay {
   position: fixed;
@@ -157,37 +150,21 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fade-in 0.2s ease;
-  backdrop-filter: blur(4px);
+  animation: fade-in 0.25s ease;
+  backdrop-filter: blur(6px);
 }
 
 .level-up-modal {
-  background: linear-gradient(160deg, #18160a 0%, #0e0d18 100%);
-  border: 2px solid rgba(232, 168, 32, 0.55);
-  border-radius: 14px;
+  background: radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
+  border: 1px solid rgba(255, 206, 58, 0.25);
+  border-radius: 20px;
   padding: 40px 48px;
   text-align: center;
   color: var(--color-text-primary);
   max-width: 420px;
   width: 90%;
   animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow:
-    0 0 60px rgba(232, 168, 32, 0.3),
-    0 0 120px rgba(232, 168, 32, 0.1),
-    0 20px 60px rgba(0, 0, 0, 0.6);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Top gold line */
-.level-up-modal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #f0c840, #e8a820, #f0c840, transparent);
+  box-shadow: 0 0 80px var(--color-energy-glow), 0 0 40px var(--color-brand-glow);
 }
 
 .level-up-title {
@@ -197,25 +174,27 @@
   font-weight: 900;
   color: #e8a820;
   margin-bottom: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
 }
 
 .level-up-number {
   font-size: 80px;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(180deg, #f8f0e0 0%, #f0c840 50%, #c88010 100%);
+  background: linear-gradient(180deg, #fff 0%, var(--color-energy) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin: 8px 0;
-  filter: drop-shadow(0 0 20px rgba(232, 168, 32, 0.5));
+  font-family: var(--font-display);
 }
 
 .level-up-subtitle {
   font-size: 14px;
   color: var(--color-text-secondary);
   margin-bottom: 24px;
-  font-weight: 600;
+  font-family: var(--font-body);
 }
 
 .level-up-rewards {
@@ -227,55 +206,24 @@
 }
 
 .reward-chip {
-  padding: 5px 14px;
-  border-radius: 4px;
+  padding: 4px 14px;
+  border-radius: 20px;
   font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
 }
 
-.reward-chip.gold {
-  background: rgba(232, 168, 32, 0.18);
-  color: #f0c840;
-  border: 1px solid rgba(232, 168, 32, 0.4);
-}
-
-.reward-chip.gems {
-  background: rgba(200, 128, 240, 0.18);
-  color: #c880f0;
-  border: 1px solid rgba(200, 128, 240, 0.4);
-}
-
-.reward-chip.title {
-  background: rgba(64, 200, 224, 0.18);
-  color: #40c8e0;
-  border: 1px solid rgba(64, 200, 224, 0.4);
-}
-
-.reward-chip.badge {
-  background: rgba(68, 221, 136, 0.15);
-  color: #44dd88;
-  border: 1px solid rgba(68, 221, 136, 0.35);
-}
+.reward-chip.gold  { background: var(--color-energy-dim); color: var(--color-energy);  border: 1px solid rgba(255,206,58,0.25); }
+.reward-chip.gems  { background: var(--color-accent-dim); color: var(--color-accent);  border: 1px solid rgba(61,212,192,0.25); }
+.reward-chip.title { background: var(--color-brand-dim);  color: var(--color-brand);   border: 1px solid rgba(108,142,240,0.25); }
+.reward-chip.badge { background: rgba(61,221,132,0.14);   color: var(--color-success); border: 1px solid rgba(61,221,132,0.25); }
 
 .level-up-unlocks {
   font-size: 12px;
   color: var(--color-text-muted);
   margin-bottom: 24px;
-  background: rgba(232, 168, 32, 0.06);
-  border: 1px solid rgba(232, 168, 32, 0.18);
-  border-radius: 8px;
-  padding: 12px 16px;
-  text-align: left;
-}
-
-.level-up-unlocks strong {
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #e8a820;
+  font-family: var(--font-body);
 }
 
 .unlock-list {
@@ -299,32 +247,31 @@
 }
 
 .level-up-close {
-  padding: 12px 40px;
-  border: 2px solid #c88820;
-  border-radius: 6px;
-  background: var(--gradient-gold-btn);
-  color: #1a0e00;
+  padding: 12px 36px;
+  border: 1px solid rgba(255, 206, 58, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-energy);
   font-size: 13px;
-  font-weight: 900;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
   cursor: pointer;
-  transition: filter 0.18s, transform 0.12s;
-  box-shadow: 0 4px 16px rgba(232, 168, 32, 0.4);
+  transition: background 0.2s, box-shadow 0.2s;
 }
 
 .level-up-close:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+  background: var(--color-energy-dim);
+  box-shadow: 0 0 12px var(--color-energy-glow);
 }
 
-
-/* ── Unlock Notification (toast) ─────────────────────────────────────────── */
+/* ── Unlock Notification (toast) ──────────────────────────────────────────── */
 
 .unlock-notifications {
   position: fixed;
-  top: 80px;
-  right: 20px;
+  top: 68px;
+  right: 12px;
   z-index: 999;
   display: flex;
   flex-direction: column;
@@ -337,23 +284,23 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #12140c 0%, #0e0f18 100%);
-  border: 1px solid rgba(232, 168, 32, 0.4);
-  border-left: 3px solid #e8a820;
-  border-radius: 6px;
+  background: rgba(16, 20, 36, 0.92);
+  border-left: 3px solid var(--color-energy);
+  border-radius: 8px;
   color: var(--color-text-primary);
   font-size: 13px;
   animation: slide-in 0.3s ease, fade-out 0.5s ease 3.5s forwards;
   pointer-events: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(232, 168, 32, 0.15);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 12px var(--color-energy-glow);
+  backdrop-filter: blur(12px);
+  font-family: var(--font-body);
 }
 
-.unlock-toast-icon { font-size: 20px; }
-.unlock-toast-label { font-weight: 800; color: #e8a820; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.unlock-toast-icon  { font-size: 20px; }
+.unlock-toast-label { font-weight: 700; color: var(--color-energy); font-family: var(--font-display); font-size: 12px; letter-spacing: 0.5px; }
 .unlock-toast-sub   { font-size: 11px; color: var(--color-text-muted); }
 
-
-/* ── Animations ──────────────────────────────────────────────────────────── */
+/* ── Animations ───────────────────────────────────────────────────────────── */
 
 @keyframes fade-in {
   from { opacity: 0; }

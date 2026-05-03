@@ -1,11 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
-import { Race, RACE_DESCRIPTIONS } from '@/types/units';
-import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { GlowButton } from '@/components/ui/GlowButton';
-import clsx from 'clsx';
+import { Race, RACE_DESCRIPTIONS, RaceDescription } from '@/types/units';
+import { GlassPanel } from '@/components/ui/GlassPanel';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 
 interface StatBarProps {
   label: string;
@@ -15,31 +13,18 @@ interface StatBarProps {
 
 function StatBar({ label, value, color }: StatBarProps) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-          {label}
-        </span>
-        <span style={{ fontSize: 11, color, fontWeight: 900 }}>{value}</span>
+    <div className="mb-2.5">
+      <div className="flex justify-between mb-1">
+        <span className="font-display text-xs uppercase tracking-wider text-text-muted">{label}</span>
+        <span className="font-display text-xs font-bold" style={{ color }}>{value}</span>
       </div>
-      <div
-        style={{
-          height: 7,
-          background: 'rgba(255,255,255,0.07)',
-          borderRadius: 4,
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.05)',
-        }}
-      >
+      <div className="progress-track h-1.5">
         <div
+          className="progress-fill h-full rounded-full transition-all duration-500"
           style={{
-            height: '100%',
             width: `${value}%`,
             background: `linear-gradient(90deg, ${color}aa, ${color})`,
-            borderRadius: 4,
-            transition: 'width 0.4s ease',
-            boxShadow: `0 0 6px ${color}70`,
-            position: 'relative',
+            boxShadow: `0 0 6px ${color}50`,
           }}
         >
           <div
@@ -78,160 +63,98 @@ function RaceCard({ race, desc, selected, onSelect }: RaceCardProps) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onSelect()}
       aria-pressed={selected}
+      className="relative rounded-2xl p-6 cursor-pointer transition-all duration-300 flex flex-col"
       style={{
-        position: 'relative',
         background: selected
-          ? `linear-gradient(160deg, ${desc.color}20 0%, #0c0e17 100%)`
-          : 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
-        border: `2px solid ${
-          selected ? desc.color : hovered ? `${desc.color}60` : 'rgba(232,168,32,0.18)'
-        }`,
-        borderRadius: 12,
-        padding: '24px 20px',
-        cursor: 'pointer',
-        transition: 'all 0.22s ease',
-        transform: hovered || selected ? 'translateY(-3px)' : 'translateY(0)',
-        boxShadow: selected
-          ? `0 0 28px ${desc.color}35, 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 ${desc.color}20`
+          ? `linear-gradient(135deg, ${desc.bgColor} 0%, rgba(10,13,20,0.85) 70%)`
           : hovered
-          ? `0 8px 24px rgba(0,0,0,0.4), 0 0 14px ${desc.color}18`
-          : '0 4px 14px rgba(0,0,0,0.35)',
+          ? `${desc.bgColor}`
+          : 'rgba(13, 17, 32, 0.7)',
+        border: `2px solid ${selected ? desc.color : hovered ? `${desc.color}50` : 'rgba(255,255,255,0.07)'}`,
+        boxShadow: selected
+          ? `0 0 32px ${desc.color}30, 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)`
+          : hovered
+          ? `0 8px 24px rgba(0,0,0,0.4), 0 0 16px ${desc.color}18`
+          : '0 4px 16px rgba(0,0,0,0.3)',
+        transform: hovered || selected ? 'translateY(-4px)' : 'none',
+        backdropFilter: 'blur(14px)',
         flex: '1 1 260px',
         minWidth: 240,
-        maxWidth: 320,
-        overflow: 'hidden',
+        maxWidth: 340,
       }}
     >
-      {/* Top border accent */}
+      {/* Selected indicator */}
       {selected && (
         <div
+          className="absolute top-3 right-3 font-display font-black text-black uppercase rounded-full px-2.5 py-0.5"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: `linear-gradient(90deg, transparent, ${desc.color}, transparent)`,
-          }}
-          aria-hidden
-        />
-      )}
-
-      {/* Selected badge */}
-      {selected && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
             background: desc.color,
-            color: '#000',
-            fontSize: 9,
-            fontWeight: 900,
-            padding: '3px 8px',
-            borderRadius: 3,
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
+            fontSize: '9px',
+            letterSpacing: '0.8px',
           }}
         >
-          ✓ SEÇİLDİ
+          SEÇİLDİ ✓
         </div>
       )}
 
-      {/* Icon + Name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-        <div
+      {/* Neon corner accent */}
+      <div
+        className="absolute top-0 left-0 w-12 h-12 pointer-events-none"
+        style={{
+          borderTop: `2px solid ${desc.color}`,
+          borderLeft: `2px solid ${desc.color}`,
+          borderTopLeftRadius: 14,
+          opacity: selected ? 1 : 0.3,
+        }}
+        aria-hidden
+      />
+
+      {/* Race icon + name */}
+      <div className="flex items-center gap-4 mb-4">
+        <span
+          className="text-5xl leading-none"
           style={{
-            width: 56,
-            height: 56,
-            borderRadius: 10,
-            background: `${desc.color}15`,
-            border: `1px solid ${desc.color}40`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 30,
-            flexShrink: 0,
-            boxShadow: selected ? `0 0 14px ${desc.color}40` : 'none',
+            filter: selected || hovered ? `drop-shadow(0 0 12px ${desc.color})` : 'none',
+            transition: 'filter 0.3s',
           }}
           aria-hidden
         >
           {desc.icon}
         </div>
         <div>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: 20,
-              fontWeight: 900,
-              color: desc.color,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-            }}
-          >
+          <h3 className="font-display text-xl font-black leading-none mb-1" style={{ color: desc.color }}>
             {desc.name}
           </h3>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontWeight: 600 }}>
-            {desc.subtitle}
-          </p>
+          <p className="font-body text-xs text-text-muted uppercase tracking-wider">{desc.subtitle}</p>
         </div>
       </div>
 
       {/* Description */}
-      <p
-        style={{
-          fontSize: 12,
-          color: 'var(--color-text-secondary)',
-          lineHeight: 1.6,
-          marginBottom: 18,
-          minHeight: 54,
-        }}
-      >
+      <p className="font-body text-sm text-text-secondary leading-relaxed mb-4 flex-1">
         {desc.description}
       </p>
 
       {/* Stats */}
-      <div style={{ marginBottom: 16 }}>
-        <StatBar label="Saldırı" value={desc.stats.attack}  color={desc.color} />
+      <div className="space-y-0">
+        <StatBar label="Saldırı"  value={desc.stats.attack}  color={desc.color} />
         <StatBar label="Savunma" value={desc.stats.defense} color={desc.color} />
-        <StatBar label="Hız"     value={desc.stats.speed}   color={desc.color} />
-        <StatBar label="Can"     value={desc.stats.hp}      color={desc.color} />
+        <StatBar label="Hız"      value={desc.stats.speed}   color={desc.color} />
+        <StatBar label="Can"      value={desc.stats.hp}      color={desc.color} />
       </div>
 
-      {/* Faction tag + select button */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div
-          style={{
-            padding: '3px 10px',
-            background: `${desc.color}15`,
-            border: `1px solid ${desc.color}35`,
-            borderRadius: 3,
-            fontSize: 9,
-            fontWeight: 900,
-            color: desc.color,
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-          }}
-        >
-          {race}
-        </div>
-        {!selected && (
-          <div
-            style={{
-              padding: '4px 14px',
-              background: `${desc.color}15`,
-              border: `1px solid ${desc.color}50`,
-              borderRadius: 4,
-              fontSize: 10,
-              fontWeight: 900,
-              color: desc.color,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-            }}
-          >
-            SEÇMEK İÇİN TIKLA
-          </div>
-        )}
+      {/* Race tag */}
+      <div
+        className="inline-flex items-center gap-1.5 mt-4 px-3 py-1 rounded-full font-display font-bold uppercase self-start"
+        style={{
+          background: `${desc.color}14`,
+          border: `1px solid ${desc.color}35`,
+          color: desc.color,
+          fontSize: '10px',
+          letterSpacing: '1px',
+        }}
+      >
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: desc.color, display: 'inline-block' }} />
+        {race}
       </div>
     </div>
   );
@@ -258,114 +181,68 @@ export function RaceSelectionScreen({ selectedRace, onSelect, onConfirm }: RaceS
   }
 
   return (
-    <div style={{ padding: '8px 0 32px' }}>
+    <div className="py-2">
       {/* Header */}
-      <div
-        style={{
-          textAlign: 'center',
-          marginBottom: 32,
-          padding: '24px 16px',
-          background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
-          border: '1px solid rgba(232,168,32,0.2)',
-          borderRadius: 10,
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: 'linear-gradient(90deg, #e8a820, #f0c840, #e8a820)',
-          }}
-          aria-hidden
-        />
-        <h2
-          style={{
-            fontSize: 26,
-            fontWeight: 900,
-            margin: 0,
-            textTransform: 'uppercase',
-            letterSpacing: 2,
-            background: 'linear-gradient(180deg, #f0c840 0%, #c88010 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}
-        >
-          🛡️ FRAKSIYON SEÇİMİ
+      <div className="text-center mb-6">
+        <h2 className="font-display text-2xl font-black text-text-primary mb-2">
+          <span className="text-gradient-brand">Irk Seçimi</span>
         </h2>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginTop: 8, fontWeight: 600 }}>
-          Savaş stilinizi belirleyin — her fraksiyonun benzersiz güçlü yanları var.
+        <p className="font-body text-text-secondary text-sm">
+          Savaş stilini belirle — her ırkın kendine özgü güçlü yanları var.
         </p>
+
+        {/* Race color indicators */}
+        <div className="flex justify-center gap-2 mt-3">
+          {(Object.values(Race) as Race[]).map((race) => {
+            const desc = RACE_DESCRIPTIONS[race];
+            const active = selectedRace === race;
+            return (
+              <button
+                key={race}
+                onClick={() => onSelect(race)}
+                className="w-2 h-2 rounded-full transition-all"
+                style={{
+                  background: desc.color,
+                  boxShadow: active ? `0 0 8px ${desc.color}` : 'none',
+                  transform: active ? 'scale(1.5)' : 'scale(1)',
+                }}
+                aria-label={`${desc.name} ırkını seç`}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {/* Race Cards grid */}
-      <div
-        className="fixed inset-0 pointer-events-none transition-all duration-700"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 16,
-          justifyContent: 'center',
-          marginBottom: 32,
-        }}
-        aria-hidden
-      />
-
-      {/* Halftone texture */}
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-20" aria-hidden />
-
-      {/* Manga speed lines */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-px w-full opacity-20"
-            style={{
-              top: `${8 + i * 11}%`,
-              background: `linear-gradient(90deg, transparent 0%, ${activeDesc.color}20 50%, transparent 100%)`,
-              transform: `rotate(${-1 + i * 0.3}deg)`,
-            }}
+      {/* Race cards */}
+      <div className="flex flex-wrap gap-4 justify-center mb-6">
+        {(Object.values(Race) as Race[]).map((race) => (
+          <RaceCard
+            key={race}
+            race={race}
+            desc={RACE_DESCRIPTIONS[race]}
+            selected={selectedRace === race}
+            onSelect={() => onSelect(race)}
           />
         ))}
       </div>
 
       {/* Confirm banner */}
       {selectedRace && (
-        <div
-          style={{
-            background: `linear-gradient(135deg, ${RACE_DESCRIPTIONS[selectedRace].color}18 0%, rgba(0,0,0,0.3) 100%)`,
-            border: `1px solid ${RACE_DESCRIPTIONS[selectedRace].color}50`,
-            borderRadius: 10,
-            padding: '16px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-            boxShadow: `0 0 20px ${RACE_DESCRIPTIONS[selectedRace].color}20`,
-          }}
-        >
-          <span style={{ fontSize: 24 }}>{RACE_DESCRIPTIONS[selectedRace].icon}</span>
-          <div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 900,
-                color: RACE_DESCRIPTIONS[selectedRace].color,
-                textTransform: 'uppercase',
-                letterSpacing: 0.8,
-              }}
-            >
-              {RACE_DESCRIPTIONS[selectedRace].name} SEÇİLDİ ✓
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-              Birimler sekmesinden birliklerinizi görüntüleyebilirsiniz.
-            </div>
+        <div className="text-center animate-fade-in-scale">
+          <div
+            className="inline-flex items-center gap-3 px-6 py-3 rounded-xl font-display font-black text-black text-sm uppercase tracking-wider"
+            style={{
+              background: `linear-gradient(135deg, ${RACE_DESCRIPTIONS[selectedRace].color}, ${RACE_DESCRIPTIONS[selectedRace].color}cc)`,
+              boxShadow: `0 4px 24px ${RACE_DESCRIPTIONS[selectedRace].color}40`,
+              letterSpacing: '1px',
+            }}
+          >
+            <span>{RACE_DESCRIPTIONS[selectedRace].icon}</span>
+            <span>{RACE_DESCRIPTIONS[selectedRace].name} Seçildi!</span>
           </div>
+          <p className="text-text-muted text-xs font-body mt-2">
+            Birimler sekmesinden birliklerini görüntüleyebilirsin.
+          </p>
         </div>
         <h1 className="font-display text-3xl md:text-4xl font-black tracking-tight">
           <span className="text-text-primary">Hangi Irk</span>{' '}

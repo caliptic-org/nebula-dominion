@@ -1,33 +1,33 @@
 import type { Metadata, Viewport } from 'next';
-import { RaceThemeProvider } from '@/hooks/useRaceTheme';
-import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
-import '@/styles/globals.css';
-import '@/styles/guild.css';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Nebula Dominion',
     default: 'Nebula Dominion',
+    template: '%s | Nebula Dominion',
   },
-  description: 'Karanlık Sci-Fi Manga Strateji Oyunu — 5 Irk, 3D Tilemap, Epik Savaşlar',
+  description: 'Uzay strateji oyunu — Irk seç, ordu kur, galaksiyi fethet',
 };
 
 export const viewport: Viewport = {
-  themeColor: '#080a10',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#0a0d14',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" data-race="insan">
-      <body>
-        <RaceThemeProvider>
-          <GuildTutorialProvider>
-            {children}
-          </GuildTutorialProvider>
-        </RaceThemeProvider>
-      </body>
+    <html lang="tr">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="stars-bg">{children}</body>
     </html>
   );
 }

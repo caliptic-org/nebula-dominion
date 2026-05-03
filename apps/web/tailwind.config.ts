@@ -9,19 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Base space theme
-        space: {
-          black: '#080a10',
-          panel: '#0d1117',
-          elevated: '#141d2b',
-          overlay: 'rgba(8,10,16,0.92)',
-        },
-        // Semantic tokens backed by CSS custom properties
         bg: {
           DEFAULT: 'var(--color-bg)',
           surface: 'var(--color-bg-surface)',
           elevated: 'var(--color-bg-elevated)',
           overlay: 'var(--color-bg-overlay)',
+          card: 'var(--color-bg-card)',
         },
         text: {
           primary: 'var(--color-text-primary)',
@@ -57,10 +50,21 @@ const config: Config = {
           DEFAULT: 'var(--color-accent)',
           hover: 'var(--color-accent-hover)',
           dim: 'var(--color-accent-dim)',
+          glow: 'var(--color-accent-glow)',
         },
         energy: {
           DEFAULT: 'var(--color-energy)',
+          hover: 'var(--color-energy-hover)',
           dim: 'var(--color-energy-dim)',
+          glow: 'var(--color-energy-glow)',
+        },
+        mineral: {
+          DEFAULT: 'var(--color-mineral)',
+          dim: 'var(--color-mineral-dim)',
+        },
+        gas: {
+          DEFAULT: 'var(--color-gas)',
+          dim: 'var(--color-gas-dim)',
         },
         border: {
           DEFAULT: 'var(--color-border)',
@@ -73,10 +77,27 @@ const config: Config = {
           warning: 'var(--color-warning)',
           info: 'var(--color-info)',
         },
+        race: {
+          human: 'var(--color-race-human)',
+          'human-dim': 'var(--color-race-human-dim)',
+          'human-glow': 'var(--color-race-human-glow)',
+          zerg: 'var(--color-race-zerg)',
+          'zerg-dim': 'var(--color-race-zerg-dim)',
+          'zerg-glow': 'var(--color-race-zerg-glow)',
+          automaton: 'var(--color-race-automaton)',
+          'automaton-dim': 'var(--color-race-automaton-dim)',
+          'automaton-glow': 'var(--color-race-automaton-glow)',
+          monster: 'var(--color-race-monster)',
+          'monster-dim': 'var(--color-race-monster-dim)',
+          'monster-glow': 'var(--color-race-monster-glow)',
+          demon: 'var(--color-race-demon)',
+          'demon-dim': 'var(--color-race-demon-dim)',
+          'demon-glow': 'var(--color-race-demon-glow)',
+        },
       },
       fontFamily: {
-        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
-        body: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'Orbitron', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'Rajdhani', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
       backgroundImage: {
@@ -84,61 +105,69 @@ const config: Config = {
         'hero-gradient': 'var(--gradient-hero)',
         'card-gradient': 'var(--gradient-card)',
         'brand-gradient': 'var(--gradient-brand)',
-        'race-gradient': 'var(--gradient-race)',
-        'halftone': "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='3' cy='3' r='1' fill='white' fill-opacity='0.06'/%3E%3C/svg%3E\")",
+        'energy-gradient': 'var(--gradient-energy)',
+        'battle-gradient': 'var(--gradient-battle)',
       },
       boxShadow: {
         'brand-glow': '0 0 20px var(--color-brand-glow)',
-        'race-glow': '0 0 24px var(--color-race), 0 0 48px var(--color-race-glow)',
-        'manga-panel': 'inset 0 0 0 3px rgba(255,255,255,0.08), 0 0 0 1px rgba(0,0,0,0.8)',
+        'brand-glow-lg': '0 0 40px var(--color-brand-glow)',
+        'accent-glow': '0 0 20px var(--color-accent-glow)',
+        'energy-glow': '0 0 20px var(--color-energy-glow)',
+        'energy-glow-lg': '0 0 40px var(--color-energy-glow)',
+        'race-human': '0 0 20px var(--color-race-human-glow)',
+        'race-zerg': '0 0 20px var(--color-race-zerg-glow)',
+        'race-automaton': '0 0 20px var(--color-race-automaton-glow)',
+        'race-monster': '0 0 20px var(--color-race-monster-glow)',
+        'race-demon': '0 0 20px var(--color-race-demon-glow)',
         'card': '0 4px 24px rgba(0,0,0,0.5)',
-        'card-hover': '0 8px 40px rgba(0,0,0,0.7)',
-        'neon': '0 0 10px var(--color-race), 0 0 40px var(--color-race-glow)',
+        'card-hover': '0 8px 40px rgba(0,0,0,0.7), 0 0 20px rgba(108,142,240,0.12)',
+        'inner-glow': 'inset 0 1px 0 rgba(255,255,255,0.08)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
         'float': 'float 6s ease-in-out infinite',
         'star-twinkle': 'twinkle 4s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
-        'scan-line': 'scan-line 8s linear infinite',
-        'speed-line': 'speed-line 0.4s ease-out forwards',
-        'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
-        'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',
+        'neon-pulse': 'neon-pulse 2.5s ease-in-out infinite',
+        'slide-in-up': 'slideInUp 0.35s ease-out',
+        'fade-in-scale': 'fadeInScale 0.3s ease-out',
+        'spin': 'spin 1s linear infinite',
       },
       keyframes: {
         float: {
           '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-12px)' },
+          '50%': { transform: 'translateY(-10px)' },
         },
         twinkle: {
-          '0%, 100%': { opacity: '0.3' },
+          '0%, 100%': { opacity: '0.25' },
           '50%': { opacity: '1' },
         },
         'glow-pulse': {
           '0%, 100%': { boxShadow: '0 0 10px var(--color-race-glow)' },
           '50%': { boxShadow: '0 0 30px var(--color-race), 0 0 60px var(--color-race-glow)' },
         },
-        'scan-line': {
-          '0%': { transform: 'translateY(-100%)' },
-          '100%': { transform: 'translateY(100vh)' },
+        'neon-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
         },
-        'speed-line': {
-          '0%': { opacity: '0', transform: 'scaleX(0)' },
-          '50%': { opacity: '1' },
-          '100%': { opacity: '0', transform: 'scaleX(1)' },
+        'slideInUp': {
+          from: { transform: 'translateY(20px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
         },
-        'manga-appear': {
-          '0%': { opacity: '0', transform: 'scale(0.95) translateY(16px)', filter: 'blur(4px)' },
-          '100%': { opacity: '1', transform: 'scale(1) translateY(0)', filter: 'blur(0)' },
+        'fadeInScale': {
+          from: { transform: 'scale(0.92)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
         },
-        'slide-up': {
-          '0%': { opacity: '0', transform: 'translateY(24px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+        spin: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
         },
       },
-      transitionTimingFunction: {
-        'spring': 'cubic-bezier(0.32,0.72,0,1)',
-        'bounce-out': 'cubic-bezier(0.34,1.56,0.64,1)',
+      spacing: {
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+      },
+      screens: {
+        'xs': '375px',
       },
     },
   },

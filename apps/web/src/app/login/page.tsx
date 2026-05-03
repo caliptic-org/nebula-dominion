@@ -1,95 +1,94 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = {
-  title: 'Giriş Yap — Nebula Dominion',
-}
+  title: 'Giriş Yap',
+};
+
+const RACE_EMBLEMS = [
+  { icon: '⚔️', color: 'var(--color-race-human)',     label: 'İnsan'    },
+  { icon: '🦟', color: 'var(--color-race-zerg)',      label: 'Zerg'     },
+  { icon: '🤖', color: 'var(--color-race-automaton)', label: 'Automaton'},
+  { icon: '👾', color: 'var(--color-race-monster)',   label: 'Canavar'  },
+  { icon: '😈', color: 'var(--color-race-demon)',     label: 'Şeytan'   },
+];
 
 export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden"
       style={{ background: 'var(--gradient-hero)' }}
     >
-      {/* Atmospheric background layers */}
+      {/* Animated nebula background */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(232,168,32,0.06) 0%, transparent 60%)',
-          zIndex: 0,
-        }}
-        aria-hidden
-      />
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(232,168,32,0.03) 39px, rgba(232,168,32,0.03) 40px),
-            repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(232,168,32,0.03) 39px, rgba(232,168,32,0.03) 40px)`,
+          background: 'radial-gradient(ellipse at 30% 20%, rgba(108,142,240,0.12) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(192,74,255,0.08) 0%, transparent 50%)',
           zIndex: 0,
         }}
         aria-hidden
       />
 
-      <div className="relative z-10 w-full max-w-sm">
-        {/* Game logo */}
-        <div className="text-center mb-8">
-          <Link href="/" aria-label="Ana sayfaya dön">
-            <div className="inline-flex flex-col items-center gap-2">
-              <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl"
-                style={{
-                  background: 'linear-gradient(145deg, #1e1a10 0%, #0d0b06 100%)',
-                  border: '2px solid rgba(232,168,32,0.5)',
-                  boxShadow: '0 0 32px rgba(232,168,32,0.25), inset 0 1px 0 rgba(255,220,80,0.2)',
-                }}
-              >
-                🚀
-              </div>
-              <div>
-                <div
-                  className="font-display font-black tracking-widest text-xl uppercase"
-                  style={{
-                    background: 'linear-gradient(180deg, #f0c840 0%, #c88010 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >
-                  NEBULA DOMINION
-                </div>
-                <div className="text-xs tracking-widest mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                  SPACE BATTLE STRATEGY
-                </div>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        {/* Login card */}
-        <div
-          style={{
-            background: 'linear-gradient(160deg, #12141f 0%, #0c0e17 100%)',
-            border: '1px solid rgba(232,168,32,0.25)',
-            borderRadius: 12,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,168,32,0.06)',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Card header band */}
-          <div
+      {/* Floating race emblems background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }} aria-hidden>
+        {RACE_EMBLEMS.map((r, i) => (
+          <span
+            key={r.label}
+            className="absolute text-5xl select-none animate-float"
             style={{
-              background: 'linear-gradient(90deg, rgba(232,168,32,0.15) 0%, transparent 100%)',
-              borderBottom: '1px solid rgba(232,168,32,0.2)',
-              padding: '14px 28px',
+              left: `${10 + i * 20}%`,
+              top: `${15 + (i % 3) * 25}%`,
+              opacity: 0.04,
+              animationDelay: `${i * 1.2}s`,
+              filter: `drop-shadow(0 0 20px ${r.color})`,
             }}
           >
-            <h1 className="font-display font-black text-base uppercase tracking-widest" style={{ color: 'var(--color-brand)' }}>
-              ⚔️ KOMUTANA GİRİŞ YAP
-            </h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Galaktik kuvvetlerine dön
+            {r.icon}
+          </span>
+        ))}
+      </div>
+
+      <div className="relative z-10 w-full max-w-md animate-slide-in-up">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <Link href="/" className="inline-flex flex-col items-center gap-3 group" aria-label="Ana sayfaya dön">
+            <span className="text-5xl animate-float" aria-hidden>🌌</span>
+            <span className="font-display text-xl font-black tracking-widest text-gradient-brand" style={{ letterSpacing: '4px' }}>
+              NEBULA DOMINION
+            </span>
+          </Link>
+
+          {/* Race color bar */}
+          <div className="flex justify-center gap-1.5 mt-4">
+            {RACE_EMBLEMS.map((r) => (
+              <span
+                key={r.label}
+                className="w-6 h-1 rounded-full"
+                style={{ background: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                aria-hidden
+              />
+            ))}
+          </div>
+
+          <h1 className="mt-6 font-display text-2xl font-bold text-text-primary">
+            Tekrar Hoş Geldin
+          </h1>
+          <p className="mt-2 text-text-secondary text-sm font-body">
+            Galaksiye dönmek için komutan kimliğini doğrula
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="glass-panel p-8">
+          <LoginForm />
+
+          <div className="mt-6 text-center">
+            <p className="text-text-muted text-sm">
+              Hesabın yok mu?{' '}
+              <Link href="/register" className="text-brand hover:text-brand-hover font-semibold transition-colors">
+                Ücretsiz kayıt ol
+              </Link>
             </p>
           </div>
 
@@ -111,9 +110,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center mt-4 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          <Link href="/" className="transition-colors hover:underline" style={{ color: 'var(--color-text-muted)' }}>
-            ← Demo Sayfasına Dön
+        <p className="text-center mt-6 text-text-muted text-xs font-body">
+          <Link href="/" className="hover:text-text-secondary transition-colors">
+            ← Ana sayfaya dön
           </Link>
         </p>
       </div>

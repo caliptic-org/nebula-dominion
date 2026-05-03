@@ -9,6 +9,7 @@ import { LessThanOrEqual, Repository } from 'typeorm';
 import { Building, BuildingStatus, BuildingType } from './entities/building.entity';
 import { BUILDING_CONFIGS } from './buildings.constants';
 import { ResourcesService } from '../resources/resources.service';
+import { EconomyService } from '../economy/economy.service';
 import { StartConstructionDto } from './dto/start-construction.dto';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class BuildingsService {
     @InjectRepository(Building)
     private readonly buildingRepo: Repository<Building>,
     private readonly resources: ResourcesService,
+    private readonly economyService: EconomyService,
   ) {}
 
   async startConstruction(playerId: string, dto: StartConstructionDto): Promise<Building> {
@@ -130,20 +132,42 @@ export class BuildingsService {
     return overdue.length;
   }
 
+  /**
+   * Sums per-tick production across all active buildings using the DB-driven formula:
+   *   production = basePerhour × levelScaleExponent^(level-1) / TICKS_PER_HOUR
+   * Falls back to the legacy BUILDING_CONFIGS constants when no economy config exists.
+   */
   async recalculateProductionRates(playerId: string): Promise<void> {
     const activeBuildings = await this.getActiveBuildings(playerId);
 
     let mineralPerTick = 0;
     let gasPerTick = 0;
     let energyPerTick = 0;
+    let populationPerTick = 0;
 
     for (const building of activeBuildings) {
-      const cfg = BUILDING_CONFIGS[building.type];
-      mineralPerTick += cfg.production.mineralPerTick;
-      gasPerTick += cfg.production.gasPerTick;
-      energyPerTick += cfg.production.energyPerTick - cfg.energyConsumptionPerTick;
+      const econRates = await this.economyService.computeBuildingRates(building.type, building.level);
+
+      if (econRates.mineralPerTick !== 0 || econRates.gasPerTick !== 0 ||
+          econRates.netEnergyPerTick !== 0 || econRates.populationPerTick !== 0) {
+        mineralPerTick    += econRates.mineralPerTick;
+        gasPerTick        += econRates.gasPerTick;
+        energyPerTick     += econRates.netEnergyPerTick;
+        populationPerTick += econRates.populationPerTick;
+      } else {
+        // Fallback to legacy constants when economy config is missing for this building type
+        const legacyCfg = BUILDING_CONFIGS[building.type];
+        mineralPerTick += legacyCfg.production.mineralPerTick;
+        gasPerTick     += legacyCfg.production.gasPerTick;
+        energyPerTick  += legacyCfg.production.energyPerTick - legacyCfg.energyConsumptionPerTick;
+      }
     }
 
-    await this.resources.updateRates(playerId, { mineralPerTick, gasPerTick, energyPerTick });
+    await this.resources.updateRates(playerId, {
+      mineralPerTick,
+      gasPerTick,
+      energyPerTick,
+      populationPerTick,
+    });
   }
 }

@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ResourcesService } from './resources.service';
 import { Resource } from './entities/resource.entity';
 import { REDIS_CLIENT } from '../database/redis.provider';
+import { EconomyService } from '../economy/economy.service';
 
 const mockResourceRepo = () => ({
   findOne: jest.fn(),
@@ -16,6 +17,10 @@ const mockRedis = () => ({
   del: jest.fn().mockResolvedValue(1),
 });
 
+const mockEconomyService = () => ({
+  computeStorageCap: jest.fn().mockResolvedValue(0),
+});
+
 function makeResource(overrides: Partial<Resource> = {}): Resource {
   return {
     id: 'r1',
@@ -23,12 +28,15 @@ function makeResource(overrides: Partial<Resource> = {}): Resource {
     mineral: 100,
     gas: 50,
     energy: 100,
-    mineralCap: 5000,
-    gasCap: 2000,
-    energyCap: 500,
+    population: 0,
+    mineralCap: 24000,
+    gasCap: 14400,
+    energyCap: 8400,
+    populationCap: 5000,
     mineralPerTick: 10,
     gasPerTick: 5,
     energyPerTick: 8,
+    populationPerTick: 0,
     lastTickAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -47,6 +55,7 @@ describe('ResourcesService', () => {
         ResourcesService,
         { provide: getRepositoryToken(Resource), useFactory: mockResourceRepo },
         { provide: REDIS_CLIENT, useFactory: mockRedis },
+        { provide: EconomyService, useFactory: mockEconomyService },
       ],
     }).compile();
 
@@ -77,9 +86,9 @@ describe('ResourcesService', () => {
 
       await service.deduct('p1', { mineral: 50, gas: 20, energy: 30 });
 
-      expect(resource.mineral).toBe(150);
-      expect(resource.gas).toBe(80);
-      expect(resource.energy).toBe(120);
+      expect(Number(resource.mineral)).toBe(150);
+      expect(Number(resource.gas)).toBe(80);
+      expect(Number(resource.energy)).toBe(120);
       expect(repo.save).toHaveBeenCalledWith(resource);
     });
 
@@ -91,13 +100,13 @@ describe('ResourcesService', () => {
 
   describe('applyTick', () => {
     it('adds per-tick production and respects caps', async () => {
-      const resource = makeResource({ mineral: 4990, mineralCap: 5000, mineralPerTick: 20 });
+      const resource = makeResource({ mineral: 23990, mineralCap: 24000, mineralPerTick: 20 });
       repo.findOne.mockResolvedValue(resource);
       repo.save.mockResolvedValue(resource);
 
       await service.applyTick('p1');
 
-      expect(resource.mineral).toBe(5000); // capped at mineralCap
+      expect(Number(resource.mineral)).toBe(24000); // capped at mineralCap
       expect(resource.lastTickAt).toBeInstanceOf(Date);
     });
 
@@ -108,8 +117,95 @@ describe('ResourcesService', () => {
 
       await service.applyTick('p1');
 
-      expect(resource.gas).toBe(60);
-      expect(resource.energy).toBe(95);
+      expect(Number(resource.gas)).toBe(60);
+      expect(Number(resource.energy)).toBe(95);
+    });
+  });
+
+  describe('applyOfflineAccumulation', () => {
+    const TICK_MS = 30_000;
+
+    it('applies 8h of missed ticks and stays under cap', async () => {
+      const eightHoursAgo = new Date(Date.now() - 8 * 3600 * 1000);
+      // 1000/hr ÷ 120 ticks/hr = 8.333/tick
+      const perTick = 1000 / 120;
+      const resource = makeResource({
+        mineral: 0,
+        mineralCap: 24000,
+        mineralPerTick: perTick,
+        lastTickAt: eightHoursAgo,
+      });
+      repo.findOne.mockResolvedValue(resource);
+      repo.save.mockResolvedValue(resource);
+
+      const snap = await service.applyOfflineAccumulation('p1');
+
+      expect(snap.mineral).toBe(8000);
+      expect(snap.mineral).toBeLessThan(snap.mineralCap);
+    });
+
+    it('24h offline → hits exactly the mineral cap', async () => {
+      const dayAgo = new Date(Date.now() - 24 * 3600 * 1000);
+      const perTick = 1000 / 120;
+      const resource = makeResource({
+        mineral: 0,
+        mineralCap: 24000,
+        mineralPerTick: perTick,
+        lastTickAt: dayAgo,
+      });
+      repo.findOne.mockResolvedValue(resource);
+      repo.save.mockResolvedValue(resource);
+
+      const snap = await service.applyOfflineAccumulation('p1');
+
+      expect(snap.mineral).toBe(24000);
+    });
+
+    it('48h offline → still capped (no loss)', async () => {
+      const twoDaysAgo = new Date(Date.now() - 48 * 3600 * 1000);
+      const perTick = 1000 / 120;
+      const resource = makeResource({
+        mineral: 0,
+        mineralCap: 24000,
+        mineralPerTick: perTick,
+        lastTickAt: twoDaysAgo,
+      });
+      repo.findOne.mockResolvedValue(resource);
+      repo.save.mockResolvedValue(resource);
+
+      const snap = await service.applyOfflineAccumulation('p1');
+
+      expect(snap.mineral).toBe(24000);
+    });
+
+    it('advances lastTickAt by full ticks applied, not to now', async () => {
+      const twoTicksAgo = new Date(Date.now() - 2 * TICK_MS - 100);
+      const resource = makeResource({
+        mineral: 0,
+        mineralCap: 24000,
+        mineralPerTick: 10,
+        lastTickAt: twoTicksAgo,
+      });
+      repo.findOne.mockResolvedValue(resource);
+      repo.save.mockResolvedValue(resource);
+
+      await service.applyOfflineAccumulation('p1');
+
+      const savedResource: Resource = repo.save.mock.calls[0][0];
+      const expectedLastTick = new Date(twoTicksAgo.getTime() + 2 * TICK_MS);
+      expect(savedResource.lastTickAt!.getTime()).toBe(expectedLastTick.getTime());
+    });
+
+    it('sets lastTickAt when null (new player)', async () => {
+      const resource = makeResource({ lastTickAt: null });
+      repo.findOne.mockResolvedValue(resource);
+      repo.save.mockResolvedValue(resource);
+
+      await service.applyOfflineAccumulation('p1');
+
+      expect(repo.save).toHaveBeenCalled();
+      const savedResource: Resource = repo.save.mock.calls[0][0];
+      expect(savedResource.lastTickAt).toBeInstanceOf(Date);
     });
   });
 });

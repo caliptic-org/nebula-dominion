@@ -1,6 +1,7 @@
 import { Race } from './units';
 
 export type GuildRole = 'leader' | 'officer' | 'member';
+export type GuildResource = 'mineral' | 'gas';
 
 export type TutorialStep =
   | 'not_started'
@@ -41,6 +42,7 @@ export interface GuildSummary {
 }
 
 export interface GuildMember {
+  id?: string;
   userId: string;
   guildId: string;
   name: string;
@@ -51,6 +53,8 @@ export interface GuildMember {
   weeklyContribution: number;
   lastActiveAt: string;
   isOnline: boolean;
+  online?: boolean;
+  avatarColor?: string;
 }
 
 export interface GuildProfile extends GuildSummary {
@@ -97,3 +101,70 @@ export const LANGUAGE_LABEL: Record<GuildLanguage, string> = {
   fr: 'Français',
   ja: '日本語',
 };
+
+export interface GuildMessage {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorRole: GuildRole;
+  content: string;
+  createdAt: string;
+  flagged?: boolean;
+  mutedAuthor?: boolean;
+  system?: boolean;
+}
+
+export interface DonationRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  resource: GuildResource;
+  amount: number;
+  createdAt: string;
+  expiresAt: string;
+  fulfilledBy: { memberId: string; memberName: string; amount: number }[];
+}
+
+export interface DailyLimits {
+  requestsRemaining: number;
+  requestsCap: number;
+  donatesRemaining: number;
+  donatesCap: number;
+  resetAt: string;
+}
+
+export interface DonationCooldown {
+  targetMemberId: string;
+  unlocksAt: string;
+}
+
+export interface ContributionBreakdown {
+  donate: number;
+  receive: number;
+  chat: number;
+}
+
+export interface ContributionEntry {
+  member: GuildMember;
+  score: number;
+  breakdown: ContributionBreakdown;
+}
+
+export interface MyContributionSummary {
+  todayScore: number;
+  dailyCap: number;
+  breakdown: ContributionBreakdown;
+  weeklyRank: number | null;
+}
+
+export interface RateLimitState {
+  cooldownMs: number;
+  perMinuteRemaining: number;
+  perMinuteCap: number;
+}
+
+export type GuildSocketEvent =
+  | { type: 'message'; payload: GuildMessage }
+  | { type: 'donation:created'; payload: DonationRequest }
+  | { type: 'donation:fulfilled'; payload: DonationRequest }
+  | { type: 'donation:expired'; payload: { id: string } };

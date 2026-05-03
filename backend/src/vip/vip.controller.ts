@@ -1,52 +1,79 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Headers,
+  RawBodyRequest,
+  Req,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 import { VipService } from './vip.service';
+import { PurchaseVipDto } from './dto/purchase-vip.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayload } from '../common/guards/jwt-auth.guard';
 
-@Controller('vip')
+@ApiTags('vip')
+@Controller('api/vip')
 export class VipController {
-  constructor(private readonly svc: VipService) {}
+  constructor(private readonly vipService: VipService) {}
 
-  @Get('tiers')
-  getTiers() {
-    return this.svc.getAllTiers();
+  @Get('status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get authenticated user's VIP status" })
+  @ApiResponse({ status: 200, description: 'VIP status returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getStatus(@CurrentUser() user: JwtPayload) {
+    return this.vipService.getStatus(user.sub);
   }
 
-  @Get('player/:playerId')
-  getLedger(@Param('playerId') playerId: string) {
-    return this.svc.getLedger(playerId);
+  @Get('plans')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List available VIP purchase plans' })
+  @ApiResponse({ status: 200, description: 'Plans list returned' })
+  getPlans() {
+    return this.vipService.getPlans();
   }
 
-  @Get('player/:playerId/benefits')
-  getBenefits(@Param('playerId') playerId: string) {
-    return this.svc.getBenefits(playerId);
-  }
-
-  @Get('player/:playerId/arppu')
-  getArppu(@Param('playerId') playerId: string, @Query('since') since?: string) {
-    return this.svc.getArppu(playerId, since ? new Date(since) : undefined);
-  }
-
-  @Post('player/:playerId/purchase')
+  @Post('claim-daily')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  recordPurchase(
-    @Param('playerId') playerId: string,
-    @Body() body: { purchaseType: string; amountCents: number },
-  ) {
-    return this.svc.recordPurchase(playerId, body.purchaseType, body.amountCents);
+  @ApiOperation({ summary: 'Claim daily VIP rewards (idempotent within 24h)' })
+  @ApiResponse({ status: 200, description: 'Rewards returned (already_claimed=true if already claimed today)' })
+  @ApiResponse({ status: 404, description: 'No active VIP subscription' })
+  claimDaily(@CurrentUser() user: JwtPayload) {
+    return this.vipService.claimDaily(user.sub);
   }
 
-  // ─── Admin ────────────────────────────────────────────────────────────────
-
-  @Patch('tiers/:level/benefits')
-  updateBenefits(
-    @Param('level') level: string,
-    @Body() body: { benefits: Record<string, unknown> },
-  ) {
-    return this.svc.updateTierBenefits(parseInt(level, 10), body.benefits);
+  @Post('purchase')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Initiate VIP purchase — returns checkout URL' })
+  @ApiResponse({ status: 201, description: 'Checkout URL returned' })
+  @ApiResponse({ status: 409, description: 'Already has an active VIP subscription' })
+  purchase(@CurrentUser() user: JwtPayload, @Body() dto: PurchaseVipDto) {
+    return this.vipService.purchase(user.sub, dto.plan_id);
   }
 
-  @Post('tiers/reload')
+  @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  reloadTiers() {
-    return this.svc.reloadTiers();
+  @ApiOperation({ summary: 'Payment provider webhook — HMAC-SHA256 signature required' })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async webhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-webhook-signature') signature: string,
+  ) {
+    const rawBody = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
+    await this.vipService.processWebhook(rawBody, signature ?? '');
+    return { ok: true };
   }
 }

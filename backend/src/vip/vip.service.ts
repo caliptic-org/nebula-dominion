@@ -1,144 +1,213 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { VipTierConfig } from './entities/vip-tier-config.entity';
-import { VipSpendLedger } from './entities/vip-spend-ledger.entity';
-import { PurchaseEvent } from './entities/purchase-event.entity';
+import { Repository } from 'typeorm';
+import { createHmac } from 'crypto';
+import { VipSubscription } from './entities/vip-subscription.entity';
+import { VipDailyClaim, VipReward } from './entities/vip-daily-claim.entity';
 
-export interface RecordPurchaseResult {
-  playerId: string;
-  amountCents: number;
-  cumulativeSpendCents: number;
-  previousVipLevel: number;
-  currentVipLevel: number;
-  vipUpgraded: boolean;
-  benefits: Record<string, unknown>;
+export interface VipPlan {
+  id: string;
+  label: string;
+  price_try: number;
+  price_usd: number;
+  duration_days: number;
+  bonus_gems: number;
+  vip_level: number;
 }
+
+export const VIP_PLANS: VipPlan[] = [
+  { id: 'monthly',   label: 'Aylık',   price_try: 179.99,  price_usd: 4.99,  duration_days: 30,  bonus_gems: 0,    vip_level: 1 },
+  { id: 'quarterly', label: '3 Aylık', price_try: 449.99,  price_usd: 12.99, duration_days: 90,  bonus_gems: 200,  vip_level: 2 },
+  { id: 'annual',    label: 'Yıllık',  price_try: 1399.99, price_usd: 39.99, duration_days: 365, bonus_gems: 1000, vip_level: 3 },
+];
+
+const XP_PER_DAY = 50;
+const DAILY_CLAIM_HOURS = 24;
 
 @Injectable()
 export class VipService {
   private readonly logger = new Logger(VipService.name);
-  private tierCache: VipTierConfig[] | null = null;
 
   constructor(
-    @InjectRepository(VipTierConfig)
-    private readonly tierRepo: Repository<VipTierConfig>,
-    @InjectRepository(VipSpendLedger)
-    private readonly ledgerRepo: Repository<VipSpendLedger>,
-    @InjectRepository(PurchaseEvent)
-    private readonly purchaseRepo: Repository<PurchaseEvent>,
-    private readonly dataSource: DataSource,
+    @InjectRepository(VipSubscription)
+    private readonly subscriptionRepo: Repository<VipSubscription>,
+    @InjectRepository(VipDailyClaim)
+    private readonly dailyClaimRepo: Repository<VipDailyClaim>,
   ) {}
 
-  private async getTiers(): Promise<VipTierConfig[]> {
-    if (!this.tierCache) {
-      this.tierCache = await this.tierRepo.find({ order: { vipLevel: 'ASC' } });
-    }
-    return this.tierCache;
-  }
-
-  async reloadTiers(): Promise<void> {
-    this.tierCache = null;
-  }
-
-  private computeVipLevel(spendCents: number, tiers: VipTierConfig[]): number {
-    let level = 0;
-    for (const tier of tiers) {
-      if (spendCents >= tier.thresholdCents) level = tier.vipLevel;
-    }
-    return level;
-  }
-
-  // Atomic: record purchase, update cumulative spend, upgrade VIP tier if threshold crossed
-  async recordPurchase(
-    playerId: string,
-    purchaseType: string,
-    amountCents: number,
-  ): Promise<RecordPurchaseResult> {
-    const tiers = await this.getTiers();
-
-    return this.dataSource.transaction(async (manager) => {
-      // Upsert ledger row
-      let ledger = await manager.findOne(VipSpendLedger, { where: { playerId } });
-      if (!ledger) {
-        ledger = manager.create(VipSpendLedger, { playerId, cumulativeSpendCents: 0, currentVipLevel: 0 });
-      }
-
-      const previousVipLevel = ledger.currentVipLevel;
-      ledger.cumulativeSpendCents += amountCents;
-      const newVipLevel = this.computeVipLevel(ledger.cumulativeSpendCents, tiers);
-      ledger.currentVipLevel = newVipLevel;
-      await manager.save(VipSpendLedger, ledger);
-
-      // Record purchase event for per-user ARPPU telemetry
-      const event = manager.create(PurchaseEvent, {
-        playerId,
-        purchaseType,
-        amountCents,
-        vipLevelAtPurchase: previousVipLevel,
-      });
-      await manager.save(PurchaseEvent, event);
-
-      const currentTier = tiers.find((t) => t.vipLevel === newVipLevel);
-
-      if (newVipLevel > previousVipLevel) {
-        this.logger.log(`Player ${playerId} VIP upgraded: ${previousVipLevel} → ${newVipLevel}`);
-      }
-
-      return {
-        playerId,
-        amountCents,
-        cumulativeSpendCents: ledger.cumulativeSpendCents,
-        previousVipLevel,
-        currentVipLevel: newVipLevel,
-        vipUpgraded: newVipLevel > previousVipLevel,
-        benefits: currentTier?.benefits ?? {},
-      };
+  async getStatus(userId: string) {
+    const now = new Date();
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { userId, status: 'active' },
+      order: { expiresAt: 'DESC' },
     });
+
+    if (!subscription) {
+      return {
+        vip_level: 0,
+        current_xp: 0,
+        next_level_xp: VIP_PLANS[0].duration_days * XP_PER_DAY,
+        expiry_date: null,
+        is_active: false,
+        daily_claimed_at: null,
+      };
+    }
+
+    if (subscription.expiresAt <= now) {
+      await this.subscriptionRepo.update(subscription.id, { status: 'expired' });
+      return {
+        vip_level: 0,
+        current_xp: 0,
+        next_level_xp: VIP_PLANS[0].duration_days * XP_PER_DAY,
+        expiry_date: null,
+        is_active: false,
+        daily_claimed_at: null,
+      };
+    }
+
+    const plan = VIP_PLANS.find((p) => p.id === subscription.planId)!;
+    const elapsedMs = now.getTime() - subscription.startedAt.getTime();
+    const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+    const currentXp = Math.min(elapsedDays * XP_PER_DAY, plan.duration_days * XP_PER_DAY);
+    const nextLevelXp = plan.duration_days * XP_PER_DAY;
+
+    const lastClaim = await this.dailyClaimRepo.findOne({
+      where: { userId },
+      order: { claimedAt: 'DESC' },
+    });
+
+    return {
+      vip_level: plan.vip_level,
+      current_xp: currentXp,
+      next_level_xp: nextLevelXp,
+      expiry_date: subscription.expiresAt,
+      is_active: true,
+      daily_claimed_at: lastClaim?.claimedAt ?? null,
+    };
   }
 
-  async getLedger(playerId: string): Promise<VipSpendLedger> {
-    const ledger = await this.ledgerRepo.findOne({ where: { playerId } });
-    if (!ledger) throw new NotFoundException(`VIP ledger not found for player ${playerId}`);
-    return ledger;
+  getPlans(): Omit<VipPlan, 'vip_level'>[] {
+    return VIP_PLANS.map(({ vip_level: _v, ...plan }) => plan);
   }
 
-  async getBenefits(playerId: string): Promise<Record<string, unknown>> {
-    const ledger = await this.ledgerRepo.findOne({ where: { playerId } });
-    if (!ledger || ledger.currentVipLevel === 0) return {};
-    const tier = (await this.getTiers()).find((t) => t.vipLevel === ledger.currentVipLevel);
-    return tier?.benefits ?? {};
+  async claimDaily(userId: string) {
+    const now = new Date();
+
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { userId, status: 'active' },
+      order: { expiresAt: 'DESC' },
+    });
+
+    if (!subscription || subscription.expiresAt <= now) {
+      throw new NotFoundException('No active VIP subscription');
+    }
+
+    const windowStart = new Date(now.getTime() - DAILY_CLAIM_HOURS * 60 * 60 * 1000);
+    const recentClaim = await this.dailyClaimRepo
+      .createQueryBuilder('c')
+      .where('c.user_id = :userId', { userId })
+      .andWhere('c.claimed_at > :windowStart', { windowStart })
+      .getOne();
+
+    if (recentClaim) {
+      const nextClaimAt = new Date(recentClaim.claimedAt.getTime() + DAILY_CLAIM_HOURS * 60 * 60 * 1000);
+      return {
+        rewards: recentClaim.rewards,
+        already_claimed: true,
+        next_claim_at: nextClaimAt,
+      };
+    }
+
+    const plan = VIP_PLANS.find((p) => p.id === subscription.planId)!;
+    const rewards: VipReward[] = [
+      { type: 'gems', amount: 50 + plan.vip_level * 25, label: `${50 + plan.vip_level * 25} Gems` },
+      { type: 'xp',   amount: 100 * plan.vip_level,     label: `${100 * plan.vip_level} XP` },
+    ];
+
+    const claim = this.dailyClaimRepo.create({ userId, claimedAt: now, rewards });
+    await this.dailyClaimRepo.save(claim);
+
+    const nextClaimAt = new Date(now.getTime() + DAILY_CLAIM_HOURS * 60 * 60 * 1000);
+    return { rewards, already_claimed: false, next_claim_at: nextClaimAt };
   }
 
-  async getAllTiers(): Promise<VipTierConfig[]> {
-    return this.getTiers();
+  async purchase(userId: string, planId: string): Promise<{ checkout_url: string }> {
+    const now = new Date();
+    const existing = await this.subscriptionRepo.findOne({
+      where: { userId, status: 'active' },
+    });
+
+    if (existing && existing.expiresAt > now) {
+      throw new ConflictException('User already has an active VIP subscription');
+    }
+
+    const plan = VIP_PLANS.find((p) => p.id === planId);
+    if (!plan) {
+      throw new NotFoundException(`Unknown plan: ${planId}`);
+    }
+
+    const paymentBaseUrl = process.env.PAYMENT_GATEWAY_URL ?? 'https://checkout.example.com';
+    const params = new URLSearchParams({
+      plan: planId,
+      user: userId,
+      amount: plan.price_usd.toFixed(2),
+      currency: 'USD',
+    });
+    const checkoutUrl = `${paymentBaseUrl}/pay?${params.toString()}`;
+
+    this.logger.log(`Purchase initiated user=${userId} plan=${planId}`);
+    return { checkout_url: checkoutUrl };
   }
 
-  // Per-player ARPPU — not aggregate
-  async getArppu(
-    playerId: string,
-    since?: Date,
-  ): Promise<{ totalSpentCents: number; purchaseCount: number; avgPerPurchaseCents: number }> {
-    const qb = this.purchaseRepo
-      .createQueryBuilder('p')
-      .select('SUM(p.amount_cents)', 'totalSpentCents')
-      .addSelect('COUNT(*)', 'purchaseCount')
-      .where('p.player_id = :playerId', { playerId });
+  async processWebhook(rawBody: string, signature: string): Promise<void> {
+    const secret = process.env.PAYMENT_WEBHOOK_SECRET;
+    if (!secret) {
+      this.logger.error('PAYMENT_WEBHOOK_SECRET not configured');
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
 
-    if (since) qb.andWhere('p.created_at >= :since', { since });
+    const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+    if (expected !== signature) {
+      this.logger.warn('Webhook signature mismatch');
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
 
-    const raw = await qb.getRawOne<{ totalSpentCents: string; purchaseCount: string }>();
-    const total = parseInt(raw?.totalSpentCents ?? '0', 10);
-    const count = parseInt(raw?.purchaseCount ?? '0', 10);
-    return { totalSpentCents: total, purchaseCount: count, avgPerPurchaseCents: count > 0 ? Math.round(total / count) : 0 };
-  }
+    let payload: { event: string; user_id: string; plan_id: string } & Record<string, unknown>;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      throw new Error('Invalid webhook payload');
+    }
 
-  async updateTierBenefits(vipLevel: number, benefits: Record<string, unknown>): Promise<VipTierConfig> {
-    const tier = await this.tierRepo.findOne({ where: { vipLevel } });
-    if (!tier) throw new NotFoundException(`VIP tier ${vipLevel} not found`);
-    tier.benefits = benefits;
-    const saved = await this.tierRepo.save(tier);
-    this.tierCache = null;
-    return saved;
+    if (payload.event === 'payment.completed') {
+      const plan = VIP_PLANS.find((p) => p.id === payload.plan_id);
+      if (!plan) {
+        this.logger.warn(`Unknown plan in webhook: ${payload.plan_id}`);
+        return;
+      }
+
+      await this.subscriptionRepo.update(
+        { userId: payload.user_id, status: 'active' },
+        { status: 'cancelled' },
+      );
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
+      const subscription = this.subscriptionRepo.create({
+        userId: payload.user_id,
+        planId: plan.id,
+        status: 'active',
+        startedAt: now,
+        expiresAt,
+      });
+      await this.subscriptionRepo.save(subscription);
+      this.logger.log(`VIP activated user=${payload.user_id} plan=${plan.id} expires=${expiresAt.toISOString()}`);
+    }
   }
 }

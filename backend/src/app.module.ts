@@ -18,6 +18,8 @@ import { XpLevelThreshold } from './progression/entities/xp-level-threshold.enti
 import { PlayerProgression } from './progression/entities/player-progression.entity';
 import { XpSourceEvent } from './progression/entities/xp-source-event.entity';
 import { XpSourceWeight } from './progression/entities/xp-source-weight.entity';
+import { VipSubscription } from './vip/entities/vip-subscription.entity';
+import { VipDailyClaim } from './vip/entities/vip-daily-claim.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -26,16 +28,13 @@ import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { ResourcesModule } from './resources/resources.module';
 import { ProgressionModule } from './progression/progression.module';
-import { VipTierConfig } from './vip/entities/vip-tier-config.entity';
-import { VipSpendLedger } from './vip/entities/vip-spend-ledger.entity';
-import { PurchaseEvent } from './vip/entities/purchase-event.entity';
 import { VipModule } from './vip/vip.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { ResourceSchema1746400000000 } from './database/migrations/1746400000000-ResourceSchema';
 import { ProgressionSchema1746500000000 } from './database/migrations/1746500000000-ProgressionSchema';
-import { VipSchema1746600000000 } from './database/migrations/1746600000000-VipSchema';
+import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipSchema';
 
 @Module({
   imports: [
@@ -54,7 +53,7 @@ import { VipSchema1746600000000 } from './database/migrations/1746600000000-VipS
           Sector, SectorBattle, WeeklyLeague, LeagueParticipant,
           ResourceConfig, PlayerResource, FeatureFlag, PlayerSegment,
           XpLevelThreshold, PlayerProgression, XpSourceEvent, XpSourceWeight,
-          VipTierConfig, VipSpendLedger, PurchaseEvent,
+          VipSubscription, VipDailyClaim,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -62,7 +61,7 @@ import { VipSchema1746600000000 } from './database/migrations/1746600000000-VipS
           SectorWarsSchema1746300000000,
           ResourceSchema1746400000000,
           ProgressionSchema1746500000000,
-          VipSchema1746600000000,
+          VipSchema1746700000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',

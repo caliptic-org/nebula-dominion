@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { VipTierConfig } from './entities/vip-tier-config.entity';
-import { VipSpendLedger } from './entities/vip-spend-ledger.entity';
-import { PurchaseEvent } from './entities/purchase-event.entity';
-import { VipService } from './vip.service';
+import { VipSubscription } from './entities/vip-subscription.entity';
+import { VipDailyClaim } from './entities/vip-daily-claim.entity';
 import { VipController } from './vip.controller';
+import { VipService } from './vip.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([VipTierConfig, VipSpendLedger, PurchaseEvent])],
+  imports: [TypeOrmModule.forFeature([VipSubscription, VipDailyClaim])],
   controllers: [VipController],
   providers: [VipService],
   exports: [VipService],

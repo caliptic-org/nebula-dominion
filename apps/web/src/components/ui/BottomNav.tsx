@@ -7,7 +7,6 @@ const NAV_ITEMS = [
   { href: '/',             icon: '🏰', label: 'Ana Üs' },
   { href: '/map',          icon: '🌌', label: 'Harita' },
   { href: '/battle',       icon: '⚔️', label: 'Savaş' },
-  { href: '/inventory',    icon: '◈',  label: 'Envanter' },
   { href: '/commanders',   icon: '🤝', label: 'Komutanlar' },
   { href: '/shop',         icon: '💎', label: 'Mağaza' },
 ];

@@ -5,11 +5,10 @@ import {
   EquipmentItem,
   EquipmentSlotType,
   EquipmentRarity,
+  EquipmentStats,
   RARITY_COLORS,
   SLOT_META,
-  DEMO_EQUIPMENT,
 } from '@/types/equipment';
-import { GlowButton } from './GlowButton';
 import { MangaPanel } from './MangaPanel';
 
 const RARITY_ORDER: EquipmentRarity[] = [
@@ -23,6 +22,10 @@ const RARITY_ORDER: EquipmentRarity[] = [
 interface EquipmentModalProps {
   slot: EquipmentSlotType;
   currentItem?: EquipmentItem;
+  inventory: EquipmentItem[];
+  inventoryLoading?: boolean;
+  inventoryError?: string | null;
+  onRetry?: () => void;
   raceColor: string;
   raceGlow: string;
   onSelect: (item: EquipmentItem) => void;
@@ -33,6 +36,10 @@ interface EquipmentModalProps {
 export function EquipmentModal({
   slot,
   currentItem,
+  inventory: allInventory,
+  inventoryLoading = false,
+  inventoryError = null,
+  onRetry,
   raceColor,
   raceGlow,
   onSelect,
@@ -46,14 +53,14 @@ export function EquipmentModal({
 
   // Items available for this slot, sorted by rarity desc
   const inventory = useMemo(() => {
-    const items = DEMO_EQUIPMENT.filter((i) => i.slot === slot);
+    const items = allInventory.filter((i) => i.slot === slot);
     return items
       .filter((i) => !rarityFilter || i.rarity === rarityFilter)
       .sort(
         (a, b) =>
           RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
       );
-  }, [slot, rarityFilter]);
+  }, [allInventory, slot, rarityFilter]);
 
   // Preview: show hovered item or current item
   const preview = hovered ?? currentItem ?? null;
@@ -144,7 +151,58 @@ export function EquipmentModal({
 
             {/* Item list */}
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-              {inventory.length === 0 ? (
+              {inventoryLoading ? (
+                <div className="space-y-2" aria-busy="true" aria-label="Envanter yükleniyor">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 p-3 rounded-xl animate-pulse"
+                      style={{
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-lg shrink-0"
+                        style={{ background: 'rgba(255,255,255,0.06)' }}
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div
+                          className="h-2.5 w-2/3 rounded"
+                          style={{ background: 'rgba(255,255,255,0.06)' }}
+                        />
+                        <div
+                          className="h-2 w-1/2 rounded"
+                          style={{ background: 'rgba(255,255,255,0.04)' }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : inventoryError ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center px-4" role="alert">
+                  <span className="text-3xl mb-2">⚠️</span>
+                  <div className="font-display text-xs uppercase tracking-widest text-text-muted mb-1">
+                    Envanter yüklenemedi
+                  </div>
+                  <div className="text-text-secondary text-[11px] mb-3 break-words">
+                    {inventoryError}
+                  </div>
+                  {onRetry && (
+                    <button
+                      onClick={onRetry}
+                      className="font-display text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition-colors"
+                      style={{
+                        background: `${raceColor}18`,
+                        border: `1px solid ${raceColor}40`,
+                        color: raceColor,
+                      }}
+                    >
+                      Tekrar Dene
+                    </button>
+                  )}
+                </div>
+              ) : inventory.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-text-muted">
                   <span className="text-3xl mb-2 opacity-30">📦</span>
                   <span className="font-display text-xs uppercase tracking-widest">Envanter Boş</span>
@@ -269,8 +327,8 @@ function StatChips({
   stats,
   currentStats,
 }: {
-  stats: Record<string, number | undefined>;
-  currentStats?: Record<string, number | undefined>;
+  stats: EquipmentStats;
+  currentStats?: EquipmentStats;
 }) {
   const labels: Record<string, string> = { attack: 'ATK', defense: 'DEF', speed: 'HZ', hp: 'HP' };
   return (
@@ -279,8 +337,8 @@ function StatChips({
         .filter(([, v]) => v !== undefined && v !== 0)
         .map(([key, val]) => {
           const v = val as number;
-          const prev = currentStats?.[key] ?? 0;
-          const diff = v - (prev as number);
+          const prev = (currentStats as Record<string, number | undefined> | undefined)?.[key] ?? 0;
+          const diff = v - prev;
           const isUpgrade = diff > 0;
           const isSame = diff === 0;
           return (

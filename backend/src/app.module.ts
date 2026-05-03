@@ -10,6 +10,10 @@ import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
 import { AnalyticsEvent } from './analytics/entities/event.entity';
+import { ShopProduct } from './shop/entities/shop-product.entity';
+import { PlayerWallet } from './shop/entities/player-wallet.entity';
+import { PurchaseTransaction } from './shop/entities/purchase-transaction.entity';
+import { GameEvent } from './shop/entities/game-event.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -17,10 +21,12 @@ import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ShopModule } from './shop/shop.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
+import { ShopSchema1746500000000 } from './database/migrations/1746500000000-ShopSchema';
 
 @Module({
   imports: [
@@ -44,12 +50,17 @@ import { AnalyticsSchema1746400000000 } from './database/migrations/174640000000
           WeeklyLeague,
           LeagueParticipant,
           AnalyticsEvent,
+          ShopProduct,
+          PlayerWallet,
+          PurchaseTransaction,
+          GameEvent,
         ],
         migrations: [
           BattleSchema1746100000000,
           UnitsSchema1746200000000,
           SectorWarsSchema1746300000000,
           AnalyticsSchema1746400000000,
+          ShopSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -63,6 +74,7 @@ import { AnalyticsSchema1746400000000 } from './database/migrations/174640000000
     SectorWarsModule,
     LeaderboardModule,
     AnalyticsModule,
+    ShopModule,
   ],
 })
 export class AppModule {}

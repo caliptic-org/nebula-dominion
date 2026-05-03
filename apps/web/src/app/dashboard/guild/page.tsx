@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GlowButton } from '@/components/ui/GlowButton';
@@ -11,34 +11,77 @@ import { TutorialOverlay } from '@/components/guild/TutorialOverlay';
 import { GuildView } from './GuildView';
 import { useGuildTutorial } from '@/hooks/useGuildTutorial';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { GuildSummary } from '@/types/guild';
+import { GuildSummary, TutorialStep } from '@/types/guild';
+import { guildApi } from '@/lib/guildApi';
 
 type Tab = 'search' | 'create';
 
+const FIRST_DONATION_AMOUNT = 50;
+
 export default function GuildHubPage() {
   const router = useRouter();
-  const { state, advance, resetForDemo, openOverlay } = useGuildTutorial();
+  const { state, advance, syncFromBackend, resetForDemo, openOverlay } = useGuildTutorial();
   const { race } = useRaceTheme();
   const [tab, setTab] = useState<Tab>('search');
   const [activeGuildId, setActiveGuildId] = useState<string | null>(state.guildId);
   const [joining, setJoining] = useState<string | null>(null);
+  const [donating, setDonating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveGuildId(state.guildId);
+  }, [state.guildId]);
 
   const handleJoin = async (guild: GuildSummary) => {
     setJoining(guild.id);
+    setError(null);
     try {
+      // Backend auto-advances tutorial not_started → guild_chosen on join.
+      // We pull the new state back via syncFromBackend rather than
+      // optimistically advancing client-side.
+      await guildApi.joinGuild(guild.id);
       setActiveGuildId(guild.id);
-      if (state.step === 'not_started') {
-        await advance(guild.id);
-      }
+      await syncFromBackend();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Loncaya katılınamadı.');
     } finally {
       setJoining(null);
     }
   };
 
   const handleCreate = async (guild: GuildSummary) => {
-    setActiveGuildId(guild.id);
-    if (state.step === 'not_started') {
-      await advance(guild.id);
+    setError(null);
+    try {
+      // Creating a guild as the leader implicitly inserts the membership row;
+      // the backend treats this as the join transition, so we sync state.
+      setActiveGuildId(guild.id);
+      await syncFromBackend();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lonca paneli güncellenemedi.');
+    }
+  };
+
+  const handleDonate = async () => {
+    if (!activeGuildId || donating) return;
+    setDonating(true);
+    setError(null);
+    try {
+      await guildApi.donate(activeGuildId, FIRST_DONATION_AMOUNT, 'mineral');
+      // Backend auto-advances guild_chosen → first_donation here.
+      await syncFromBackend();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bağış başarısız oldu.');
+    } finally {
+      setDonating(false);
+    }
+  };
+
+  const handleManualAdvance = async () => {
+    setError(null);
+    try {
+      await advance();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tutorial ilerletilemedi.');
     }
   };
 
@@ -50,6 +93,27 @@ export default function GuildHubPage() {
     name: 'Komutan',
     role: 'officer' as const,
   };
+
+  const stepCallouts: Partial<Record<TutorialStep, { copy: string; cta: string; onClick: () => void; loading?: boolean }>> = {
+    guild_chosen: {
+      copy: `${FIRST_DONATION_AMOUNT} mineral bağışı yaparak ilk katkı puanını kazan.`,
+      cta: `${FIRST_DONATION_AMOUNT} Mineral Bağışla`,
+      onClick: handleDonate,
+      loading: donating,
+    },
+    first_donation: {
+      copy: 'İlk lonca görevini al — XP hızla birikecek.',
+      cta: 'Görevi Aldım',
+      onClick: handleManualAdvance,
+    },
+    first_quest: {
+      copy: 'Tutorial neredeyse tamam, ödülünü topla.',
+      cta: 'Ödülü Topla',
+      onClick: handleManualAdvance,
+    },
+  };
+
+  const callout = inGuild ? stepCallouts[state.step] : undefined;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
@@ -90,6 +154,12 @@ export default function GuildHubPage() {
       </header>
 
       <main className="flex-1 px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full space-y-6">
+        {error && (
+          <div role="alert" className="glass-card p-3 text-status-danger text-sm border border-status-danger/40">
+            {error}
+          </div>
+        )}
+
         {!inGuild && (
           <>
             <nav
@@ -132,7 +202,7 @@ export default function GuildHubPage() {
 
             <GuildView me={me} />
 
-            {state.step !== 'completed' && (
+            {callout && state.step !== 'completed' && (
               <div
                 className="glass-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 style={{ borderColor: 'var(--color-race)', boxShadow: '0 0 24px var(--color-race-glow)' }}
@@ -142,14 +212,14 @@ export default function GuildHubPage() {
                   <p className="font-display text-sm font-bold text-text-primary mb-1">
                     Tutorial devam ediyor
                   </p>
-                  <p className="text-text-secondary text-xs">
-                    {state.step === 'guild_chosen' && '50 mineral bağışı yaparak ilk katkı puanını kazan.'}
-                    {state.step === 'first_donation' && 'İlk lonca görevini al — XP hızla birikecek.'}
-                    {state.step === 'first_quest' && 'Tutorial neredeyse tamam, ödülünü topla.'}
-                  </p>
+                  <p className="text-text-secondary text-xs">{callout.copy}</p>
                 </div>
-                <GlowButton size="md" onClick={() => advance()}>
-                  Sonraki Adım
+                <GlowButton
+                  size="md"
+                  onClick={callout.onClick}
+                  loading={callout.loading}
+                >
+                  {callout.cta}
                 </GlowButton>
               </div>
             )}
@@ -167,7 +237,7 @@ export default function GuildHubPage() {
         )}
       </main>
 
-      <TutorialOverlay />
+      <TutorialOverlay onPrimaryAction={callout?.onClick} primaryActionLoading={callout?.loading} />
     </div>
   );
 }

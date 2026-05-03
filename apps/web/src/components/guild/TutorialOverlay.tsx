@@ -22,26 +22,26 @@ const STEP_COPY: Record<TutorialStep, StepCopy> = {
     title: 'Loncana ihtiyacın var, Komutan.',
     body:
       'Yalnız çağı geride kaldı. Çağ 3 ve sonrası, lonca içi raid, kaynak yardımlaşma ve haftalık tech araştırması üzerine kuruludur. Devam etmek için bir loncaya katıl ya da kendi loncanı kur.',
-    cta: 'Şimdi loncana katıl',
+    cta: 'Loncayı seç',
   },
   guild_chosen: {
-    eyebrow: 'Adım 2 / 3',
+    eyebrow: 'Adım 2 / 4',
     title: 'İlk bağışını yap.',
     body:
       'Lonca depoları, üyelerin günlük katkısıyla büyür. Şimdi minik bir mineral bağışı yaparak haftalık katkı puanını başlat.',
     cta: '50 Mineral bağışla',
   },
   first_donation: {
-    eyebrow: 'Adım 3 / 3',
+    eyebrow: 'Adım 3 / 4',
     title: 'İlk lonca görevini al.',
     body:
       'Lonca görevleri kovan zihninle paylaşılır — bireysel görevlerden daha hızlı ilerlersin ve hem sana hem loncana XP kazandırır.',
     cta: 'Görev panosunu aç',
   },
   first_quest: {
-    eyebrow: 'Tamamlandı',
+    eyebrow: 'Adım 4 / 4',
     title: 'Tutorial tamam!',
-    body: 'Ödüllerini toplamak için bir saniyene ihtiyacımız var…',
+    body: 'Ödüllerini toplamak için son bir adım kaldı.',
     cta: 'Ödülü topla',
   },
   completed: {
@@ -53,7 +53,18 @@ const STEP_COPY: Record<TutorialStep, StepCopy> = {
   },
 };
 
-export function TutorialOverlay() {
+interface TutorialOverlayProps {
+  /**
+   * Optional handler invoked when the user clicks the primary CTA. When
+   * provided, it overrides the default advance() call. This is how the
+   * dashboard wires step-specific actions (e.g. donate vs manual advance)
+   * into the overlay without the overlay knowing about backend internals.
+   */
+  onPrimaryAction?: () => void | Promise<void>;
+  primaryActionLoading?: boolean;
+}
+
+export function TutorialOverlay({ onPrimaryAction, primaryActionLoading }: TutorialOverlayProps = {}) {
   const { state, isOverlayOpen, isAdvancing, advance, closeOverlay } = useGuildTutorial();
   const { race } = useRaceTheme();
   const copy = STEP_COPY[state.step];
@@ -83,6 +94,25 @@ export function TutorialOverlay() {
 
   const showRewardScene = state.step === 'completed' && state.rewardClaimed;
   const showRewardPreview = state.step === 'first_quest';
+
+  // For `not_started` the user must physically pick a guild from the
+  // search/create panels behind the overlay, so the CTA simply closes the
+  // overlay and lets that interaction happen. closeOverlay is unconditional
+  // (see useGuildTutorial); non-skippability is enforced by the auto-reopen
+  // on next page load.
+  const isNotStarted = state.step === 'not_started';
+
+  const handlePrimary = async () => {
+    if (state.step === 'completed' || isNotStarted) {
+      closeOverlay();
+      return;
+    }
+    if (onPrimaryAction) {
+      await onPrimaryAction();
+      return;
+    }
+    await advance();
+  };
 
   return (
     <div
@@ -124,23 +154,19 @@ export function TutorialOverlay() {
           )}
 
           <div className="tutorial-card__actions">
-            {state.step === 'completed' ? (
-              <GlowButton size="lg" onClick={closeOverlay}>
-                {copy.cta}
-              </GlowButton>
-            ) : (
-              <GlowButton
-                size="lg"
-                loading={isAdvancing}
-                onClick={() => advance()}
-                aria-label={copy.cta}
-              >
-                {copy.cta}
-              </GlowButton>
+            <GlowButton
+              size="lg"
+              loading={primaryActionLoading || (isAdvancing && !isNotStarted)}
+              onClick={handlePrimary}
+              aria-label={copy.cta}
+            >
+              {copy.cta}
+            </GlowButton>
+            {state.step !== 'completed' && (
+              <span className="tutorial-card__copy" style={{ opacity: 0.6, fontSize: 12 }}>
+                Tutorial atlanamaz · Çağ 3 unlock zorunlu adımı
+              </span>
             )}
-            <span className="tutorial-card__copy" style={{ opacity: 0.6, fontSize: 12 }}>
-              Tutorial atlanamaz · Çağ 3 unlock zorunlu adımı
-            </span>
           </div>
         </div>
       </div>

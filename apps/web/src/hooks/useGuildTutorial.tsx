@@ -26,9 +26,12 @@ interface TutorialContextValue {
   state: TutorialState;
   isOverlayOpen: boolean;
   isAdvancing: boolean;
+  isHydrating: boolean;
+  tutorialRequired: boolean;
   openOverlay: () => void;
   closeOverlay: () => void;
   advance: (guildIdHint?: string) => Promise<void>;
+  syncFromBackend: () => Promise<void>;
   resetForDemo: () => void;
 }
 
@@ -68,25 +71,56 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TutorialState>(INITIAL_STATE);
   const [isOverlayOpen, setOverlayOpen] = useState(false);
   const [isAdvancing, setAdvancing] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [isHydrating, setHydrating] = useState(true);
+  const [tutorialRequired, setTutorialRequired] = useState(true);
 
-  useEffect(() => {
-    const loaded = loadFromStorage();
-    setState(loaded);
-    setHydrated(true);
-    if (loaded.step !== 'completed') {
-      setOverlayOpen(true);
+  // Sync local cache + backend on mount. Backend is authoritative — local
+  // cache is only used to render an immediate UI before the network roundtrip
+  // completes and to remember the guildId hint between page navigations.
+  const syncFromBackend = useCallback(async () => {
+    try {
+      const remote = await guildApi.getTutorialState();
+      setTutorialRequired(remote.tutorialRequired);
+      setState((prev) => ({
+        ...prev,
+        step: remote.step,
+        rewardClaimed: remote.rewardGranted || prev.rewardClaimed,
+        completedAt: remote.completedAt ?? prev.completedAt,
+      }));
+      // If state is `guild_chosen` or later, find the user's actual guild so
+      // the dashboard can render without the search panel re-appearing.
+      if (remote.step !== 'not_started') {
+        const m = await guildApi.getMembership();
+        if (m) setState((prev) => ({ ...prev, guildId: m.guildId }));
+      }
+    } catch {
+      // Backend unreachable — fall back to local cache (already loaded).
+      // Showing the overlay against stale state is fine; backend will reject
+      // illegal advance attempts on its side anyway.
+    } finally {
+      setHydrating(false);
     }
   }, []);
 
   useEffect(() => {
-    if (hydrated) saveToStorage(state);
-  }, [state, hydrated]);
+    const loaded = loadFromStorage();
+    setState(loaded);
+    syncFromBackend().then(() => {
+      setOverlayOpen(loaded.step !== 'completed');
+    });
+  }, [syncFromBackend]);
+
+  useEffect(() => {
+    if (!isHydrating) saveToStorage(state);
+  }, [state, isHydrating]);
 
   const openOverlay = useCallback(() => setOverlayOpen(true), []);
-  const closeOverlay = useCallback(() => {
-    if (state.step === 'completed') setOverlayOpen(false);
-  }, [state.step]);
+  // Close is allowed at any step. Non-skippability comes from two things
+  // outside this function: (1) the overlay re-opens automatically on the
+  // next page load when step !== 'completed', and (2) the user can only
+  // *advance* state via real guild interactions — donating, joining, etc.
+  // — which the backend gates. There is no "skip" CTA.
+  const closeOverlay = useCallback(() => setOverlayOpen(false), []);
 
   const advance = useCallback(
     async (guildIdHint?: string) => {
@@ -101,10 +135,10 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
           startedAt: state.startedAt ?? new Date().toISOString(),
         };
 
-        // Idempotency guard: only request the reward if it has not already
-        // been granted client-side. The backend MUST also enforce this via
-        // tutorial_completed_at — a tampered localStorage value can flip
-        // rewardClaimed back to false (see guildApi.grantTutorialReward).
+        // Reward is server-authoritative + idempotent. Skip the call if we
+        // already know it landed (rewardClaimed) — guards against double
+        // requests when the user re-clicks during transition. The backend's
+        // 409 also gets translated to success in guildApi.grantTutorialReward.
         if (next === 'completed' && !state.rewardClaimed) {
           await guildApi.grantTutorialReward();
           nextState = {
@@ -133,8 +167,30 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ state, isOverlayOpen, isAdvancing, openOverlay, closeOverlay, advance, resetForDemo }),
-    [state, isOverlayOpen, isAdvancing, openOverlay, closeOverlay, advance, resetForDemo],
+    () => ({
+      state,
+      isOverlayOpen,
+      isAdvancing,
+      isHydrating,
+      tutorialRequired,
+      openOverlay,
+      closeOverlay,
+      advance,
+      syncFromBackend,
+      resetForDemo,
+    }),
+    [
+      state,
+      isOverlayOpen,
+      isAdvancing,
+      isHydrating,
+      tutorialRequired,
+      openOverlay,
+      closeOverlay,
+      advance,
+      syncFromBackend,
+      resetForDemo,
+    ],
   );
 
   return <TutorialCtx.Provider value={value}>{children}</TutorialCtx.Provider>;

@@ -115,7 +115,7 @@ export function SettingsClient() {
 
   return (
     <div
-      className="min-h-screen pb-28 lg:pb-12"
+      className="h-dvh overflow-y-auto pb-28 lg:pb-12"
       style={{ background: 'var(--gradient-hero)' }}
     >
       {/* Header */}

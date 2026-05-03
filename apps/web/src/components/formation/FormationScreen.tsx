@@ -481,7 +481,7 @@ export function FormationScreen({ playerId }: FormationScreenProps) {
   /* ── Initial load: error / empty state ────────────────────────────────── */
   if (unitsError) {
     return (
-      <div className="min-h-dvh flex items-center justify-center px-4" style={{ background: '#080a10' }}>
+      <div className="h-dvh flex items-center justify-center px-4" style={{ background: '#080a10' }}>
         <MangaPanel thick className="p-8 max-w-md text-center">
           <div className="text-3xl mb-3">⚠️</div>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-text-primary mb-2">
@@ -496,7 +496,7 @@ export function FormationScreen({ playerId }: FormationScreenProps) {
 
   return (
     <div
-      className="min-h-dvh text-text-primary font-body relative overflow-hidden"
+      className="h-dvh text-text-primary font-body relative overflow-y-auto"
       style={{ background: `radial-gradient(ellipse 90% 50% at 50% 0%, ${rc.dim} 0%, #080a10 55%)` }}
     >
       {/* Speed lines bg */}

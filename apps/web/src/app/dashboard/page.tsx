@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="min-h-screen flex"
+      className="h-dvh flex overflow-hidden"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* ─── Sidebar ───────────────────────────────── */}

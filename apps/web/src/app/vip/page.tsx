@@ -227,7 +227,7 @@ export default function VipPage() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col"
+      className="h-dvh flex flex-col overflow-y-auto"
       style={{ background: 'linear-gradient(180deg, #080a10 0%, #0a0c14 60%, #080a10 100%)' }}
     >
       {/* Starfield ambient */}

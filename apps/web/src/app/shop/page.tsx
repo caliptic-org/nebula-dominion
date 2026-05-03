@@ -809,7 +809,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col relative" style={{ background: 'var(--color-bg)' }}>
+    <div className="h-dvh flex flex-col relative overflow-hidden" style={{ background: 'var(--color-bg)' }}>
       {/* Background layers */}
       <div
         className="fixed inset-0 pointer-events-none transition-all duration-700"

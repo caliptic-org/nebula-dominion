@@ -34,7 +34,7 @@ export default function CommandersPage() {
   const totalUnlocked = COMMANDERS.filter((c) => c.isUnlocked).length;
 
   return (
-    <div className="commanders-screen min-h-[100dvh] flex flex-col text-text-primary">
+    <div className="commanders-screen h-dvh flex flex-col text-text-primary overflow-hidden">
       <div className="commanders-bg" aria-hidden />
       <div className="commanders-halftone" aria-hidden />
 

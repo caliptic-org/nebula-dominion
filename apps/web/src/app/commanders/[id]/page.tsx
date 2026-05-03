@@ -60,7 +60,7 @@ function CommanderDetail({ commander }: { commander: Commander }) {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col"
+      className="h-dvh flex flex-col overflow-hidden"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* Background glow */}

@@ -1116,7 +1116,7 @@ export default function ResearchPage() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-y-auto"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* Nebula background */}

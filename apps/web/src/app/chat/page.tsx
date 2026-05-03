@@ -515,7 +515,7 @@ export default function ChatPage() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-hidden"
       style={{ background: 'var(--color-bg)' }}
     >
       {/* Nebula bg */}

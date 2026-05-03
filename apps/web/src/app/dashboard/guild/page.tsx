@@ -116,7 +116,7 @@ export default function GuildHubPage() {
   const callout = inGuild ? stepCallouts[state.step] : undefined;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
+    <div className="h-dvh flex flex-col overflow-y-auto" style={{ background: 'var(--color-bg)' }}>
       <header
         className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border"
         style={{ background: 'rgba(7,11,22,0.85)', backdropFilter: 'blur(12px)' }}

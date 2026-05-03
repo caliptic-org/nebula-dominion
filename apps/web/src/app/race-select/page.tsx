@@ -62,7 +62,7 @@ export default function RaceSelectPage() {
 
   return (
     <div
-      className="min-h-[100dvh] relative overflow-hidden flex flex-col text-text-primary"
+      className="h-dvh relative overflow-hidden flex flex-col text-text-primary"
       style={{ background: 'var(--color-bg, #07090f)' }}
     >
       {/* Race-themed atmosphere */}

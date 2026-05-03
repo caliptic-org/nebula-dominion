@@ -17,7 +17,7 @@ const RACE_EMBLEMS = [
 export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden"
+      className="h-dvh flex flex-col items-center justify-center px-4 py-12 relative overflow-y-auto"
       style={{ background: 'var(--gradient-hero)' }}
     >
       {/* Animated nebula background */}

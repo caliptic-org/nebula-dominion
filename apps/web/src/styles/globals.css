@@ -138,6 +138,14 @@
 }
 
 /* ── Base Styles ────────────────────────────────────────────────────────── */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -146,11 +154,10 @@ body {
   background: var(--color-bg);
   color: var(--color-text-primary);
   font-family: var(--font-body);
-  min-height: 100dvh;
+  height: 100dvh;
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 /* Starfield noise — fixed overlay, pointer-events-none */
@@ -676,7 +683,7 @@ body::before {
 /* ── Battle Page ────────────────────────────────────────────────────────── */
 .battle-page {
   width: 100%;
-  min-height: 100dvh;
+  height: 100dvh;
   background: #07090f;
   display: flex;
   flex-direction: column;

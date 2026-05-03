@@ -20,7 +20,7 @@ function BattleContent() {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative"
+      className="h-dvh flex flex-col relative overflow-hidden"
       style={{ background: '#07090f' }}
       data-race={raceDesc?.dataRace ?? 'insan'}
     >
@@ -136,7 +136,7 @@ export default function BattlePage() {
   return (
     <Suspense fallback={
       <div
-        className="min-h-[100dvh] flex items-center justify-center"
+        className="h-dvh flex items-center justify-center"
         style={{ background: '#07090f' }}
       >
         <div className="text-center">

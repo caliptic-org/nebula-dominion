@@ -17,7 +17,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full overflow-hidden flex flex-col items-center justify-center px-6"
+      className="relative h-dvh w-full overflow-y-auto flex flex-col items-center justify-center px-6"
       style={{ background: 'var(--color-bg)' }}
     >
       <div

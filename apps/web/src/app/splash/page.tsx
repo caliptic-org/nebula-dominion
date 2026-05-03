@@ -71,7 +71,7 @@ export default function SplashPage() {
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full overflow-hidden flex flex-col items-center justify-center"
+      className="relative h-dvh w-full overflow-hidden flex flex-col items-center justify-center"
       style={{
         background: '#080a10',
         opacity: fadingOut ? 0 : 1,

@@ -15,7 +15,8 @@ export function RaceSelectionScreen({ selectedRace, onSelect, onConfirm }: RaceS
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100dvh',
+        overflowY: 'auto',
         padding: '48px 24px',
         background: 'var(--color-bg)',
         display: 'flex',

@@ -1163,7 +1163,8 @@ export default function CustomizationPage() {
 
       <div
         style={{
-          minHeight: '100dvh',
+          height: '100dvh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',

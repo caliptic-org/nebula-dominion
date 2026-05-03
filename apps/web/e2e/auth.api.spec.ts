@@ -130,9 +130,9 @@ test.describe('POST /auth/login', () => {
     await api.dispose();
   });
 
-  test('200 — successful login returns accessToken and userId', async () => {
+  test('200 — successful login by username returns accessToken and userId', async () => {
     const res = await api.post('/auth/login', {
-      data: { username: user.username, password: user.password },
+      data: { identifier: user.username, password: user.password },
     });
 
     expect(res.status()).toBe(200);
@@ -142,21 +142,31 @@ test.describe('POST /auth/login', () => {
     expect(typeof body.userId).toBe('string');
   });
 
+  test('200 — successful login by email returns accessToken', async () => {
+    const res = await api.post('/auth/login', {
+      data: { identifier: user.email, password: user.password },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(typeof body.accessToken).toBe('string');
+  });
+
   test('401 — wrong password returns unauthorized', async () => {
     const res = await api.post('/auth/login', {
-      data: { username: user.username, password: 'WrongP@ss999!' },
+      data: { identifier: user.username, password: 'WrongP@ss999!' },
     });
     expect(res.status()).toBe(401);
   });
 
   test('401 — non-existent user returns unauthorized', async () => {
     const res = await api.post('/auth/login', {
-      data: { username: 'ghost_xyz_nobody', password: 'SomeP@ss123!' },
+      data: { identifier: 'ghost_xyz_nobody', password: 'SomeP@ss123!' },
     });
     expect(res.status()).toBe(401);
   });
 
-  test('400 — missing username returns validation error', async () => {
+  test('400 — missing identifier returns validation error', async () => {
     const res = await api.post('/auth/login', {
       data: { password: user.password },
     });
@@ -165,7 +175,7 @@ test.describe('POST /auth/login', () => {
 
   test('400 — missing password returns validation error', async () => {
     const res = await api.post('/auth/login', {
-      data: { username: user.username },
+      data: { identifier: user.username },
     });
     expect(res.status()).toBe(400);
   });
@@ -224,7 +234,7 @@ test.describe('Protected endpoints — JWT guard', () => {
     const user = uniqueUser();
     await api.post('/auth/register', { data: user });
     const loginRes = await api.post('/auth/login', {
-      data: { username: user.username, password: user.password },
+      data: { identifier: user.username, password: user.password },
     });
     const { accessToken } = await loginRes.json();
 
@@ -261,7 +271,7 @@ test.describe('Logout — token lifecycle', () => {
     const user = uniqueUser();
     await api.post('/auth/register', { data: user });
     const loginRes = await api.post('/auth/login', {
-      data: { username: user.username, password: user.password },
+      data: { identifier: user.username, password: user.password },
     });
     const { accessToken } = await loginRes.json();
 

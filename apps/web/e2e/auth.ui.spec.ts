@@ -167,29 +167,26 @@ test.describe('Login page (/login)', () => {
     await apiRegister(loginUser);
   });
 
-  /**
-   * BUG — LoginForm field name mismatch:
-   * The form's state key is `email` and the input has name="email", but the
-   * backend LoginDto expects the field `username` (not email). Sending `email`
-   * causes the backend to return 400 (forbidNonWhitelisted + missing username).
-   *
-   * Until the LoginForm is fixed, this test documents the broken behaviour.
-   * After the fix, the `name="email"` input should become `name="username"`
-   * (or the DTO should accept email as the identifier).
-   *
-   * Additionally, the form submits to:
-   *   ${NEXT_PUBLIC_API_URL}/auth/login  → http://localhost:4000/auth/login
-   * but the actual versioned endpoint is:
-   *   http://localhost:4000/api/v1/auth/login
-   * NEXT_PUBLIC_API_URL must include the `/api/v1` prefix to match.
-   */
-  test('successful login stores accessToken and leaves /login page', async ({ page }) => {
+  test('successful login by username stores accessToken and leaves /login page', async ({ page }) => {
     await page.goto('/login');
 
-    // The form's input name is "email" but sends the username value.
-    // Fill with the registered username so the submitted JSON has the right value
-    // once the field-name bug is fixed.
-    await page.fill('[name="email"]', loginUser.username);
+    await page.fill('[name="identifier"]', loginUser.username);
+    await page.fill('[name="password"]', loginUser.password);
+
+    await Promise.all([
+      page.waitForNavigation({ timeout: 10_000 }),
+      page.click('button[type="submit"]'),
+    ]);
+
+    expect(page.url()).not.toContain('/login');
+    const token = await page.evaluate(() => window.localStorage.getItem('accessToken'));
+    expect(token).toBeTruthy();
+  });
+
+  test('successful login by email stores accessToken', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.fill('[name="identifier"]', loginUser.email);
     await page.fill('[name="password"]', loginUser.password);
 
     await Promise.all([
@@ -205,7 +202,7 @@ test.describe('Login page (/login)', () => {
   test('wrong password shows error alert', async ({ page }) => {
     await page.goto('/login');
 
-    await page.fill('[name="email"]', loginUser.username);
+    await page.fill('[name="identifier"]', loginUser.username);
     await page.fill('[name="password"]', 'WrongP@ss!000');
     await page.click('button[type="submit"]');
 
@@ -218,7 +215,7 @@ test.describe('Login page (/login)', () => {
   test('non-existent user shows error alert', async ({ page }) => {
     await page.goto('/login');
 
-    await page.fill('[name="email"]', 'ghost_nobody_xyz');
+    await page.fill('[name="identifier"]', 'ghost_nobody_xyz');
     await page.fill('[name="password"]', 'SomeP@ss123!');
     await page.click('button[type="submit"]');
 

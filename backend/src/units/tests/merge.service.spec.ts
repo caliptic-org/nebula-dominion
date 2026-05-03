@@ -302,7 +302,7 @@ describe('MergeService', () => {
         createdAt: new Date().toISOString(),
       };
       redis.get.mockResolvedValue(JSON.stringify(session));
-      redis.del.mockResolvedValue(undefined);
+      redis.del.mockResolvedValue(1);
 
       await service.cancelSession('sess-1', 'player-1');
       expect(redis.del).toHaveBeenCalledWith('merge:session:sess-1');

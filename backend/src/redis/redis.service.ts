@@ -39,8 +39,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.get(key);
   }
 
-  async del(key: string): Promise<void> {
-    await this.client.del(key);
+  async del(key: string): Promise<number> {
+    return this.client.del(key);
   }
 
   async exists(key: string): Promise<boolean> {
@@ -88,5 +88,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async zcard(key: string): Promise<number> {
     return this.client.zcard(key);
+  }
+
+  async zrangebyscore(key: string, min: number, max: number): Promise<string[]> {
+    return this.client.zrangebyscore(key, min, max);
+  }
+
+  async zrem(key: string, ...members: string[]): Promise<number> {
+    return this.client.zrem(key, ...members);
   }
 }

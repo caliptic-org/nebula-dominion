@@ -21,24 +21,15 @@ interface MatchRecord {
   ago: string;
 }
 
-const PROFILE = {
-  playerName: 'Komutan Voss',
-  level: 12,
-  age: 'I',
-  tier: 2,
-  pvpMatches: 47,
-  pvpWins: 28,
-  totalXp: 18420,
-  xpToNext: 2400,
-  xpInLevel: 1620,
-  guild: {
-    name: 'Yutucu Yıldız Akademisi',
-    tag: 'YYA',
-    members: 28,
-    capacity: 40,
-    rank: 7,
-  },
-};
+const navItems = [
+  { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
+  { href: '/dashboard/fleet', label: 'Filo', icon: '🚀' },
+  { href: '/dashboard/battle', label: 'Savaş', icon: '⚔️' },
+  { href: '/dashboard/guild', label: 'Lonca', icon: '🛡️' },
+  { href: '/dashboard/sectors', label: 'Sektörler', icon: '🌍' },
+  { href: '/dashboard/shop', label: 'Mağaza', icon: '🛍️' },
+  { href: '/dashboard/settings', label: 'Ayarlar', icon: '⚙️' },
+]
 
 const RECENT_MATCHES: MatchRecord[] = [
   { id: 'm1', result: 'win',  mode: 'PvP',    race: Race.INSAN,   opponentRace: Race.ZERG,    commanderId: 'voss',           durationMin: 14, xpGained: 240, ago: '12dk önce' },

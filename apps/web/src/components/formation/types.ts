@@ -122,3 +122,83 @@ export const DEMO_AVAILABLE_COMMANDERS: SlotCommander[] = [
   { id: 'c4', name: 'Khorvash',      race: 'canavar', level: 6, portrait: '/assets/characters/canavar/khorvash.png',      power: 4100, abilities: ['Ateş Nefesi', 'Yıkım Darbesi'],                   isUnlocked: true },
   { id: 'c5', name: 'Vex Thara',     race: 'zerg',    level: 6, portrait: '/assets/characters/zerg/vex_thara.png',        power: 3900, abilities: ['Kovan Sürüsü', 'Mutasyon Çağrısı'],               isUnlocked: true },
 ];
+
+export interface UnitSlot {
+  unitId: string;
+  position: number;
+}
+
+export interface CommanderSlot {
+  commanderId: string;
+  position: number;
+}
+
+export interface Formation {
+  id: string;
+  playerId: string;
+  name: string;
+  unitSlots: UnitSlot[];
+  commanderSlots: CommanderSlot[];
+  templateId: string | null;
+  isLastActive: boolean;
+  totalPower: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FormationTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  unitSlots: UnitSlot[];
+  commanderSlots: CommanderSlot[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface FormationPowerBreakdown {
+  unitId: string;
+  power: number;
+  isCommander: boolean;
+}
+
+export interface FormationPowerResult {
+  totalPower: number;
+  unitCount: number;
+  commanderCount: number;
+  breakdown: FormationPowerBreakdown[];
+}
+
+export interface ListFormationsResponse {
+  formations: Formation[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateFormationRequest {
+  playerId: string;
+  name: string;
+  unitSlots: UnitSlot[];
+  commanderSlots: CommanderSlot[];
+  templateId?: string;
+}
+
+export interface UpdateFormationRequest {
+  name?: string;
+  unitSlots?: UnitSlot[];
+  commanderSlots?: CommanderSlot[];
+  templateId?: string;
+}
+
+export interface FormationPowerRequest {
+  playerId: string;
+  unitSlots: UnitSlot[];
+  commanderSlots: CommanderSlot[];
+}
+
+export const FORMATION_LIMITS = {
+  MAX_UNIT_SLOTS: 10,
+  MAX_COMMANDER_SLOTS: 2,
+} as const;

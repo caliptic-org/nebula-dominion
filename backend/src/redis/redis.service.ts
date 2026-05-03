@@ -94,6 +94,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.zrangebyscore(key, min, max);
   }
 
+  async zremrangebyscore(
+    key: string,
+    min: number | string,
+    max: number | string,
+  ): Promise<number> {
+    return this.client.zremrangebyscore(key, min, max);
+  }
+
   async zrem(key: string, member: string): Promise<number> {
     return this.client.zrem(key, member);
   }

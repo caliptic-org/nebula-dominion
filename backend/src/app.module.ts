@@ -63,6 +63,9 @@ import { GuildWeeklyRank } from './guild-rank/entities/guild-weekly-rank.entity'
 import { GuildChampionBadge } from './guild-rank/entities/guild-champion-badge.entity';
 import { InactiveGuardModule } from './inactive-guard/inactive-guard.module';
 import { GuildInactiveMarker } from './inactive-guard/entities/guild-inactive-marker.entity';
+import { MapModule } from './map/map.module';
+import { MapActionLog } from './map/entities/map-action-log.entity';
+import { PlayerResources } from './map/entities/player-resources.entity';
 import { GuildSchema1746800000000 } from './database/migrations/1746800000000-GuildSchema';
 import { MailSchema1746900000000 } from './database/migrations/1746900000000-MailSchema';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
@@ -76,6 +79,7 @@ import { StatsSchema1746500000000 } from './database/migrations/1746500000000-St
 import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000000-LeaderboardSchema';
 import { FormationsSchema1746500000000 } from './database/migrations/1746500000000-FormationsSchema';
 import { ArenaCoopRankSchema1747000000000 } from './database/migrations/1747000000000-ArenaCoopRankSchema';
+import { MapSchema1746400000000 } from './database/migrations/1746400000000-MapSchema';
 
 @Module({
   imports: [
@@ -120,6 +124,8 @@ import { ArenaCoopRankSchema1747000000000 } from './database/migrations/17470000
           GuildWeeklyRank,
           GuildChampionBadge,
           GuildInactiveMarker,
+          MapActionLog,
+          PlayerResources,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -135,6 +141,7 @@ import { ArenaCoopRankSchema1747000000000 } from './database/migrations/17470000
           GuildSchema1746800000000,
           MailSchema1746900000000,
           ArenaCoopRankSchema1747000000000,
+          MapSchema1746400000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -160,6 +167,7 @@ import { ArenaCoopRankSchema1747000000000 } from './database/migrations/17470000
     CoopRaidModule,
     GuildRankModule,
     InactiveGuardModule,
+    MapModule,
   ],
 })
 export class AppModule {}

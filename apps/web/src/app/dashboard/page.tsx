@@ -15,7 +15,7 @@ const navItems = [
   { href: '/dashboard/guild',     label: 'Lonca',      icon: '🛡️' },
   { href: '/dashboard/sectors',   label: 'Sektörler',  icon: '🌍' },
   { href: '/dashboard/shop',      label: 'Mağaza',     icon: '🛍️' },
-  { href: '/dashboard/settings',  label: 'Ayarlar',    icon: '⚙️' },
+  { href: '/settings',            label: 'Ayarlar',    icon: '⚙️' },
 ]
 
 const playerStats = [

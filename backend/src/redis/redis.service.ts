@@ -89,4 +89,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async zcard(key: string): Promise<number> {
     return this.client.zcard(key);
   }
+
+  async zremrangebyscore(key: string, min: number | string, max: number | string): Promise<void> {
+    await this.client.zremrangebyscore(key, min, max);
+  }
+
+  async expire(key: string, seconds: number): Promise<void> {
+    await this.client.expire(key, seconds);
+  }
 }

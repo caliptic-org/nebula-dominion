@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginStreak } from './entities/login-streak.entity';
+import { PlayerWalletService } from './player-wallet.service';
 import { STREAK_REWARDS, StreakReward } from './types/daily-engagement.types';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class StreakService {
   constructor(
     @InjectRepository(LoginStreak)
     private readonly streakRepo: Repository<LoginStreak>,
+    private readonly walletService: PlayerWalletService,
   ) {}
 
   private getTodayDate(): string {
@@ -105,8 +107,13 @@ export class StreakService {
       throw new BadRequestException(`No unclaimed reward for streak day ${streakDay}`);
     }
 
+    const reward = streak.pendingRewards[idx];
+
+    // Transfer reward to wallet BEFORE marking as claimed to prevent loss on failure
+    await this.walletService.creditReward(playerId, reward.type, reward.amount);
+
     streak.pendingRewards[idx] = {
-      ...streak.pendingRewards[idx],
+      ...reward,
       claimed: true,
       claimedAt: new Date().toISOString(),
     };

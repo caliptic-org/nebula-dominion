@@ -9,19 +9,25 @@ import { Sector } from './sector-wars/entities/sector.entity';
 import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
-import { PlayerResources } from './map/entities/player-resources.entity';
-import { MapActionLog } from './map/entities/map-action-log.entity';
+import { AnalyticsEvent } from './analytics/entities/event.entity';
+import { LoginStreak } from './daily-engagement/entities/login-streak.entity';
+import { DailyQuestProfile } from './daily-engagement/entities/daily-quest-profile.entity';
+import { PlayerStamina } from './daily-engagement/entities/player-stamina.entity';
+import { PlayerWallet } from './daily-engagement/entities/player-wallet.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
 import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
-import { MapModule } from './map/map.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { DailyEngagementModule } from './daily-engagement/daily-engagement.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
-import { MapSchema1746400000000 } from './database/migrations/1746400000000-MapSchema';
+import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
+import { DailyEngagementSchema1746400000000 } from './database/migrations/1746400000000-DailyEngagementSchema';
+import { PlayerWalletSchema1746500000000 } from './database/migrations/1746500000000-PlayerWalletSchema';
 
 @Module({
   imports: [
@@ -35,8 +41,29 @@ import { MapSchema1746400000000 } from './database/migrations/1746400000000-MapS
         username: config.get('DB_USERNAME', 'postgres'),
         password: config.get('DB_PASSWORD', 'postgres'),
         database: config.get('DB_NAME', 'nebula_dominion'),
-        entities: [Battle, BattleLog, Unit, MutationRule, Sector, SectorBattle, WeeklyLeague, LeagueParticipant, PlayerResources, MapActionLog],
-        migrations: [BattleSchema1746100000000, UnitsSchema1746200000000, SectorWarsSchema1746300000000, MapSchema1746400000000],
+        entities: [
+          Battle,
+          BattleLog,
+          Unit,
+          MutationRule,
+          Sector,
+          SectorBattle,
+          WeeklyLeague,
+          LeagueParticipant,
+          AnalyticsEvent,
+          LoginStreak,
+          DailyQuestProfile,
+          PlayerStamina,
+          PlayerWallet,
+        ],
+        migrations: [
+          BattleSchema1746100000000,
+          UnitsSchema1746200000000,
+          SectorWarsSchema1746300000000,
+          AnalyticsSchema1746400000000,
+          DailyEngagementSchema1746400000000,
+          PlayerWalletSchema1746500000000,
+        ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
@@ -48,7 +75,8 @@ import { MapSchema1746400000000 } from './database/migrations/1746400000000-MapS
     UnitsModule,
     SectorWarsModule,
     LeaderboardModule,
-    MapModule,
+    AnalyticsModule,
+    DailyEngagementModule,
   ],
 })
 export class AppModule {}

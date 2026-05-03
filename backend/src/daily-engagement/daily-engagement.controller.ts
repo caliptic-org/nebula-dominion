@@ -7,8 +7,12 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { StreakService } from './streak.service';
 import { DailyQuestService } from './daily-quest.service';
 import { StaminaService } from './stamina.service';
@@ -16,6 +20,7 @@ import { UpdateQuestProgressDto } from './dto/update-quest-progress.dto';
 import { SpendStaminaDto } from './dto/spend-stamina.dto';
 
 @ApiTags('daily-engagement')
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/daily')
 export class DailyEngagementController {
   constructor(
@@ -36,7 +41,13 @@ export class DailyEngagementController {
   })
   @ApiParam({ name: 'playerId', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Login recorded' })
-  recordLogin(@Param('playerId', ParseUUIDPipe) playerId: string) {
+  recordLogin(
+    @Param('playerId', ParseUUIDPipe) playerId: string,
+    @CurrentUser('sub') jwtSub: string,
+  ) {
+    if (jwtSub !== playerId) {
+      throw new ForbiddenException('Cannot record login for another player');
+    }
     return this.streakService.recordLogin(playerId);
   }
 
@@ -56,7 +67,11 @@ export class DailyEngagementController {
   claimStreakReward(
     @Param('playerId', ParseUUIDPipe) playerId: string,
     @Param('day') day: string,
+    @CurrentUser('sub') jwtSub: string,
   ) {
+    if (jwtSub !== playerId) {
+      throw new ForbiddenException('Cannot claim reward for another player');
+    }
     return this.streakService.claimReward(playerId, parseInt(day, 10));
   }
 
@@ -83,7 +98,11 @@ export class DailyEngagementController {
   updateProgress(
     @Param('playerId', ParseUUIDPipe) playerId: string,
     @Body() dto: UpdateQuestProgressDto,
+    @CurrentUser('sub') jwtSub: string,
   ) {
+    if (jwtSub !== playerId) {
+      throw new ForbiddenException('Cannot update progress for another player');
+    }
     return this.dailyQuestService.updateProgress(playerId, dto);
   }
 
@@ -94,7 +113,13 @@ export class DailyEngagementController {
   })
   @ApiParam({ name: 'playerId', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Bonus chest claimed' })
-  claimBonusChest(@Param('playerId', ParseUUIDPipe) playerId: string) {
+  claimBonusChest(
+    @Param('playerId', ParseUUIDPipe) playerId: string,
+    @CurrentUser('sub') jwtSub: string,
+  ) {
+    if (jwtSub !== playerId) {
+      throw new ForbiddenException('Cannot claim bonus chest for another player');
+    }
     return this.dailyQuestService.claimBonusChest(playerId);
   }
 
@@ -119,7 +144,11 @@ export class DailyEngagementController {
   spendStamina(
     @Param('playerId', ParseUUIDPipe) playerId: string,
     @Body() dto: SpendStaminaDto,
+    @CurrentUser('sub') jwtSub: string,
   ) {
+    if (jwtSub !== playerId) {
+      throw new ForbiddenException('Cannot spend stamina for another player');
+    }
     return this.staminaService.spend(playerId, dto.amount);
   }
 }

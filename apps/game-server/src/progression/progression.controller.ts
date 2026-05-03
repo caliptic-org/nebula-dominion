@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ProgressionService } from './progression.service';
 import { AwardXpDto } from './dto/award-xp.dto';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
 import { AdminRoleGuard } from '../auth/admin-role.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @UseGuards(HttpJwtGuard)
 @Controller('progression')

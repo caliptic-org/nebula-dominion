@@ -28,7 +28,7 @@ export class TelemetryService {
       }),
     );
 
-    await this.eventRepo.insert(entities);
+    await this.eventRepo.save(entities);
     this.logger.log(`Inserted ${entities.length} funnel events`);
     return { inserted: entities.length };
   }

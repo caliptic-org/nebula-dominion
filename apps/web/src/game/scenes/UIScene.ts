@@ -13,6 +13,21 @@ const SKILL_PANEL_OFFSET_FROM_BOTTOM = PANEL_H + 12;
 
 type RaceKey = keyof typeof THEME.RACE;
 
+interface RaceVisual { color: number; colorStr: string; icons: string[] }
+
+function getRaceVisual(race: string): RaceVisual {
+  const key = race as RaceKey;
+  const palette = THEME.RACE[key] ?? { num: THEME.BRAND, str: THEME.BRAND_STR };
+  return { color: palette.num, colorStr: palette.str, icons: RACE_ICONS[race] ?? RACE_ICONS.insan };
+}
+
+interface UISceneInitData {
+  socket: GameSocket;
+  room: GameRoom;
+  playerRace: string;
+  enemyRace: string;
+}
+
 const RACE_ICONS: Record<string, string[]> = {
   insan:   ['⚡', '🔫', '💥', '🛡'],
   zerg:    ['🦷', '🩸', '🕸', '🦠'],
@@ -31,11 +46,16 @@ export class UIScene extends Phaser.Scene {
   private manaBar!: Phaser.GameObjects.Graphics;
   private manaValueText!: Phaser.GameObjects.Text;
   private unitInfoText!: Phaser.GameObjects.Text;
-  private endTurnBtn!: Phaser.GameObjects.Container;
-  private surrenderBtn!: Phaser.GameObjects.Container;
+  private endTurnBtn!: Phaser.GameObjects.Text;
+  private surrenderBtn!: Phaser.GameObjects.Text;
   private notifText!: Phaser.GameObjects.Text;
   private skillsPanel!: HeroSkillsPanel;
   private logPanel!: BattleLogPanel;
+  private playerVisual!: RaceVisual;
+  private enemyVisual!: RaceVisual;
+  private turnLabel!: Phaser.GameObjects.Text;
+  private activeBanner!: Phaser.GameObjects.Text;
+  private timerEvent?: Phaser.Time.TimerEvent;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -60,12 +80,14 @@ export class UIScene extends Phaser.Scene {
     this.turnText = this.add.text(16, 8, 'Turn 1', {
       fontSize: '18px', color: THEME.BRAND_STR, fontStyle: 'bold',
     });
+    this.turnLabel = this.turnText;
     this.phaseText = this.add.text(16, 30, 'Phase: action', {
       fontSize: '12px', color: THEME.TEXT_MUTED,
     });
     this.activeText = this.add.text(SCENE_W / 2, 8, '', {
       fontSize: '15px', color: THEME.ENERGY_STR, fontStyle: 'bold',
     }).setOrigin(0.5, 0);
+    this.activeBanner = this.activeText;
 
     // Mana bar (now placed left of the right-edge log panel)
     this.add.text(SCENE_W - LOG_W - 160, 8, 'MANA', { fontSize: '11px', color: '#9966ff' });
@@ -197,10 +219,6 @@ export class UIScene extends Phaser.Scene {
     this.skillsPanel?.update(time, deltaMs);
   }
 
-  update(time: number, deltaMs: number) {
-    this.skillsPanel?.update(time, deltaMs);
-  }
-
   private refresh() {
     this.turnLabel.setText(`TUR ${this.room.currentTurn}`);
 
@@ -243,5 +261,25 @@ export class UIScene extends Phaser.Scene {
   private getRaceColor(): number {
     const race = this.socket.myRace as RaceKey;
     return THEME.RACE[race]?.num ?? THEME.BRAND;
+  }
+
+  private refreshTeamHp() { /* HP bars refreshed by BattleScene events */ }
+
+  private showNotif(msg: string) {
+    this.notifText?.setText(msg).setAlpha(1);
+    this.tweens?.add({ targets: this.notifText, alpha: 0, delay: 2000, duration: 600 });
+  }
+
+  private flashSpeedLines(_fx: number, _fy: number, _tx: number, _ty: number) { /* visual-only */ }
+
+  private startTimer() {
+    this.timerEvent = this.time.addEvent({ delay: 30000, callback: () => {
+      if (this.room.currentPlayerId === this.socket.myUserId) this.socket.sendAction('end_turn');
+    } });
+  }
+
+  private resetTimer() {
+    this.timerEvent?.remove();
+    this.startTimer();
   }
 }

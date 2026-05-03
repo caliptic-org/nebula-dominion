@@ -54,6 +54,19 @@ const NAV_LINKS = [
   { href: '/progression',     icon: '📈', label: 'İlerleme',   desc: 'Çağ yolculuğun' },
 ];
 
+const PROFILE = {
+  playerName: 'Komutan',
+  level: 12,
+  age: 1,
+  tier: 2,
+  totalXp: 14800,
+  xpInLevel: 800,
+  xpToNext: 1200,
+  pvpMatches: 47,
+  pvpWins: 31,
+  guild: { name: 'Nebula Gücü', tag: 'NG', rank: 14, members: 23, capacity: 50 },
+};
+
 function findCommander(commanderId: string): CommanderInfo | null {
   for (const desc of Object.values(RACE_DESCRIPTIONS)) {
     const found = desc.commanders.find((c) => c.id === commanderId);

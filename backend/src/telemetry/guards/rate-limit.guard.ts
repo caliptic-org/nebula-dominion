@@ -1,10 +1,17 @@
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
-  TooManyRequestsException,
 } from '@nestjs/common';
+
+class TooManyRequestsException extends HttpException {
+  constructor(message = 'Too Many Requests') {
+    super(message, HttpStatus.TOO_MANY_REQUESTS);
+  }
+}
 import { Request } from 'express';
 import { RedisService } from '../../redis/redis.service';
 

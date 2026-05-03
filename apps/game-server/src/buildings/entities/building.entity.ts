@@ -21,6 +21,11 @@ export enum BuildingType {
   QUANTUM_REACTOR = 'quantum_reactor',
   DEFENSE_MATRIX = 'defense_matrix',
   REPAIR_DRONE_BAY = 'repair_drone_bay',
+  // Unit training buildings
+  ACADEMY = 'academy',
+  FACTORY = 'factory',
+  SPAWNING_POOL = 'spawning_pool',
+  HATCHERY = 'hatchery',
 }
 
 export enum BuildingStatus {

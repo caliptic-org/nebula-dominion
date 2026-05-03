@@ -26,6 +26,7 @@ export interface ResourceSnapshot {
 
 const RESOURCE_CACHE_KEY = (playerId: string) => `player:resources:${playerId}`;
 const RESOURCE_CACHE_TTL = 60; // seconds
+const STORAGE_WARN_THRESHOLD = 0.9;
 
 @Injectable()
 export class ResourcesService {
@@ -37,6 +38,7 @@ export class ResourcesService {
     @InjectRedis()
     private readonly redis: Redis,
     private readonly economyService: EconomyService,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   async getOrCreate(playerId: string): Promise<Resource> {

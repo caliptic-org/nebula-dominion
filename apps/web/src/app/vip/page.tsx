@@ -594,7 +594,7 @@ export default function VipPage() {
                   onClick={() => setSelectedPlan(plan.id as typeof selectedPlan)}
                   style={{
                     position: 'relative', padding: '12px 8px',
-                    borderRadius: 12, cursor: 'pointer', background: 'none',
+                    borderRadius: 12, cursor: 'pointer',
                     border: `1.5px solid ${isSel ? gold : 'rgba(255,255,255,0.08)'}`,
                     background: isSel ? goldDim : 'rgba(255,255,255,0.02)',
                     boxShadow: isSel ? `0 0 16px ${goldGlow}` : 'none',

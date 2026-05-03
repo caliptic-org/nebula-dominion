@@ -24,7 +24,7 @@ export class ProgressionConfigService {
   private thresholds: Map<number, AgeThresholdConfig> = new Map();
 
   constructor(
-    @InjectRepository('xp_threshold_config', { optional: true } as any)
+    @InjectRepository('xp_threshold_config' as any, { optional: true } as any)
     private readonly rawRepo?: Repository<any>,
   ) {
     this.loadDefaults();

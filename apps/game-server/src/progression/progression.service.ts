@@ -18,13 +18,26 @@ import {
   MAX_AGE,
   MAX_LEVEL,
   ContentUnlock,
-  MAX_AGE,
-  ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
-import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
-import { ProgressionConfigService } from './progression-config.service';
+import {
+  LevelUpEvent,
+  PlayerProgressDto,
+  XpGainedEvent,
+  EraTransitionPackage,
+  EraTransitionEvent,
+  ActiveBoostDto,
+  AgeTransitionEvent,
+} from './dto/player-progress.dto';
+
+const ERA_CATCH_UP_PRODUCTION_MULTIPLIER = 1.5;
+
+const AGE_BADGE_LABELS: Record<AgeTierBadge, string> = {
+  [AgeTierBadge.ACEMI]: 'Acemi',
+  [AgeTierBadge.DENEYIMLI]: 'Deneyimli',
+  [AgeTierBadge.SAMPIYON]: 'Şampiyon',
+};
 
 @Injectable()
 export class ProgressionService {
@@ -151,7 +164,7 @@ export class ProgressionService {
 
     const fromAge = record.currentAge;
     const toAge = fromAge + 1;
-    const firstLevel = getFirstLevelForAge(toAge);
+    const firstLevel = getFirstLevel(toAge);
     const newLevelDef = getLevelDef(firstLevel, toAge);
 
     if (!newLevelDef) {
@@ -335,7 +348,12 @@ export class ProgressionService {
   }
 
   async reloadConfig(): Promise<{ success: boolean; reason?: string }> {
-    return this.progressionConfigService.reloadFromDb();
+    try {
+      await this.progressionConfigService.reloadFromDb();
+      return { success: true };
+    } catch (err) {
+      return { success: false, reason: (err as Error).message };
+    }
   }
 
   async getRecentTransactions(userId: string, limit = 20): Promise<XpTransaction[]> {
@@ -369,7 +387,26 @@ export class ProgressionService {
     dto.unlockedContent = record.unlockedContent;
     dto.tierBonusMultiplier = levelDef?.xpMultiplier ?? 1.0;
     dto.isMaxLevel = isMaxLevel;
-    dto.canAdvanceAge = canAdvanceAge;
+    dto.canAdvanceAge = record.currentLevel >= getMaxLevel(record.currentAge) && record.currentAge < MAX_AGE;
     return dto;
+  }
+
+  private emitTelemetry(
+    userId: string,
+    source: string,
+    baseAmount: number,
+    finalAmount: number,
+    record: PlayerLevel,
+  ) {
+    this.emitter.emit('progression.xp_telemetry', {
+      userId,
+      source,
+      baseAmount,
+      finalAmount,
+      level: record.currentLevel,
+      age: record.currentAge,
+      totalXp: record.totalXp,
+      timestamp: new Date().toISOString(),
+    });
   }
 }

@@ -36,6 +36,11 @@ export const THEME = {
   INFO:        0x4488ff,
   INFO_STR:    '#4488ff',
 
+  // Manga halftone dot pattern overlay
+  HALFTONE_DOT: 0x8890b0,
+  // Manga panel ink border (thick black outline)
+  PANEL_INK: 0x000000,
+
   // Battle grid — manga panel style
   GRID_PLAYER_SIDE: 0x1a2a44,
   GRID_ENEMY_SIDE:  0x3a1a20,

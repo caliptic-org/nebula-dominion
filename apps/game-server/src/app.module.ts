@@ -16,6 +16,7 @@ import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
 import { ChatModule } from './chat/chat.module';
 import { EconomyModule } from './economy/economy.module';
+import { GuildsModule } from './guilds/guilds.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { EconomyModule } from './economy/economy.module';
     ProgressionModule,
     ChatModule,
     EconomyModule,
+    GuildsModule,
   ],
 })
 export class AppModule {}

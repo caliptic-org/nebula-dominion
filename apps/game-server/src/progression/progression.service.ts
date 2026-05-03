@@ -18,13 +18,15 @@ import {
   MAX_AGE,
   MAX_LEVEL,
   ContentUnlock,
-  MAX_AGE,
   ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
 import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
-import { ProgressionConfigService } from './progression-config.service';
+import {
+  EVENT_GUILD_TUTORIAL_REQUIRED,
+  GUILD_TUTORIAL_XP_THRESHOLD,
+} from '../guilds/guilds.constants';
 
 @Injectable()
 export class ProgressionService {
@@ -81,6 +83,7 @@ export class ProgressionService {
     }
 
     const levelBefore = record.currentLevel;
+    const totalXpBefore = record.totalXp;
     const baseAmount = XP_BASE_AMOUNTS[dto.source] ?? 0;
     const levelDef = getLevelDef(record.currentLevel);
     const multiplier = levelDef?.xpMultiplier ?? 1.0;
@@ -119,6 +122,20 @@ export class ProgressionService {
       age: record.currentAge,
     };
     this.emitter.emit('progression.xp_gained', xpEvent);
+
+    if (
+      totalXpBefore < GUILD_TUTORIAL_XP_THRESHOLD &&
+      record.totalXp >= GUILD_TUTORIAL_XP_THRESHOLD
+    ) {
+      this.emitter.emit(EVENT_GUILD_TUTORIAL_REQUIRED, {
+        userId: dto.userId,
+        totalXp: record.totalXp,
+        age: record.currentAge,
+      });
+      this.logger.log(
+        `Guild tutorial threshold crossed: user=${dto.userId} totalXp=${record.totalXp}`,
+      );
+    }
 
     this.logger.log(
       `XP awarded: user=${dto.userId} source=${dto.source} amount=${finalAmount} level=${record.currentLevel} age=${record.currentAge}`,

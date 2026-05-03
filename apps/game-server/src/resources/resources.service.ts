@@ -148,6 +148,32 @@ export class ResourcesService {
     return snap.mineral >= cost.mineral && snap.gas >= cost.gas && snap.energy >= cost.energy;
   }
 
+  async grant(
+    playerId: string,
+    amounts: Partial<ResourceCost>,
+  ): Promise<ResourceSnapshot> {
+    const resource = await this.getOrCreate(playerId);
+
+    if (amounts.mineral) {
+      resource.mineral = Math.min(resource.mineral + amounts.mineral, resource.mineralCap);
+    }
+    if (amounts.gas) {
+      resource.gas = Math.min(resource.gas + amounts.gas, resource.gasCap);
+    }
+    if (amounts.energy) {
+      resource.energy = Math.min(resource.energy + amounts.energy, resource.energyCap);
+    }
+
+    await this.resourceRepo.save(resource);
+    const snapshot = this.toSnapshot(resource);
+    await this.setCache(playerId, snapshot);
+
+    this.logger.debug(
+      `Granted resources to player ${playerId}: +${amounts.mineral ?? 0}M +${amounts.gas ?? 0}G +${amounts.energy ?? 0}E`,
+    );
+    return snapshot;
+  }
+
   async deduct(playerId: string, cost: ResourceCost): Promise<ResourceSnapshot> {
     const resource = await this.getOrCreate(playerId);
 

@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
+import Stripe from 'stripe';
 import { Transaction } from './entities/transaction.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { UserConsent } from './entities/user-consent.entity';
@@ -176,18 +177,12 @@ export class PaymentService {
     let payload: Record<string, unknown> = {};
 
     try {
-      // Gerçek implementasyonda: stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-      const parsed = JSON.parse(rawBody.toString()) as Record<string, unknown>;
-      eventId = (parsed.id as string) || `evt_${Date.now()}`;
-      eventType = (parsed.type as string) || 'unknown';
-      payload = parsed;
-
-      // Signature doğrulama (simplified mock)
-      const hmac = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex');
-      isVerified = signature.includes(hmac.substring(0, 8));
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
+      const stripeEvent = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      eventId = stripeEvent.id;
+      eventType = stripeEvent.type;
+      payload = stripeEvent as unknown as Record<string, unknown>;
+      isVerified = true;
     } catch (err) {
       throw new UnauthorizedException('Stripe webhook imzası geçersiz');
     }
@@ -216,17 +211,25 @@ export class PaymentService {
     callbackData: IyzicoCallbackDto,
     rawBody: string,
   ): Promise<Record<string, unknown>> {
-    const secretKey = process.env.IYZICO_SECRET_KEY || '';
+    const secretKey = process.env.IYZICO_SECRET_KEY;
+    if (!secretKey) {
+      throw new UnauthorizedException('IYZICO_SECRET_KEY ortam değişkeni eksik');
+    }
 
-    // iyzico imza doğrulama
+    // iyzico imza doğrulama — HMAC-SHA256 + constant-time comparison
     const expectedHash = crypto
-      .createHash('sha1')
-      .update(secretKey + callbackData.conversationId + callbackData.paymentStatus)
+      .createHmac('sha256', secretKey)
+      .update(callbackData.conversationId + callbackData.paymentStatus)
       .digest('base64');
 
-    const isVerified = callbackData.token
-      ? callbackData.token === expectedHash
-      : false;
+    const receivedToken = callbackData.token ?? '';
+    let isVerified = false;
+    if (receivedToken.length === expectedHash.length) {
+      isVerified = crypto.timingSafeEqual(
+        Buffer.from(expectedHash),
+        Buffer.from(receivedToken),
+      );
+    }
 
     const event = await this.webhookRepository.save(
       this.webhookRepository.create({

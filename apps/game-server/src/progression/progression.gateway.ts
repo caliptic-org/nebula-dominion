@@ -7,7 +7,7 @@ import {
 import { Server } from 'socket.io';
 import { LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
 
-@WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })
+@WebSocketGateway({ namespace: '/game' })
 export class ProgressionGateway {
   @WebSocketServer()
   server: Server;

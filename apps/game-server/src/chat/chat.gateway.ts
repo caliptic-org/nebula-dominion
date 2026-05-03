@@ -17,7 +17,7 @@ import { ChannelType } from './entities/chat-message.entity';
 
 const GLOBAL_ROOM = 'chat:global';
 
-@WebSocketGateway({ namespace: '/chat', cors: { origin: '*' } })
+@WebSocketGateway({ namespace: '/chat' })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(ChatGateway.name);

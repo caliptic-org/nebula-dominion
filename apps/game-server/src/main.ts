@@ -9,6 +9,11 @@ import { ConfigService } from '@nestjs/config';
 
 class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
+  private allowedOrigins: string[];
+
+  setAllowedOrigins(origins: string[]): void {
+    this.allowedOrigins = origins;
+  }
 
   async connectToRedis(redisUrl: string): Promise<void> {
     const pubClient = new Redis(redisUrl);
@@ -25,7 +30,7 @@ class RedisIoAdapter extends IoAdapter {
   createIOServer(port: number, options?: ServerOptions) {
     const server = super.createIOServer(port, {
       ...options,
-      cors: { origin: '*', methods: ['GET', 'POST'] },
+      cors: { origin: this.allowedOrigins, methods: ['GET', 'POST'] },
       pingInterval: 10000,
       pingTimeout: 5000,
       transports: ['websocket', 'polling'],
@@ -51,7 +56,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const redisUrl = config.get<string>('redisUrl', 'redis://localhost:6379');
+  const corsOrigins = config.get<string[]>('cors.origins', ['http://localhost:3000']);
+
   const redisAdapter = new RedisIoAdapter(app);
+  redisAdapter.setAllowedOrigins(corsOrigins);
   await redisAdapter.connectToRedis(redisUrl);
   app.useWebSocketAdapter(redisAdapter);
 

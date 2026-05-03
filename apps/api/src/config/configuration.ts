@@ -1,4 +1,20 @@
-export default () => ({
+export default () => {
+  const jwtSecret = process.env.API_JWT_SECRET || process.env.JWT_SECRET;
+  if (!jwtSecret || jwtSecret.length < 32) {
+    throw new Error('API_JWT_SECRET must be set and at least 32 characters long');
+  }
+
+  const jwtRefreshSecret = process.env.API_JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET;
+  if (!jwtRefreshSecret || jwtRefreshSecret.length < 32) {
+    throw new Error('API_JWT_REFRESH_SECRET must be set and at least 32 characters long');
+  }
+
+  const corsOrigins = process.env.CORS_ORIGINS;
+  if (process.env.NODE_ENV === 'production' && !corsOrigins) {
+    throw new Error('CORS_ORIGINS must be set in production');
+  }
+
+  return {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
@@ -22,9 +38,9 @@ export default () => ({
   },
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'nebula-dominion-dev-secret',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'nebula-dominion-refresh-dev-secret',
+    refreshSecret: jwtRefreshSecret,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
 
@@ -33,7 +49,7 @@ export default () => ({
   },
 
   cors: {
-    origins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
+    origins: corsOrigins ? corsOrigins.split(',') : ['http://localhost:3000'],
   },
 
   cache: {
@@ -43,4 +59,5 @@ export default () => ({
   swagger: {
     enabled: process.env.SWAGGER_ENABLED !== 'false',
   },
-});
+  };
+};

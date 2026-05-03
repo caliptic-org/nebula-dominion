@@ -10,6 +10,8 @@ import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
 import { AnalyticsEvent } from './analytics/entities/event.entity';
+import { TechNode } from './research/entities/tech-node.entity';
+import { PlayerResearch } from './research/entities/player-research.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -17,10 +19,12 @@ import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ResearchModule } from './research/research.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
+import { ResearchSchema1746500000000 } from './database/migrations/1746500000000-ResearchSchema';
 
 @Module({
   imports: [
@@ -44,12 +48,15 @@ import { AnalyticsSchema1746400000000 } from './database/migrations/174640000000
           WeeklyLeague,
           LeagueParticipant,
           AnalyticsEvent,
+          TechNode,
+          PlayerResearch,
         ],
         migrations: [
           BattleSchema1746100000000,
           UnitsSchema1746200000000,
           SectorWarsSchema1746300000000,
           AnalyticsSchema1746400000000,
+          ResearchSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -63,6 +70,7 @@ import { AnalyticsSchema1746400000000 } from './database/migrations/174640000000
     SectorWarsModule,
     LeaderboardModule,
     AnalyticsModule,
+    ResearchModule,
   ],
 })
 export class AppModule {}

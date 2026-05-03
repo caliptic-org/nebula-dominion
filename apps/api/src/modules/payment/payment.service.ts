@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { Transaction } from './entities/transaction.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { UserConsent } from './entities/user-consent.entity';
+import { VipService } from '../vip/vip.service';
 
 interface CreatePaymentIntentDto {
   itemSku?: string;
@@ -40,6 +41,7 @@ export class PaymentService {
     private readonly webhookRepository: Repository<WebhookEvent>,
     @InjectRepository(UserConsent)
     private readonly consentRepository: Repository<UserConsent>,
+    private readonly vipService: VipService,
   ) {}
 
   // ==========================================
@@ -323,6 +325,23 @@ export class PaymentService {
     await this.transactionRepository.save(tx);
 
     this.logger.log(`Ödeme tamamlandı: txn=${transactionId}`);
+
+    // VIP cumulative spend update + per-user ARPPU telemetry
+    const vipResult = await this.vipService.recordPurchaseAndUpgradeVip({
+      userId: tx.userId,
+      transactionId: tx.id,
+      amountUsd: tx.amountUsd,
+      amountTry: tx.amountTry,
+      currencyCode: tx.currencyCode,
+      purchaseType: tx.transactionType,
+      countryCode: tx.countryCode,
+    });
+
+    if (vipResult.upgraded) {
+      this.logger.log(
+        `VIP yükseltme sonrası bildirim gönderilecek: kullanıcı=${tx.userId} VIP${vipResult.oldVipLevel}→VIP${vipResult.newVipLevel}`,
+      );
+    }
   }
 
   private async failTransaction(transactionId: string, reason: string): Promise<void> {

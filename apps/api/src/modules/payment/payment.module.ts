@@ -5,9 +5,10 @@ import { PaymentService } from './payment.service';
 import { Transaction } from './entities/transaction.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { UserConsent } from './entities/user-consent.entity';
+import { VipModule } from '../vip/vip.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, WebhookEvent, UserConsent])],
+  imports: [TypeOrmModule.forFeature([Transaction, WebhookEvent, UserConsent]), VipModule],
   controllers: [PaymentController],
   providers: [PaymentService],
   exports: [PaymentService],

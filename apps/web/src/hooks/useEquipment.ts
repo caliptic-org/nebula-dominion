@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import useSWR from 'swr';
 import {
   CommanderEquipment,
   EquipmentItem,
@@ -18,99 +19,88 @@ interface UseCommanderEquipmentResult {
   reload: () => void;
 }
 
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
 export function useCommanderEquipment(
   commanderId: string | null,
 ): UseCommanderEquipmentResult {
-  const [equipment, setEquipment] = useState<CommanderEquipment | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [mutating, setMutating] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const key = commanderId ? ['commander-equipment', commanderId] : null;
 
-  useEffect(() => {
-    if (!commanderId) {
-      setEquipment(null);
-      setError(null);
-      setLoading(false);
-      return;
-    }
+  const { data, error, isLoading, mutate } = useSWR<CommanderEquipment>(
+    key,
+    () => equipmentApi.getCommanderEquipment(commanderId!),
+  );
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    equipmentApi
-      .getCommanderEquipment(commanderId)
-      .then((data) => {
-        if (!cancelled) setEquipment(data);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setEquipment(null);
-          setError(
-            err instanceof Error ? err.message : 'Ekipman yüklenemedi',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [commanderId, reloadKey]);
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const equip = useCallback(
     async (slot: EquipmentSlotType, item: EquipmentItem) => {
-      if (!commanderId || !equipment) return;
-      const previous = equipment;
+      if (!commanderId || !data || mutating) return;
       const optimistic: CommanderEquipment = {
-        ...equipment,
-        slots: { ...equipment.slots, [slot]: item },
+        ...data,
+        slots: { ...data.slots, [slot]: item },
       };
-      setEquipment(optimistic);
       setMutating(true);
-      setError(null);
+      setMutationError(null);
       try {
-        const next = await equipmentApi.equipItem(commanderId, slot, item.id);
-        setEquipment(next);
+        await mutate(equipmentApi.equipItem(commanderId, slot, item.id), {
+          optimisticData: optimistic,
+          rollbackOnError: true,
+          populateCache: true,
+          revalidate: false,
+        });
       } catch (err) {
-        setEquipment(previous);
-        setError(err instanceof Error ? err.message : 'Ekipman eklenemedi');
+        setMutationError(errorMessage(err, 'Ekipman eklenemedi'));
       } finally {
         setMutating(false);
       }
     },
-    [commanderId, equipment],
+    [commanderId, data, mutate, mutating],
   );
 
   const unequip = useCallback(
     async (slot: EquipmentSlotType) => {
-      if (!commanderId || !equipment) return;
-      const previous = equipment;
-      const slots = { ...equipment.slots };
+      if (!commanderId || !data || mutating) return;
+      const slots = { ...data.slots };
       delete slots[slot];
-      const optimistic: CommanderEquipment = { ...equipment, slots };
-      setEquipment(optimistic);
+      const optimistic: CommanderEquipment = { ...data, slots };
       setMutating(true);
-      setError(null);
+      setMutationError(null);
       try {
-        const next = await equipmentApi.unequipItem(commanderId, slot);
-        setEquipment(next);
+        await mutate(equipmentApi.unequipItem(commanderId, slot), {
+          optimisticData: optimistic,
+          rollbackOnError: true,
+          populateCache: true,
+          revalidate: false,
+        });
       } catch (err) {
-        setEquipment(previous);
-        setError(err instanceof Error ? err.message : 'Ekipman çıkarılamadı');
+        setMutationError(errorMessage(err, 'Ekipman çıkarılamadı'));
       } finally {
         setMutating(false);
       }
     },
-    [commanderId, equipment],
+    [commanderId, data, mutate, mutating],
   );
 
-  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  const reload = useCallback(() => {
+    setMutationError(null);
+    mutate();
+  }, [mutate]);
 
-  return { equipment, loading, error, mutating, equip, unequip, reload };
+  const fetchError = error ? errorMessage(error, 'Ekipman yüklenemedi') : null;
+
+  return {
+    equipment: data ?? null,
+    loading: isLoading,
+    error: mutationError ?? fetchError,
+    mutating,
+    equip,
+    unequip,
+    reload,
+  };
 }
 
 interface UseInventoryResult {
@@ -121,41 +111,19 @@ interface UseInventoryResult {
 }
 
 export function useEquipmentInventory(enabled: boolean): UseInventoryResult {
-  const [inventory, setInventory] = useState<EquipmentItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const { data, error, isLoading, mutate } = useSWR<EquipmentItem[]>(
+    enabled ? 'equipment-inventory' : null,
+    () => equipmentApi.getInventory(),
+  );
 
-  useEffect(() => {
-    if (!enabled) return;
+  const reload = useCallback(() => {
+    mutate();
+  }, [mutate]);
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    equipmentApi
-      .getInventory()
-      .then((items) => {
-        if (!cancelled) setInventory(items);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setInventory([]);
-          setError(
-            err instanceof Error ? err.message : 'Envanter yüklenemedi',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, reloadKey]);
-
-  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
-
-  return { inventory, loading, error, reload };
+  return {
+    inventory: data ?? [],
+    loading: isLoading,
+    error: error ? errorMessage(error, 'Envanter yüklenemedi') : null,
+    reload,
+  };
 }

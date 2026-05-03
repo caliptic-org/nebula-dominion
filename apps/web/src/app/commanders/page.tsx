@@ -28,6 +28,7 @@ export default function CommandersPage() {
     equipment,
     loading: equipmentLoading,
     error: equipmentError,
+    mutating: equipmentMutating,
     equip,
     unequip,
     reload: reloadEquipment,
@@ -320,6 +321,7 @@ export default function CommandersPage() {
                       onInventoryRetry={reloadInventory}
                       onEquip={equip}
                       onUnequip={unequip}
+                      mutating={equipmentMutating}
                     />
                   ) : null}
                 </div>

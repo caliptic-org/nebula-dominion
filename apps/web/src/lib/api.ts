@@ -4,6 +4,20 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
 }
 
+export class FetchError extends Error {
+  readonly status: number
+  readonly statusText: string
+  readonly data: unknown
+
+  constructor(status: number, statusText: string, message: string, data: unknown) {
+    super(message)
+    this.name = 'FetchError'
+    this.status = status
+    this.statusText = statusText
+    this.data = data
+  }
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, ...rest } = options
 
@@ -22,7 +36,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const message =
       (data as { message?: string }).message ??
       `API error: ${res.status} ${res.statusText}`
-    throw new Error(message)
+    throw new FetchError(res.status, res.statusText, message, data)
   }
 
   if (res.status === 204) return undefined as T

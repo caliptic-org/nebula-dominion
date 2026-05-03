@@ -23,6 +23,7 @@ interface EquipmentSlotsProps {
   onInventoryRetry?: () => void;
   onEquip?: (slot: EquipmentSlotType, item: EquipmentItem) => void;
   onUnequip?: (slot: EquipmentSlotType) => void;
+  mutating?: boolean;
 }
 
 export function EquipmentSlots({
@@ -35,6 +36,7 @@ export function EquipmentSlots({
   onInventoryRetry,
   onEquip,
   onUnequip,
+  mutating = false,
 }: EquipmentSlotsProps) {
   const [activeSlot, setActiveSlot] = useState<EquipmentSlotType | null>(null);
 
@@ -45,13 +47,14 @@ export function EquipmentSlots({
   }
 
   function handleSlotTap(slot: EquipmentSlotType) {
+    if (mutating) return;
     const state = getSlotState(slot);
     if (state === 'locked') return;
     setActiveSlot(slot);
   }
 
   function handleSelect(item: EquipmentItem) {
-    if (activeSlot) {
+    if (activeSlot && !mutating) {
       onEquip?.(activeSlot, item);
       setActiveSlot(null);
     }
@@ -80,7 +83,7 @@ export function EquipmentSlots({
               <button
                 key={slot}
                 onClick={() => handleSlotTap(slot)}
-                disabled={state === 'locked'}
+                disabled={state === 'locked' || mutating}
                 aria-label={
                   state === 'locked'
                     ? `${meta.label} kilitli`
@@ -88,6 +91,7 @@ export function EquipmentSlots({
                     ? `${item.name} — değiştir`
                     : `${meta.label} — ekipman ekle`
                 }
+                aria-busy={mutating || undefined}
                 className="relative flex flex-col items-center justify-center rounded-xl transition-all duration-200 group"
                 style={{
                   height: 76,
@@ -107,8 +111,9 @@ export function EquipmentSlots({
                     state === 'filled'
                       ? `0 0 12px ${rarityStyle!.glow}`
                       : 'none',
-                  cursor: state === 'locked' ? 'not-allowed' : 'pointer',
-                  opacity: state === 'locked' ? 0.45 : 1,
+                  cursor:
+                    state === 'locked' || mutating ? 'not-allowed' : 'pointer',
+                  opacity: state === 'locked' ? 0.45 : mutating ? 0.6 : 1,
                 }}
               >
                 {/* Hover glow overlay for empty slots */}
@@ -194,11 +199,16 @@ export function EquipmentSlots({
           onRetry={onInventoryRetry}
           raceColor={raceColor}
           raceGlow={raceGlow}
+          mutating={mutating}
           onSelect={handleSelect}
           onClose={handleClose}
           onUnequip={
             equipment.slots[activeSlot]
-              ? () => { onUnequip?.(activeSlot); setActiveSlot(null); }
+              ? () => {
+                  if (mutating) return;
+                  onUnequip?.(activeSlot);
+                  setActiveSlot(null);
+                }
               : undefined
           }
         />

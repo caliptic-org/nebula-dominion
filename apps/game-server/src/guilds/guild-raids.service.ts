@@ -39,7 +39,7 @@ import {
 import { composeGuildBuffs } from './research.config';
 import { isoWeekEndUtc, isoWeekStartUtc } from './time.util';
 
-interface AttackResult {
+export interface AttackResult {
   raidId: string;
   guildId: string;
   bossCurrentHp: number;
@@ -50,7 +50,7 @@ interface AttackResult {
   status: GuildRaidStatus;
 }
 
-interface DropAward {
+export interface DropAward {
   userId: string;
   baseAmount: number;
   bonusAmount: number;

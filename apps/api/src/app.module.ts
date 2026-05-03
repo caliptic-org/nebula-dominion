@@ -8,7 +8,7 @@ import { BossModule } from './modules/boss/boss.module';
 import { ShopModule } from './modules/shop/shop.module';
 import { PremiumModule } from './modules/premium/premium.module';
 import { PaymentModule } from './modules/payment/payment.module';
-import { VipModule } from './modules/vip/vip.module';
+import { EventsModule } from './modules/events/events.module';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { VipModule } from './modules/vip/vip.module';
     ShopModule,
     PremiumModule,
     PaymentModule,
-    VipModule,
+    EventsModule,
   ],
 })
 export class AppModule {}

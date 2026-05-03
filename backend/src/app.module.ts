@@ -25,6 +25,8 @@ import { PlayerBuff } from './stats/entities/player-buff.entity';
 import { PlayerResource as StatsPlayerResource } from './stats/entities/player-resource.entity';
 import { PlayerPower } from './stats/entities/player-power.entity';
 import { LeaderboardSnapshot } from './leaderboard/entities/leaderboard-snapshot.entity';
+import { Formation } from './formations/entities/formation.entity';
+import { FormationTemplate } from './formations/entities/formation-template.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -36,6 +38,7 @@ import { ProgressionModule } from './progression/progression.module';
 import { VipModule } from './vip/vip.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { StatsModule } from './stats/stats.module';
+import { FormationsModule } from './formations/formations.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
@@ -45,6 +48,7 @@ import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipS
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
 import { StatsSchema1746500000000 } from './database/migrations/1746500000000-StatsSchema';
 import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000000-LeaderboardSchema';
+import { FormationsSchema1746500000000 } from './database/migrations/1746500000000-FormationsSchema';
 
 @Module({
   imports: [
@@ -69,6 +73,8 @@ import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000
           StatsPlayerResource,
           PlayerPower,
           LeaderboardSnapshot,
+          Formation,
+          FormationTemplate,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -80,6 +86,7 @@ import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000
           AnalyticsSchema1746400000000,
           StatsSchema1746500000000,
           LeaderboardSchema1746500000000,
+          FormationsSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -98,6 +105,7 @@ import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000
     VipModule,
     AnalyticsModule,
     StatsModule,
+    FormationsModule,
   ],
 })
 export class AppModule {}

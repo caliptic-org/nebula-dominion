@@ -7,18 +7,21 @@ import { BootScene } from './scenes/BootScene';
 import { BattleScene } from './scenes/BattleScene';
 import { UIScene } from './scenes/UIScene';
 import { WinLoseScene } from './scenes/WinLoseScene';
+import { TutorialOverlayScene } from './scenes/TutorialOverlayScene';
+import { getRaceVisual } from './raceVisuals';
 import type { Race, GameMode } from './types';
 
 interface Props {
   race: string;
   mode: string;
   userId: string;
+  tutorial?: boolean;
 }
 
 const GAME_W = BattleScene.WIDTH;
 const GAME_H = BattleScene.HEIGHT;
 
-export default function GameCanvas({ race, mode, userId }: Props) {
+export default function GameCanvas({ race, mode, userId, tutorial = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const socketRef = useRef<GameSocket | null>(null);
@@ -35,14 +38,20 @@ export default function GameCanvas({ race, mode, userId }: Props) {
       height: GAME_H,
       parent: containerRef.current,
       backgroundColor: '#07090f',
-      scene: [BootScene, BattleScene, UIScene, WinLoseScene],
+      scene: [BootScene, BattleScene, UIScene, WinLoseScene, TutorialOverlayScene],
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       callbacks: {
         postBoot: (game) => {
-          game.scene.start('BootScene', { socket, race: race as Race, mode: mode as GameMode });
+          game.scene.start('BootScene', {
+            socket,
+            race: race as Race,
+            mode: mode as GameMode,
+            tutorial,
+            tutorialRaceColorHex: getRaceVisual(race).hex,
+          });
         },
       },
     };
@@ -55,7 +64,7 @@ export default function GameCanvas({ race, mode, userId }: Props) {
       gameRef.current = null;
       socketRef.current = null;
     };
-  }, [race, mode, userId]);
+  }, [race, mode, userId, tutorial]);
 
   return (
     <div

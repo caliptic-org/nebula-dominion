@@ -102,13 +102,20 @@ export class GameSocket {
     });
   }
 
-  startPve(botRace?: string) {
+  startPve(botRace?: string, opts?: { tutorial?: boolean }) {
     this.pveSocket.connect();
     this.pveSocket.emit('start_pve', {
       race: this.myRace,
       botRace,
       playerElo: 1000,
       playerGamesPlayed: 0,
+      // Tutorial mode is a frontend hint: backends that recognise it should
+      // weaken the bot and skip ranked rewards. Older backends ignore the
+      // flag and the player gets a regular PvE match.
+      tutorial: opts?.tutorial === true,
+      // Bot strength multiplier for tutorial mode (50% of the player) — sent
+      // alongside `tutorial` so backends can apply without reading the flag.
+      botStrengthMultiplier: opts?.tutorial ? 0.5 : 1,
     });
   }
 

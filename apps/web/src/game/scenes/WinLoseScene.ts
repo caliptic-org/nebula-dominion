@@ -14,17 +14,22 @@ interface WinLoseData {
   room?: GameRoom;
 }
 
+const FIRST_VICTORY_LS_KEY = 'nebula:firstVictoryClaimedAt';
+const ONBOARDING_LS_KEY = 'nebula:onboarding:v1';
+
 export class WinLoseScene extends Phaser.Scene {
   private myId!: string;
   private winLoseData!: WinLoseData;
+  private tutorial = false;
 
   constructor() {
     super({ key: 'WinLoseScene' });
   }
 
-  init(initData: { data: Record<string, unknown>; myId: string }) {
+  init(initData: { data: Record<string, unknown>; myId: string; tutorial?: boolean }) {
     this.myId = initData.myId;
     this.winLoseData = initData.data as unknown as WinLoseData;
+    this.tutorial = initData.tutorial === true;
   }
 
   create() {
@@ -84,6 +89,15 @@ export class WinLoseScene extends Phaser.Scene {
         fontSize: '13px', fontStyle: 'bold', color: accentStr,
         stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5, 0);
+
+      // First Victory badge: shown only the first time a player wins, with
+      // an extra emphasis if they win the tutorial battle. Persisted to
+      // localStorage so a /battle reload can't farm the celebration twice.
+      if (this.shouldShowFirstVictory()) {
+        this.spawnFirstVictoryBadge(width / 2, py + panelH - 110, accentHex, accentStr);
+        this.markFirstVictoryClaimed();
+        this.markOnboardingComplete();
+      }
     }
 
     // End reason
@@ -187,6 +201,151 @@ export class WinLoseScene extends Phaser.Scene {
     menuBtn.on('pointerdown', () => { window.location.href = '/'; });
     menuBtn.on('pointerover', () => menuBtn.setStyle({ color: THEME.TEXT_PRIMARY }));
     menuBtn.on('pointerout', () => menuBtn.setStyle({ color: THEME.BRAND_STR }));
+  }
+
+  /** "First Victory" is a one-shot celebration to make the first win feel huge. */
+  private shouldShowFirstVictory(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      // Tutorial wins always trigger the badge; later wins don't.
+      const claimed = window.localStorage.getItem(FIRST_VICTORY_LS_KEY);
+      return claimed === null;
+    } catch {
+      return false;
+    }
+  }
+
+  private markFirstVictoryClaimed() {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FIRST_VICTORY_LS_KEY, new Date().toISOString());
+    } catch {
+      // ignore quota errors
+    }
+  }
+
+  /** Mirrors the schema in `useOnboarding.ts` — keep both in sync. */
+  private markOnboardingComplete() {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(ONBOARDING_LS_KEY);
+      const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      const next = {
+        ...parsed,
+        hasSeenIntro: true,
+        hasCompletedTutorial: true,
+        firstVictoryClaimedAt: new Date().toISOString(),
+        lastSessionEndedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem(ONBOARDING_LS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  }
+
+  private spawnFirstVictoryBadge(cx: number, cy: number, accentHex: number, accentStr: string) {
+    const badge = this.add.container(cx, cy).setDepth(200);
+
+    const ringR = 46;
+    const halo = this.add.graphics();
+    halo.fillStyle(accentHex, 0.18);
+    halo.fillCircle(0, 0, ringR + 22);
+    badge.add(halo);
+
+    const ring = this.add.graphics();
+    ring.lineStyle(3, accentHex, 1);
+    ring.strokeCircle(0, 0, ringR);
+    ring.lineStyle(1, accentHex, 0.5);
+    ring.strokeCircle(0, 0, ringR + 8);
+    badge.add(ring);
+
+    const star = this.add.text(0, -2, '★', {
+      fontSize: '46px', fontStyle: 'bold', color: accentStr,
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5);
+    badge.add(star);
+
+    const subtitle = this.add.text(0, ringR + 26, 'ILK ZAFER', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: accentStr,
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+    badge.add(subtitle);
+
+    const microTitle = this.add.text(0, ringR + 44, this.tutorial ? 'Egitim tamamlandi' : 'Komutan rutubesinde', {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '11px',
+      color: '#e8e8f0',
+    }).setOrigin(0.5);
+    badge.add(microTitle);
+
+    badge.setAlpha(0).setScale(0.3);
+
+    this.tweens.add({
+      targets: badge,
+      alpha: 1,
+      scale: 1,
+      duration: 520,
+      delay: 1100,
+      ease: 'Back.out',
+    });
+
+    // Continuous halo pulse to keep the eye locked on it.
+    this.tweens.add({
+      targets: halo,
+      scale: { from: 1, to: 1.18 },
+      alpha: { from: 0.55, to: 0.15 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+      delay: 1600,
+    });
+
+    // Slow ring rotation
+    this.tweens.add({
+      targets: ring,
+      angle: 360,
+      duration: 8000,
+      repeat: -1,
+      ease: 'Linear',
+      delay: 1600,
+    });
+
+    // Star sparkle bounce
+    this.tweens.add({
+      targets: star,
+      scale: { from: 1, to: 1.08 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+      delay: 1600,
+    });
+
+    // Confetti particles around the badge
+    for (let i = 0; i < 18; i++) {
+      const angle = (i / 18) * Math.PI * 2;
+      const dist = 70 + Math.random() * 40;
+      const dot = this.add.graphics();
+      dot.fillStyle(accentHex, 1);
+      dot.fillCircle(0, 0, 3);
+      badge.add(dot);
+      this.tweens.add({
+        targets: dot,
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        alpha: 0,
+        scale: 0.2,
+        duration: 700,
+        delay: 1500 + Math.random() * 200,
+        ease: 'Cubic.out',
+        onComplete: () => dot.destroy(),
+      });
+    }
   }
 
   private addVictoryParticles(cx: number, cy: number) {

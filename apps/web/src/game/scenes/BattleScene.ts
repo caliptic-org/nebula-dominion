@@ -30,6 +30,8 @@ function pixelToCell(px: number, py: number): { col: number; row: number } {
 export class BattleScene extends Phaser.Scene {
   private socket!: GameSocket;
   private room!: GameRoom;
+  private tutorial = false;
+  private tutorialRaceColorHex?: number;
 
   private unitSprites = new Map<string, UnitSprite>();
   private selectedUnit: UnitSprite | null = null;
@@ -41,9 +43,16 @@ export class BattleScene extends Phaser.Scene {
     super({ key: 'BattleScene' });
   }
 
-  init(data: { socket: GameSocket; room: GameRoom }) {
+  init(data: {
+    socket: GameSocket;
+    room: GameRoom;
+    tutorial?: boolean;
+    tutorialRaceColorHex?: number;
+  }) {
     this.socket = data.socket;
     this.room = data.room;
+    this.tutorial = data.tutorial === true;
+    this.tutorialRaceColorHex = data.tutorialRaceColorHex;
   }
 
   create() {
@@ -66,6 +75,14 @@ export class BattleScene extends Phaser.Scene {
       playerRace,
       enemyRace,
     });
+
+    if (this.tutorial) {
+      // Run the 3-step tutorial overlay in parallel — it sleeps the BattleScene
+      // events bus rather than the game itself, so combat still flows below.
+      this.scene.launch('TutorialOverlayScene', {
+        raceColorHex: this.tutorialRaceColorHex,
+      });
+    }
   }
 
   private drawHalftoneBackdrop() {
@@ -277,6 +294,11 @@ export class BattleScene extends Phaser.Scene {
       const target = this.unitSprites.get(targetUnitId);
       if (!attacker || !target) return;
 
+      // Tutorial overlay listens for these to advance step 3.
+      if (!attacker.isEnemy) {
+        this.events.emit('tutorial:attacked', { attackerUnitId, targetUnitId });
+      }
+
       // Speed lines fire as the attacker lunges
       const ui = this.scene.get('UIScene');
       ui.events.emit('speed_lines', { fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y });
@@ -305,6 +327,11 @@ export class BattleScene extends Phaser.Scene {
       const { x, y } = cellToPixel(position.x, position.y);
       sprite.unitState.position = position;
       sprite.playMoveAnim(x, y);
+
+      // Tutorial overlay advances to step 3 when the player's unit moves.
+      if (!sprite.isEnemy) {
+        this.events.emit('tutorial:moved', { unitId, position });
+      }
     });
 
     this.socket.on('ability_used', (data) => {
@@ -344,6 +371,7 @@ export class BattleScene extends Phaser.Scene {
         this.scene.launch('WinLoseScene', {
           data: { ...data, winnerRace, room: this.room },
           myId: this.socket.myUserId,
+          tutorial: this.tutorial,
         });
         this.scene.pause();
       });

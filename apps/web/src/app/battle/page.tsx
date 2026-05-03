@@ -13,6 +13,7 @@ function BattleContent() {
   const race = params.get('race') ?? 'insan';
   const mode = params.get('mode') ?? 'pve';
   const userId = params.get('userId') ?? 'player_demo';
+  const tutorial = params.get('tutorial') === '1';
 
   const raceKey = (race in RACE_DESCRIPTIONS) ? race as keyof typeof RACE_DESCRIPTIONS : 'insan' as keyof typeof RACE_DESCRIPTIONS;
   const raceDesc = RACE_DESCRIPTIONS[raceKey as keyof typeof RACE_DESCRIPTIONS];
@@ -47,8 +48,24 @@ function BattleContent() {
             className="font-display text-[10px] font-black uppercase tracking-widest"
             style={{ color: raceDesc?.color ?? '#4a9eff' }}
           >
-            {raceDesc?.icon} {raceDesc?.name ?? race} — {mode === 'pvp' ? 'PvP Savaş' : 'PvE Savaş'}
+            {raceDesc?.icon} {raceDesc?.name ?? race} —{' '}
+            {tutorial ? 'Egitim Savasi' : mode === 'pvp' ? 'PvP Savaş' : 'PvE Savaş'}
           </span>
+          {tutorial && (
+            <span
+              className="badge text-[9px] font-display font-black uppercase tracking-widest"
+              style={{
+                background: 'rgba(255,200,50,0.12)',
+                color: 'var(--color-energy)',
+                border: '1px solid rgba(255,200,50,0.3)',
+                padding: '2px 8px',
+                borderRadius: '999px',
+              }}
+              aria-label="Egitim modu — kayip imkansiz"
+            >
+              ★ EGITIM
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -95,7 +112,7 @@ function BattleContent() {
             boxShadow: `0 0 40px ${raceDesc?.glowColor ?? 'rgba(74,158,255,0.15)'}`,
           }}
         >
-          <GameCanvas race={race} mode={mode} userId={userId} />
+          <GameCanvas race={race} mode={mode} userId={userId} tutorial={tutorial} />
         </div>
       </main>
 

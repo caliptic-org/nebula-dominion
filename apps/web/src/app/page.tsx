@@ -5,12 +5,15 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
+import { useOnboarding } from '@/hooks/useOnboarding';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { STRUCTURE_ASSETS } from '@/lib/assets';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { LevelUpModal } from '@/components/progression/LevelUpModal';
 import { UnlockNotification } from '@/components/progression/UnlockNotification';
+import { OnboardingFirstSession } from '@/components/hud/OnboardingFirstSession';
+import { NextSessionHookBanner } from '@/components/hud/NextSessionHookBanner';
 import { LevelUpPayload, ContentUnlock } from '@/types/progression';
 import clsx from 'clsx';
 
@@ -70,8 +73,20 @@ export default function HomePage() {
     },
   });
 
+  const {
+    hydrated: onboardingHydrated,
+    isFirstSession,
+    shouldShowNextSessionHook,
+    markIntroSeen,
+  } = useOnboarding();
+  // The cinematic Onboarding overlay only renders for brand-new players who
+  // haven't yet finished their tutorial battle. We gate on `hydrated` to
+  // avoid flashing it during SSR or before localStorage has been read.
+  const showOnboardingOverlay = onboardingHydrated && isFirstSession;
+
   const raceDesc = RACE_DESCRIPTIONS[race];
   const primaryCommander = raceDesc.commanders[0];
+  const tutorialBattleHref = `/battle?race=${race}&mode=pve&tutorial=1`;
 
   return (
     <>
@@ -80,6 +95,12 @@ export default function HomePage() {
         <LevelUpModal
           payload={pendingLevelUp}
           onClose={() => { setPendingLevelUp(null); setPendingUnlocks([]); }}
+        />
+      )}
+      {showOnboardingOverlay && (
+        <OnboardingFirstSession
+          onSkip={markIntroSeen}
+          battleHref={tutorialBattleHref}
         />
       )}
 
@@ -95,6 +116,9 @@ export default function HomePage() {
         />
         {/* Halftone */}
         <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+
+        {/* Next-session hook — only shown after a player has finished onboarding. */}
+        {shouldShowNextSessionHook && <NextSessionHookBanner />}
 
         {/* ── Resource Bar (Top) ────────────────────────────── */}
         <header
@@ -396,11 +420,17 @@ export default function HomePage() {
                   Phaser.js ile güçlendirilmiş gerçek zamanlı savaş sahneleri yakında.
                 </p>
                 <a
-                  href={`/battle?race=${race}&mode=pve`}
+                  href={
+                    onboardingHydrated && !shouldShowNextSessionHook
+                      ? tutorialBattleHref
+                      : `/battle?race=${race}&mode=pve`
+                  }
                   className="btn-primary inline-flex items-center gap-2"
                   style={{ background: raceColor }}
                 >
-                  <span>Savaşa Gir</span>
+                  <span>
+                    {onboardingHydrated && !shouldShowNextSessionHook ? 'Eğitim Savaşı' : 'Savaşa Gir'}
+                  </span>
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/20 text-xs">→</span>
                 </a>
               </div>

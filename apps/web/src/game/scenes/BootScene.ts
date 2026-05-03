@@ -7,6 +7,8 @@ export class BootScene extends Phaser.Scene {
   private socket!: GameSocket;
   private race!: Race;
   private mode!: string;
+  private tutorial = false;
+  private tutorialRaceColorHex?: number;
   private loadingText!: Phaser.GameObjects.Text;
   private dots = 0;
   private dotTimer!: Phaser.Time.TimerEvent;
@@ -15,10 +17,18 @@ export class BootScene extends Phaser.Scene {
     super({ key: 'BootScene' });
   }
 
-  init(data: { socket: GameSocket; race: Race; mode: string }) {
+  init(data: {
+    socket: GameSocket;
+    race: Race;
+    mode: string;
+    tutorial?: boolean;
+    tutorialRaceColorHex?: number;
+  }) {
     this.socket = data.socket;
     this.race = data.race;
     this.mode = data.mode;
+    this.tutorial = data.tutorial === true;
+    this.tutorialRaceColorHex = data.tutorialRaceColorHex;
   }
 
   create() {
@@ -63,12 +73,17 @@ export class BootScene extends Phaser.Scene {
           this.dotTimer.remove();
           this.setStatus(`Battle ready! ${roomData.yourTurn ? 'You go first.' : 'Bot goes first.'}`);
           this.time.delayedCall(800, () => {
-            this.scene.start('BattleScene', { socket: this.socket, room });
+            this.scene.start('BattleScene', {
+              socket: this.socket,
+              room,
+              tutorial: this.tutorial,
+              tutorialRaceColorHex: this.tutorialRaceColorHex,
+            });
           });
         });
       });
 
-      this.socket.startPve();
+      this.socket.startPve(undefined, { tutorial: this.tutorial });
     } else {
       // PvP matchmaking — join matchmaking namespace
       this.setStatus('Looking for opponent...');

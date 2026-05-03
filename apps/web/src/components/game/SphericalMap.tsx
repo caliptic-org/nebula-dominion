@@ -13,6 +13,12 @@ import type {
   HitTarget,
   TerritoryZone,
 } from './WorldMap';
+import { createRaceBase, createInstancedBaseField, type RaceBaseInstance } from './bases';
+import { loadEnemySprite, loadResourceSprite, preloadSprites } from './bases/spriteLoader';
+
+// When the base count exceeds this threshold, fall back to InstancedMesh silhouettes
+// instead of full procedural geometry per base.
+const INSTANCING_THRESHOLD = 50;
 
 // ── Layout constants ───────────────────────────────────────────────────────
 const COLS              = 26;       // matches WorldMap seed grid for col→sphere mapping
@@ -212,7 +218,7 @@ function createNebula(raceColor: string): THREE.Group {
 interface MapObject {
   kind: 'base' | 'resource' | 'enemy';
   obj: THREE.Object3D;            // root (scaled for hit-testing)
-  body: THREE.Mesh;               // visible body
+  body: THREE.Mesh;               // visible body (used for raycasting reference)
   glow?: THREE.Sprite;            // halo
   ring?: THREE.Mesh;              // selection ring
   base?: WorldBase;
@@ -220,6 +226,10 @@ interface MapObject {
   enemy?: WorldEnemy;
   basePosition: THREE.Vector3;    // pre-jitter target position
   bobPhase: number;
+  /** Race-specific procedural base (player + opponent) — owns its own sub-animation. */
+  raceBase?: RaceBaseInstance;
+  /** Sprite billboard (enemy/resource) — null when CAL-338 PNG hasn't loaded yet. */
+  spriteBillboard?: THREE.Sprite;
 }
 
 function makeGlowSprite(color: string, size: number): THREE.Sprite {
@@ -252,48 +262,56 @@ function createBaseObject(b: WorldBase): MapObject {
   const color = RACE_COL[b.race];
   const root = new THREE.Group();
 
-  const radius = b.isPlayer ? 2.6 : 1.8;
-  const geom = new THREE.IcosahedronGeometry(radius, 1);
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: b.isPlayer ? 1.2 : 0.7,
-    roughness: 0.45,
-    metalness: 0.25,
-    flatShading: true,
+  // ── Race-specific procedural geometry ─────────────────────────────────
+  const raceBase = createRaceBase(b.race, { compact: !b.isPlayer, level: b.level, isPlayer: b.isPlayer });
+  // All meshes inside the race base delegate hit-tests to the root group.
+  raceBase.group.traverse(child => {
+    if ((child as THREE.Mesh).isMesh) child.userData.hitObject = root;
   });
-  const body = new THREE.Mesh(geom, mat);
-  body.userData.hitObject = root;
-  root.add(body);
+  root.add(raceBase.group);
+
+  // The race-base radius drives selection-ring sizing and bobbing amplitude.
+  const radius = raceBase.radius;
+
+  // Reference body for raycaster traversal — first mesh inside the race group.
+  let body: THREE.Mesh | null = null;
+  raceBase.group.traverse(child => {
+    if (body) return;
+    if ((child as THREE.Mesh).isMesh) body = child as THREE.Mesh;
+  });
+  if (!body) body = new THREE.Mesh();
 
   const glow = makeGlowSprite(color, b.isPlayer ? 14 : 10);
+  glow.position.y = radius * 0.6;
   root.add(glow);
 
   // Soft equator ring for player base
   if (b.isPlayer) {
-    const ringGeom = new THREE.RingGeometry(radius * 1.6, radius * 1.85, 64);
+    const ringGeom = new THREE.RingGeometry(radius * 1.4, radius * 1.6, 64);
     const ringMat = new THREE.MeshBasicMaterial({
       color, side: THREE.DoubleSide, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const ring = new THREE.Mesh(ringGeom, ringMat);
     ring.rotation.x = Math.PI / 2;
+    ring.position.y = -0.2;
     root.add(ring);
   }
 
   // Hidden selection ring (toggled when selected)
-  const selGeom = new THREE.RingGeometry(radius * 2.0, radius * 2.15, 64);
+  const selGeom = new THREE.RingGeometry(radius * 1.8, radius * 1.95, 64);
   const selMat = new THREE.MeshBasicMaterial({
     color: '#ffffff', side: THREE.DoubleSide, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const selRing = new THREE.Mesh(selGeom, selMat);
   selRing.rotation.x = Math.PI / 2;
+  selRing.position.y = -0.4;
   root.add(selRing);
 
   const pos = b.isPlayer ? new THREE.Vector3(0, 0, 0) : gridToSphere(b.col, b.row);
   root.position.copy(pos);
 
   return {
-    kind: 'base', obj: root, body, glow, ring: selRing, base: b,
+    kind: 'base', obj: root, body, glow, ring: selRing, base: b, raceBase,
     basePosition: pos.clone(),
     bobPhase: Math.random() * Math.PI * 2,
   };
@@ -303,7 +321,7 @@ function createResourceObject(r: WorldResource): MapObject {
   const color = RES_COL[r.kind];
   const root = new THREE.Group();
 
-  // Cluster of small irregular shards
+  // Cluster of small irregular shards (procedural fallback / always visible)
   const cluster = new THREE.Group();
   const shardCount = 4 + (r.id.length % 3);
   for (let i = 0; i < shardCount; i++) {
@@ -326,14 +344,30 @@ function createResourceObject(r: WorldResource): MapObject {
     cluster.add(shard);
   }
   cluster.userData.hitObject = root;
-  // Use the first shard as the "body" reference for raycasting traversal
   const body = cluster.children[0] as THREE.Mesh;
-  // All shards delegate selection to the root
   cluster.children.forEach(c => { c.userData.hitObject = root; });
   root.add(cluster);
 
   const glow = makeGlowSprite(color, 7);
   root.add(glow);
+
+  // CAL-338 sprite — overlay if/when the PNG is available
+  let billboard: THREE.Sprite | undefined;
+  loadResourceSprite(r.kind).then(tex => {
+    if (!tex) return;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.4, 2.4, 1);
+    sprite.userData.hitObject = root;
+    root.add(sprite);
+    billboard = sprite;
+    // Sprite supersedes the procedural cluster — fade it down so the PNG reads cleanly.
+    cluster.children.forEach(c => {
+      const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      m.opacity = 0.35;
+      m.transparent = true;
+    });
+  });
 
   const pos = gridToSphere(r.col, r.row, SPHERE_RADIUS * (0.65 + (r.col % 5) * 0.05));
   root.position.copy(pos);
@@ -342,6 +376,7 @@ function createResourceObject(r: WorldResource): MapObject {
     kind: 'resource', obj: root, body, glow, resource: r,
     basePosition: pos.clone(),
     bobPhase: Math.random() * Math.PI * 2,
+    spriteBillboard: billboard,
   };
 }
 
@@ -366,6 +401,20 @@ function createEnemyObject(e: WorldEnemy): MapObject {
   const glow = makeGlowSprite(color, 6);
   root.add(glow);
 
+  // CAL-338 race-themed billboard sprite — fades the procedural body when loaded.
+  let billboard: THREE.Sprite | undefined;
+  loadEnemySprite(e.race).then(tex => {
+    if (!tex) return;
+    const sMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(sMat);
+    sprite.scale.set(2.6, 2.6, 1);
+    sprite.userData.hitObject = root;
+    root.add(sprite);
+    billboard = sprite;
+    mat.opacity = 0.4;
+    mat.transparent = true;
+  });
+
   const pos = gridToSphere(e.fcol, e.frow, SPHERE_RADIUS * 0.85);
   root.position.copy(pos);
 
@@ -373,6 +422,7 @@ function createEnemyObject(e: WorldEnemy): MapObject {
     kind: 'enemy', obj: root, body, glow, enemy: e,
     basePosition: pos.clone(),
     bobPhase: Math.random() * Math.PI * 2,
+    spriteBillboard: billboard,
   };
 }
 
@@ -458,13 +508,31 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
     const nebula = createNebula(RACE_COL[playerRaceRef.current]);
     scene.add(nebula);
 
-    // Build map objects
+    // Pre-warm the CAL-338 sprite cache for races present on the map.
+    preloadSprites(Array.from(new Set(basesRef.current.map(b => b.race))));
+
+    // Build map objects (procedural per-base, plus instanced silhouette layer
+    // when the crowd exceeds INSTANCING_THRESHOLD).
     const objects: MapObject[] = [
       ...basesRef.current.map(createBaseObject),
       ...resRef.current.map(createResourceObject),
       ...enemiesRef.current.map(createEnemyObject),
     ];
     objects.forEach(o => scene.add(o.obj));
+
+    let instancedField: { groups: THREE.Group; dispose: () => void } | null = null;
+    if (basesRef.current.length > INSTANCING_THRESHOLD) {
+      instancedField = createInstancedBaseField(
+        basesRef.current
+          .filter(b => !b.isPlayer)
+          .map(b => ({ race: b.race, position: gridToSphere(b.col, b.row), isPlayer: false })),
+      );
+      scene.add(instancedField.groups);
+      // Hide individual procedural opponent bases — we render the cheap silhouettes instead.
+      objects.forEach(o => {
+        if (o.kind === 'base' && o.base && !o.base.isPlayer) o.obj.visible = false;
+      });
+    }
 
     sceneRef.current    = scene;
     cameraRef.current   = camera;
@@ -577,7 +645,8 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
           o.body.rotation.y += dt * 1.4;
           o.body.rotation.x += dt * 0.8;
         } else if (o.kind === 'base') {
-          o.body.rotation.y += dt * (o.base?.isPlayer ? 0.18 : 0.3);
+          // Race-specific update owns its own per-frame motion (gears, portals, pulses).
+          o.raceBase?.update(elapsed, dt);
           // Pulse halo intensity for player base
           if (o.glow && o.base?.isPlayer) {
             const pulse = 0.85 + 0.25 * Math.sin(elapsed * 1.4);
@@ -608,6 +677,10 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup',   onPointerUp);
       controls.dispose();
+
+      // Race bases own internal geometry/material/texture caches — let them dispose first.
+      objectsRef.current.forEach(o => o.raceBase?.dispose());
+      instancedField?.dispose();
 
       // Dispose Three.js resources to avoid GPU leaks on route change
       scene.traverse(o => {
@@ -648,7 +721,10 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
     if (!scene) return;
     const list = bases ?? makeBases(playerRaceRef.current);
     const prev = objectsRef.current.filter(o => o.kind === 'base');
-    prev.forEach(o => scene.remove(o.obj));
+    prev.forEach(o => {
+      o.raceBase?.dispose();
+      scene.remove(o.obj);
+    });
     const next = list.map(createBaseObject);
     next.forEach(o => scene.add(o.obj));
     objectsRef.current = [
@@ -703,15 +779,18 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
     scene.add(next);
     nebulaRef.current = next;
 
-    // Re-tint player base if it follows the race
-    objectsRef.current.forEach(o => {
-      if (o.kind === 'base' && o.base?.isPlayer) {
-        const c = new THREE.Color(RACE_COL[playerRace]);
-        const mat = o.body.material as THREE.MeshStandardMaterial;
-        mat.color = c;
-        mat.emissive = c;
-      }
-    });
+    // Race switch: rebuild the player's procedural base from scratch.
+    // Each race uses a totally different geometry stack — retinting the previous
+    // mesh would leave Otomat gears on a Şeytan portal, so we rebuild instead.
+    const playerObj = objectsRef.current.find(o => o.kind === 'base' && o.base?.isPlayer);
+    if (playerObj && playerObj.base) {
+      playerObj.raceBase?.dispose();
+      scene.remove(playerObj.obj);
+      const updatedBase: WorldBase = { ...playerObj.base, race: playerRace };
+      const rebuilt = createBaseObject(updatedBase);
+      scene.add(rebuilt.obj);
+      objectsRef.current = objectsRef.current.map(o => (o === playerObj ? rebuilt : o));
+    }
   }, [playerRace]);
 
   // ── Selection helper ────────────────────────────────────────────────────

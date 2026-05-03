@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { CountdownTimer } from '@/components/events/CountdownTimer';
 import { EventBadge, type EventType } from '@/components/events/EventBadge';
+import { sanitizeColor, sanitizeGradient } from '@/lib/colorSanitizer';
 
 /* ── Static demo data ─────────────────────────────────────────────── */
 
@@ -143,43 +144,45 @@ function SpeedLines({ color }: { color: string }) {
   );
 }
 
+const SAFE_BG = 'linear-gradient(135deg, #0d1020 0%, #07090f 100%)';
+
 /* ── Featured banner ─────────────────────────────────────────────── */
 function FeaturedBanner({ event }: { event: GameEvent }) {
+  // FIX: sanitize colors from data before placing in inline styles (CSS injection)
+  const c = sanitizeColor(event.raceColor);
+  const bg = sanitizeGradient(event.raceGradient, SAFE_BG);
   return (
     <Link href={`/events/${event.id}`} className="block group" aria-label={`${event.title} etkinliğine git`}>
       {/* Outer double-bezel shell */}
       <div
         className="relative rounded-2xl p-0.5 overflow-hidden transition-all duration-700"
         style={{
-          background: `linear-gradient(135deg, ${event.raceColor}40, ${event.raceColor}10, transparent)`,
-          boxShadow: `0 0 60px ${event.raceColor}20, 0 0 120px ${event.raceColor}08`,
+          background: `linear-gradient(135deg, ${c}40, ${c}10, transparent)`,
+          boxShadow: `0 0 60px ${c}20, 0 0 120px ${c}08`,
         }}
       >
         {/* Inner core */}
         <div
           className="relative rounded-[calc(1rem-2px)] overflow-hidden"
-          style={{ background: event.raceGradient, minHeight: '280px' }}
+          style={{ background: bg, minHeight: '280px' }}
         >
-          <SpeedLines color={event.raceColor} />
+          <SpeedLines color={c} />
 
           {/* Manga halftone corner */}
           <div
             className="absolute bottom-0 right-0 w-48 h-48 pointer-events-none"
-            style={{
-              background: `radial-gradient(circle at 100% 100%, ${event.raceColor}18 0%, transparent 70%)`,
-            }}
+            style={{ background: `radial-gradient(circle at 100% 100%, ${c}18 0%, transparent 70%)` }}
             aria-hidden
           />
 
           {/* Content */}
           <div className="relative z-10 p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 min-h-[280px]">
             <div className="flex-1">
-              {/* Eyebrow */}
               <div className="flex items-center gap-3 mb-4">
                 <EventBadge type={event.type} />
                 <span
                   className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full"
-                  style={{ background: `${event.raceColor}18`, color: event.raceColor, border: `1px solid ${event.raceColor}30` }}
+                  style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}
                 >
                   {event.raceLabel}
                 </span>
@@ -193,29 +196,24 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
 
               <h2
                 className="font-display font-black text-3xl md:text-5xl leading-none mb-2 tracking-tight"
-                style={{ color: event.raceColor, textShadow: `0 0 40px ${event.raceColor}66` }}
+                style={{ color: c, textShadow: `0 0 40px ${c}66` }}
               >
                 {event.title}
               </h2>
               <p className="text-text-secondary text-sm mb-6">{event.subtitle}</p>
 
-              {/* Countdown */}
               <div>
                 <p className="text-[9px] font-bold tracking-widest uppercase text-text-muted mb-2">
                   KALAN SÜRE
                 </p>
-                <CountdownTimer targetDate={event.endDate} raceColor={event.raceColor} size="md" />
+                <CountdownTimer targetDate={event.endDate} raceColor={c} size="md" />
               </div>
             </div>
 
             <div className="flex flex-col items-start md:items-end gap-4">
-              {/* Stats */}
               <div className="text-right">
                 <p className="text-[9px] tracking-widest uppercase text-text-muted">Katılımcı</p>
-                <p
-                  className="font-display font-black text-2xl"
-                  style={{ color: event.raceColor }}
-                >
+                <p className="font-display font-black text-2xl" style={{ color: c }}>
                   {event.participants.toLocaleString()}
                 </p>
               </div>
@@ -228,9 +226,9 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
               <button
                 className="flex items-center gap-3 rounded-full font-bold text-sm px-5 py-3 transition-all duration-500 group-hover:scale-105 active:scale-95"
                 style={{
-                  background: `linear-gradient(135deg, ${event.raceColor}, ${event.raceColor}bb)`,
+                  background: `linear-gradient(135deg, ${c}, ${c}bb)`,
                   color: '#000',
-                  boxShadow: `0 0 30px ${event.raceColor}55`,
+                  boxShadow: `0 0 30px ${c}55`,
                   transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
                 }}
                 aria-label={`${event.title} etkinliğine katıl`}
@@ -256,6 +254,9 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
 function EventCard({ event }: { event: GameEvent }) {
   const isArchive = event.status === 'archive';
   const isUpcoming = event.status === 'upcoming';
+  // FIX: sanitize colors from data before placing in inline styles (CSS injection)
+  const c = sanitizeColor(event.raceColor);
+  const bg = sanitizeGradient(event.raceGradient, SAFE_BG);
 
   return (
     <Link
@@ -266,16 +267,15 @@ function EventCard({ event }: { event: GameEvent }) {
       <div
         className="relative rounded-xl overflow-hidden transition-all duration-500 hover-glow"
         style={{
-          border: `1px solid ${isArchive ? '#333344' : event.raceColor + '30'}`,
-          background: isArchive ? 'rgba(10,10,18,0.8)' : event.raceGradient,
+          border: `1px solid ${isArchive ? '#333344' : c + '30'}`,
+          background: isArchive ? 'rgba(10,10,18,0.8)' : bg,
           transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
           opacity: isArchive ? 0.65 : 1,
         }}
       >
-        {!isArchive && <SpeedLines color={event.raceColor} />}
+        {!isArchive && <SpeedLines color={c} />}
 
         <div className="relative z-10 p-5">
-          {/* Top row */}
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2 flex-wrap">
               <EventBadge type={event.type} size="sm" />
@@ -290,29 +290,24 @@ function EventCard({ event }: { event: GameEvent }) {
                 </span>
               )}
             </div>
-            <span
-              className="text-[9px] font-bold shrink-0"
-              style={{ color: event.raceColor }}
-            >
+            <span className="text-[9px] font-bold shrink-0" style={{ color: c }}>
               {event.raceLabel}
             </span>
           </div>
 
-          {/* Title */}
           <h3
             className="font-display font-black text-lg leading-tight mb-1 tracking-tight"
             style={{
-              color: isArchive ? 'var(--color-text-secondary)' : event.raceColor,
-              textShadow: isArchive ? 'none' : `0 0 20px ${event.raceColor}55`,
+              color: isArchive ? 'var(--color-text-secondary)' : c,
+              textShadow: isArchive ? 'none' : `0 0 20px ${c}55`,
             }}
           >
             {event.title}
           </h3>
           <p className="text-text-muted text-xs mb-4">{event.subtitle}</p>
 
-          {/* Countdown or date */}
           {event.status === 'active' && (
-            <CountdownTimer targetDate={event.endDate} raceColor={event.raceColor} size="sm" />
+            <CountdownTimer targetDate={event.endDate} raceColor={c} size="sm" />
           )}
           {isUpcoming && (
             <p className="text-xs text-text-secondary">
@@ -327,13 +322,13 @@ function EventCard({ event }: { event: GameEvent }) {
 
           {/* Bottom bar */}
           {!isArchive && (
-            <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${event.raceColor}15` }}>
+            <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${c}15` }}>
               <span className="text-[10px] text-text-muted">
                 {event.participants.toLocaleString()} oyuncu
               </span>
               <span
                 className="text-[10px] font-bold transition-transform duration-300 group-hover:translate-x-1"
-                style={{ color: event.raceColor }}
+                style={{ color: c }}
               >
                 Detay →
               </span>

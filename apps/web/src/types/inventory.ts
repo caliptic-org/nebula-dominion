@@ -21,9 +21,11 @@ export enum SortMode {
 }
 
 export interface ItemEffect {
-  label: string;
-  value: string;
+  label?: string;
+  type?: string;
+  value: string | number;
   positive?: boolean;
+  duration?: number; // minutes
 }
 
 export interface InventoryItem {
@@ -297,3 +299,27 @@ export const DEMO_INVENTORY: InventoryItem[] = [
     sellValue: 0,
   },
 ];
+
+export interface InventoryCapacity {
+  used: number;
+  max: number;
+}
+
+export interface InventoryListResponse {
+  items: InventoryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface UseItemResponse {
+  success: boolean;
+  remainingQuantity: number;
+  effects: ItemEffect[];
+}
+
+export interface SellItemResponse {
+  success: boolean;
+  gemsEarned: number;
+  remainingQuantity: number;
+}

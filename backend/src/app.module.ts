@@ -39,6 +39,18 @@ import { VipModule } from './vip/vip.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { StatsModule } from './stats/stats.module';
 import { FormationsModule } from './formations/formations.module';
+import { GuildModule } from './guild/guild.module';
+import { Guild } from './guild/entities/guild.entity';
+import { GuildMember } from './guild/entities/guild-member.entity';
+import { GuildEvent } from './guild/entities/guild-event.entity';
+import { ChatMessage } from './guild/entities/chat-message.entity';
+import { GuildMute } from './guild/entities/guild-mute.entity';
+import { GuildReport } from './guild/entities/guild-report.entity';
+import { DonateRequest } from './guild/entities/donate-request.entity';
+import { DonateFulfillment } from './guild/entities/donate-fulfillment.entity';
+import { ContributionDaily } from './guild/entities/contribution-daily.entity';
+import { ProfanityWord } from './guild/entities/profanity-word.entity';
+import { GuildSchema1746800000000 } from './database/migrations/1746800000000-GuildSchema';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
@@ -75,6 +87,16 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           LeaderboardSnapshot,
           Formation,
           FormationTemplate,
+          Guild,
+          GuildMember,
+          GuildEvent,
+          ChatMessage,
+          GuildMute,
+          GuildReport,
+          DonateRequest,
+          DonateFulfillment,
+          ContributionDaily,
+          ProfanityWord,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -87,6 +109,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           StatsSchema1746500000000,
           LeaderboardSchema1746500000000,
           FormationsSchema1746500000000,
+          GuildSchema1746800000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -106,6 +129,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
     AnalyticsModule,
     StatsModule,
     FormationsModule,
+    GuildModule,
   ],
 })
 export class AppModule {}

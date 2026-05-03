@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Post, HttpCode, HttpStatus, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ProgressionService } from './progression.service';
 import { AwardXpDto } from './dto/award-xp.dto';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { AdminRoleGuard } from '../auth/admin-role.guard';
 
 @UseGuards(HttpJwtGuard)
 @Controller('progression')
@@ -34,14 +34,9 @@ export class ProgressionController {
     return this.progressionService.getRecentTransactions(userId);
   }
 
-  @Post('advance-age')
-  @HttpCode(HttpStatus.OK)
-  advanceAge(@Body() dto: AdvanceAgeDto) {
-    return this.progressionService.advanceAge(dto.userId);
-  }
-
-  @Get(':userId/active-boost')
-  getActiveBoost(@Param('userId') userId: string) {
-    return this.progressionService.getActiveProductionBoost(userId);
+  @Post('admin/reload-config')
+  @UseGuards(HttpJwtGuard, AdminRoleGuard)
+  reloadConfig() {
+    return this.progressionService.reloadConfig();
   }
 }

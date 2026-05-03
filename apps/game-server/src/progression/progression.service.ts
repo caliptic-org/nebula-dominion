@@ -23,19 +23,8 @@ import {
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
-import {
-  LevelUpEvent,
-  AgeTransitionEvent,
-  PlayerProgressDto,
-  XpGainedEvent,
-  XpTelemetryEvent,
-} from './dto/player-progress.dto';
-
-const AGE_BADGE_LABELS: Record<AgeTierBadge, string> = {
-  [AgeTierBadge.ACEMI]:     'Acemi',
-  [AgeTierBadge.DENEYIMLI]: 'Deneyimli',
-  [AgeTierBadge.SAMPIYON]:  'Şampiyon',
-};
+import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { ProgressionConfigService } from './progression-config.service';
 
 @Injectable()
 export class ProgressionService {
@@ -49,7 +38,7 @@ export class ProgressionService {
     @InjectRepository(EraPackage)
     private readonly eraPackageRepo: Repository<EraPackage>,
     private readonly emitter: EventEmitter2,
-    private readonly progressionConfig: ProgressionConfigService,
+    private readonly progressionConfigService: ProgressionConfigService,
   ) {}
 
   async getOrCreateProgress(userId: string): Promise<PlayerLevel> {
@@ -345,72 +334,8 @@ export class ProgressionService {
     return leveledUp;
   }
 
-  private emitTelemetry(
-    userId: string,
-    source: string,
-    baseAmount: number,
-    finalAmount: number,
-    record: PlayerLevel,
-  ): void {
-    const weight = XP_SOURCE_WEIGHTS[source as XpSource] ?? 0;
-    const telemetryEvent: XpTelemetryEvent = {
-      userId,
-      source,
-      baseAmount,
-      finalAmount,
-      level: record.currentLevel,
-      age: record.currentAge,
-      totalXp: record.totalXp,
-      timestamp: new Date().toISOString(),
-    };
-    this.emitter.emit('progression.xp_telemetry', telemetryEvent);
-
-    // Log an anomaly if a source contributes outside expected weight band
-    if (weight === 0 && !['battle_win', 'battle_loss', 'quest_easy', 'quest_medium', 'quest_hard'].includes(source)) {
-      this.logger.warn(`XP source '${source}' has no weight defined in XP_SOURCE_WEIGHTS`);
-    }
-  }
-
-  /** Returns actual F2P daily XP rate for a player based on their transactions. */
-  async getF2pProgressionRate(userId: string): Promise<{
-    avgDailyXp: number;
-    estimatedDaysToNextAge: number | null;
-    onTrack: boolean;
-  }> {
-    const record = await this.getOrCreateProgress(userId);
-
-    const rows: Array<{ day_xp: string }> = await this.xpTxRepo.query(
-      `SELECT SUM(final_amount) AS day_xp
-       FROM xp_transactions
-       WHERE user_id = $1
-         AND created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY DATE(created_at)`,
-      [userId],
-    );
-
-    const dailyTotals = rows.map((r) => Number(r.day_xp));
-    const avgDailyXp = dailyTotals.length
-      ? Math.round(dailyTotals.reduce((a, b) => a + b, 0) / dailyTotals.length)
-      : 0;
-
-    let estimatedDaysToNextAge: number | null = null;
-    let onTrack = false;
-
-    if (avgDailyXp > 0 && record.currentAge < MAX_AGE) {
-      const threshold = this.progressionConfig.getThreshold(record.currentAge);
-      const xpRemaining = threshold.xpEnd - record.totalXp;
-      estimatedDaysToNextAge = Math.ceil(xpRemaining / avgDailyXp);
-
-      const f2pTarget = threshold.f2pDaysTo - threshold.f2pDaysFrom;
-      onTrack = estimatedDaysToNextAge <= f2pTarget;
-    }
-
-    return { avgDailyXp, estimatedDaysToNextAge, onTrack };
-  }
-
-  async reloadConfig(): Promise<void> {
-    await this.progressionConfig.reloadFromDb();
-    this.logger.log('Progression config hot-reloaded');
+  async reloadConfig(): Promise<{ success: boolean; reason?: string }> {
+    return this.progressionConfigService.reloadFromDb();
   }
 
   async getRecentTransactions(userId: string, limit = 20): Promise<XpTransaction[]> {

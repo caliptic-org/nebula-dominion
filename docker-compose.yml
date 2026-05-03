@@ -109,8 +109,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-nebula_dev_password}
       DB_NAME: ${POSTGRES_DB:-nebula_dominion}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-prod}
+      JWT_SECRET: ${JWT_SECRET:-nebula-dominion-dev-jwt-secret-32chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-nebula-dominion-dev-refresh-secret-32}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}

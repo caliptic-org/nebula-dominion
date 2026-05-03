@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { GameStateModule } from './game-state/game-state.module';
 import { ScoreboardModule } from './scoreboard/scoreboard.module';
 import { HealthModule } from './health/health.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { HealthModule } from './health/health.module';
     GameStateModule,
     ScoreboardModule,
     HealthModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

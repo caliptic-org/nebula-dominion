@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './auth/auth.module';
 import { Battle } from './battle/entities/battle.entity';
 import { BattleLog } from './battle/entities/battle-log.entity';
 import { Unit } from './units/entities/unit.entity';
@@ -67,6 +68,7 @@ import { PvpProtectionSchema1746400000000 } from './database/migrations/17464000
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
       }),
     }),
+    AuthModule,
     RedisModule,
     StorageModule,
     BattleModule,

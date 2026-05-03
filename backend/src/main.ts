@@ -30,6 +30,7 @@ async function bootstrap() {
     .setTitle('Nebula Dominion Battle API')
     .setDescription('Battle Engine REST API — turn-based combat, anti-cheat, replay system')
     .setVersion('1.0')
+    .addBearerAuth()
     .addTag('battles')
     .addTag('analytics')
     .build();

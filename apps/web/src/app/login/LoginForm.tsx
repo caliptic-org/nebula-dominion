@@ -8,7 +8,7 @@ export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [values, setValues] = useState({ username: '', password: '' });
+  const [values, setValues] = useState({ identifier: '', password: '' });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,17 +65,17 @@ export function LoginForm() {
         )}
 
         <div>
-          <label htmlFor="username" className="form-label">Komutan Adı</label>
+          <label htmlFor="identifier" className="form-label">Komutan Adı veya E-posta</label>
           <input
-            id="username"
+            id="identifier"
             type="text"
-            name="username"
+            name="identifier"
             className="form-input"
             placeholder="komutan_nova"
             autoComplete="username"
             required
-            value={values.username}
-            onChange={(e) => setValues((v) => ({ ...v, username: e.target.value }))}
+            value={values.identifier}
+            onChange={(e) => setValues((v) => ({ ...v, identifier: e.target.value }))}
             disabled={isLoading}
           />
         </div>

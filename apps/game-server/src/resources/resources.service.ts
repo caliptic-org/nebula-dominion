@@ -3,8 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
 import { InjectRedis } from '../database/redis.provider';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Resource } from './entities/resource.entity';
 import { ResourceCost } from '../buildings/buildings.constants';
+
+/** Fraction of capacity at which a storage-warning event is emitted */
+const STORAGE_WARN_THRESHOLD = 0.9;
 
 export interface ResourceSnapshot {
   mineral: number;
@@ -31,6 +35,7 @@ export class ResourcesService {
     private readonly resourceRepo: Repository<Resource>,
     @InjectRedis()
     private readonly redis: Redis,
+    private readonly emitter: EventEmitter2,
   ) {}
 
   async getOrCreate(playerId: string): Promise<Resource> {
@@ -105,7 +110,21 @@ export class ResourcesService {
     const snapshot = this.toSnapshot(resource);
     await this.setCache(playerId, snapshot);
 
+    this.checkStorageWarning(playerId, snapshot);
+
     return snapshot;
+  }
+
+  /** Emit a storage warning when any resource hits 90% of its cap */
+  private checkStorageWarning(playerId: string, snapshot: ResourceSnapshot): void {
+    const nearFull: string[] = [];
+    if (snapshot.mineral / snapshot.mineralCap >= STORAGE_WARN_THRESHOLD) nearFull.push('mineral');
+    if (snapshot.gas / snapshot.gasCap >= STORAGE_WARN_THRESHOLD) nearFull.push('gas');
+    if (snapshot.energy / snapshot.energyCap >= STORAGE_WARN_THRESHOLD) nearFull.push('energy');
+
+    if (nearFull.length > 0) {
+      this.emitter.emit('resources.storage_near_full', { playerId, nearFull, snapshot });
+    }
   }
 
   async invalidateCache(playerId: string): Promise<void> {

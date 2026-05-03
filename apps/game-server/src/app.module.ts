@@ -15,6 +15,8 @@ import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
 import { ChatModule } from './chat/chat.module';
+import { DailyRewardsModule } from './daily-rewards/daily-rewards.module';
+import { StaminaModule } from './stamina/stamina.module';
 
 @Module({
   imports: [
@@ -23,7 +25,7 @@ import { ChatModule } from './chat/chat.module';
       load: [configuration],
       envFilePath: ['.env.local', '.env'],
     }),
-    EventEmitterModule.forRoot({ wildcard: false, maxListeners: 20 }),
+    EventEmitterModule.forRoot({ wildcard: false, maxListeners: 30 }),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -47,6 +49,8 @@ import { ChatModule } from './chat/chat.module';
     HealthModule,
     ProgressionModule,
     ChatModule,
+    DailyRewardsModule,
+    StaminaModule,
   ],
 })
 export class AppModule {}

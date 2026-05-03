@@ -12,6 +12,9 @@ import { XpSource } from '../progression/config/level-config';
 import { MergeService } from './merge/merge.service';
 
 const BOT_USER_ID_PREFIX = 'bot:';
+const GRID_WIDTH = 8;
+const GRID_HEIGHT = 6;
+const SKILL_COOLDOWNS: Record<number, number> = { 0: 2, 1: 3, 2: 4, 3: 5 };
 
 export interface GameCreatedEvent {
   match: MatchResult;
@@ -191,15 +194,28 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   private async handleDeploy(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.phase !== TurnPhase.DEPLOY) return fail('Not deploy phase');
 
+    const { unitId, position } = dto.payload as any;
+
+    const unit = this.findUnit(room, userId, unitId);
+    if (!unit) return fail('Unit not found or not owned by player');
+
+    if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+      return fail('Invalid position');
+    }
+    if (position.x < 0 || position.x >= GRID_WIDTH || position.y < 0 || position.y >= GRID_HEIGHT) {
+      return fail('Position out of bounds');
+    }
+
+    unit.position = { x: position.x, y: position.y };
     room.players[userId].lastActionSequence = dto.sequenceNumber;
     await this.rooms.save(room);
-    return { success: true, room, events: [{ type: 'unit_deployed', data: { ...dto.payload } }] };
+    return { success: true, room, events: [{ type: 'unit_deployed', data: { unitId, position } }] };
   }
 
   private async handleAbility(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.currentPlayerId !== userId) return fail('Not your turn');
 
-    const { unitId, skillIndex = 0, cooldown = 2 } = dto.payload as any;
+    const { unitId, skillIndex = 0 } = dto.payload as any;
     if (skillIndex < 0 || skillIndex > 3) return fail('Invalid skill index');
 
     const unit = this.findUnit(room, userId, unitId);
@@ -213,6 +229,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const manaCost = 10;
     if (room.players[userId].mana < manaCost) return fail('Not enough mana');
 
+    const cooldown = SKILL_COOLDOWNS[skillIndex] ?? 2;
     room.players[userId].mana -= manaCost;
     unit.skillCooldowns[skillIndex] = cooldown;
     unit.skillCooldownMax[skillIndex] = cooldown;

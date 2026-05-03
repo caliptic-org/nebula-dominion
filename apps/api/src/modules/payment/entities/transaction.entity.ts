@@ -14,13 +14,13 @@ export class Transaction {
   @Column({ default: 'pending' })
   status: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   provider: string | null;
 
-  @Column({ name: 'shop_item_id', nullable: true })
+  @Column({ name: 'shop_item_id', type: 'varchar', nullable: true })
   shopItemId: string | null;
 
-  @Column({ name: 'premium_pass_id', nullable: true })
+  @Column({ name: 'premium_pass_id', type: 'varchar', nullable: true })
   premiumPassId: string | null;
 
   @Column({ name: 'amount_usd', type: 'decimal', precision: 10, scale: 2, nullable: true })
@@ -68,7 +68,7 @@ export class Transaction {
   @Column({ name: 'refund_reason', type: 'text', nullable: true })
   refundReason: string | null;
 
-  @Column({ name: 'parent_transaction_id', nullable: true })
+  @Column({ name: 'parent_transaction_id', type: 'varchar', nullable: true })
   parentTransactionId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

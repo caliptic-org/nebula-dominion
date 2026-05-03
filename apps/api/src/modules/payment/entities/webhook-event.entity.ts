@@ -33,7 +33,7 @@ export class WebhookEvent {
   @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
   processedAt: Date | null;
 
-  @Column({ name: 'transaction_id', nullable: true })
+  @Column({ name: 'transaction_id', type: 'varchar', nullable: true })
   transactionId: string | null;
 
   @CreateDateColumn({ name: 'received_at' })

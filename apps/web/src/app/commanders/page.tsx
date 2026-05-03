@@ -49,7 +49,7 @@ export default function CommandersPage() {
         </Link>
         <div className="h-4 w-px bg-border" />
         <div className="flex items-baseline gap-2">
-          <h1 className="font-display text-base font-black tracking-wide uppercase">
+          <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
             Komutanlar
           </h1>
           <span className="text-[11px] text-text-muted">
@@ -199,7 +199,8 @@ function CommanderCard({
       aria-pressed={selected}
       className={[
         'commander-card group relative text-left rounded-xl overflow-hidden border transition-all duration-200 focus:outline-none focus-visible:ring-2',
-        selected ? 'is-selected' : 'hover:-translate-y-0.5',
+        'speed-lines-hover',
+        selected ? 'is-selected ink-border-race' : 'hover:-translate-y-0.5',
       ].join(' ')}
       style={
         {

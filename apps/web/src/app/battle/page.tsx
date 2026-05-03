@@ -97,13 +97,7 @@ function BattleContent() {
 
       {/* Phaser Game Canvas */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-2">
-        <div
-          className="w-full rounded-lg overflow-hidden"
-          style={{
-            border: `1px solid ${raceDesc?.color ?? '#4a9eff'}20`,
-            boxShadow: `0 0 40px ${raceDesc?.glowColor ?? 'rgba(74,158,255,0.15)'}`,
-          }}
-        >
+        <div className="w-full ink-border-race overflow-hidden">
           <GameCanvas race={race} mode={mode} userId={userId} tutorial={tutorial} />
         </div>
       </main>

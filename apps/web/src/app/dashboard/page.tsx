@@ -73,9 +73,15 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="h-dvh flex overflow-hidden"
+      className="h-dvh flex overflow-hidden relative"
       style={{ background: 'var(--color-bg)' }}
     >
+      {/* Race-tinted halftone overlay — manga atmosphere */}
+      <div
+        className="manga-halftone-race absolute inset-0 pointer-events-none"
+        style={{ zIndex: 0, opacity: 0.12 }}
+        aria-hidden
+      />
       {/* ─── Sidebar ───────────────────────────────── */}
       <aside
         className="hidden lg:flex flex-col w-64 shrink-0"
@@ -191,7 +197,7 @@ export default function DashboardPage() {
             <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="Ana sayfa">
               <span aria-hidden>🌌</span>
             </Link>
-            <h1 className="font-display text-base font-black text-text-primary tracking-widest" style={{ letterSpacing: '1px' }}>
+            <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
               KOMUTA MERKEZİ
             </h1>
           </div>
@@ -245,6 +251,8 @@ export default function DashboardPage() {
             </span>
           </section>
 
+          <div className="panel-divider" aria-hidden />
+
           {/* ── Player stats ────────────────────────────────────────── */}
           <section aria-labelledby="stats-heading">
             <h2
@@ -258,17 +266,19 @@ export default function DashboardPage() {
               {playerStats.map((stat) => (
                 <div
                   key={stat.label}
-                  className="glass-card p-4 transition-all hover-glow"
+                  className="stat-card ink-border-race p-4 transition-all hover-glow"
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg" aria-hidden>{stat.icon}</span>
-                    <span className="font-display text-xs text-text-muted uppercase tracking-wider">{stat.label}</span>
+                    <span className="manga-label">{stat.label}</span>
                   </div>
-                  <p className="font-display text-2xl font-black" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="manga-number" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.25rem)', color: stat.color }}>{stat.value}</p>
                 </div>
               ))}
             </div>
           </section>
+
+          <div className="panel-divider" aria-hidden />
 
           {/* Upcoming features */}
           <section aria-labelledby="features-heading">
@@ -313,6 +323,8 @@ export default function DashboardPage() {
               ))}
             </div>
           </section>
+
+          <div className="panel-divider" aria-hidden />
 
           {/* ── Game area placeholder ──────────────────────────────── */}
           <section aria-labelledby="game-heading">

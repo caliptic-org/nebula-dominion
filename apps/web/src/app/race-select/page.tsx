@@ -75,13 +75,11 @@ export default function RaceSelectPage() {
         aria-hidden
       />
 
-      {/* Halftone dot texture */}
+      {/* Race-tinted manga halftone texture */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-[0.18]"
+        className="manga-halftone-race fixed inset-0 pointer-events-none transition-all duration-700"
         style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1.5px)',
-          backgroundSize: '14px 14px',
+          opacity: 0.18,
           maskImage:
             'radial-gradient(ellipse 90% 80% at 50% 50%, black 30%, transparent 80%)',
           WebkitMaskImage:
@@ -183,7 +181,7 @@ export default function RaceSelectPage() {
                 onFocus={() => setHoveredId(race.id)}
                 onBlur={() => setHoveredId(null)}
                 aria-pressed={isSelected}
-                className="relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
+                className="speed-lines-hover relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
                 style={{
                   background: isSelected
                     ? race.bg
@@ -294,14 +292,12 @@ export default function RaceSelectPage() {
 
           {/* Race name plate at bottom */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center pointer-events-none">
-            <div
-              className="text-[10px] uppercase tracking-[0.4em] text-text-muted mb-0.5 transition-colors duration-500"
-            >
+            <div className="manga-label mb-0.5 transition-colors duration-500" style={{ letterSpacing: '0.4em', opacity: 0.8 }}>
               {active.subtitle}
             </div>
             <div
-              className="text-xl md:text-2xl font-black tracking-widest transition-colors duration-500"
-              style={{ color: active.color, textShadow: `0 0 18px ${active.glow}` }}
+              className="manga-title transition-colors duration-500"
+              style={{ fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)', color: active.color, textShadow: `0 0 18px ${active.glow}` }}
             >
               {active.name.toUpperCase()}
             </div>

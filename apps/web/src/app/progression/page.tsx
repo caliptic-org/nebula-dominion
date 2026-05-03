@@ -58,7 +58,7 @@ export default function ProgressionPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.15 }} aria-hidden />
 
       {/* Header */}
       <header
@@ -93,10 +93,13 @@ export default function ProgressionPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
               <div>
                 <div className="mb-2"><span className="badge badge-race">Oyuncu Profili</span></div>
-                <h1 className="font-display text-2xl font-black text-text-primary">
-                  Seviye <span style={{ color: raceColor, textShadow: `0 0 16px ${raceGlow}` }}>{progress.level}</span>
-                  <span className="text-text-muted text-base ml-2">/ 9</span>
-                </h1>
+                <div className="manga-label mb-1">Seviye</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="manga-number" style={{ fontSize: 'clamp(2.5rem, 6vw, 3.5rem)', color: raceColor }}>
+                    {progress.level}
+                  </span>
+                  <span className="text-text-muted font-display text-base">/ 9</span>
+                </div>
               </div>
               <div className="text-right">
                 <div className="font-display text-[10px] uppercase tracking-widest text-text-muted mb-1">Tier</div>
@@ -150,6 +153,8 @@ export default function ProgressionPage() {
             </div>
           </MangaPanel>
         )}
+
+        <div className="panel-divider-diagonal mb-4" aria-hidden />
 
         {/* Age Timeline */}
         <div className="mb-8">
@@ -246,6 +251,7 @@ export default function ProgressionPage() {
         {/* Unlocked Content */}
         {progress && progress.unlockedContent.length > 0 && (
           <div>
+            <div className="panel-divider-diagonal mb-4" aria-hidden />
             <div className="flex items-center gap-2 mb-4">
               <span className="badge badge-race">Açık İçerikler</span>
               <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />

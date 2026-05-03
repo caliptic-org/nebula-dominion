@@ -1125,7 +1125,10 @@ export default function ResearchPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-[0.12]" aria-hidden />
+      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.12 }} aria-hidden />
+
+      {/* Manga horizontal sweep — research-tree atmosphere */}
+      <div className="speed-lines-sweep fixed inset-0 pointer-events-none" style={{ opacity: 0.4 }} aria-hidden />
 
       {/* Scan line ambient effect */}
       <div
@@ -1252,13 +1255,10 @@ export default function ResearchPage() {
         <div className="mb-5 animate-manga-appear">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xl">{activeCategoryData.icon}</span>
-            <h1
-              className="font-display text-xl font-black"
-              style={{ color: raceColor, textShadow: `0 0 20px ${raceGlow}` }}
-            >
+            <h1 className="manga-title" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.6rem)' }}>
               {activeCategoryData.label} Tech Tree
             </h1>
-            <div className="flex-1 h-px" style={{ background: `${raceColor}18` }} />
+            <div className="flex-1 panel-divider" aria-hidden />
           </div>
           <TierProgress nodes={activeCategoryData.nodes} raceColor={raceColor} />
         </div>

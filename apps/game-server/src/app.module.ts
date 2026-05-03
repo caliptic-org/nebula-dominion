@@ -15,8 +15,7 @@ import { AntiCheatModule } from './anti-cheat/anti-cheat.module';
 import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
 import { ChatModule } from './chat/chat.module';
-import { DailyRewardsModule } from './daily-rewards/daily-rewards.module';
-import { StaminaModule } from './stamina/stamina.module';
+import { EconomyModule } from './economy/economy.module';
 
 @Module({
   imports: [
@@ -49,8 +48,7 @@ import { StaminaModule } from './stamina/stamina.module';
     HealthModule,
     ProgressionModule,
     ChatModule,
-    DailyRewardsModule,
-    StaminaModule,
+    EconomyModule,
   ],
 })
 export class AppModule {}

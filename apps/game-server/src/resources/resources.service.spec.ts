@@ -5,11 +5,25 @@ import { Resource } from './entities/resource.entity';
 import { REDIS_CLIENT } from '../database/redis.provider';
 import { EconomyService } from '../economy/economy.service';
 
-const mockResourceRepo = () => ({
-  findOne: jest.fn(),
-  create: jest.fn(),
-  save: jest.fn(),
-});
+const mockResourceRepo = () => {
+  const repo = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    manager: null as any,
+  };
+  repo.manager = {
+    transaction: jest.fn().mockImplementation(async (cb: (em: any) => Promise<void>) => {
+      const em = {
+        findOne: jest.fn().mockImplementation((_entityClass: any, opts: any) => repo.findOne(opts)),
+        save: jest.fn().mockImplementation((entity: any) => repo.save(entity)),
+        create: jest.fn().mockImplementation((_entityClass: any, data: any) => Object.assign(new Resource(), data)),
+      };
+      return cb(em);
+    }),
+  };
+  return repo;
+};
 
 const mockRedis = () => ({
   get: jest.fn().mockResolvedValue(null),

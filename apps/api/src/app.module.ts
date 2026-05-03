@@ -14,6 +14,7 @@ import { PremiumModule } from './modules/premium/premium.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { EventsModule } from './modules/events/events.module';
 import { CosmeticsModule } from './modules/cosmetics/cosmetics.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CosmeticsModule } from './modules/cosmetics/cosmetics.module';
     PaymentModule,
     EventsModule,
     CosmeticsModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

@@ -25,8 +25,13 @@ export function GuildView({ guildId, me }: GuildViewProps) {
           {mocked ? (
             <span
               className="badge"
-              style={{ background: 'var(--color-energy-dim)', color: 'var(--color-energy)', borderColor: 'var(--color-energy)' }}
-              title="Lonca backend mock modunda. NEXT_PUBLIC_GUILD_BACKEND_READY=true ile gerçek API'ya bağlanır."
+              style={{
+                background: 'transparent',
+                color: 'var(--color-text-secondary)',
+                borderColor: 'var(--color-text-muted)',
+                borderStyle: 'dashed',
+              }}
+              title="NEXT_PUBLIC_GUILD_BACKEND_READY=true ile gerçek API'ya geçer"
             >
               Mock
             </span>

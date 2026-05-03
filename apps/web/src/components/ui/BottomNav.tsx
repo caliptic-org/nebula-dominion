@@ -5,10 +5,10 @@ import clsx from 'clsx';
 
 const NAV_ITEMS = [
   { href: '/',             icon: '🏰', label: 'Ana Üs' },
+  { href: '/map',          icon: '🌌', label: 'Harita' },
   { href: '/battle',       icon: '⚔️', label: 'Savaş' },
-  { href: '/missions',     icon: '📖', label: 'Görevler' },
   { href: '/commanders',   icon: '🤝', label: 'Komutanlar' },
-  { href: '/progression',  icon: '✨', label: 'İlerleme' },
+  { href: '/shop',         icon: '💎', label: 'Mağaza' },
 ];
 
 export function BottomNav() {

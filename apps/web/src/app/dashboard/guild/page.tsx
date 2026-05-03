@@ -8,6 +8,7 @@ import { GuildSearchPanel } from '@/components/guild/GuildSearchPanel';
 import { GuildCreatePanel } from '@/components/guild/GuildCreatePanel';
 import { GuildDashboard } from '@/components/guild/GuildDashboard';
 import { TutorialOverlay } from '@/components/guild/TutorialOverlay';
+import { GuildView } from './GuildView';
 import { useGuildTutorial } from '@/hooks/useGuildTutorial';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { GuildSummary } from '@/types/guild';
@@ -43,6 +44,12 @@ export default function GuildHubPage() {
 
   const inGuild = activeGuildId && state.step !== 'not_started';
   const isDev = process.env.NODE_ENV === 'development';
+
+  const me = {
+    id: 'me',
+    name: 'Komutan',
+    role: 'officer' as const,
+  };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
@@ -122,6 +129,8 @@ export default function GuildHubPage() {
         {inGuild && activeGuildId && (
           <>
             <GuildDashboard guildId={activeGuildId} />
+
+            <GuildView me={me} />
 
             {state.step !== 'completed' && (
               <div

@@ -14,12 +14,14 @@ const resources = [
 
 const navItems = [
   { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
-  { href: '/',          label: 'Ana Üs',          icon: '🏰' },
-  { href: '/battle',    label: 'Savaş',            icon: '⚔️' },
-  { href: '#',          label: 'Sektörler',        icon: '🌍' },
-  { href: '#',          label: 'Mağaza',           icon: '💎' },
-  { href: '#',          label: 'Ayarlar',          icon: '⚙️' },
-];
+  { href: '/',                    label: 'Ana Üs',     icon: '🏰' },
+  { href: '/dashboard/fleet',     label: 'Filo',       icon: '🚀' },
+  { href: '/dashboard/battle',    label: 'Savaş',      icon: '⚔️' },
+  { href: '/dashboard/guild',     label: 'Lonca',      icon: '🛡️' },
+  { href: '/dashboard/sectors',   label: 'Sektörler',  icon: '🌍' },
+  { href: '/dashboard/shop',      label: 'Mağaza',     icon: '🛍️' },
+  { href: '/dashboard/settings',  label: 'Ayarlar',    icon: '⚙️' },
+]
 
 const playerStats = [
   { label: 'Seviye',  value: '1',     icon: '⭐', color: 'var(--color-energy)'         },

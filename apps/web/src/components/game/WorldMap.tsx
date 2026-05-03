@@ -86,10 +86,18 @@ export interface WorldMapProps {
   playerRace: Race;
   onSelect?: (target: HitTarget | null) => void;
   className?: string;
+  /** Backend-supplied bases. Falls back to seed data when omitted. */
+  bases?: WorldBase[];
+  /** Backend-supplied resources. Falls back to seed data when omitted. */
+  resources?: WorldResource[];
+  /** Backend-supplied enemy units. Falls back to seed data when omitted. */
+  enemies?: WorldEnemy[];
+  /** Backend-supplied territory zones. Falls back to seed data when omitted. */
+  territories?: TerritoryZone[];
 }
 
 // ── Internal types ─────────────────────────────────────────────────────────
-interface TerritoryZone {
+export interface TerritoryZone {
   race: Race;
   centerCol: number;
   centerRow: number;
@@ -170,17 +178,64 @@ function screenToIso(sx: number, sy: number, ox: number, oy: number, z: number) 
   };
 }
 
+// ── Enemy normalization ─────────────────────────────────────────────────────
+// Backend may send a partial WorldEnemy (race/power/patrolPath) without the
+// client-side animation fields. Fill them in deterministically from patrolPath.
+type EnemyInput = Omit<
+  WorldEnemy,
+  'col' | 'row' | 'fcol' | 'frow' | 'targetCol' | 'targetRow' | 'progress' | 'pathIdx'
+> & Partial<Pick<WorldEnemy, 'col' | 'row' | 'fcol' | 'frow' | 'targetCol' | 'targetRow' | 'progress' | 'pathIdx'>>;
+
+function normalizeEnemy(input: EnemyInput, idx: number): WorldEnemy {
+  const path = input.patrolPath?.length ? input.patrolPath : [[0, 0], [0, 0]];
+  const start = path[0];
+  const next  = path[Math.min(1, path.length - 1)];
+  const col   = input.col   ?? start[0];
+  const row   = input.row   ?? start[1];
+  return {
+    id:        input.id,
+    race:      input.race,
+    power:     input.power,
+    patrolPath: path,
+    col, row,
+    fcol:      input.fcol      ?? col,
+    frow:      input.frow      ?? row,
+    targetCol: input.targetCol ?? next[0],
+    targetRow: input.targetRow ?? next[1],
+    progress:  input.progress  ?? idx * 0.18,
+    pathIdx:   input.pathIdx   ?? 0,
+  };
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(function WorldMap(
-  { playerRace, onSelect, className },
+  { playerRace, onSelect, className, bases, resources, enemies, territories },
   ref,
 ) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const tilesRef    = useRef<TileKind[][]>(generateTiles());
-  const basesRef    = useRef<WorldBase[]>(makeBases(playerRace));
-  const resRef      = useRef<WorldResource[]>(makeResources());
-  const enemiesRef  = useRef<WorldEnemy[]>(makeEnemies());
-  const zonesRef    = useRef<TerritoryZone[]>(makeTerritories());
+  const basesRef    = useRef<WorldBase[]>(bases ?? makeBases(playerRace));
+  const resRef      = useRef<WorldResource[]>(resources ?? makeResources());
+  const enemiesRef  = useRef<WorldEnemy[]>(
+    enemies ? enemies.map((e, i) => normalizeEnemy(e as EnemyInput, i)) : makeEnemies(),
+  );
+  const zonesRef    = useRef<TerritoryZone[]>(territories ?? makeTerritories());
+
+  // Sync incoming props into refs so the animation loop picks up live data.
+  useEffect(() => { if (bases)        basesRef.current   = bases; },        [bases]);
+  useEffect(() => { if (resources)    resRef.current     = resources; },    [resources]);
+  useEffect(() => { if (territories)  zonesRef.current   = territories; },  [territories]);
+  useEffect(() => {
+    if (!enemies) return;
+    // Preserve animation state for enemies that already exist by ID.
+    const prev = new Map(enemiesRef.current.map(e => [e.id, e]));
+    enemiesRef.current = enemies.map((incoming, i) => {
+      const existing = prev.get(incoming.id);
+      return existing
+        ? { ...existing, ...incoming, patrolPath: incoming.patrolPath ?? existing.patrolPath }
+        : normalizeEnemy(incoming as EnemyInput, i);
+    });
+  }, [enemies]);
   const offsetRef   = useRef({ x:0, y:0 });
   const zoomRef     = useRef(1.0);
   const dragRef     = useRef({ active:false, sx:0, sy:0, ox:0, oy:0 });

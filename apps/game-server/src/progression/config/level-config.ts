@@ -32,6 +32,10 @@ export interface LevelReward {
   gems?: number;
   title?: string;
   badge?: string;
+  // Era catch-up package fields (only on era-transition levels)
+  productionBoostHours?: number;
+  unitPackCount?: number;
+  premiumCurrency?: number;
 }
 
 export interface LevelDefinition {
@@ -43,6 +47,7 @@ export interface LevelDefinition {
   unlocks: ContentUnlock[];
   rewards: LevelReward;
   description: string;
+  eraTransition?: boolean; // true for the first level of each new age
 }
 
 // Age 1 — Levels 1-9 (the first 9 of 54 total levels across 6 ages)
@@ -140,23 +145,32 @@ export const AGE_1_LEVELS: LevelDefinition[] = [
 ];
 
 // Age 2 — Levels 10-18
+// Levels 10-12 use a soft difficulty ramp: multiplier and xpToNext increase gradually
+// over the first 3 levels instead of jumping to full Age 2 difficulty immediately.
 export const AGE_2_LEVELS: LevelDefinition[] = [
   {
     level: 10,
     age: 2,
     tier: 4,
-    xpToNext: 3500,
-    xpMultiplier: 1.5,
+    xpToNext: 2800, // gradual ramp from Age 1's 2500 (was 3500)
+    xpMultiplier: 1.33, // soft entry (was 1.5); ~17% above Age 1's 1.25 cap
     unlocks: [ContentUnlock.AGE_2_BUILDINGS],
-    rewards: { gold: 5000, gems: 150 },
+    rewards: {
+      gold: 5000,
+      gems: 151,
+      productionBoostHours: 24, // era catch-up: 24h x2 production boost
+      unitPackCount: 5,          // era catch-up: 5 free units for new age
+      premiumCurrency: 1,        // era catch-up: 1 premium currency token
+    },
     description: 'Çağ 2 başlıyor — yeni yapılar açıldı',
+    eraTransition: true,
   },
   {
     level: 11,
     age: 2,
     tier: 4,
-    xpToNext: 4000,
-    xpMultiplier: 1.5,
+    xpToNext: 3100, // mid-ramp (was 4000)
+    xpMultiplier: 1.41, // mid-ramp (was 1.5)
     unlocks: [ContentUnlock.AUTOMATA_ADVANCED_UNITS],
     rewards: { gold: 3000, gems: 50 },
     description: 'Gelişmiş Automata birimleri açıldı',
@@ -165,8 +179,8 @@ export const AGE_2_LEVELS: LevelDefinition[] = [
     level: 12,
     age: 2,
     tier: 4,
-    xpToNext: 4500,
-    xpMultiplier: 1.5,
+    xpToNext: 3500, // full Age 2 difficulty reached (was 4500)
+    xpMultiplier: 1.5, // full Age 2 multiplier reached
     unlocks: [ContentUnlock.BOSS_HYDRA_ENCOUNTER],
     rewards: { gold: 3500, gems: 75, badge: 'boss_slayer' },
     description: 'İlk boss: Hidra karşılaşması açıldı — Tier 4 tamamlandı',
@@ -242,6 +256,8 @@ export const XP_BASE_AMOUNTS: Record<XpSource, number> = {
   [XpSource.QUEST_HARD]: 300,
 };
 
+export const MAX_AGE = 2;
+
 export function getLevelDef(level: number, age = 1): LevelDefinition | undefined {
   if (age === 1) return AGE_1_LEVELS.find((l) => l.level === level);
   if (age === 2) return AGE_2_LEVELS.find((l) => l.level === level);
@@ -253,3 +269,15 @@ export function getMaxLevel(age = 1): number {
   if (age === 2) return 18;
   return 9;
 }
+
+export function getFirstLevelForAge(age: number): number {
+  if (age === 1) return 1;
+  if (age === 2) return 10;
+  return (age - 1) * 9 + 1;
+}
+
+export function isEraTransitionLevel(level: number, age: number): boolean {
+  return getLevelDef(level, age)?.eraTransition === true;
+}
+
+export const ERA_CATCH_UP_PRODUCTION_MULTIPLIER = 2.0;

@@ -27,11 +27,12 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter(analyticsService));
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Nebula Dominion Battle API')
-    .setDescription('Battle Engine REST API — turn-based combat, anti-cheat, replay system')
+    .setTitle('Nebula Dominion API')
+    .setDescription('Nebula Dominion REST API — battle engine, shop, events, analytics')
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('battles')
+    .addTag('shop')
     .addTag('analytics')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

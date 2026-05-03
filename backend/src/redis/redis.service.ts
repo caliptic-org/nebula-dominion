@@ -90,11 +90,34 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.zcard(key);
   }
 
-  async zremrangebyscore(key: string, min: number | string, max: number | string): Promise<void> {
-    await this.client.zremrangebyscore(key, min, max);
+  // ─── Counter helpers (rate limiting) ────────────────────────────────────────
+
+  async incr(key: string): Promise<number> {
+    return this.client.incr(key);
   }
 
-  async expire(key: string, seconds: number): Promise<void> {
-    await this.client.expire(key, seconds);
+  async expire(key: string, ttlSeconds: number): Promise<void> {
+    await this.client.expire(key, ttlSeconds);
+  }
+
+  async ttl(key: string): Promise<number> {
+    return this.client.ttl(key);
+  }
+
+  /**
+   * Atomically increments a counter and sets TTL on first write.
+   * Returns the new count.
+   */
+  async incrWithExpire(key: string, ttlSeconds: number): Promise<number> {
+    const count = await this.client.incr(key);
+    if (count === 1) {
+      await this.client.expire(key, ttlSeconds);
+    }
+    return count;
+  }
+
+  async setnx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+    return result === 'OK';
   }
 }

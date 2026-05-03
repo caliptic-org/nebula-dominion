@@ -11,10 +11,10 @@ import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
 import { AnalyticsEvent } from './analytics/entities/event.entity';
-import { PvpShield } from './pvp-protection/entities/pvp-shield.entity';
-import { PvpBotProfile } from './pvp-protection/entities/pvp-bot-profile.entity';
-import { PvpMatchRecord } from './pvp-protection/entities/pvp-match-record.entity';
-import { ComebackBonus } from './pvp-protection/entities/comeback-bonus.entity';
+import { ShopProduct } from './shop/entities/shop-product.entity';
+import { PlayerWallet } from './shop/entities/player-wallet.entity';
+import { PurchaseTransaction } from './shop/entities/purchase-transaction.entity';
+import { GameEvent } from './shop/entities/game-event.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -22,12 +22,12 @@ import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
-import { PvpProtectionModule } from './pvp-protection/pvp-protection.module';
+import { ShopModule } from './shop/shop.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
-import { PvpProtectionSchema1746400000000 } from './database/migrations/1746400000000-PvpProtectionSchema';
+import { ShopSchema1746500000000 } from './database/migrations/1746500000000-ShopSchema';
 
 @Module({
   imports: [
@@ -51,17 +51,17 @@ import { PvpProtectionSchema1746400000000 } from './database/migrations/17464000
           WeeklyLeague,
           LeagueParticipant,
           AnalyticsEvent,
-          PvpShield,
-          PvpBotProfile,
-          PvpMatchRecord,
-          ComebackBonus,
+          ShopProduct,
+          PlayerWallet,
+          PurchaseTransaction,
+          GameEvent,
         ],
         migrations: [
           BattleSchema1746100000000,
           UnitsSchema1746200000000,
           SectorWarsSchema1746300000000,
           AnalyticsSchema1746400000000,
-          PvpProtectionSchema1746400000000,
+          ShopSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -76,7 +76,7 @@ import { PvpProtectionSchema1746400000000 } from './database/migrations/17464000
     SectorWarsModule,
     LeaderboardModule,
     AnalyticsModule,
-    PvpProtectionModule,
+    ShopModule,
   ],
 })
 export class AppModule {}

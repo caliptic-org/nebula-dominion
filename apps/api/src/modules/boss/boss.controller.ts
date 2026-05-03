@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { BossService } from './boss.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('Boss Encounters')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/bosses')
 export class BossController {
   constructor(private readonly bossService: BossService) {}
@@ -30,21 +32,21 @@ export class BossController {
   @Post('attempt')
   @ApiOperation({ summary: 'Boss karşılaşması başlat' })
   startAttempt(
+    @Request() req: { user: { id: string } },
     @Body() body: { bossCode: string; unitsDeployed: Record<string, unknown>[] },
   ) {
-    const userId = 'demo-user-id';
-    return this.bossService.startAttempt(userId, body);
+    return this.bossService.startAttempt(req.user.id, body);
   }
 
   @Post('attempt/:attemptId/attack')
   @ApiOperation({ summary: 'Boss\'a saldır' })
   @ApiParam({ name: 'attemptId', description: 'Karşılaşma ID' })
   attackBoss(
+    @Request() req: { user: { id: string } },
     @Param('attemptId') attemptId: string,
     @Body() body: { damageDealt: number; mechanicName?: string },
   ) {
-    const userId = 'demo-user-id';
-    return this.bossService.attackBoss(userId, {
+    return this.bossService.attackBoss(req.user.id, {
       attemptId,
       damageDealt: body.damageDealt,
       mechanicName: body.mechanicName,
@@ -54,9 +56,8 @@ export class BossController {
   @Patch('attempt/:attemptId/retreat')
   @ApiOperation({ summary: 'Boss\'tan çekilin' })
   @ApiParam({ name: 'attemptId', description: 'Karşılaşma ID' })
-  retreat(@Param('attemptId') attemptId: string) {
-    const userId = 'demo-user-id';
-    return this.bossService.retreat(userId, attemptId);
+  retreat(@Request() req: { user: { id: string } }, @Param('attemptId') attemptId: string) {
+    return this.bossService.retreat(req.user.id, attemptId);
   }
 
   @Get(':code/leaderboard')
@@ -70,8 +71,7 @@ export class BossController {
   @Get('attempts/my')
   @ApiOperation({ summary: 'Kullanıcının boss deneme geçmişi' })
   @ApiQuery({ name: 'bossCode', required: false })
-  getUserAttempts(@Query('bossCode') bossCode?: string) {
-    const userId = 'demo-user-id';
-    return this.bossService.getUserAttempts(userId, bossCode);
+  getUserAttempts(@Request() req: { user: { id: string } }, @Query('bossCode') bossCode?: string) {
+    return this.bossService.getUserAttempts(req.user.id, bossCode);
   }
 }

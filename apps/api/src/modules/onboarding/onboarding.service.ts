@@ -73,8 +73,8 @@ export class OnboardingService {
     return record;
   }
 
-  async completeStep(dto: CompleteStepDto): Promise<{ progress: TutorialProgress; reward: object | null }> {
-    const record = await this.getOrCreateProgress(dto.userId);
+  async completeStep(userId: string, dto: CompleteStepDto): Promise<{ progress: TutorialProgress; reward: object | null }> {
+    const record = await this.getOrCreateProgress(userId);
 
     if (record.isCompleted) {
       throw new BadRequestException('Tutorial zaten tamamlandı');
@@ -117,7 +117,7 @@ export class OnboardingService {
 
     await this.progressRepo.save(record);
 
-    this.logger.log(`Tutorial step '${dto.stepId}' completed by user=${dto.userId}`);
+    this.logger.log(`Tutorial step '${dto.stepId}' completed by user=${userId}`);
 
     return {
       progress: record,

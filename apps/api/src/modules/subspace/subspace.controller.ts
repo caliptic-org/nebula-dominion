@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { SubspaceService } from './subspace.service';
 import { EnterSubspaceDto, StartSubspaceBattleDto } from './dto/enter-subspace.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('Subspace')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/subspace')
 export class SubspaceController {
   constructor(private readonly subspaceService: SubspaceService) {}
@@ -25,26 +27,22 @@ export class SubspaceController {
 
   @Post('enter')
   @ApiOperation({ summary: 'Subspace bölgesine gir' })
-  enterSubspace(@Body() dto: EnterSubspaceDto) {
-    // Production'da userId JWT'den alınır
-    const userId = 'demo-user-id';
-    return this.subspaceService.enterSubspace(userId, dto);
+  enterSubspace(@Request() req: { user: { id: string } }, @Body() dto: EnterSubspaceDto) {
+    return this.subspaceService.enterSubspace(req.user.id, dto);
   }
 
   @Patch('sessions/:sessionId/exit')
   @ApiOperation({ summary: 'Subspace\'ten çıkış yap (normal)' })
   @ApiParam({ name: 'sessionId', description: 'Oturum ID' })
-  exitSubspace(@Param('sessionId') sessionId: string) {
-    const userId = 'demo-user-id';
-    return this.subspaceService.exitSubspace(userId, sessionId, false);
+  exitSubspace(@Request() req: { user: { id: string } }, @Param('sessionId') sessionId: string) {
+    return this.subspaceService.exitSubspace(req.user.id, sessionId, false);
   }
 
   @Patch('sessions/:sessionId/flee')
   @ApiOperation({ summary: 'Subspace\'ten kaç (ödül azalır)' })
   @ApiParam({ name: 'sessionId', description: 'Oturum ID' })
-  fleeSubspace(@Param('sessionId') sessionId: string) {
-    const userId = 'demo-user-id';
-    return this.subspaceService.exitSubspace(userId, sessionId, true);
+  fleeSubspace(@Request() req: { user: { id: string } }, @Param('sessionId') sessionId: string) {
+    return this.subspaceService.exitSubspace(req.user.id, sessionId, true);
   }
 
   @Post('sessions/:sessionId/hazard')
@@ -56,9 +54,8 @@ export class SubspaceController {
 
   @Post('battles')
   @ApiOperation({ summary: 'Subspace savaşı başlat' })
-  startBattle(@Body() dto: StartSubspaceBattleDto) {
-    const userId = 'demo-user-id';
-    return this.subspaceService.startBattle(userId, dto);
+  startBattle(@Request() req: { user: { id: string } }, @Body() dto: StartSubspaceBattleDto) {
+    return this.subspaceService.startBattle(req.user.id, dto);
   }
 
   @Patch('battles/:battleId/resolve')
@@ -73,8 +70,7 @@ export class SubspaceController {
 
   @Get('sessions')
   @ApiOperation({ summary: 'Kullanıcının subspace oturumlarını listele' })
-  getUserSessions() {
-    const userId = 'demo-user-id';
-    return this.subspaceService.getUserSessions(userId);
+  getUserSessions(@Request() req: { user: { id: string } }) {
+    return this.subspaceService.getUserSessions(req.user.id);
   }
 }

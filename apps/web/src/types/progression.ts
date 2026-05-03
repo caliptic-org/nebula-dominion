@@ -59,3 +59,17 @@ export interface XpGainedPayload {
   currentLevel: number;
   age: number;
 }
+
+export interface AgeTransitionPayload {
+  /** The age the player is transitioning into (1–6). */
+  toAge: number;
+  race: string;
+  raceColor: string;
+  raceGlow: string;
+  newUnlocks: ContentUnlock[];
+  /** Absolute URL or path to a scene image (Image Generator output). */
+  sceneImageSrc?: string;
+  /** Auto-advance after this many ms. Defaults to 10 000. Set 0 to disable. */
+  autoAdvanceMs?: number;
+  onComplete: () => void;
+}

@@ -12,6 +12,10 @@ import { BattleLog } from './entities/battle-log.entity';
 import { BattleEngineService } from './battle-engine.service';
 import { MinioService } from '../storage/minio.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { PvpShieldService } from '../pvp-protection/pvp-shield.service';
+import { ComebackBonusService } from '../pvp-protection/comeback-bonus.service';
+import { MatchmakingService } from '../pvp-protection/matchmaking.service';
+import { PvpMatchResult } from '../pvp-protection/entities/pvp-match-record.entity';
 import {
   BattleStatus,
   BattleSide,
@@ -23,6 +27,7 @@ import {
   ReplayFrame,
 } from './types/battle.types';
 
+// isBotOpponent is intentionally excluded — determined server-side from matchmaking
 export interface CreateBattleDto {
   attackerId: string;
   defenderId: string;
@@ -49,6 +54,9 @@ export class BattleService {
     private readonly engine: BattleEngineService,
     private readonly minio: MinioService,
     private readonly analytics: AnalyticsService,
+    private readonly pvpShield: PvpShieldService,
+    private readonly comebackBonus: ComebackBonusService,
+    private readonly matchmaking: MatchmakingService,
   ) {}
 
   async createBattle(dto: CreateBattleDto): Promise<Battle> {
@@ -57,6 +65,24 @@ export class BattleService {
     }
     if (!dto.attackerUnits.length || !dto.defenderUnits.length) {
       throw new BadRequestException('Both armies must have at least one unit');
+    }
+
+    // Determine bot status server-side — never trust the client
+    const isBotOpponent = await this.matchmaking.isBotProfile(dto.defenderId);
+
+    if (!isBotOpponent) {
+      // Real PvP: check if defender is shielded
+      const defenderShielded = await this.pvpShield.isShieldActive(dto.defenderId);
+      if (defenderShielded) {
+        throw new ConflictException(`Defender ${dto.defenderId} is protected by a new-player PvP shield`);
+      }
+      // Attacker opting into real PvP forfeits their own shield
+      await this.pvpShield.optOut(dto.attackerId).catch(() => {
+        // Ignore if attacker has no shield record
+      });
+    } else {
+      // Bot match: track bot matches played for the attacker
+      await this.pvpShield.incrementBotMatchesPlayed(dto.attackerId).catch(() => {});
     }
 
     const attackerArmy: BattleArmy = {
@@ -78,17 +104,18 @@ export class BattleService {
       defenderArmyState: defenderArmy as unknown as object,
       currentTurn: 0,
       currentTurnSide: BattleSide.ATTACKER,
+      isBotOpponent,
       startedAt: new Date(),
     });
 
     const saved = await this.battleRepo.save(battle);
-    this.logger.log(`Battle created: ${saved.id} (${dto.attackerId} vs ${dto.defenderId})`);
+    this.logger.log(`Battle created: ${saved.id} (${dto.attackerId} vs ${dto.defenderId}, bot=${isBotOpponent})`);
 
     void this.analytics.trackServer({
       event_type: 'pvp.match_started',
       user_id: dto.attackerId,
       session_id: saved.id,
-      properties: { battle_id: saved.id, defender_id: dto.defenderId, is_bot: false },
+      properties: { battle_id: saved.id, defender_id: dto.defenderId, is_bot: isBotOpponent },
     });
 
     return saved;
@@ -199,6 +226,51 @@ export class BattleService {
           duration_ms: durationMs,
           total_turns: state.currentTurn,
         },
+      });
+    }
+
+    // Record PvP match results for comeback bonus tracking
+    await this.recordPvpResults(battle, winnerId).catch((err) =>
+      this.logger.error(`Failed to record PvP results for battle ${battle.id}: ${err.message}`),
+    );
+  }
+
+  private async recordPvpResults(battle: Battle, winnerId: string | null): Promise<void> {
+    const attackerUnits = (battle.attackerArmy as unknown as BattleArmy)?.units ?? [];
+    const defenderUnits = (battle.defenderArmy as unknown as BattleArmy)?.units ?? [];
+    const attackerPower = this.matchmaking.computePowerScore(attackerUnits);
+    const defenderPower = this.matchmaking.computePowerScore(defenderUnits);
+
+    const isBotOpponent = battle.isBotOpponent;
+
+    const attackerResult =
+      winnerId === battle.attackerId ? PvpMatchResult.WIN
+      : winnerId === null ? PvpMatchResult.DRAW
+      : PvpMatchResult.LOSS;
+
+    await this.comebackBonus.recordMatchResult({
+      playerId: battle.attackerId,
+      battleId: battle.id,
+      result: attackerResult,
+      isBotMatch: isBotOpponent,
+      opponentId: battle.defenderId,
+      playerPowerScore: attackerPower,
+    });
+
+    // Skip recording for the defender side when it's a bot
+    if (!isBotOpponent) {
+      const defenderResult =
+        winnerId === battle.defenderId ? PvpMatchResult.WIN
+        : winnerId === null ? PvpMatchResult.DRAW
+        : PvpMatchResult.LOSS;
+
+      await this.comebackBonus.recordMatchResult({
+        playerId: battle.defenderId,
+        battleId: battle.id,
+        result: defenderResult,
+        isBotMatch: false,
+        opponentId: battle.attackerId,
+        playerPowerScore: defenderPower,
       });
     }
   }

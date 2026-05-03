@@ -4,7 +4,7 @@ import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { AgeTransitionEvent, LevelUpEvent, XpGainedEvent } from './dto/player-progress.dto';
 
-@WebSocketGateway({ namespace: '/game', cors: { origin: process.env.WEBSOCKET_CORS_ORIGIN || '*' } })
+@WebSocketGateway({ namespace: '/game' })
 export class ProgressionGateway {
   @WebSocketServer()
   server: Server;

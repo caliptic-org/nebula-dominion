@@ -18,7 +18,7 @@ import { SessionService } from './session.service';
 import { GameActionDto } from './dto/game-action.dto';
 import { ReconnectDto } from './dto/reconnect.dto';
 
-@WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })
+@WebSocketGateway({ namespace: '/game' })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(GameGateway.name);

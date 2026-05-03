@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
@@ -15,6 +16,10 @@ import { HealthModule } from './health/health.module';
       load: [configuration],
       envFilePath: ['.env.local', '.env'],
     }),
+    ThrottlerModule.forRoot([
+      { name: 'login', ttl: 60000, limit: 5 },
+      { name: 'register', ttl: 3600000, limit: 10 },
+    ]),
     DatabaseModule,
     AuthModule,
     UsersModule,

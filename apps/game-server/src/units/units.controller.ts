@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Param,
   Post,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UnitsService } from './units.service';
@@ -21,15 +20,10 @@ import { Race } from '../matchmaking/dto/join-queue.dto';
 export class UnitsController {
   constructor(private readonly units: UnitsService) {}
 
-  /** GET /api/v1/units?playerId=<uuid>  — list alive units */
+  /** GET /api/v1/units — list alive units for the authenticated player */
   @Get()
-  async getUnits(
-    @CurrentUser() userId: string,
-    @Query('playerId') queryPlayerId?: string,
-  ) {
-    // Use authenticated user's ID; allow explicit query param override (e.g. admin/debug)
-    const playerId = queryPlayerId ?? userId;
-    return this.units.getUnits(playerId);
+  async getUnits(@CurrentUser() userId: string) {
+    return this.units.getUnits(userId);
   }
 
   /** POST /api/v1/units/train — queue a unit for training */

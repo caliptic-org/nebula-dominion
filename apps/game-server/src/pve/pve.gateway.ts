@@ -27,7 +27,7 @@ class StartPveDto {
   playerGamesPlayed?: number;
 }
 
-@WebSocketGateway({ namespace: '/pve', cors: { origin: '*' } })
+@WebSocketGateway({ namespace: '/pve' })
 export class PveGateway {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(PveGateway.name);

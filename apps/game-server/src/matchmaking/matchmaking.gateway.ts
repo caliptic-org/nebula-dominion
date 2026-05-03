@@ -16,7 +16,7 @@ import { MatchmakingService, QueueEntry, MatchResult } from './matchmaking.servi
 import { JoinQueueDto, GameMode } from './dto/join-queue.dto';
 import type { GameCreatedEvent } from '../game/game.service';
 
-@WebSocketGateway({ namespace: '/matchmaking', cors: { origin: '*' } })
+@WebSocketGateway({ namespace: '/matchmaking' })
 export class MatchmakingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(MatchmakingGateway.name);

@@ -78,11 +78,12 @@ export function EquipmentModal({
       aria-label={`${slotMeta.label} ekipmanı seç`}
     >
       <div
-        className="hud-panel hud-panel-corners relative w-full sm:max-w-lg flex flex-col"
+        className="modal-diagonal-panel modal-diagonal-panel-race relative w-full sm:max-w-lg flex flex-col"
         style={{
-          background: 'linear-gradient(160deg, #0d1117 0%, #080a10 100%)',
+          '--color-race': raceColor,
+          '--color-race-glow': raceGlow,
           maxHeight: '90dvh',
-        }}
+        } as React.CSSProperties}
       >
         {/* Header */}
         <div

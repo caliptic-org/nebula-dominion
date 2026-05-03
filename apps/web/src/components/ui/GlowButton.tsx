@@ -38,6 +38,7 @@ export function GlowButton({
       className={clsx(
         variants[variant],
         sizes[size],
+        'btn-speed-flash',
         'group relative flex items-center justify-center font-display font-bold tracking-widest uppercase rounded-full',
         'transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
         disabled && 'opacity-50 cursor-not-allowed',

@@ -157,19 +157,33 @@
 .level-up-modal {
   position: relative;
   background: radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
-  border: 1px solid rgba(0, 207, 255, 0.35);
+  border: 2.5px solid rgba(255, 255, 255, 0.85);
   padding: 40px 48px;
   text-align: center;
   color: var(--color-text-primary);
   max-width: 420px;
   width: 90%;
   clip-path: polygon(
-    0 14px, 14px 0, calc(100% - 14px) 0, 100% 14px,
-    100% calc(100% - 14px), calc(100% - 14px) 100%,
-    14px 100%, 0 calc(100% - 14px)
+    24px 0,
+    100% 0,
+    100% calc(100% - 24px),
+    calc(100% - 24px) 100%,
+    0 100%,
+    0 24px
   );
   animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  filter: drop-shadow(0 0 24px var(--color-energy-glow)) drop-shadow(0 0 16px var(--color-brand-glow));
+  filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.85))
+          drop-shadow(0 0 24px rgba(255, 200, 50, 0.4))
+          drop-shadow(0 0 16px var(--color-brand-glow));
+}
+
+/* Halftone dot overlay over the modal surface — dots on top, blended */
+.level-up-modal {
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.16) 1px, transparent 1px),
+    radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
+  background-size: 6px 6px, auto;
+  background-blend-mode: screen, normal;
 }
 
 .level-up-modal::before,

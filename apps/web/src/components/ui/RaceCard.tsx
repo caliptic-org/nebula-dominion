@@ -13,6 +13,11 @@ export function RaceCard({ race }: { race: Race }) {
       role="button"
       aria-label={`${race.name} ırkını seç`}
     >
+      <span
+        className="manga-halftone-overlay"
+        style={{ color: race.color }}
+        aria-hidden
+      />
       <div
         className="w-12 h-12 rounded-full flex items-center justify-center text-2xl mx-auto mb-3 transition-transform group-hover:scale-110"
         style={{ background: `${race.color}20`, border: `1px solid ${race.color}40` }}

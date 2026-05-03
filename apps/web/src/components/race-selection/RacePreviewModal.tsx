@@ -127,15 +127,14 @@ export function RacePreviewModal({ race, onClose, onPick }: RacePreviewModalProp
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="hud-panel hud-panel-corners"
+        className="modal-diagonal-panel modal-diagonal-panel-race"
         style={{
           width: '100%',
           maxWidth: 640,
-          background: 'var(--color-bg-surface)',
-          border: `1px solid ${desc.color}55`,
           padding: 24,
-          filter: `drop-shadow(0 0 24px ${desc.color}40) drop-shadow(0 12px 32px rgba(0,0,0,0.6))`,
-        }}
+          '--color-race': desc.color,
+          '--color-race-glow': desc.glowColor,
+        } as React.CSSProperties}
       >
         {/* Close */}
         <button

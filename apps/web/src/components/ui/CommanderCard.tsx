@@ -58,6 +58,12 @@ export function CommanderCard({ commander, onSelect, selected, compact }: Comman
             background: `linear-gradient(to top, ${desc.bgColor.replace('0.08', '0.9')} 0%, transparent 60%)`,
           }}
         />
+        {/* Manga halftone texture */}
+        <span
+          className="manga-halftone-overlay"
+          style={{ color: desc.color }}
+          aria-hidden
+        />
         {/* Level badge */}
         <div
           className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-display font-bold"

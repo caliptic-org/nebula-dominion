@@ -19,14 +19,33 @@ const LEVEL_ICONS: Record<number, string> = {
 };
 
 const SIZE_CONFIG = {
-  sm: { px: '4px 8px', fontSize: '0.55rem', iconSize: 10, gap: 4 },
-  md: { px: '5px 10px', fontSize: '0.65rem', iconSize: 13, gap: 5 },
-  lg: { px: '6px 14px', fontSize: '0.75rem', iconSize: 16, gap: 6 },
+  sm: { px: '4px 8px',   fontSize: '0.55rem', iconSize: 10, gap: 4 },
+  md: { px: '5px 10px',  fontSize: '0.65rem', iconSize: 13, gap: 5 },
+  lg: { px: '6px 14px',  fontSize: '0.75rem', iconSize: 16, gap: 6 },
 };
+
+// Module-level keyframe injected once, not per render
+const VIP_BADGE_KEYFRAMES = `
+  @keyframes vip-badge-pulse {
+    0%, 100% { box-shadow: 0 0 12px ${GOLD_GLOW}; }
+    50%       { box-shadow: 0 0 22px rgba(255,215,0,0.50); }
+  }
+`;
+
+let keyframesInjected = false;
+function ensureKeyframes() {
+  if (keyframesInjected || typeof document === 'undefined') return;
+  const style = document.createElement('style');
+  style.textContent = VIP_BADGE_KEYFRAMES;
+  document.head.appendChild(style);
+  keyframesInjected = true;
+}
 
 export function VipBadge({ level, size = 'md', animated = false, clickable = true }: VipBadgeProps) {
   const cfg = SIZE_CONFIG[size];
   const icon = LEVEL_ICONS[Math.min(Math.max(level, 1), 10)] ?? '👑';
+
+  if (animated) ensureKeyframes();
 
   const badge = (
     <span style={{
@@ -51,14 +70,6 @@ export function VipBadge({ level, size = 'md', animated = false, clickable = tru
       }}>
         VIP {level}
       </span>
-      {animated && (
-        <style>{`
-          @keyframes vip-badge-pulse {
-            0%, 100% { box-shadow: 0 0 12px ${GOLD_GLOW}; }
-            50%       { box-shadow: 0 0 22px rgba(255,215,0,0.50); }
-          }
-        `}</style>
-      )}
     </span>
   );
 

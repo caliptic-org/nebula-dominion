@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { MangaPanel } from '@/components/ui/MangaPanel';
-import { GlowButton } from '@/components/ui/GlowButton';
 import clsx from 'clsx';
 
 // ── VIP Level Data ───────────────────────────────────────────────────────────
@@ -550,7 +548,7 @@ export default function VipPage() {
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}
                 className="[&::-webkit-scrollbar]:hidden">
                 {DAILY_REWARDS.map((r, i) => (
-                  <DailyRewardToken key={i} reward={r} claimed={todayClaimed} index={i} />
+                  <DailyRewardToken key={i} reward={r} claimed={todayClaimed} />
                 ))}
               </div>
               <button
@@ -867,10 +865,9 @@ function BenefitCard({ benefit, tierStyle, isActive, locked }: BenefitCardProps)
 interface DailyRewardTokenProps {
   reward: { icon: string; label: string; color: string };
   claimed: boolean;
-  index: number;
 }
 
-function DailyRewardToken({ reward, claimed, index }: DailyRewardTokenProps) {
+function DailyRewardToken({ reward, claimed }: DailyRewardTokenProps) {
   return (
     <div style={{
       flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,

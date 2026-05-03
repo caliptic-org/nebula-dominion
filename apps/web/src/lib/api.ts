@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+const NORMALIZED = RAW_API_URL.replace(/\/+$/, '')
+const BASE_URL = /\/api\/v1$/.test(NORMALIZED) ? NORMALIZED : `${NORMALIZED}/api/v1`
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown

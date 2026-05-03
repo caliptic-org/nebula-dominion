@@ -4,67 +4,75 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHmac } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 
 export interface JwtPayload {
   sub: string;
-  iat?: number;
+  race?: string;
   exp?: number;
+  iat?: number;
   [key: string]: unknown;
 }
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  constructor(private readonly config: ConfigService) {}
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const token = this.extractToken(request);
-    if (!token) {
-      throw new UnauthorizedException('Missing Bearer token');
+    const authHeader: string | undefined = request.headers['authorization'];
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing or invalid authorization header');
     }
-    request.user = this.verifyToken(token);
+
+    const token = authHeader.slice(7);
+    const payload = this.verifyToken(token);
+
+    if (!payload) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    request.userId = payload.sub;
+    request.userRace = payload.race;
     return true;
   }
 
-  private extractToken(request: { headers: Record<string, string> }): string | null {
-    const auth = request.headers['authorization'];
-    if (!auth?.startsWith('Bearer ')) return null;
-    return auth.slice(7);
-  }
-
-  private verifyToken(token: string): JwtPayload {
+  private verifyToken(token: string): JwtPayload | null {
     const parts = token.split('.');
-    if (parts.length !== 3) {
-      throw new UnauthorizedException('Malformed token');
-    }
+    if (parts.length !== 3) return null;
 
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new UnauthorizedException('JWT_SECRET not configured');
-    }
+    const [header, payload, signature] = parts;
+    const secret = this.config.get<string>('JWT_SECRET', 'nebula-secret');
 
-    const expected = createHmac('sha256', secret)
-      .update(`${parts[0]}.${parts[1]}`)
+    const data = `${header}.${payload}`;
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(data)
       .digest('base64url');
 
-    if (expected !== parts[2]) {
-      throw new UnauthorizedException('Invalid token signature');
-    }
+    if (expectedSig.length !== signature.length) return null;
 
-    let payload: JwtPayload;
     try {
-      payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      if (!crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(signature))) {
+        return null;
+      }
     } catch {
-      throw new UnauthorizedException('Invalid token payload');
+      return null;
     }
 
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      throw new UnauthorizedException('Token expired');
-    }
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(payload, 'base64url').toString('utf8'),
+      ) as JwtPayload;
 
-    if (!payload.sub) {
-      throw new UnauthorizedException('Token missing subject claim');
-    }
+      if (decoded.exp && decoded.exp < Date.now() / 1000) return null;
+      if (!decoded.sub) return null;
 
-    return payload;
+      return decoded;
+    } catch {
+      return null;
+    }
   }
 }

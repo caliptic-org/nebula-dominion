@@ -520,28 +520,42 @@ function DetailPanel({
           </ul>
         </section>
 
-        {/* CTA */}
-        <button
-          type="button"
-          disabled={locked}
-          className="w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm transition-all"
-          style={{
-            background: locked
-              ? 'rgba(255,200,50,0.18)'
-              : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 60%, #000) 100%)`,
-            color: locked ? 'var(--color-energy)' : '#07090f',
-            border: locked
-              ? '1px solid rgba(255,200,50,0.4)'
-              : `1px solid ${theme.color}`,
-            boxShadow: locked
-              ? '0 0 16px rgba(255,200,50,0.25)'
-              : `0 0 24px ${theme.glowColor}`,
-            cursor: locked ? 'not-allowed' : 'pointer',
-            opacity: locked ? 0.9 : 1,
-          }}
-        >
-          {locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}
-        </button>
+        {/* CTAs */}
+        <div className="flex flex-col gap-2">
+          <Link
+            href={`/commanders/${commander.id}`}
+            className="block w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm text-center transition-all"
+            style={{
+              background: `${theme.bgTint}`,
+              color: theme.color,
+              border: `1px solid ${theme.color}55`,
+              boxShadow: `0 0 14px ${theme.color}20`,
+            }}
+          >
+            ◈  Detay Sayfası
+          </Link>
+          <button
+            type="button"
+            disabled={locked}
+            className="w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm transition-all"
+            style={{
+              background: locked
+                ? 'rgba(255,200,50,0.18)'
+                : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 60%, #000) 100%)`,
+              color: locked ? 'var(--color-energy)' : '#07090f',
+              border: locked
+                ? '1px solid rgba(255,200,50,0.4)'
+                : `1px solid ${theme.color}`,
+              boxShadow: locked
+                ? '0 0 16px rgba(255,200,50,0.25)'
+                : `0 0 24px ${theme.glowColor}`,
+              cursor: locked ? 'not-allowed' : 'pointer',
+              opacity: locked ? 0.9 : 1,
+            }}
+          >
+            {locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}
+          </button>
+        </div>
       </div>
     </div>
   );

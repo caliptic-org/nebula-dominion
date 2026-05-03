@@ -9,13 +9,21 @@ import {
   Query,
 } from '@nestjs/common';
 import { GuildsService } from './guilds.service';
+import { GuildRaidsService } from './guild-raids.service';
+import { GuildResearchService } from './guild-research.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { JoinGuildDto, LeaveGuildDto, DonateDto } from './dto/membership.dto';
 import { AdvanceTutorialDto } from './dto/advance-tutorial.dto';
+import { RaidAttackDto } from './dto/raid.dto';
+import { ResearchContributeDto, StartResearchDto } from './dto/research.dto';
 
 @Controller('guilds')
 export class GuildsController {
-  constructor(private readonly guilds: GuildsService) {}
+  constructor(
+    private readonly guilds: GuildsService,
+    private readonly raids: GuildRaidsService,
+    private readonly research: GuildResearchService,
+  ) {}
 
   // ─── Guild lifecycle ────────────────────────────────────────────────────────
 
@@ -96,5 +104,110 @@ export class GuildsController {
   @Get('users/:userId/membership')
   membership(@Param('userId') userId: string) {
     return this.guilds.getUserMembership(userId);
+  }
+
+  // ─── Raids (CAL-240) ────────────────────────────────────────────────────────
+
+  @Get(':id/raids/current')
+  currentRaid(@Param('id') id: string) {
+    return this.raids.getCurrentRaid(id);
+  }
+
+  @Get(':id/raids')
+  listRaids(@Param('id') id: string, @Query('limit') limit?: string) {
+    return this.raids.listRaids(id, limit ? parseInt(limit, 10) : undefined);
+  }
+
+  @Get('raids/:raidId')
+  getRaid(@Param('raidId') raidId: string) {
+    return this.raids.getRaid(raidId);
+  }
+
+  @Get('raids/:raidId/contributions')
+  raidContributions(@Param('raidId') raidId: string) {
+    return this.raids.listContributions(raidId);
+  }
+
+  @Get('raids/:raidId/drops')
+  raidDrops(@Param('raidId') raidId: string) {
+    return this.raids.listDrops(raidId);
+  }
+
+  @Post('raids/:raidId/attack')
+  @HttpCode(HttpStatus.OK)
+  attackRaid(@Param('raidId') raidId: string, @Body() dto: RaidAttackDto) {
+    return this.raids.attack(raidId, dto.userId, dto.damage);
+  }
+
+  @Post('raids/:raidId/resolve-drops')
+  @HttpCode(HttpStatus.OK)
+  resolveDrops(@Param('raidId') raidId: string) {
+    return this.raids.resolveDrops(raidId);
+  }
+
+  @Get('users/:userId/essence')
+  essenceBalance(@Param('userId') userId: string) {
+    return this.raids.getEssenceBalance(userId);
+  }
+
+  @Get('users/:userId/essence/weekly')
+  essenceWeekly(@Param('userId') userId: string) {
+    return this.raids.getWeeklyEssenceUsage(userId);
+  }
+
+  // ─── Research / Tech ağacı (CAL-240) ────────────────────────────────────────
+
+  @Get('research/catalog')
+  researchCatalog() {
+    return this.research.catalog();
+  }
+
+  @Get(':id/research')
+  guildResearch(@Param('id') id: string) {
+    return this.research.listGuildResearch(id);
+  }
+
+  @Get(':id/research/active')
+  guildResearchActive(@Param('id') id: string) {
+    return this.research.getActiveSlots(id);
+  }
+
+  @Get(':id/research/buffs')
+  guildBuffs(@Param('id') id: string) {
+    return this.research.getGuildBuffs(id);
+  }
+
+  @Post(':id/research/start')
+  @HttpCode(HttpStatus.CREATED)
+  startResearch(@Param('id') id: string, @Body() dto: StartResearchDto) {
+    return this.research.startResearch({
+      guildId: id,
+      researchId: dto.researchId,
+      level: dto.level,
+      selectedBy: dto.selectedBy,
+    });
+  }
+
+  @Get('research/:stateId')
+  getResearch(@Param('stateId') stateId: string) {
+    return this.research.getResearchState(stateId);
+  }
+
+  @Get('research/:stateId/contributions')
+  researchContributions(@Param('stateId') stateId: string) {
+    return this.research.listContributions(stateId);
+  }
+
+  @Post('research/:stateId/contribute')
+  @HttpCode(HttpStatus.OK)
+  contributeResearch(
+    @Param('stateId') stateId: string,
+    @Body() dto: ResearchContributeDto,
+  ) {
+    return this.research.contribute({
+      researchStateId: stateId,
+      userId: dto.userId,
+      xp: dto.xp,
+    });
   }
 }

@@ -10,10 +10,10 @@ import { SectorBattle } from './sector-wars/entities/sector-battle.entity';
 import { WeeklyLeague } from './sector-wars/entities/weekly-league.entity';
 import { LeagueParticipant } from './sector-wars/entities/league-participant.entity';
 import { AnalyticsEvent } from './analytics/entities/event.entity';
-import { LoginStreak } from './daily-engagement/entities/login-streak.entity';
-import { DailyQuestProfile } from './daily-engagement/entities/daily-quest-profile.entity';
-import { PlayerStamina } from './daily-engagement/entities/player-stamina.entity';
-import { PlayerWallet } from './daily-engagement/entities/player-wallet.entity';
+import { PvpShield } from './pvp-protection/entities/pvp-shield.entity';
+import { PvpBotProfile } from './pvp-protection/entities/pvp-bot-profile.entity';
+import { PvpMatchRecord } from './pvp-protection/entities/pvp-match-record.entity';
+import { ComebackBonus } from './pvp-protection/entities/comeback-bonus.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -21,13 +21,12 @@ import { UnitsModule } from './units/units.module';
 import { SectorWarsModule } from './sector-wars/sector-wars.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
-import { DailyEngagementModule } from './daily-engagement/daily-engagement.module';
+import { PvpProtectionModule } from './pvp-protection/pvp-protection.module';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
 import { UnitsSchema1746200000000 } from './database/migrations/1746200000000-UnitsSchema';
 import { SectorWarsSchema1746300000000 } from './database/migrations/1746300000000-SectorWarsSchema';
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
-import { DailyEngagementSchema1746400000000 } from './database/migrations/1746400000000-DailyEngagementSchema';
-import { PlayerWalletSchema1746500000000 } from './database/migrations/1746500000000-PlayerWalletSchema';
+import { PvpProtectionSchema1746400000000 } from './database/migrations/1746400000000-PvpProtectionSchema';
 
 @Module({
   imports: [
@@ -51,18 +50,17 @@ import { PlayerWalletSchema1746500000000 } from './database/migrations/174650000
           WeeklyLeague,
           LeagueParticipant,
           AnalyticsEvent,
-          LoginStreak,
-          DailyQuestProfile,
-          PlayerStamina,
-          PlayerWallet,
+          PvpShield,
+          PvpBotProfile,
+          PvpMatchRecord,
+          ComebackBonus,
         ],
         migrations: [
           BattleSchema1746100000000,
           UnitsSchema1746200000000,
           SectorWarsSchema1746300000000,
           AnalyticsSchema1746400000000,
-          DailyEngagementSchema1746400000000,
-          PlayerWalletSchema1746500000000,
+          PvpProtectionSchema1746400000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -76,7 +74,7 @@ import { PlayerWalletSchema1746500000000 } from './database/migrations/174650000
     SectorWarsModule,
     LeaderboardModule,
     AnalyticsModule,
-    DailyEngagementModule,
+    PvpProtectionModule,
   ],
 })
 export class AppModule {}

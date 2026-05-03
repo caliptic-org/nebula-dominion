@@ -41,11 +41,9 @@ export class UnitSnapshotDto {
   speed: number;
 }
 
+// attackerId is intentionally omitted — extracted from JWT on the controller
+// isBotOpponent is intentionally omitted — determined server-side from matchmaking
 export class CreateBattleDto {
-  @ApiProperty()
-  @IsUUID()
-  attackerId: string;
-
   @ApiProperty()
   @IsUUID()
   defenderId: string;

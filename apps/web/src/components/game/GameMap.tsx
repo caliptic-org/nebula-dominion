@@ -95,8 +95,8 @@ export function GameMap({ units, selectedUnitId, onSelectUnit, onMoveUnit }: Gam
         ctx.shadowBlur = 0;
       }
 
-      // Unit shape: Human = square, Zerg = circle, Automaton = diamond
-      if (unit.race === Race.HUMAN) {
+      // Unit shape: İnsan = square, Zerg = circle, others = diamond
+      if (unit.race === Race.INSAN) {
         // Filled square
         ctx.fillStyle = isSelected ? color : `${color}aa`;
         ctx.strokeStyle = isSelected ? '#ffffff' : color;

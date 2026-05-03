@@ -68,7 +68,7 @@ export function ResourceBar(props: ResourceBarProps) {
         )}
       </div>
 
-      {/* Right slot (children via portal or props expansion) */}
+      {/* Right slot */}
       <div className="w-6" />
     </div>
   );

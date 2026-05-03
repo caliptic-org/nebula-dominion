@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -46,9 +47,10 @@ const RESOURCES = [
   { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
 ];
 
-type Tab = 'base' | 'map' | 'battle' | 'commanders' | 'shop';
+type Tab = 'base' | 'map' | 'commanders' | 'shop';
+type NavTabId = Tab | 'battle';
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
+const TABS: { id: NavTabId; icon: string; label: string }[] = [
   { id: 'base', icon: '🏰', label: 'Ana Üs' },
   { id: 'map', icon: '🌌', label: 'Harita' },
   { id: 'battle', icon: '⚔️', label: 'Savaş' },
@@ -57,6 +59,7 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
 ];
 
 export default function HomePage() {
+  const router = useRouter();
   const { race, setRace, raceColor, raceGlow } = useRaceTheme();
   const [activeTab, setActiveTab] = useState<Tab>('base');
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
@@ -87,6 +90,10 @@ export default function HomePage() {
   const raceDesc = RACE_DESCRIPTIONS[race];
   const primaryCommander = raceDesc.commanders[0];
   const tutorialBattleHref = `/battle?race=${race}&mode=pve&tutorial=1`;
+  const battleHref =
+    onboardingHydrated && !shouldShowNextSessionHook
+      ? tutorialBattleHref
+      : `/battle?race=${race}&mode=pve`;
 
   return (
     <>
@@ -400,43 +407,6 @@ export default function HomePage() {
               </MangaPanel>
             </div>
 
-          {/* ── Battle Tab ────────────────────────────────────── */}
-          {activeTab === 'battle' && (
-            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="text-center max-w-sm mx-auto">
-                <div
-                  className="text-6xl mb-6 animate-float inline-block"
-                  style={{ filter: `drop-shadow(0 0 20px ${raceGlow})` }}
-                >
-                  ⚔️
-                </div>
-                <div className="mb-3">
-                  <span className="badge badge-race">Savaş Modu</span>
-                </div>
-                <h2 className="font-display text-2xl font-black text-text-primary mb-3">
-                  Savaşa <span style={{ color: raceColor }}>Hazır mısın?</span>
-                </h2>
-                <p className="text-text-muted text-sm mb-8">
-                  Phaser.js ile güçlendirilmiş gerçek zamanlı savaş sahneleri yakında.
-                </p>
-                <a
-                  href={
-                    onboardingHydrated && !shouldShowNextSessionHook
-                      ? tutorialBattleHref
-                      : `/battle?race=${race}&mode=pve`
-                  }
-                  className="btn-primary inline-flex items-center gap-2"
-                  style={{ background: raceColor }}
-                >
-                  <span>
-                    {onboardingHydrated && !shouldShowNextSessionHook ? 'Eğitim Savaşı' : 'Savaşa Gir'}
-                  </span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/20 text-xs">→</span>
-                </a>
-              </div>
-            </div>
-          )}
-
           {/* ── Commanders Tab ────────────────────────────────── */}
           {activeTab === 'commanders' && (
             <div className="p-4">
@@ -500,11 +470,18 @@ export default function HomePage() {
           }}
         >
           {TABS.map((tab) => {
-            const active = activeTab === tab.id;
+            const active = tab.id !== 'battle' && activeTab === tab.id;
+            const handleClick = () => {
+              if (tab.id === 'battle') {
+                router.push(battleHref);
+              } else {
+                setActiveTab(tab.id);
+              }
+            };
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={handleClick}
                 className={clsx(
                   'bottom-nav-item transition-all duration-300',
                   active && 'active',

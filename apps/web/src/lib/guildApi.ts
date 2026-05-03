@@ -169,6 +169,14 @@ export const guildApi = {
   advanceTutorial: (current: TutorialStep): Promise<TutorialStep> =>
     wait(TUTORIAL_TRANSITIONS[current]),
 
+  // BACKEND CONTRACT (required before swapping in the real endpoint):
+  //   POST /api/guild/tutorial/reward MUST be idempotent based on
+  //   `users.tutorial_completed_at`. The frontend cannot prevent reward
+  //   duplication on its own — localStorage `nebula:guildTutorial` can be
+  //   reset via DevTools to re-trigger this CTA. The server is the only
+  //   authority that can decide whether the +500 Energy / cosmetic grant
+  //   has already happened. Frontend additionally guards via
+  //   `state.rewardClaimed` (see useGuildTutorial.advance).
   grantTutorialReward: (): Promise<{ energy: number; cosmetic: string }> =>
     wait({ energy: 500, cosmetic: 'guild_crest_starter' }),
 };

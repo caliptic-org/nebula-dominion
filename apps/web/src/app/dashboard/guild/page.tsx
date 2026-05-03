@@ -42,6 +42,7 @@ export default function GuildHubPage() {
   };
 
   const inGuild = activeGuildId && state.step !== 'not_started';
+  const isDev = process.env.NODE_ENV === 'development';
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
@@ -58,7 +59,7 @@ export default function GuildHubPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {state.step === 'completed' && (
+          {isDev && state.step === 'completed' && (
             <button
               type="button"
               className="btn-ghost text-xs"

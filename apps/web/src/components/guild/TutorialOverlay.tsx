@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import clsx from 'clsx';
 import { GlowButton } from '@/components/ui/GlowButton';
 import { useGuildTutorial, TUTORIAL_STEP_INDEX } from '@/hooks/useGuildTutorial';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { TutorialStep } from '@/types/guild';
 import { GuildCrest } from './GuildCrest';
 
@@ -57,6 +58,7 @@ export function TutorialOverlay() {
   const { race } = useRaceTheme();
   const copy = STEP_COPY[state.step];
   const stepIndex = TUTORIAL_STEP_INDEX[state.step];
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOverlayOpen) return;
@@ -66,6 +68,8 @@ export function TutorialOverlay() {
       document.body.style.overflow = original;
     };
   }, [isOverlayOpen]);
+
+  useFocusTrap(cardRef, isOverlayOpen);
 
   const stepNodes = useMemo(
     () => [0, 1, 2, 3].map((i) => {
@@ -87,7 +91,7 @@ export function TutorialOverlay() {
       aria-modal="true"
       aria-labelledby="tutorial-title"
     >
-      <div className="tutorial-card">
+      <div className="tutorial-card" ref={cardRef}>
         <div className="tutorial-card__progress" aria-hidden>
           {stepNodes}
         </div>

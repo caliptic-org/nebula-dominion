@@ -101,12 +101,21 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
           startedAt: state.startedAt ?? new Date().toISOString(),
         };
 
-        if (next === 'completed') {
+        // Idempotency guard: only request the reward if it has not already
+        // been granted client-side. The backend MUST also enforce this via
+        // tutorial_completed_at — a tampered localStorage value can flip
+        // rewardClaimed back to false (see guildApi.grantTutorialReward).
+        if (next === 'completed' && !state.rewardClaimed) {
           await guildApi.grantTutorialReward();
           nextState = {
             ...nextState,
             rewardClaimed: true,
             completedAt: new Date().toISOString(),
+          };
+        } else if (next === 'completed') {
+          nextState = {
+            ...nextState,
+            completedAt: state.completedAt ?? new Date().toISOString(),
           };
         }
         setState(nextState);
@@ -118,6 +127,7 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
   );
 
   const resetForDemo = useCallback(() => {
+    if (process.env.NODE_ENV !== 'development') return;
     setState(INITIAL_STATE);
     setOverlayOpen(true);
   }, []);

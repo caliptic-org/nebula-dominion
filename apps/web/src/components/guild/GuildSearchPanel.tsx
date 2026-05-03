@@ -9,6 +9,7 @@ import {
   TIER_LABEL,
 } from '@/types/guild';
 import { guildApi } from '@/lib/guildApi';
+import { useDebounce } from '@/hooks/useDebounce';
 import { GuildCrest } from './GuildCrest';
 import { GuildBadge } from './GuildBadge';
 
@@ -23,13 +24,14 @@ export function GuildSearchPanel({ onJoin, isJoining }: GuildSearchPanelProps) {
   const [minSize, setMinSize] = useState<string>('');
   const [results, setResults] = useState<GuildSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const debouncedTag = useDebounce(tag, 300);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     guildApi
       .search({
-        tag,
+        tag: debouncedTag,
         language,
         minSize: minSize ? Number(minSize) : null,
       })
@@ -42,7 +44,7 @@ export function GuildSearchPanel({ onJoin, isJoining }: GuildSearchPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [tag, language, minSize]);
+  }, [debouncedTag, language, minSize]);
 
   const helpText = useMemo(() => {
     if (loading) return 'Loncalar aranıyor…';
@@ -119,7 +121,7 @@ export function GuildSearchPanel({ onJoin, isJoining }: GuildSearchPanelProps) {
         </div>
       </div>
 
-      <p className="text-text-muted text-xs" role="status">
+      <p className="text-text-muted text-xs" role="status" aria-live="polite" aria-atomic="true">
         {helpText}
       </p>
 

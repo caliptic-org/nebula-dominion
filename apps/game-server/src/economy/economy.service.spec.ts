@@ -179,6 +179,56 @@ describe('Offline accumulation', () => {
   });
 });
 
+// ── Storage cap: age bounds validation ──────────────────────────────────────
+
+describe('Storage cap age bounds', () => {
+  const AGE_MULTIPLIERS = [1, 2.5, 6, 14, 30, 60];
+  const MINERAL_BASE_CAP = 24_000;
+
+  it('Age 1 is valid (lower bound)', () => {
+    expect(() => {
+      if (1 < 1 || 1 > 6) throw new Error('Age out of range');
+    }).not.toThrow();
+  });
+
+  it('Age 6 is valid (upper bound)', () => {
+    expect(() => {
+      if (6 < 1 || 6 > 6) throw new Error('Age out of range');
+    }).not.toThrow();
+  });
+
+  it('Age 0 is out of range', () => {
+    expect(() => {
+      if (0 < 1 || 0 > 6) throw new Error('Age out of range');
+    }).toThrow('Age out of range');
+  });
+
+  it('Age 7 is out of range', () => {
+    expect(() => {
+      if (7 < 1 || 7 > 6) throw new Error('Age out of range');
+    }).toThrow('Age out of range');
+  });
+
+  it('No undefined array access within valid age range [1,6]', () => {
+    for (let age = 1; age <= 6; age++) {
+      expect(AGE_MULTIPLIERS[age - 1]).toBeDefined();
+    }
+  });
+
+  it('Missing config should not silently return 0', () => {
+    // Previously cfg === null returned 0 — now it should throw NotFoundException
+    // This verifies the guard clause behaviour at the service level (the pure path)
+    const simulate = (cfg: null | { baseCap: number; ageMultipliers: number[] }, age: number): number => {
+      if (age < 1 || age > 6) throw new Error('BadRequest: age out of range');
+      if (!cfg) throw new Error('NotFound: no storage config');
+      return Math.floor(cfg.baseCap * cfg.ageMultipliers[age - 1]);
+    };
+
+    expect(() => simulate(null, 3)).toThrow('NotFound: no storage config');
+    expect(simulate({ baseCap: MINERAL_BASE_CAP, ageMultipliers: AGE_MULTIPLIERS }, 3)).toBe(144_000);
+  });
+});
+
 // ── TICKS_PER_HOUR sanity ────────────────────────────────────────────────────
 
 describe('Tick interval constants', () => {

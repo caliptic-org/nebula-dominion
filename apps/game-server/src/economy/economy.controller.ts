@@ -13,13 +13,10 @@ import { UpdateStorageConfigDto } from './dto/update-storage-config.dto';
 import { UpsertFeatureFlagDto } from './dto/upsert-feature-flag.dto';
 import { ResourceType } from './entities/economy-storage-config.entity';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
+import { AdminRoleGuard } from '../auth/admin-role.guard';
 
-/**
- * Admin endpoints for hot-reloading economy configs without deployment.
- * All routes require a valid JWT. In production, restrict further with an admin role guard.
- */
 @Controller('admin/economy')
-@UseGuards(HttpJwtGuard)
+@UseGuards(HttpJwtGuard, AdminRoleGuard)
 export class EconomyController {
   constructor(private readonly economyService: EconomyService) {}
 

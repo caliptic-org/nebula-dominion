@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
@@ -140,8 +140,11 @@ export class EconomyService {
    * cap = baseCap × ageMultipliers[age-1]
    */
   async computeStorageCap(resourceType: ResourceType, age: number): Promise<number> {
+    if (age < 1 || age > 6) {
+      throw new BadRequestException(`Age must be between 1 and 6, got: ${age}`);
+    }
     const cfg = await this.getStorageConfig(resourceType);
-    if (!cfg) return 0;
+    if (!cfg) throw new NotFoundException(`No storage config for resource type: ${resourceType}`);
 
     const multiplier = Number(cfg.ageMultipliers[age - 1] ?? 1);
     return Math.floor(cfg.baseCap * multiplier);

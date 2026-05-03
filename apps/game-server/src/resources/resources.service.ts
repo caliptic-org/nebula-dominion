@@ -75,54 +75,71 @@ export class ResourcesService {
    * Calculates and applies all resource production accumulated since lastTickAt.
    * Called on player login and lazily from getSnapshot.
    * Each resource is capped at its current storage limit (CoC behaviour — no overflow loss).
+   * Uses a pessimistic_write lock to prevent double-accumulation on concurrent logins.
    */
-  async applyOfflineAccumulation(playerId: string, existingResource?: Resource): Promise<ResourceSnapshot> {
-    const resource = existingResource ?? await this.getOrCreate(playerId);
+  async applyOfflineAccumulation(playerId: string, _existingResource?: Resource): Promise<ResourceSnapshot> {
+    let result!: ResourceSnapshot;
 
-    if (!resource.lastTickAt) {
-      resource.lastTickAt = new Date();
-      await this.resourceRepo.save(resource);
-      return this.toSnapshot(resource);
-    }
+    await this.resourceRepo.manager.transaction(async (em) => {
+      const resource = await em.findOne(Resource, {
+        where: { playerId },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    const now = Date.now();
-    const elapsedMs = now - new Date(resource.lastTickAt).getTime();
-    const missedTicks = Math.floor(elapsedMs / TICK_INTERVAL_MS);
+      if (!resource) {
+        const newResource = em.create(Resource, { playerId, lastTickAt: new Date() });
+        const saved = await em.save(newResource);
+        result = this.toSnapshot(saved);
+        return;
+      }
 
-    if (missedTicks <= 0) {
-      const snapshot = this.toSnapshot(resource);
-      await this.setCache(playerId, snapshot);
-      return snapshot;
-    }
+      if (!resource.lastTickAt) {
+        resource.lastTickAt = new Date();
+        await em.save(resource);
+        result = this.toSnapshot(resource);
+        return;
+      }
 
-    resource.mineral = Math.min(
-      Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick) * missedTicks),
-      resource.mineralCap,
-    );
-    resource.gas = Math.min(
-      Math.floor(Number(resource.gas) + Number(resource.gasPerTick) * missedTicks),
-      resource.gasCap,
-    );
-    resource.energy = Math.min(
-      Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * missedTicks),
-      resource.energyCap,
-    );
-    resource.population = Math.min(
-      Math.floor(Number(resource.population) + Number(resource.populationPerTick) * missedTicks),
-      resource.populationCap,
-    );
+      const now = Date.now();
+      const elapsedMs = now - new Date(resource.lastTickAt).getTime();
+      const missedTicks = Math.floor(elapsedMs / TICK_INTERVAL_MS);
 
-    // Advance lastTickAt by exact ticks applied so fractional remainder carries forward
-    resource.lastTickAt = new Date(new Date(resource.lastTickAt).getTime() + missedTicks * TICK_INTERVAL_MS);
+      if (missedTicks <= 0) {
+        result = this.toSnapshot(resource);
+        await this.setCache(playerId, result);
+        return;
+      }
 
-    await this.resourceRepo.save(resource);
-    const snapshot = this.toSnapshot(resource);
-    await this.setCache(playerId, snapshot);
+      resource.mineral = Math.min(
+        Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick) * missedTicks),
+        resource.mineralCap,
+      );
+      resource.gas = Math.min(
+        Math.floor(Number(resource.gas) + Number(resource.gasPerTick) * missedTicks),
+        resource.gasCap,
+      );
+      resource.energy = Math.min(
+        Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * missedTicks),
+        resource.energyCap,
+      );
+      resource.population = Math.min(
+        Math.floor(Number(resource.population) + Number(resource.populationPerTick) * missedTicks),
+        resource.populationCap,
+      );
 
-    this.logger.debug(
-      `Offline accumulation applied for ${playerId}: +${missedTicks} ticks (~${Math.round(elapsedMs / 60_000)} min)`,
-    );
-    return snapshot;
+      // Advance lastTickAt by exact ticks applied so fractional remainder carries forward
+      resource.lastTickAt = new Date(new Date(resource.lastTickAt).getTime() + missedTicks * TICK_INTERVAL_MS);
+
+      await em.save(resource);
+      result = this.toSnapshot(resource);
+      await this.setCache(playerId, result);
+
+      this.logger.debug(
+        `Offline accumulation applied for ${playerId}: +${missedTicks} ticks (~${Math.round(elapsedMs / 60_000)} min)`,
+      );
+    });
+
+    return result;
   }
 
   async canAfford(playerId: string, cost: ResourceCost): Promise<boolean> {

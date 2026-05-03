@@ -39,7 +39,6 @@ export function RegisterForm() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           username: values.username,
           email: values.email,
@@ -50,6 +49,15 @@ export function RegisterForm() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
+      }
+
+      const data = (await res.json()) as { accessToken?: string };
+      if (data.accessToken) {
+        try {
+          window.localStorage.setItem('accessToken', data.accessToken);
+        } catch {
+          /* localStorage unavailable (private mode); auth-required pages will surface 401 */
+        }
       }
 
       router.push('/dashboard');

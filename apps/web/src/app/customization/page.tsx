@@ -13,7 +13,6 @@ import {
   fetchBalance,
   equipCosmetic,
   purchaseCosmetic,
-  newIdempotencyKey,
 } from '@/lib/cosmetics-api';
 
 // ─── Category metadata ────────────────────────────────────────────────────────
@@ -23,6 +22,22 @@ const CATEGORIES: { id: CosmeticCategory; label: string; icon: string }[] = [
   { id: 'title',  label: 'Unvanlar',   icon: '🎖️' },
   { id: 'effect', label: 'Efektler',   icon: '✨' },
 ];
+
+// Names of the no-op default items per category (matches DB seed in
+// database/migrations/007_cosmetics.sql). Used to suppress visual decorations
+// (frame ring, title badge, effect particles, category-tab dot) when the
+// equipped item is the category default. We can't compare by ID because the
+// backend uses UUIDs; if backend later exposes an `isDefault` flag, swap to it.
+const DEFAULT_ITEM_NAMES: Record<CosmeticCategory, string> = {
+  skin:   'Standart Zırh',
+  frame:  'Standart Çerçeve',
+  title:  'Komutan',
+  effect: 'Efekt Yok',
+};
+
+function isDefaultItem(item: CosmeticItem): boolean {
+  return DEFAULT_ITEM_NAMES[item.category] === item.name;
+}
 
 // ─── Shared color tokens (match design system) ────────────────────────────────
 const TOKEN = {
@@ -504,7 +519,7 @@ function PreviewPanel({
           )}
 
           {/* Frame overlay ring */}
-          {equippedFrame && equippedFrame.id !== 'frame-default' && (
+          {equippedFrame && !isDefaultItem(equippedFrame) && (
             <div
               style={{
                 position: 'absolute', inset: -4,
@@ -520,7 +535,7 @@ function PreviewPanel({
         </div>
 
         {/* Effect particles (decorative) */}
-        {equippedEffect && equippedEffect.id !== 'effect-none' && (
+        {equippedEffect && !isDefaultItem(equippedEffect) && (
           <>
             {['10%,20%', '85%,15%', '5%,75%', '90%,70%', '50%,88%'].map((pos, i) => {
               const [left, top] = pos.split(',');
@@ -560,7 +575,7 @@ function PreviewPanel({
       </div>
 
       {/* Selected item title display (when in title tab) */}
-      {equippedTitle && equippedTitle.id !== 'title-default' && (
+      {equippedTitle && !isDefaultItem(equippedTitle) && (
         <div style={{ textAlign: 'center' }}>
           <span
             style={{
@@ -1087,8 +1102,11 @@ export default function CustomizationPage() {
     setBalance(optimisticBalance);
 
     try {
-      const { newBalance } = await purchaseCosmetic(target.id, newIdempotencyKey());
-      setBalance(newBalance);
+      await purchaseCosmetic(target.id);
+      // Backend returns the cosmetic DTO, not the new balance. Refetch the
+      // server-authoritative balance so it stays in sync.
+      const fresh = await fetchBalance();
+      setBalance(fresh);
       pushToast('success', `${target.name} satın alındı`);
     } catch (e) {
       setCosmetics(previousCosmetics);
@@ -1346,7 +1364,7 @@ export default function CustomizationPage() {
                   <span style={{ fontSize: 14 }}>{cat.icon}</span>
                   <span>{cat.label}</span>
                   {/* Active item dot indicator */}
-                  {equippedInCat && equippedInCat.id !== `${cat.id}-default` && (
+                  {equippedInCat && !isDefaultItem(equippedInCat) && (
                     <span
                       style={{
                         width: 6, height: 6,

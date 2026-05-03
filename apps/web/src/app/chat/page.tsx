@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { MangaPanel } from '@/components/ui/MangaPanel';
 import { BottomNav } from '@/components/ui/BottomNav';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */

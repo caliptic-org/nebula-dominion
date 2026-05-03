@@ -5,11 +5,12 @@ import { XpTransaction } from './entities/xp-transaction.entity';
 import { ProgressionService } from './progression.service';
 import { ProgressionController } from './progression.controller';
 import { ProgressionGateway } from './progression.gateway';
+import { ProgressionConfigService } from './config/progression-config.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PlayerLevel, XpTransaction])],
-  providers: [ProgressionService, ProgressionGateway],
+  providers: [ProgressionService, ProgressionGateway, ProgressionConfigService],
   controllers: [ProgressionController],
-  exports: [ProgressionService],
+  exports: [ProgressionService, ProgressionConfigService],
 })
 export class ProgressionModule {}

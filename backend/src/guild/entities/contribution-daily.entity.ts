@@ -31,6 +31,18 @@ export class ContributionDaily {
   @Column({ name: 'chat_message_count', type: 'int', default: 0 })
   chatMessageCount: number;
 
+  // Cumulative raid damage % (0..1+) contributed today across raid runs
+  @Column({ name: 'raid_damage_pct', type: 'numeric', precision: 6, scale: 4, default: 0 })
+  raidDamagePct: number;
+
+  // Total research XP contributed today
+  @Column({ name: 'research_xp_contributed', type: 'int', default: 0 })
+  researchXpContributed: number;
+
+  // Number of arena matches played today (cap 15/day toward contribution score)
+  @Column({ name: 'arena_match_played', type: 'int', default: 0 })
+  arenaMatchPlayed: number;
+
   @Column({ name: 'points', type: 'int', default: 0 })
   points: number;
 

@@ -52,6 +52,17 @@ import { ContributionDaily } from './guild/entities/contribution-daily.entity';
 import { ProfanityWord } from './guild/entities/profanity-word.entity';
 import { Mail } from './mail/entities/mail.entity';
 import { MailModule } from './mail/mail.module';
+import { ArenaModule } from './arena/arena.module';
+import { ArenaPlayerStats } from './arena/entities/arena-player-stats.entity';
+import { ArenaMatch } from './arena/entities/arena-match.entity';
+import { CoopRaidModule } from './coop-raid/coop-raid.module';
+import { CoopRaidRun } from './coop-raid/entities/coop-raid-run.entity';
+import { CoopRaidParticipant } from './coop-raid/entities/coop-raid-participant.entity';
+import { GuildRankModule } from './guild-rank/guild-rank.module';
+import { GuildWeeklyRank } from './guild-rank/entities/guild-weekly-rank.entity';
+import { GuildChampionBadge } from './guild-rank/entities/guild-champion-badge.entity';
+import { InactiveGuardModule } from './inactive-guard/inactive-guard.module';
+import { GuildInactiveMarker } from './inactive-guard/entities/guild-inactive-marker.entity';
 import { GuildSchema1746800000000 } from './database/migrations/1746800000000-GuildSchema';
 import { MailSchema1746900000000 } from './database/migrations/1746900000000-MailSchema';
 import { BattleSchema1746100000000 } from './database/migrations/1746100000000-BattleSchema';
@@ -64,6 +75,7 @@ import { AnalyticsSchema1746400000000 } from './database/migrations/174640000000
 import { StatsSchema1746500000000 } from './database/migrations/1746500000000-StatsSchema';
 import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000000-LeaderboardSchema';
 import { FormationsSchema1746500000000 } from './database/migrations/1746500000000-FormationsSchema';
+import { ArenaCoopRankSchema1747000000000 } from './database/migrations/1747000000000-ArenaCoopRankSchema';
 
 @Module({
   imports: [
@@ -101,6 +113,13 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           ContributionDaily,
           ProfanityWord,
           Mail,
+          ArenaPlayerStats,
+          ArenaMatch,
+          CoopRaidRun,
+          CoopRaidParticipant,
+          GuildWeeklyRank,
+          GuildChampionBadge,
+          GuildInactiveMarker,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -115,6 +134,7 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
           FormationsSchema1746500000000,
           GuildSchema1746800000000,
           MailSchema1746900000000,
+          ArenaCoopRankSchema1747000000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',
@@ -136,6 +156,10 @@ import { FormationsSchema1746500000000 } from './database/migrations/17465000000
     FormationsModule,
     GuildModule,
     MailModule,
+    ArenaModule,
+    CoopRaidModule,
+    GuildRankModule,
+    InactiveGuardModule,
   ],
 })
 export class AppModule {}

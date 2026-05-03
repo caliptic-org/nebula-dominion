@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { getRaceVisual } from '@/game/raceVisuals';
+import { RACE_DESCRIPTIONS } from '@/types/units';
 
 const GameCanvas = dynamic(() => import('@/game/GameCanvas'), { ssr: false });
 
@@ -14,76 +14,50 @@ function BattleContent() {
   const mode = params.get('mode') ?? 'pve';
   const userId = params.get('userId') ?? 'player_demo';
 
-  const visual = getRaceVisual(race);
-  const accent = visual.str;
-  const glow = `${accent}55`;
+  const raceKey = (race in RACE_DESCRIPTIONS) ? race as keyof typeof RACE_DESCRIPTIONS : 'insan' as keyof typeof RACE_DESCRIPTIONS;
+  const raceDesc = RACE_DESCRIPTIONS[raceKey as keyof typeof RACE_DESCRIPTIONS];
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative overflow-hidden"
+      className="min-h-[100dvh] flex flex-col relative"
       style={{ background: '#07090f' }}
-      data-race={race}
+      data-race={raceDesc?.dataRace ?? 'insan'}
     >
-      {/* Manga halftone overlay */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-[0.06]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at center, rgba(255,255,255,0.6) 1px, transparent 1.5px)',
-          backgroundSize: '6px 6px',
-        }}
-      />
-
-      {/* Speed-line decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-px"
-            style={{
-              top: `${15 + i * 14}%`,
-              left: 0,
-              right: 0,
-              background: `linear-gradient(90deg, transparent 0%, ${accent}22 50%, transparent 100%)`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Top manga HUD strip */}
+      {/* Manga panel top HUD */}
       <header
         className="relative z-50 flex items-center justify-between px-4 py-2"
         style={{
           background: 'rgba(8,10,16,0.95)',
-          borderBottom: `2px solid ${accent}33`,
+          borderBottom: `1px solid ${raceDesc?.color ?? '#4a9eff'}22`,
           backdropFilter: 'blur(20px)',
         }}
       >
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="text-xs hover:opacity-80 transition-opacity"
-            style={{ color: accent }}
+            className="font-display text-text-muted text-xs hover:text-text-primary transition-colors"
           >
-            ← Ana Us
+            ← Ana Üs
           </Link>
-          <div className="h-3 w-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
+          <div
+            className="h-3 w-px"
+            style={{ background: 'rgba(255,255,255,0.12)' }}
+          />
           <span
-            className="text-[10px] font-bold uppercase tracking-widest"
-            style={{ color: accent, textShadow: '0 0 8px currentColor' }}
+            className="font-display text-[10px] font-black uppercase tracking-widest"
+            style={{ color: raceDesc?.color ?? '#4a9eff' }}
           >
-            {visual.icon} {visual.label} {'—'} {mode === 'pvp' ? 'PvP Savas' : 'PvE Savas'}
+            {raceDesc?.icon} {raceDesc?.name ?? race} — {mode === 'pvp' ? 'PvP Savaş' : 'PvE Savaş'}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <span
-            className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded"
+            className="badge text-[9px]"
             style={{
-              background: `${accent}1a`,
-              color: accent,
-              border: `1px solid ${accent}55`,
+              background: raceDesc ? raceDesc.bgColor : 'rgba(74,158,255,0.1)',
+              color: raceDesc?.color ?? '#4a9eff',
+              border: `1px solid ${raceDesc?.color ?? '#4a9eff'}30`,
             }}
           >
             {mode.toUpperCase()}
@@ -91,38 +65,50 @@ function BattleContent() {
           <span
             className="w-2 h-2 rounded-full animate-pulse"
             style={{ background: '#44ff88' }}
-            title="Baglanti aktif"
+            title="Bağlantı aktif"
           />
         </div>
       </header>
 
-      {/* Game canvas — full-bleed with race-glow border */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-2 sm:p-3">
+      {/* Speed lines decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute h-px"
+            style={{
+              top: `${15 + i * 14}%`,
+              left: 0,
+              right: 0,
+              background: `linear-gradient(90deg, transparent 0%, ${raceDesc?.color ?? '#4a9eff'}08 50%, transparent 100%)`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Phaser Game Canvas */}
+      <main className="relative z-10 flex-1 flex items-center justify-center p-2">
         <div
-          className="w-full h-full flex items-center justify-center rounded-lg overflow-hidden"
+          className="w-full rounded-lg overflow-hidden"
           style={{
-            border: `2px solid ${accent}66`,
-            boxShadow: `0 0 50px ${glow}, inset 0 0 40px rgba(0,0,0,0.6)`,
-            background: 'rgba(7, 9, 15, 0.6)',
+            border: `1px solid ${raceDesc?.color ?? '#4a9eff'}20`,
+            boxShadow: `0 0 40px ${raceDesc?.glowColor ?? 'rgba(74,158,255,0.15)'}`,
           }}
         >
           <GameCanvas race={race} mode={mode} userId={userId} />
         </div>
       </main>
 
-      {/* Bottom manga ribbon */}
+      {/* Bottom status strip */}
       <footer
         className="relative z-50 flex items-center justify-center gap-4 px-4 py-2"
         style={{
-          background: 'rgba(8,10,16,0.92)',
-          borderTop: `2px solid ${accent}33`,
+          background: 'rgba(8,10,16,0.9)',
+          borderTop: `1px solid ${raceDesc?.color ?? '#4a9eff'}15`,
         }}
       >
-        <span
-          className="text-[9px] font-bold uppercase tracking-[0.25em]"
-          style={{ color: 'rgba(255,255,255,0.5)' }}
-        >
-          Phaser.js · Gercek Zamanli Savas Motoru
+        <span className="font-display text-[9px] text-text-muted uppercase tracking-widest">
+          Phaser.js 3.60 · Gerçek Zamanlı Savaş Motoru
         </span>
       </footer>
     </div>
@@ -131,24 +117,19 @@ function BattleContent() {
 
 export default function BattlePage() {
   return (
-    <Suspense
-      fallback={
-        <div
-          className="min-h-[100dvh] flex items-center justify-center"
-          style={{ background: '#07090f' }}
-        >
-          <div className="text-center">
-            <div className="text-4xl mb-4 animate-pulse">{'⚔'}</div>
-            <span
-              className="text-xs uppercase tracking-widest"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-            >
-              Savas Alani Yukleniyor...
-            </span>
-          </div>
+    <Suspense fallback={
+      <div
+        className="min-h-[100dvh] flex items-center justify-center"
+        style={{ background: '#07090f' }}
+      >
+        <div className="text-center">
+          <div className="text-4xl mb-4 animate-pulse">⚔️</div>
+          <span className="font-display text-xs text-text-muted uppercase tracking-widest">
+            Savaş Alanı Yükleniyor…
+          </span>
         </div>
-      }
-    >
+      </div>
+    }>
       <BattleContent />
     </Suspense>
   );

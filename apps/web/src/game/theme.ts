@@ -61,21 +61,18 @@ export const THEME = {
   LOSE_BORDER:   0xff3355,
 
   // Rewards
-  REWARD_MINERAL: '#60aaff',
-  REWARD_GAS:     '#88ffaa',
-  REWARD_XP:      '#ffcc44',
+  REWARD_MINERAL: '#4a9eff',
+  REWARD_GAS:     '#44ff88',
+  REWARD_XP:      '#ffc832',
 
-  // Manga HUD
-  PANEL_INK:        0x000000,
-  PANEL_FILL:       0x0a0c14,
-  PANEL_HIGHLIGHT:  0xffffff,
-  HUD_HP_TRACK:     0x141828,
-  HUD_HP_DAMAGE:    0xff4444,
-  HUD_TIMER_BG:     0x0a0c14,
-  HUD_TIMER_RING:   0xffffff,
-  HUD_TIMER_DANGER: 0xff4444,
-  SPEED_LINE:       0xffffff,
-  HALFTONE_DOT:     0xffffff,
+  // Race colors (for dynamic theming in scenes)
+  RACE: {
+    insan:   { num: 0x4a9eff, str: '#4a9eff', glow: '#4a9eff44' },
+    zerg:    { num: 0x44ff44, str: '#44ff44', glow: '#44ff4444' },
+    otomat:  { num: 0x00cfff, str: '#00cfff', glow: '#00cfff44' },
+    canavar: { num: 0xff6600, str: '#ff6600', glow: '#ff660044' },
+    seytan:  { num: 0xcc00ff, str: '#cc00ff', glow: '#cc00ff44' },
+  },
 } as const;
 
 export const UNIT_COLORS: Record<string, number> = {

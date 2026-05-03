@@ -13,6 +13,7 @@ import {
 } from './config/level-config';
 import { AwardXpDto } from './dto/award-xp.dto';
 import { LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { ProgressionConfigService } from './progression-config.service';
 
 @Injectable()
 export class ProgressionService {
@@ -24,6 +25,7 @@ export class ProgressionService {
     @InjectRepository(XpTransaction)
     private readonly xpTxRepo: Repository<XpTransaction>,
     private readonly emitter: EventEmitter2,
+    private readonly progressionConfigService: ProgressionConfigService,
   ) {}
 
   async getOrCreateProgress(userId: string): Promise<PlayerLevel> {
@@ -143,6 +145,10 @@ export class ProgressionService {
     }
 
     return leveledUp;
+  }
+
+  async reloadConfig(): Promise<{ success: boolean; reason?: string }> {
+    return this.progressionConfigService.reloadFromDb();
   }
 
   async getRecentTransactions(userId: string, limit = 20): Promise<XpTransaction[]> {

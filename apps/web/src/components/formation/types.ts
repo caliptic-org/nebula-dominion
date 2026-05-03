@@ -99,30 +99,6 @@ export const SYNERGY_RULES: Record<RaceKey, SynergyBonus[]> = {
   ],
 };
 
-export const DEMO_AVAILABLE_UNITS: SlotUnit[] = [
-  { id: 'u1',  name: 'Voss',          race: 'insan',   level: 5, portrait: '/assets/characters/insan/voss.png',             unitClass: 'assault', power: 1840, hp: 450,  attack: 95,  defense: 72, speed: 55 },
-  { id: 'u2',  name: 'Chen',          race: 'insan',   level: 3, portrait: '/assets/characters/insan/chen.png',             unitClass: 'support', power: 1120, hp: 310,  attack: 42,  defense: 55, speed: 50 },
-  { id: 'u3',  name: 'Reyes',         race: 'insan',   level: 2, portrait: '/assets/characters/insan/reyes.png',            unitClass: 'sniper',  power: 980,  hp: 270,  attack: 88,  defense: 30, speed: 48 },
-  { id: 'u4',  name: 'Kovacs',        race: 'insan',   level: 4, portrait: '/assets/characters/insan/kovacs.png',           unitClass: 'tank',    power: 1650, hp: 620,  attack: 55,  defense: 90, speed: 28 },
-  { id: 'u5',  name: 'Vex Thara',     race: 'zerg',    level: 6, portrait: '/assets/characters/zerg/vex_thara.png',         unitClass: 'mage',    power: 2200, hp: 390,  attack: 110, defense: 40, speed: 80 },
-  { id: 'u6',  name: 'Morgath',       race: 'zerg',    level: 4, portrait: '/assets/characters/zerg/morgath.png',           unitClass: 'assault', power: 1780, hp: 440,  attack: 105, defense: 45, speed: 75 },
-  { id: 'u7',  name: 'Threnix',       race: 'zerg',    level: 3, portrait: '/assets/characters/zerg/threnix.png',           unitClass: 'stealth', power: 1340, hp: 320,  attack: 88,  defense: 32, speed: 85 },
-  { id: 'u8',  name: 'Demiurge Prime',race: 'otomat',  level: 7, portrait: '/assets/characters/otomat/demiurge_prime.png',  unitClass: 'tank',    power: 2650, hp: 750,  attack: 80,  defense: 120, speed: 35 },
-  { id: 'u9',  name: 'Aurelius',      race: 'otomat',  level: 4, portrait: '/assets/characters/otomat/aurelius.png',        unitClass: 'sniper',  power: 1520, hp: 360,  attack: 98,  defense: 65, speed: 42 },
-  { id: 'u10', name: 'Khorvash',      race: 'canavar', level: 6, portrait: '/assets/characters/canavar/khorvash.png',       unitClass: 'assault', power: 2400, hp: 680,  attack: 130, defense: 70, speed: 38 },
-  { id: 'u11', name: 'Ravenna',       race: 'canavar', level: 4, portrait: '/assets/characters/canavar/ravenna.png',        unitClass: 'mage',    power: 1720, hp: 400,  attack: 115, defense: 42, speed: 45 },
-  { id: 'u12', name: 'Malphas',       race: 'seytan',  level: 8, portrait: '/assets/characters/seytan/malphas.png',         unitClass: 'mage',    power: 2900, hp: 420,  attack: 145, defense: 55, speed: 62 },
-  { id: 'u13', name: 'Lilithra',      race: 'seytan',  level: 5, portrait: '/assets/characters/seytan/lilithra.png',        unitClass: 'stealth', power: 1960, hp: 370,  attack: 122, defense: 38, speed: 78 },
-];
-
-export const DEMO_AVAILABLE_COMMANDERS: SlotCommander[] = [
-  { id: 'c1', name: 'Voss',          race: 'insan',   level: 5, portrait: '/assets/characters/insan/voss.png',            power: 3200, abilities: ['Stimpack', 'Zırh Takviyesi', 'Nişancı Modu'],   isUnlocked: true },
-  { id: 'c2', name: 'Demiurge Prime',race: 'otomat',  level: 7, portrait: '/assets/characters/otomat/demiurge_prime.png', power: 4800, abilities: ['Enerji Alanı', 'Holografik Yansıma'],            isUnlocked: true },
-  { id: 'c3', name: 'Malphas',       race: 'seytan',  level: 8, portrait: '/assets/characters/seytan/malphas.png',        power: 5600, abilities: ['Lanet Fırtınası', 'Ruh Çalma', 'Karanlık Portal'], isUnlocked: true },
-  { id: 'c4', name: 'Khorvash',      race: 'canavar', level: 6, portrait: '/assets/characters/canavar/khorvash.png',      power: 4100, abilities: ['Ateş Nefesi', 'Yıkım Darbesi'],                   isUnlocked: true },
-  { id: 'c5', name: 'Vex Thara',     race: 'zerg',    level: 6, portrait: '/assets/characters/zerg/vex_thara.png',        power: 3900, abilities: ['Kovan Sürüsü', 'Mutasyon Çağrısı'],               isUnlocked: true },
-];
-
 export interface UnitSlot {
   unitId: string;
   position: number;

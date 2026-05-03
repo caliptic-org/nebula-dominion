@@ -11,25 +11,57 @@ import { UnitRoster } from './UnitRoster';
 import {
   SlotUnit, SlotCommander, FormationSlotData, CommanderSlotData,
   RaceSynergy, RaceKey, RACE_COLORS, SYNERGY_RULES,
-  DEMO_AVAILABLE_UNITS, DEMO_AVAILABLE_COMMANDERS,
+  Formation, FormationTemplate, UnitSlot as ApiUnitSlot, CommanderSlot as ApiCommanderSlot,
+  FORMATION_LIMITS,
 } from './types';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
+import {
+  fetchPlayerUnits,
+  fetchTemplates,
+  fetchFormations,
+  createFormation,
+  updateFormation,
+  calculatePower,
+  unitToSlotUnit,
+  unitToSlotCommander,
+  isCommanderEligible,
+  FormationApiError,
+} from '@/lib/formation-api';
 
-const MAX_COMMANDERS = 5;
+const MAX_COMMANDERS = FORMATION_LIMITS.MAX_COMMANDER_SLOTS;
+// Backend caps total slots at 10. Layout: front 4 + middle 3 + rear 3 = 10.
 const ROWS = ['rear', 'middle', 'front'] as const;
-const SLOTS_PER_ROW = 5;
+const ROW_COUNTS: Record<typeof ROWS[number], number> = { rear: 3, middle: 3, front: 4 };
+const TOTAL_UNIT_SLOTS = FORMATION_LIMITS.MAX_UNIT_SLOTS;
 const ROW_LABELS: Record<string, string> = { front: 'Ön Saf', middle: 'Orta Saf', rear: 'Arka Saf' };
+const POWER_DEBOUNCE_MS = 350;
 
-/* ── Snapshot types for templates ────────────────────────────────────────── */
-interface FormationSnapshot {
+interface FormationScreenProps {
+  playerId: string;
+}
+
+interface SavedFormationEntry {
+  kind: 'saved';
+  id: string;
+  name: string;
+  unitSlots: FormationSlotData[];
+  commanderSlots: CommanderSlotData[];
+  isLastActive: boolean;
+}
+
+interface PresetEntry {
+  kind: 'preset';
+  id: string;
   name: string;
   unitSlots: FormationSlotData[];
   commanderSlots: CommanderSlotData[];
 }
 
+type TemplateEntry = SavedFormationEntry | PresetEntry;
+
 function buildInitialUnitSlots(): FormationSlotData[] {
   return ROWS.flatMap((row) =>
-    Array.from({ length: SLOTS_PER_ROW }, (_, i) => ({ id: `${row}-${i}`, row, index: i, unit: null }))
+    Array.from({ length: ROW_COUNTS[row] }, (_, i) => ({ id: `${row}-${i}`, row, index: i, unit: null }))
   );
 }
 
@@ -37,48 +69,169 @@ function buildInitialCommanderSlots(): CommanderSlotData[] {
   return Array.from({ length: MAX_COMMANDERS }, (_, i) => ({ id: `cmd-${i}`, index: i, commander: null }));
 }
 
-/* Pre-seeded demo templates */
-function buildPresetTemplates(): FormationSnapshot[] {
-  const attackUnits = buildInitialUnitSlots().map((s, i) => ({
-    ...s,
-    unit: i < 5 ? (DEMO_AVAILABLE_UNITS[i] ?? null) : null,
-  }));
-  const attackCmds = buildInitialCommanderSlots().map((s, i) => ({
-    ...s,
-    commander: i < 2 ? (DEMO_AVAILABLE_COMMANDERS[i] ?? null) : null,
-  }));
-
-  const defenseUnits = buildInitialUnitSlots().map((s, i) => ({
-    ...s,
-    unit: [3, 7, 9].includes(i) ? (DEMO_AVAILABLE_UNITS[[3, 7, 9].indexOf(i)] ?? null) : null,
-  }));
-  const defenseCmds = buildInitialCommanderSlots().map((s, i) => ({
-    ...s,
-    commander: i === 0 ? (DEMO_AVAILABLE_COMMANDERS[1] ?? null) : null,
-  }));
-
-  return [
-    { name: 'Saldırı Formasyonu', unitSlots: attackUnits, commanderSlots: attackCmds },
-    { name: 'Savunma Hattı',      unitSlots: defenseUnits, commanderSlots: defenseCmds },
-  ];
+function applyApiSlotsToVisual(
+  apiSlots: ApiUnitSlot[],
+  units: SlotUnit[],
+): FormationSlotData[] {
+  const visual = buildInitialUnitSlots();
+  const unitMap = new Map(units.map((u) => [u.id, u]));
+  for (const slot of apiSlots) {
+    if (slot.position < 0 || slot.position >= TOTAL_UNIT_SLOTS) continue;
+    const unit = unitMap.get(slot.unitId);
+    if (!unit) continue;
+    visual[slot.position] = { ...visual[slot.position], unit };
+  }
+  return visual;
 }
 
-export function FormationScreen() {
+function applyApiCommandersToVisual(
+  apiSlots: ApiCommanderSlot[],
+  commanders: SlotCommander[],
+): CommanderSlotData[] {
+  const visual = buildInitialCommanderSlots();
+  const cmdMap = new Map(commanders.map((c) => [c.id, c]));
+  for (const slot of apiSlots) {
+    if (slot.position < 0 || slot.position >= MAX_COMMANDERS) continue;
+    const cmd = cmdMap.get(slot.commanderId);
+    if (!cmd) continue;
+    visual[slot.position] = { ...visual[slot.position], commander: cmd };
+  }
+  return visual;
+}
+
+function visualToApiUnitSlots(slots: FormationSlotData[]): ApiUnitSlot[] {
+  const result: ApiUnitSlot[] = [];
+  slots.forEach((s, idx) => {
+    if (!s.unit) return;
+    if (idx >= FORMATION_LIMITS.MAX_UNIT_SLOTS) return;
+    result.push({ unitId: s.unit.id, position: idx });
+  });
+  return result;
+}
+
+function visualToApiCommanderSlots(slots: CommanderSlotData[]): ApiCommanderSlot[] {
+  const result: ApiCommanderSlot[] = [];
+  slots.forEach((s, idx) => {
+    if (!s.commander) return;
+    if (idx >= FORMATION_LIMITS.MAX_COMMANDER_SLOTS) return;
+    result.push({ commanderId: s.commander.id, position: idx });
+  });
+  return result;
+}
+
+export function FormationScreen({ playerId }: FormationScreenProps) {
   const { race, setRace, meta } = useRaceTheme();
   const rc = RACE_COLORS[race] ?? RACE_COLORS.insan;
 
-  const [unitSlots, setUnitSlots]             = useState<FormationSlotData[]>(buildInitialUnitSlots);
-  const [commanderSlots, setCommanderSlots]   = useState<CommanderSlotData[]>(buildInitialCommanderSlots);
-  const [rosterMode, setRosterMode]           = useState<'units' | 'commanders'>('units');
-  const [templates, setTemplates]             = useState<FormationSnapshot[]>(buildPresetTemplates);
-  const [activeTemplate, setActiveTemplate]   = useState<string | null>(null);
-  const [saveFlash, setSaveFlash]             = useState(false);
+  // ── Roster state (loaded from /units/player/:playerId) ────────────────────
+  const [availableUnits, setAvailableUnits] = useState<SlotUnit[]>([]);
+  const [availableCommanders, setAvailableCommanders] = useState<SlotCommander[]>([]);
+  const [unitsLoading, setUnitsLoading] = useState(true);
+  const [unitsError, setUnitsError] = useState<string | null>(null);
 
-  /* Mobile click-to-place: pending selection from roster */
-  const [pendingUnit, setPendingUnit]         = useState<SlotUnit | null>(null);
-  const [pendingCmd, setPendingCmd]           = useState<SlotCommander | null>(null);
+  // ── Formation state ───────────────────────────────────────────────────────
+  const [unitSlots, setUnitSlots] = useState<FormationSlotData[]>(buildInitialUnitSlots);
+  const [commanderSlots, setCommanderSlots] = useState<CommanderSlotData[]>(buildInitialCommanderSlots);
+  const [rosterMode, setRosterMode] = useState<'units' | 'commanders'>('units');
 
-  /* ── Auto race theme: dominant race in formation ─────────────────────── */
+  // ── Templates: backend presets + user-saved formations ────────────────────
+  const [presets, setPresets] = useState<PresetEntry[]>([]);
+  const [savedFormations, setSavedFormations] = useState<SavedFormationEntry[]>([]);
+  const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+  const [activeFormationId, setActiveFormationId] = useState<string | null>(null);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+
+  // ── Save / power state ────────────────────────────────────────────────────
+  const [saveFlash, setSaveFlash] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [serverPower, setServerPower] = useState<number | null>(null);
+  const [powerCalculating, setPowerCalculating] = useState(false);
+
+  // ── Mobile click-to-place ─────────────────────────────────────────────────
+  const [pendingUnit, setPendingUnit] = useState<SlotUnit | null>(null);
+  const [pendingCmd, setPendingCmd] = useState<SlotCommander | null>(null);
+
+  // ── Initial data load ─────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setUnitsLoading(true);
+    setUnitsError(null);
+
+    fetchPlayerUnits(playerId)
+      .then((rawUnits) => {
+        if (cancelled) return;
+        const units = rawUnits.map(unitToSlotUnit);
+        const commanders = rawUnits
+          .filter(isCommanderEligible)
+          .map(unitToSlotCommander);
+        setAvailableUnits(units);
+        setAvailableCommanders(commanders);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : 'Birimler yüklenemedi';
+        setUnitsError(message);
+      })
+      .finally(() => {
+        if (!cancelled) setUnitsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [playerId]);
+
+  // Templates and saved formations depend on the loaded units to resolve slot references.
+  useEffect(() => {
+    if (unitsLoading) return;
+    let cancelled = false;
+    setTemplatesLoading(true);
+
+    Promise.all([fetchTemplates(), fetchFormations(playerId, 1, 50)])
+      .then(([tplList, savedList]) => {
+        if (cancelled) return;
+
+        const presetEntries: PresetEntry[] = tplList.map((tpl: FormationTemplate) => ({
+          kind: 'preset',
+          id: tpl.id,
+          name: tpl.name,
+          unitSlots: applyApiSlotsToVisual(tpl.unitSlots, availableUnits),
+          commanderSlots: applyApiCommandersToVisual(tpl.commanderSlots, availableCommanders),
+        }));
+        setPresets(presetEntries);
+
+        const savedEntries: SavedFormationEntry[] = savedList.formations.map((f: Formation) => ({
+          kind: 'saved',
+          id: f.id,
+          name: f.name,
+          unitSlots: applyApiSlotsToVisual(f.unitSlots, availableUnits),
+          commanderSlots: applyApiCommandersToVisual(f.commanderSlots, availableCommanders),
+          isLastActive: f.isLastActive,
+        }));
+        setSavedFormations(savedEntries);
+
+        // Auto-load last-active formation, if any
+        const lastActive = savedEntries.find((e) => e.isLastActive) ?? savedEntries[0];
+        if (lastActive) {
+          setUnitSlots(lastActive.unitSlots);
+          setCommanderSlots(lastActive.commanderSlots);
+          setActiveTemplate(lastActive.name);
+          setActiveFormationId(lastActive.id);
+        }
+      })
+      .catch(() => {
+        // Non-fatal: keep an empty list. Errors here shouldn't block placing units.
+        if (cancelled) return;
+        setPresets([]);
+        setSavedFormations([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTemplatesLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [playerId, unitsLoading, availableUnits, availableCommanders]);
+
+  /* ── Synergy detection (pure client-side: race counts) ─────────────────── */
   const synergies = useMemo<RaceSynergy[]>(() => {
     const counts = new Map<string, number>();
     unitSlots.forEach((s)      => { if (s.unit)      counts.set(s.unit.race,      (counts.get(s.unit.race)      ?? 0) + 1); });
@@ -111,17 +264,60 @@ export function FormationScreen() {
     () => new Set(commanderSlots.map((s) => s.commander?.id).filter(Boolean) as string[]),
     [commanderSlots],
   );
-  const totalPower = useMemo(() => {
+
+  const optimisticPower = useMemo(() => {
     const up = unitSlots.reduce((acc, s)      => acc + (s.unit?.power      ?? 0), 0);
     const cp = commanderSlots.reduce((acc, s) => acc + (s.commander?.power ?? 0), 0);
     return up + cp;
   }, [unitSlots, commanderSlots]);
 
+  const displayedPower = serverPower ?? optimisticPower;
+
   const filledSlots = unitSlots.filter((s) => !!s.unit).length;
+
+  /* ── Server-side power (debounced) ────────────────────────────────────── */
+  const apiUnitSlotsKey = useMemo(
+    () => JSON.stringify(visualToApiUnitSlots(unitSlots)),
+    [unitSlots],
+  );
+  const apiCmdSlotsKey = useMemo(
+    () => JSON.stringify(visualToApiCommanderSlots(commanderSlots)),
+    [commanderSlots],
+  );
+
+  useEffect(() => {
+    const apiUnitSlots = JSON.parse(apiUnitSlotsKey) as ApiUnitSlot[];
+    const apiCmdSlots  = JSON.parse(apiCmdSlotsKey)  as ApiCommanderSlot[];
+
+    if (apiUnitSlots.length === 0 && apiCmdSlots.length === 0) {
+      setServerPower(null);
+      setPowerCalculating(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPowerCalculating(true);
+
+    const handle = window.setTimeout(() => {
+      calculatePower({
+        playerId,
+        unitSlots: apiUnitSlots,
+        commanderSlots: apiCmdSlots,
+      })
+        .then((res) => { if (!cancelled) setServerPower(res.totalPower); })
+        .catch(() => { /* Keep optimistic — server rejected (validation, ownership, etc.) */ })
+        .finally(() => { if (!cancelled) setPowerCalculating(false); });
+    }, POWER_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [playerId, apiUnitSlotsKey, apiCmdSlotsKey]);
 
   /* ── Unit slot interactions ───────────────────────────────────────────── */
   const handleUnitDrop = useCallback((toSlotId: string, unitId: string) => {
-    const unit = DEMO_AVAILABLE_UNITS.find((u) => u.id === unitId);
+    const unit = availableUnits.find((u) => u.id === unitId);
     if (!unit) return;
     setUnitSlots((prev) =>
       prev.map((s) => {
@@ -130,20 +326,18 @@ export function FormationScreen() {
         return s;
       })
     );
-  }, []);
+  }, [availableUnits]);
 
   const handleUnitRemove = useCallback((slotId: string) => {
     setUnitSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, unit: null } : s));
   }, []);
 
-  /* Mobile: clicking an empty slot places the pending unit */
   const handleUnitSlotClick = useCallback((slotId: string, currentUnit: SlotUnit | null) => {
     if (pendingUnit) {
-      // Swap or place
       setUnitSlots((prev) =>
         prev.map((s) => {
-          if (s.unit?.id === pendingUnit.id) return { ...s, unit: currentUnit }; // source gets old occupant
-          if (s.id === slotId) return { ...s, unit: pendingUnit };               // target gets pending
+          if (s.unit?.id === pendingUnit.id) return { ...s, unit: currentUnit };
+          if (s.id === slotId) return { ...s, unit: pendingUnit };
           return s;
         })
       );
@@ -155,7 +349,7 @@ export function FormationScreen() {
 
   /* ── Commander slot interactions ─────────────────────────────────────── */
   const handleCommanderDrop = useCallback((toSlotId: string, commanderId: string) => {
-    const cmd = DEMO_AVAILABLE_COMMANDERS.find((c) => c.id === commanderId);
+    const cmd = availableCommanders.find((c) => c.id === commanderId);
     if (!cmd) return;
     setCommanderSlots((prev) =>
       prev.map((s) => {
@@ -164,7 +358,7 @@ export function FormationScreen() {
         return s;
       })
     );
-  }, []);
+  }, [availableCommanders]);
 
   const handleCommanderRemove = useCallback((slotId: string) => {
     setCommanderSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, commander: null } : s));
@@ -196,34 +390,74 @@ export function FormationScreen() {
     setPendingUnit(null);
   }, []);
 
-  /* ── Template save / load ─────────────────────────────────────────────── */
-  const handleSave = useCallback(() => {
-    const name = `Formasyon ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
-    const snapshot: FormationSnapshot = {
-      name,
-      unitSlots: unitSlots.map((s) => ({ ...s })),
-      commanderSlots: commanderSlots.map((s) => ({ ...s })),
-    };
-    setTemplates((prev) => [...prev.slice(-4), snapshot]);
-    setActiveTemplate(name);
-    setSaveFlash(true);
-    setTimeout(() => setSaveFlash(false), 1400);
-  }, [unitSlots, commanderSlots]);
+  /* ── Save: POST or PUT depending on whether a saved formation is active ── */
+  const handleSave = useCallback(async () => {
+    const apiUnitSlots = visualToApiUnitSlots(unitSlots);
+    const apiCmdSlots = visualToApiCommanderSlots(commanderSlots);
 
-  const handleLoadTemplate = useCallback((templateName: string) => {
-    const tpl = templates.find((t) => t.name === templateName);
-    if (!tpl) return;
-    setUnitSlots(tpl.unitSlots.map((s) => ({ ...s })));
-    setCommanderSlots(tpl.commanderSlots.map((s) => ({ ...s })));
-    setActiveTemplate(templateName);
+    setSaving(true);
+    setSaveError(null);
+
+    try {
+      let saved: Formation;
+      if (activeFormationId) {
+        saved = await updateFormation(activeFormationId, playerId, {
+          name: activeTemplate ?? `Formasyon ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
+          unitSlots: apiUnitSlots,
+          commanderSlots: apiCmdSlots,
+        });
+      } else {
+        const name = `Formasyon ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        saved = await createFormation({
+          playerId,
+          name,
+          unitSlots: apiUnitSlots,
+          commanderSlots: apiCmdSlots,
+        });
+      }
+
+      const entry: SavedFormationEntry = {
+        kind: 'saved',
+        id: saved.id,
+        name: saved.name,
+        unitSlots: applyApiSlotsToVisual(saved.unitSlots, availableUnits),
+        commanderSlots: applyApiCommandersToVisual(saved.commanderSlots, availableCommanders),
+        isLastActive: saved.isLastActive,
+      };
+      setSavedFormations((prev) => {
+        const without = prev.filter((e) => e.id !== saved.id);
+        return [entry, ...without].slice(0, 10);
+      });
+      setActiveFormationId(saved.id);
+      setActiveTemplate(saved.name);
+      setServerPower(saved.totalPower);
+
+      setSaveFlash(true);
+      window.setTimeout(() => setSaveFlash(false), 1400);
+    } catch (err: unknown) {
+      const message = err instanceof FormationApiError ? err.message
+        : err instanceof Error ? err.message
+        : 'Formasyon kaydedilemedi';
+      setSaveError(message);
+    } finally {
+      setSaving(false);
+    }
+  }, [activeFormationId, activeTemplate, availableCommanders, availableUnits, commanderSlots, playerId, unitSlots]);
+
+  const handleLoadEntry = useCallback((entry: TemplateEntry) => {
+    setUnitSlots(entry.unitSlots.map((s) => ({ ...s })));
+    setCommanderSlots(entry.commanderSlots.map((s) => ({ ...s })));
+    setActiveTemplate(entry.name);
+    setActiveFormationId(entry.kind === 'saved' ? entry.id : null);
     setPendingUnit(null);
     setPendingCmd(null);
-  }, [templates]);
+  }, []);
 
   const handleReset = useCallback(() => {
     setUnitSlots(buildInitialUnitSlots());
     setCommanderSlots(buildInitialCommanderSlots());
     setActiveTemplate(null);
+    setActiveFormationId(null);
     setPendingUnit(null);
     setPendingCmd(null);
   }, []);
@@ -238,6 +472,26 @@ export function FormationScreen() {
   }, []);
 
   const hasPending = !!pendingUnit || !!pendingCmd;
+  const allTemplates: TemplateEntry[] = useMemo(
+    () => [...savedFormations, ...presets],
+    [savedFormations, presets],
+  );
+
+  /* ── Initial load: error / empty state ────────────────────────────────── */
+  if (unitsError) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-4" style={{ background: '#080a10' }}>
+        <MangaPanel thick className="p-8 max-w-md text-center">
+          <div className="text-3xl mb-3">⚠️</div>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-text-primary mb-2">
+            Birimler yüklenemedi
+          </h2>
+          <p className="text-text-muted font-body text-xs mb-4">{unitsError}</p>
+          <GlowButton size="sm" onClick={() => window.location.reload()}>Yeniden Dene</GlowButton>
+        </MangaPanel>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -263,6 +517,23 @@ export function FormationScreen() {
         >
           {pendingUnit ? `${pendingUnit.name} seçildi — slot'a yerleştir` : `${pendingCmd?.name} seçildi — slot'a yerleştir`}
           {' · '}ESC iptal
+        </div>
+      )}
+
+      {/* Save error toast */}
+      {saveError && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-xs font-display border max-w-md text-center"
+          style={{ background: 'rgba(255,51,85,0.12)', color: '#ff5577', borderColor: 'rgba(255,51,85,0.35)' }}
+          role="alert"
+          aria-live="assertive"
+        >
+          {saveError}
+          <button
+            onClick={() => setSaveError(null)}
+            className="ml-2 opacity-70 hover:opacity-100"
+            aria-label="Hatayı kapat"
+          >✕</button>
         </div>
       )}
 
@@ -296,10 +567,11 @@ export function FormationScreen() {
           <GlowButton
             size="sm"
             onClick={handleSave}
+            disabled={saving || unitsLoading}
             className={clsx(saveFlash && 'scale-105')}
             style={saveFlash ? { boxShadow: `0 0 24px ${rc.glow}` } : undefined}
           >
-            {saveFlash ? '✓ Kaydedildi' : 'Kaydet'}
+            {saving ? 'Kaydediliyor…' : saveFlash ? '✓ Kaydedildi' : 'Kaydet'}
           </GlowButton>
         </div>
       </header>
@@ -312,7 +584,22 @@ export function FormationScreen() {
 
           {/* Power summary */}
           <MangaPanel thick glow className="p-4">
-            <PowerBar current={totalPower} max={50000} raceColor={rc.color} raceGlow={rc.glow} />
+            <PowerBar current={displayedPower} max={50000} raceColor={rc.color} raceGlow={rc.glow} />
+            <div className="mt-2 flex items-center justify-end gap-1.5 text-[9px] font-display uppercase tracking-widest text-text-muted">
+              {powerCalculating ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: rc.color }} aria-hidden />
+                  <span>Sunucu hesaplıyor…</span>
+                </>
+              ) : serverPower !== null ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#44ff88' }} aria-hidden />
+                  <span>Sunucu doğruladı</span>
+                </>
+              ) : (
+                <span>Tahmini güç</span>
+              )}
+            </div>
           </MangaPanel>
 
           {/* Commander slots */}
@@ -378,7 +665,7 @@ export function FormationScreen() {
                           key={slot.id}
                           unit={slot.unit}
                           slotId={slot.id}
-                          animDelay={(ri * SLOTS_PER_ROW + si) * 45}
+                          animDelay={(ri * 5 + si) * 45}
                           pendingUnit={pendingUnit}
                           onDrop={handleUnitDrop}
                           onSlotClick={handleUnitSlotClick}
@@ -411,30 +698,49 @@ export function FormationScreen() {
 
           {/* Template bar */}
           <div className="flex gap-2 flex-wrap items-center">
-            <GlowButton size="sm" onClick={handleSave} icon={<span>💾</span>}>Kaydet</GlowButton>
+            <GlowButton size="sm" onClick={handleSave} icon={<span>💾</span>} disabled={saving || unitsLoading}>
+              {saving ? 'Kaydediliyor' : 'Kaydet'}
+            </GlowButton>
             <GlowButton size="sm" variant="ghost" onClick={handleReset}>Sıfırla</GlowButton>
             <div className="h-4 w-px bg-white/10" />
-            {templates.map((t) => (
-              <button
-                key={t.name}
-                onClick={() => handleLoadTemplate(t.name)}
-                title={`"${t.name}" formasyonunu yükle`}
-                className={clsx(
-                  'px-3 py-1.5 rounded-full text-[10px] font-display uppercase tracking-wider border transition-all duration-250',
-                  activeTemplate === t.name
-                    ? 'border-transparent'
-                    : 'border-white/08 text-text-muted hover:border-white/16 hover:text-text-secondary',
-                )}
-                style={activeTemplate === t.name ? {
-                  background:   rc.dim,
-                  color:        rc.color,
-                  borderColor:  `${rc.color}60`,
-                  boxShadow:    `0 0 10px ${rc.glow}`,
-                } : undefined}
-              >
-                {t.name}
-              </button>
-            ))}
+            {templatesLoading ? (
+              <span className="font-display text-[9px] uppercase tracking-wider text-text-muted">
+                Şablonlar yükleniyor…
+              </span>
+            ) : allTemplates.length === 0 ? (
+              <span className="font-display text-[9px] uppercase tracking-wider text-text-muted">
+                Kayıtlı formasyon yok
+              </span>
+            ) : (
+              allTemplates.map((t) => {
+                const key = `${t.kind}:${t.id}`;
+                const isActive = activeTemplate === t.name && (
+                  t.kind === 'preset' ? activeFormationId === null : activeFormationId === t.id
+                );
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleLoadEntry(t)}
+                    title={`"${t.name}" formasyonunu yükle`}
+                    className={clsx(
+                      'px-3 py-1.5 rounded-full text-[10px] font-display uppercase tracking-wider border transition-all duration-250 flex items-center gap-1.5',
+                      isActive
+                        ? 'border-transparent'
+                        : 'border-white/08 text-text-muted hover:border-white/16 hover:text-text-secondary',
+                    )}
+                    style={isActive ? {
+                      background:   rc.dim,
+                      color:        rc.color,
+                      borderColor:  `${rc.color}60`,
+                      boxShadow:    `0 0 10px ${rc.glow}`,
+                    } : undefined}
+                  >
+                    {t.kind === 'preset' && <span className="opacity-60">⚙︎</span>}
+                    {t.name}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -455,18 +761,35 @@ export function FormationScreen() {
               )}
             </div>
             <div className="flex flex-col" style={{ maxHeight: 'calc(100dvh - 10rem)' }}>
-              <UnitRoster
-                units={DEMO_AVAILABLE_UNITS}
-                commanders={DEMO_AVAILABLE_COMMANDERS}
-                placedUnitIds={placedUnitIds}
-                placedCommanderIds={placedCommanderIds}
-                mode={rosterMode}
-                onModeChange={setRosterMode}
-                selectedUnitId={pendingUnit?.id ?? null}
-                selectedCommanderId={pendingCmd?.id ?? null}
-                onSelectUnit={handleSelectUnit}
-                onSelectCommander={handleSelectCommander}
-              />
+              {unitsLoading ? (
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 rounded-lg animate-pulse"
+                      style={{ background: 'rgba(255,255,255,0.04)' }}
+                    />
+                  ))}
+                  <p className="text-text-muted font-body text-xs text-center pt-2">Birimler yükleniyor…</p>
+                </div>
+              ) : availableUnits.length === 0 ? (
+                <p className="text-text-muted font-body text-xs text-center py-6">
+                  Henüz birimin yok. Önce mağaza ya da savaştan birim kazan.
+                </p>
+              ) : (
+                <UnitRoster
+                  units={availableUnits}
+                  commanders={availableCommanders}
+                  placedUnitIds={placedUnitIds}
+                  placedCommanderIds={placedCommanderIds}
+                  mode={rosterMode}
+                  onModeChange={setRosterMode}
+                  selectedUnitId={pendingUnit?.id ?? null}
+                  selectedCommanderId={pendingCmd?.id ?? null}
+                  onSelectUnit={handleSelectUnit}
+                  onSelectCommander={handleSelectCommander}
+                />
+              )}
             </div>
           </MangaPanel>
         </div>

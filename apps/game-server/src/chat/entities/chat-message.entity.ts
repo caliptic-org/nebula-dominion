@@ -20,7 +20,7 @@ export class ChatMessage {
   @Index()
   channelType: ChannelType;
 
-  @Column({ name: 'channel_id', length: 100, nullable: true })
+  @Column({ name: 'channel_id', type: 'varchar', length: 100, nullable: true })
   channelId: string | null;
 
   @Column({ type: 'text' })

@@ -9,6 +9,7 @@ import { Slider } from '@/components/ui/Slider';
 import { SegmentedControl, SegmentedOption } from '@/components/ui/SegmentedControl';
 import { Button } from '@/components/ui/Button';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { clearTokens } from '@/lib/session';
 
 type GraphicsQuality = 'low' | 'mid' | 'high';
 type Language = 'tr' | 'en';
@@ -467,11 +468,7 @@ function AccountSection() {
 
   function handleLogout() {
     setLoggingOut(true);
-    try {
-      window.localStorage.removeItem('accessToken');
-    } catch {
-      /* ignore */
-    }
+    clearTokens();
     router.push('/login');
   }
 

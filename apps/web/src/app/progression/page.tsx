@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
 import { useProgression } from '@/hooks/useProgression';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
+import { useSession } from '@/hooks/useSession';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { AgeTransitionScreen } from '@/components/progression/AgeTransitionScreen';
 import { ContentUnlock, LevelUpPayload, UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
@@ -27,6 +28,8 @@ export default function ProgressionPage() {
   const lastSeenAgeRef = useRef<number | null>(null);
   const [ageTransition, setAgeTransition] = useState<AgeTransitionState | null>(null);
 
+  const { userId } = useSession();
+
   const handleLevelUp = useCallback((payload: LevelUpPayload) => {
     const previousAge = lastSeenAgeRef.current;
     if (previousAge !== null && payload.age > previousAge) {
@@ -36,7 +39,7 @@ export default function ProgressionPage() {
   }, []);
 
   const { progress, loading } = useProgression({
-    userId: 'demo-player-001',
+    userId: userId ?? '',
     onLevelUp: handleLevelUp,
   });
 

@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { RACES, RACE_BY_ID, RaceId, RaceConfig } from './races';
+import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
+import { Race } from '@/types/units';
 
 const STAT_LABELS: Array<{ key: keyof RaceConfig['stats']; label: string }> = [
   { key: 'attack', label: 'Saldırı' },
@@ -42,9 +44,15 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 
 export default function RaceSelectPage() {
   const router = useRouter();
+  const { commit } = useRaceCommitment();
   const [selectedId, setSelectedId] = useState<RaceId>('insan');
   const [hoveredId, setHoveredId] = useState<RaceId | null>(null);
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
+
+  const handleStart = () => {
+    commit(selected.id as Race);
+    router.push(`/?race=${selected.id}`);
+  };
 
   const activeId = hoveredId ?? selectedId;
   const active = RACE_BY_ID[activeId];
@@ -422,7 +430,7 @@ export default function RaceSelectPage() {
           {/* CTA */}
           <div className="mt-auto pt-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
             <button
-              onClick={() => router.push(`/?race=${selected.id}`)}
+              onClick={handleStart}
               className="w-full py-3 px-4 rounded-xl font-extrabold text-sm tracking-wider uppercase transition-all duration-200 hover:brightness-110 active:scale-[0.99] outline-none focus-visible:ring-2"
               style={{
                 background: `linear-gradient(135deg, ${selected.color}cc 0%, ${selected.color} 100%)`,

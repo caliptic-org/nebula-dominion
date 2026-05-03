@@ -1,3 +1,5 @@
+import { getAccessToken } from './session'
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
 
 export class FetchError extends Error {
@@ -12,10 +14,15 @@ export class FetchError extends Error {
 }
 
 export async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAccessToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'include',
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   })
 
   if (!res.ok) {

@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useProgression } from '@/hooks/useProgression';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { useSession } from '@/hooks/useSession';
+import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { STRUCTURE_ASSETS } from '@/lib/assets';
 import { BottomNav } from '@/components/ui/BottomNav';
@@ -27,11 +29,6 @@ const IsometricTilemap = dynamic(
     </div>
   )}
 );
-
-// TODO(auth): replace DEMO_USER_ID with the authenticated session's userId.
-// The /battle route should also resolve the user from session/cookie rather
-// than receiving it via query string (avoids leaking IDs to logs / referrers).
-const DEMO_USER_ID = 'demo-player-001';
 
 const STRUCTURES_ON_MAP = [
   { col: 3, row: 2, structureKey: 'kovan_kalbi' as keyof typeof STRUCTURE_ASSETS },
@@ -68,8 +65,19 @@ export default function HomePage() {
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [portraitImgError, setPortraitImgError] = useState(false);
 
+  const { userId, loading: sessionLoading } = useSession();
+  const { committed: committedRace } = useRaceCommitment();
+
+  // Auth flow: signed-in users without a race land on race-select before the base.
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (userId && committedRace === null) {
+      router.replace('/race-select');
+    }
+  }, [sessionLoading, userId, committedRace, router]);
+
   const { progress, loading } = useProgression({
-    userId: DEMO_USER_ID,
+    userId: userId ?? '',
     onLevelUp: (payload) => {
       setPendingLevelUp(payload);
       if (payload.newUnlocks.length) setPendingUnlocks(payload.newUnlocks);

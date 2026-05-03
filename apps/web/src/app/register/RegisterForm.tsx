@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { setTokens } from '@/lib/session';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -50,14 +51,8 @@ export function RegisterForm() {
         throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
       }
 
-      const data = (await res.json()) as { accessToken?: string };
-      if (data.accessToken) {
-        try {
-          window.localStorage.setItem('accessToken', data.accessToken);
-        } catch {
-          /* localStorage unavailable (private mode); auth-required pages will surface 401 */
-        }
-      }
+      const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
+      setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
 
       router.push('/race-select');
     } catch (err) {

@@ -3,6 +3,21 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { GlowButton } from '@/components/ui/GlowButton';
+import { setTokens } from '@/lib/session';
+
+const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
+
+function hasRaceCommitment(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(RACE_COMMITMENT_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { race?: string; committedAt?: number };
+    return Boolean(parsed?.race && typeof parsed.committedAt === 'number');
+  } catch {
+    return false;
+  }
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -27,16 +42,10 @@ export function LoginForm() {
         throw new Error(data.message ?? 'Giriş başarısız. Tekrar dene.');
       }
 
-      const data = (await res.json()) as { accessToken?: string };
-      if (data.accessToken) {
-        try {
-          window.localStorage.setItem('accessToken', data.accessToken);
-        } catch {
-          /* localStorage unavailable (private mode); auth-required pages will surface 401 */
-        }
-      }
+      const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
+      setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
 
-      router.push('/race-select');
+      router.push(hasRaceCommitment() ? '/' : '/race-select');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {

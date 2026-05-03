@@ -13,8 +13,6 @@ import { MergeService } from './merge/merge.service';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 
-const BOT_USER_ID_PREFIX = 'bot:';
-
 export interface GameCreatedEvent {
   match: MatchResult;
   room: GameRoom;

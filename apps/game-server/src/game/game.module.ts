@@ -12,8 +12,7 @@ import { MergeController } from './merge/merge.controller';
 
 @Module({
   imports: [AuthModule, MatchmakingModule, AntiCheatModule, ProgressionModule],
-  controllers: [MergeController],
-  providers: [GameGateway, GameService, RoomService, SessionService, MergeService],
-  exports: [GameService, RoomService, SessionService, MergeService],
+  providers: [GameGateway, GameService, RoomService, SessionService, MergeService, MergeController],
+  exports: [GameService, RoomService, SessionService],
 })
 export class GameModule {}

@@ -312,6 +312,7 @@ export default function WorldMapPage() {
   const [panelVisible,    setPanelVisible]    = useState(false);
   const [feedback,        setFeedback]        = useState<{ tone: 'info' | 'error'; text: string }|null>(null);
   const [pendingActionId, setPendingActionId] = useState<string|null>(null);
+  const [actionError,     setActionError]     = useState<unknown>(null);
 
   // ── Server state ─────────────────────────────────────────────────────────
   const {
@@ -324,9 +325,10 @@ export default function WorldMapPage() {
     error: playerResourcesError,
   } = useSWR<PlayerResourcesResponse>(PLAYER_RESOURCES_URL, fetcher, { refreshInterval: 3000 });
 
-  // Auth guard — redirect to /login if either fetch returns 401
+  // Auth guard — redirect to /login if any request returns 401
   useAuthGuard(mapStateError);
   useAuthGuard(playerResourcesError);
+  useAuthGuard(actionError);
 
   // Show a non-401 fetch error as a toast (auth errors are handled by the guard)
   useEffect(() => {
@@ -352,27 +354,14 @@ export default function WorldMapPage() {
     if (!selected) return;
     setPendingActionId(action.id);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-      const res = await fetch(`${baseUrl}${MAP_ACTION_URL}`, {
+      await fetcher(MAP_ACTION_URL, {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action:    action.id,
           targetCol: selected.col,
           targetRow: selected.row,
         }),
       });
-      if (res.status === 401) {
-        window.location.href = '/login';
-        return;
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const message = (data as { message?: string }).message ?? `İşlem başarısız (${res.status})`;
-        setFeedback({ tone: 'error', text: `⚠ ${message}` });
-        return;
-      }
       setFeedback({ tone: 'info', text: `${action.icon} ${action.label} komutu verildi` });
       // Refresh resources & map state — server state may have changed.
       mutate(PLAYER_RESOURCES_URL);
@@ -380,6 +369,11 @@ export default function WorldMapPage() {
       setPanelVisible(false);
       setSelected(null);
     } catch (err) {
+      // Route 401s through the shared auth guard; other errors surface as a toast.
+      if (err instanceof FetchError && err.status === 401) {
+        setActionError(err);
+        return;
+      }
       const text = err instanceof Error ? err.message : 'Ağ hatası';
       setFeedback({ tone: 'error', text: `⚠ ${text}` });
     } finally {

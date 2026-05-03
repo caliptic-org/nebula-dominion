@@ -187,23 +187,26 @@ type EnemyInput = Omit<
 > & Partial<Pick<WorldEnemy, 'col' | 'row' | 'fcol' | 'frow' | 'targetCol' | 'targetRow' | 'progress' | 'pathIdx'>>;
 
 function normalizeEnemy(input: EnemyInput, idx: number): WorldEnemy {
-  const path = input.patrolPath?.length ? input.patrolPath : [[0, 0], [0, 0]];
-  const start = path[0];
-  const next  = path[Math.min(1, path.length - 1)];
-  const col   = input.col   ?? start[0];
-  const row   = input.row   ?? start[1];
+  const incomingPath = input.patrolPath?.length ? input.patrolPath : [];
+  const col = input.col ?? incomingPath[0]?.[0] ?? 0;
+  const row = input.row ?? incomingPath[0]?.[1] ?? 0;
+  const targetCol = input.targetCol ?? incomingPath[1]?.[0] ?? incomingPath[0]?.[0] ?? col;
+  const targetRow = input.targetRow ?? incomingPath[1]?.[1] ?? incomingPath[0]?.[1] ?? row;
+  const patrolPath: Array<[number, number]> = incomingPath.length
+    ? incomingPath
+    : [[col, row], [col, row]];
   return {
     id:        input.id,
     race:      input.race,
     power:     input.power,
-    patrolPath: path,
+    patrolPath,
     col, row,
-    fcol:      input.fcol      ?? col,
-    frow:      input.frow      ?? row,
-    targetCol: input.targetCol ?? next[0],
-    targetRow: input.targetRow ?? next[1],
-    progress:  input.progress  ?? idx * 0.18,
-    pathIdx:   input.pathIdx   ?? 0,
+    fcol:      input.fcol     ?? col,
+    frow:      input.frow     ?? row,
+    targetCol,
+    targetRow,
+    progress:  input.progress ?? idx * 0.18,
+    pathIdx:   input.pathIdx  ?? 0,
   };
 }
 

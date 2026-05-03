@@ -12,6 +12,8 @@ import { MangaPanel } from '@/components/ui/MangaPanel';
 import { LevelUpModal } from '@/components/progression/LevelUpModal';
 import { UnlockNotification } from '@/components/progression/UnlockNotification';
 import { LevelUpPayload, ContentUnlock } from '@/types/progression';
+import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
+import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
 import clsx from 'clsx';
 
 const IsometricTilemap = dynamic(
@@ -55,9 +57,8 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<Tab>('base');
   const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpPayload | null>(null);
   const [pendingUnlocks, setPendingUnlocks] = useState<ContentUnlock[]>([]);
-  const [selectedRace, setSelectedRace] = useState<Race>(Race.INSAN);
-  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [demoUnits, setDemoUnits] = useState<PlayerUnit[]>(DEMO_UNITS[Race.INSAN]);
+  const [selectedTile, setSelectedTile] = useState<{ col: number; row: number } | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   const { progress, loading } = useProgression({
     userId: DEMO_USER_ID,
@@ -455,6 +456,16 @@ export default function HomePage() {
             </div>
           )}
         </main>
+
+        {/* ── HUD: Shortcut Buttons (right side) ───────────── */}
+        <ShortcutButtons
+          unreadMessages={3}
+          activeMissions={2}
+          inventoryStatus="full"
+        />
+
+        {/* ── HUD: Unit Production Queue (bottom left) ──────── */}
+        <UnitProductionQueue />
 
         {/* ── Bottom Navigation ─────────────────────────────── */}
         <nav

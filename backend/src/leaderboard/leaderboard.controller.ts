@@ -8,17 +8,60 @@ import {
   ParseIntPipe,
   ParseUUIDPipe,
   DefaultValuePipe,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { LeaderboardService } from './leaderboard.service';
 import { UpdateScoreDto } from './dto/leaderboard-query.dto';
+import {
+  V1LeaderboardQueryDto,
+  V1MeQueryDto,
+  V1PeriodQueryDto,
+} from './dto/v1-leaderboard-query.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('leaderboard')
-@Controller({ path: 'leaderboard', version: '1' })
+@Controller('api/v1/leaderboard')
 export class LeaderboardController {
   constructor(private readonly svc: LeaderboardService) {}
 
-  // ─── Global ──────────────────────────────────────────────────────────────────
+  // ─── V1 Public API (JWT required) ─────────────────────────────────────────
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get leaderboard by category and period (paginated)' })
+  @ApiResponse({ status: 200, description: 'Paginated leaderboard entries' })
+  getLeaderboardV1(@Query() query: V1LeaderboardQueryDto) {
+    return this.svc.getLeaderboardV1(
+      query.category,
+      query.period,
+      query.page ?? 1,
+      query.limit ?? 50,
+    );
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get authenticated user's rank for a category and period" })
+  @ApiResponse({ status: 200, description: "Current user's rank, score, and delta" })
+  getMyRankV1(@Query() query: V1MeQueryDto, @CurrentUser() user: JwtPayload) {
+    return this.svc.getMyRankV1(user.sub, query.category, query.period);
+  }
+
+  @Get('period')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get period reset time for weekly or seasonal leaderboard' })
+  @ApiResponse({ status: 200, description: 'Next reset timestamp and period type' })
+  getPeriodInfo(@Query() query: V1PeriodQueryDto) {
+    return this.svc.getPeriodInfo(query.type);
+  }
+
+  // ─── Legacy: Global ───────────────────────────────────────────────────────
 
   @Get('global')
   @ApiOperation({ summary: 'Get global leaderboard (Redis sorted set)' })
@@ -54,7 +97,7 @@ export class LeaderboardController {
       .then((score) => ({ score }));
   }
 
-  // ─── Sector ──────────────────────────────────────────────────────────────────
+  // ─── Legacy: Sector ───────────────────────────────────────────────────────
 
   @Get('sector/:sectorId')
   @ApiOperation({ summary: 'Get sector leaderboard by player contribution score' })
@@ -78,7 +121,7 @@ export class LeaderboardController {
     return this.svc.getSectorRank(sectorId, playerId).then((rank) => ({ rank }));
   }
 
-  // ─── Weekly ───────────────────────────────────────────────────────────────────
+  // ─── Legacy: Weekly ───────────────────────────────────────────────────────
 
   @Get('weekly/:leagueId')
   @ApiOperation({ summary: 'Get weekly league leaderboard (Redis sorted set)' })

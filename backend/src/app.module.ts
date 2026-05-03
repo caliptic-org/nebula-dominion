@@ -24,6 +24,7 @@ import { AnalyticsEvent } from './analytics/entities/event.entity';
 import { PlayerBuff } from './stats/entities/player-buff.entity';
 import { PlayerResource as StatsPlayerResource } from './stats/entities/player-resource.entity';
 import { PlayerPower } from './stats/entities/player-power.entity';
+import { LeaderboardSnapshot } from './leaderboard/entities/leaderboard-snapshot.entity';
 import { BattleModule } from './battle/battle.module';
 import { StorageModule } from './storage/storage.module';
 import { RedisModule } from './redis/redis.module';
@@ -43,6 +44,7 @@ import { ProgressionSchema1746500000000 } from './database/migrations/1746500000
 import { VipSchema1746700000000 } from './database/migrations/1746700000000-VipSchema';
 import { AnalyticsSchema1746400000000 } from './database/migrations/1746400000000-AnalyticsSchema';
 import { StatsSchema1746500000000 } from './database/migrations/1746500000000-StatsSchema';
+import { LeaderboardSchema1746500000000 } from './database/migrations/1746500000000-LeaderboardSchema';
 
 @Module({
   imports: [
@@ -66,6 +68,7 @@ import { StatsSchema1746500000000 } from './database/migrations/1746500000000-St
           PlayerBuff,
           StatsPlayerResource,
           PlayerPower,
+          LeaderboardSnapshot,
         ],
         migrations: [
           BattleSchema1746100000000,
@@ -76,6 +79,7 @@ import { StatsSchema1746500000000 } from './database/migrations/1746500000000-St
           VipSchema1746700000000,
           AnalyticsSchema1746400000000,
           StatsSchema1746500000000,
+          LeaderboardSchema1746500000000,
         ],
         synchronize: config.get('NODE_ENV') === 'development',
         logging: config.get('NODE_ENV') === 'development',

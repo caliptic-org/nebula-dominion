@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRaceTheme } from '@/hooks/useRaceTheme';
 import clsx from 'clsx';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
+import {
+  useVipStatus,
+  useVipPlans,
+  claimDailyVip,
+  purchaseVip,
+  FetchError,
+  type VipPlan,
+  type VipReward,
+} from '@/hooks/useVip';
 
 // ── VIP Level Data ───────────────────────────────────────────────────────────
 interface VipLevel {
@@ -44,15 +53,17 @@ const ALL_BENEFITS: VipBenefit[] = [
   { id: 'annual-skin',   icon: '🌟', title: 'Eşsiz Yıllık Skin',       description: 'Hiç kimsenin sahip olmadığı özel skin',  unlocksAt: 10, tier: 'legendary' },
 ];
 
+const LEVEL_XP_THRESHOLDS = [0, 500, 1200, 2500, 4500, 7500, 12000, 18000, 26000, 36000];
+const LEVEL_ICONS = ['🥉','🥉','🥈','🥈','🥇','🥇','💠','💠','💎','👑'];
+
 const VIP_LEVELS: VipLevel[] = Array.from({ length: 10 }, (_, i) => {
   const level = i + 1;
-  const icons = ['🥉','🥉','🥈','🥈','🥇','🥇','💠','💠','💎','👑'];
   return {
     level,
     label: `VIP ${level}`,
-    xpRequired: level === 1 ? 0 : [0, 500, 1200, 2500, 4500, 7500, 12000, 18000, 26000, 36000][level - 1],
-    icon: icons[i],
-    benefits: ALL_BENEFITS.filter(b => b.unlocksAt === level),
+    xpRequired: LEVEL_XP_THRESHOLDS[level - 1],
+    icon: LEVEL_ICONS[i],
+    benefits: ALL_BENEFITS.filter((b) => b.unlocksAt === level),
   };
 });
 
@@ -64,32 +75,66 @@ const TIER_STYLES: Record<VipBenefit['tier'], { color: string; glow: string; bad
   legendary:{ color: '#cc00ff', glow: 'rgba(204,0,255,0.40)',   badge: 'rgba(204,0,255,0.12)'   },
 };
 
-// Plan tiers
-const PLANS = [
-  { id: 'monthly',   label: 'Aylık',   price: '₺179,99', usd: '$4.99',  duration: 30,  gems: 0,    tag: null,        popular: false },
-  { id: 'quarterly', label: '3 Aylık', price: '₺449,99', usd: '$12.99', duration: 90,  gems: 200,  tag: 'POPÜLER',   popular: true  },
-  { id: 'annual',    label: 'Yıllık',  price: '₺1399,99',usd: '$39.99', duration: 365, gems: 1000, tag: 'EN İYİ DEĞER', popular: false },
-];
+const GOLD = '#FFD700';
+const GOLD_DIM = 'rgba(255,215,0,0.12)';
+const GOLD_GLOW = 'rgba(255,215,0,0.35)';
 
-const DAILY_REWARDS = [
-  { icon: '💎', label: '+50 Kristal',  color: '#00cfff' },
-  { icon: '⚡', label: '2× XP',       color: '#FFD700' },
-  { icon: '🛡️', label: '4h Kalkan',   color: '#44ff88' },
-  { icon: '⛏️', label: 'Kaynak ×1.2', color: '#ff6600' },
-  { icon: '⭐', label: 'Bonus Görev', color: '#cc00ff' },
-  { icon: '🎁', label: 'Sürpriz Ödül',color: '#FFD700' },
-  { icon: '🔮', label: 'Void Crystal', color: '#44d9c8' },
-];
+// Module-level keyframe injection (matches the pattern used in VipBadge).
+const VIP_PAGE_KEYFRAMES = `
+  @keyframes vip-crown-pulse {
+    0%, 100% { box-shadow: 0 0 20px ${GOLD_GLOW}, 0 0 40px ${GOLD_GLOW}; }
+    50%       { box-shadow: 0 0 32px ${GOLD_GLOW}, 0 0 64px rgba(255,215,0,0.25); }
+  }
+  @keyframes vip-ring-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50%       { transform: scale(1.15); opacity: 0.15; }
+  }
+  @keyframes vip-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+  }
+  @keyframes vip-skeleton {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+`;
+
+let keyframesInjected = false;
+function ensureKeyframes() {
+  if (keyframesInjected || typeof document === 'undefined') return;
+  const style = document.createElement('style');
+  style.textContent = VIP_PAGE_KEYFRAMES;
+  document.head.appendChild(style);
+  keyframesInjected = true;
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function VipPage() {
-  const { raceColor, raceDim, raceGlow } = useRaceTheme();
-  const [currentVipLevel] = useState(3);
-  const [currentXp] = useState(3240);
-  const [selectedLevel, setSelectedLevel] = useState(3);
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'quarterly' | 'annual'>('quarterly');
+  ensureKeyframes();
+  const { raceGlow } = useRaceTheme();
+  const {
+    status,
+    loading: statusLoading,
+    error: statusError,
+    refetch: refetchStatus,
+    setStatus,
+    claimedToday,
+  } = useVipStatus();
+  const {
+    plans,
+    loading: plansLoading,
+    error: plansError,
+    refetch: refetchPlans,
+  } = useVipPlans();
+
+  const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
-  const [todayClaimed, setTodayClaimed] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimToast, setClaimToast] = useState<VipReward[] | null>(null);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const ladderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,44 +142,102 @@ export default function VipPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // Scroll active level into view on mount
+  // Sync selected level to current VIP level once status loads.
   useEffect(() => {
-    if (ladderRef.current) {
-      const node = ladderRef.current.querySelector(`[data-level="${currentVipLevel}"]`) as HTMLElement;
-      if (node) node.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    if (status && selectedLevel === null) {
+      setSelectedLevel(Math.max(1, status.vipLevel || 1));
     }
-  }, [currentVipLevel]);
+  }, [status, selectedLevel]);
 
-  const nextLevel = VIP_LEVELS[currentVipLevel]; // index = level, so VIP_LEVELS[3] = VIP 4
-  const xpForNext = nextLevel ? nextLevel.xpRequired : 0;
-  const xpForCurrent = VIP_LEVELS[currentVipLevel - 1].xpRequired;
-  const progressPct = nextLevel
-    ? Math.min(100, ((currentXp - xpForCurrent) / (xpForNext - xpForCurrent)) * 100)
-    : 100;
+  // Default selected plan once plans load (popular > first).
+  useEffect(() => {
+    if (plans && selectedPlanId === null && plans.length > 0) {
+      setSelectedPlanId((plans.find((p) => p.popular) ?? plans[0]).id);
+    }
+  }, [plans, selectedPlanId]);
 
-  const selectedLevelData = VIP_LEVELS[selectedLevel - 1];
-  const benefitsForSelected = ALL_BENEFITS.filter(b => b.unlocksAt <= selectedLevel);
-  const lockedBenefits = ALL_BENEFITS.filter(b => b.unlocksAt > selectedLevel && b.unlocksAt <= selectedLevel + 2);
+  // Scroll active level into view.
+  useEffect(() => {
+    if (!status || !ladderRef.current) return;
+    const target = Math.max(1, status.vipLevel || 1);
+    const node = ladderRef.current.querySelector(
+      `[data-level="${target}"]`,
+    ) as HTMLElement | null;
+    if (node) node.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [status]);
 
-  const gold = '#FFD700';
-  const goldDim = 'rgba(255,215,0,0.12)';
-  const goldGlow = 'rgba(255,215,0,0.35)';
-  const goldSolid = 'rgba(255,215,0,0.08)';
+  const currentVipLevel = status?.vipLevel ?? 0;
+  const displayLevel = Math.max(1, currentVipLevel);
+  const currentXp = status?.currentXp ?? 0;
+  const xpForNext = status?.nextLevelXp ?? VIP_LEVELS[Math.min(displayLevel, VIP_LEVELS.length - 1)].xpRequired;
+  const xpForCurrent = VIP_LEVELS[Math.max(0, displayLevel - 1)].xpRequired;
+  const hasNext = currentVipLevel < VIP_LEVELS.length;
+  const progressPct = useMemo(() => {
+    if (!hasNext) return 100;
+    const span = xpForNext - xpForCurrent;
+    if (span <= 0) return 100;
+    return Math.max(0, Math.min(100, ((currentXp - xpForCurrent) / span) * 100));
+  }, [hasNext, xpForNext, xpForCurrent, currentXp]);
+
+  const effectiveSelectedLevel = selectedLevel ?? displayLevel;
+  const benefitsForSelected = ALL_BENEFITS.filter((b) => b.unlocksAt <= effectiveSelectedLevel);
+  const lockedBenefits = ALL_BENEFITS.filter(
+    (b) => b.unlocksAt > effectiveSelectedLevel && b.unlocksAt <= effectiveSelectedLevel + 2,
+  );
+
+  const selectedPlan = plans?.find((p) => p.id === selectedPlanId) ?? null;
+
+  const handleClaim = async () => {
+    if (claimLoading || claimedToday) return;
+    setClaimLoading(true);
+    setClaimError(null);
+    try {
+      const result = await claimDailyVip();
+      setClaimToast(result.rewards);
+      setStatus((prev) => ({ ...prev, dailyClaimedAt: result.nextClaimAt }));
+      // Refetch to ensure UI reflects server-side state (XP/expiry may have changed).
+      refetchStatus();
+    } catch (err) {
+      if (err instanceof FetchError && err.status === 404) {
+        setClaimError('Aktif VIP üyeliğin bulunmuyor.');
+      } else {
+        setClaimError(err instanceof Error ? err.message : 'Ödül talep edilemedi.');
+      }
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (purchaseLoading || !selectedPlan) return;
+    setPurchaseLoading(true);
+    setPurchaseError(null);
+    try {
+      const { checkoutUrl } = await purchaseVip(selectedPlan.id);
+      window.location.href = checkoutUrl;
+    } catch (err) {
+      if (err instanceof FetchError && err.status === 409) {
+        setPurchaseError('Zaten aktif bir VIP üyeliğin var.');
+      } else {
+        setPurchaseError(err instanceof Error ? err.message : 'Satın alma başlatılamadı.');
+      }
+      setPurchaseLoading(false);
+    }
+  };
 
   return (
     <div
       className="min-h-[100dvh] flex flex-col"
       style={{ background: 'linear-gradient(180deg, #080a10 0%, #0a0c14 60%, #080a10 100%)' }}
     >
-      {/* ── Starfield ambient ──────────────────────────────────────────────── */}
+      {/* Starfield ambient */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{
         background: `
-          radial-gradient(ellipse 60% 40% at 50% 0%, ${goldGlow.replace('0.35','0.08')} 0%, transparent 70%),
+          radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,215,0,0.08) 0%, transparent 70%),
           radial-gradient(ellipse 40% 30% at 20% 80%, ${raceGlow.replace('0.30','0.06')} 0%, transparent 60%)
-        `
+        `,
       }} />
 
-      {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <header className="relative z-10 flex items-center justify-between px-4 pt-safe-top pt-4 pb-3">
         <Link
           href="/"
@@ -150,23 +253,21 @@ export default function VipPage() {
           <span>Geri</span>
         </Link>
 
-        {/* VIP badge */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '4px 12px', borderRadius: 9999,
-          background: goldDim,
-          border: `1px solid ${goldGlow}`,
-          boxShadow: `0 0 16px ${goldGlow}`,
+          background: GOLD_DIM,
+          border: `1px solid ${GOLD_GLOW}`,
+          boxShadow: `0 0 16px ${GOLD_GLOW}`,
         }}>
           <span style={{ fontSize: 14 }}>👑</span>
           <span style={{
             fontFamily: 'var(--font-display)', fontSize: '0.65rem',
             fontWeight: 700, letterSpacing: '0.14em',
-            textTransform: 'uppercase', color: gold,
+            textTransform: 'uppercase', color: GOLD,
           }}>VIP Üyelik</span>
         </div>
 
-        {/* Currency */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           padding: '4px 10px', borderRadius: 9999,
@@ -181,170 +282,32 @@ export default function VipPage() {
         </div>
       </header>
 
-      {/* ── Main content ──────────────────────────────────────────────────── */}
       <main className="relative z-10 flex-1 px-4 pb-24 flex flex-col gap-5">
-
-        {/* ── Hero: Current Level Card ─────────────────────────────────── */}
+        {/* Hero */}
         <div
           className={clsx('transition-all duration-700', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          {/* Outer shell (doppelrand) */}
-          <div style={{
-            padding: 2,
-            background: `linear-gradient(135deg, ${gold}33 0%, ${goldGlow} 50%, ${raceGlow} 100%)`,
-            borderRadius: '1.25rem',
-            boxShadow: `0 0 40px ${goldGlow}, 0 0 80px rgba(0,0,0,0.6)`,
-          }}>
-            {/* Inner core */}
-            <div style={{
-              background: 'linear-gradient(160deg, #0f1220 0%, #080a10 100%)',
-              borderRadius: 'calc(1.25rem - 2px)',
-              padding: '20px 20px 16px',
-              boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.08)',
-              overflow: 'hidden',
-              position: 'relative',
-            }}>
-              {/* Halftone dots bg */}
-              <div aria-hidden style={{
-                position: 'absolute', inset: 0, pointerEvents: 'none',
-                backgroundImage: 'radial-gradient(circle, rgba(255,215,0,0.04) 1px, transparent 1px)',
-                backgroundSize: '8px 8px',
-              }} />
-              {/* Speed line corner accent */}
-              <div aria-hidden style={{
-                position: 'absolute', top: 0, right: 0, width: 80, height: 80,
-                pointerEvents: 'none',
-                background: `radial-gradient(circle at top right, ${goldGlow} 0%, transparent 70%)`,
-                opacity: 0.5,
-              }} />
-
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                {/* Row 1: level badge + crown */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {/* Crown glow icon */}
-                    <div style={{
-                      width: 48, height: 48, borderRadius: '50%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: goldDim,
-                      border: `2px solid ${gold}`,
-                      boxShadow: `0 0 20px ${goldGlow}, 0 0 40px ${goldGlow}`,
-                      fontSize: 24,
-                      animation: 'vip-crown-pulse 2s ease-in-out infinite',
-                    }}>
-                      👑
-                    </div>
-                    <div>
-                      <div style={{
-                        fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-                        fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-                        color: gold, marginBottom: 2,
-                      }}>Mevcut Seviye</div>
-                      <div style={{
-                        fontFamily: 'var(--font-display)', fontSize: '1.5rem',
-                        fontWeight: 900, letterSpacing: '-0.02em',
-                        background: `linear-gradient(135deg, ${gold} 0%, #fff 60%, ${gold} 100%)`,
-                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        textShadow: 'none',
-                      }}>VIP {currentVipLevel}</div>
-                    </div>
-                  </div>
-                  {/* Next level preview */}
-                  <div style={{
-                    textAlign: 'right',
-                    padding: '6px 12px', borderRadius: 8,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                  }}>
-                    <div style={{
-                      fontFamily: 'var(--font-display)', fontSize: '0.55rem',
-                      fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
-                      color: 'var(--color-text-muted)', marginBottom: 2,
-                    }}>Sonraki</div>
-                    <div style={{
-                      fontFamily: 'var(--font-display)', fontSize: '1rem',
-                      fontWeight: 800, color: 'var(--color-text-secondary)',
-                    }}>VIP {currentVipLevel + 1}</div>
-                  </div>
-                </div>
-
-                {/* XP Progress bar */}
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{
-                      fontFamily: 'var(--font-body)', fontSize: '0.75rem',
-                      color: 'var(--color-text-muted)',
-                    }}>
-                      {(xpForNext - currentXp).toLocaleString()} XP daha → VIP {currentVipLevel + 1}
-                    </span>
-                    <span style={{
-                      fontFamily: 'var(--font-display)', fontSize: '0.7rem',
-                      fontWeight: 700, color: gold,
-                    }}>{currentXp.toLocaleString()} / {xpForNext.toLocaleString()}</span>
-                  </div>
-                  {/* Bar outer */}
-                  <div style={{
-                    height: 8, borderRadius: 9999,
-                    background: 'rgba(255,255,255,0.07)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                  }}>
-                    {/* Bar fill */}
-                    <div style={{
-                      height: '100%', borderRadius: 9999,
-                      width: `${progressPct}%`,
-                      background: `linear-gradient(90deg, ${gold} 0%, #fff8c0 100%)`,
-                      boxShadow: `0 0 12px ${goldGlow}, 0 0 24px ${goldGlow}`,
-                      transition: 'width 1.2s cubic-bezier(0.32,0.72,0,1)',
-                    }} />
-                  </div>
-                </div>
-
-                {/* Active benefits strip */}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                  {ALL_BENEFITS.filter(b => b.unlocksAt <= currentVipLevel).slice(0, 4).map(b => (
-                    <div key={b.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '2px 8px', borderRadius: 9999,
-                      background: goldDim,
-                      border: `1px solid ${goldGlow}`,
-                      fontSize: '0.65rem', color: gold,
-                      fontFamily: 'var(--font-body)', fontWeight: 600,
-                    }}>
-                      <span style={{ fontSize: 10 }}>{b.icon}</span>
-                      <span>{b.title.split(' ').slice(0, 2).join(' ')}</span>
-                    </div>
-                  ))}
-                  {ALL_BENEFITS.filter(b => b.unlocksAt <= currentVipLevel).length > 4 && (
-                    <div style={{
-                      padding: '2px 8px', borderRadius: 9999,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.07)',
-                      fontSize: '0.65rem', color: 'var(--color-text-muted)',
-                      fontFamily: 'var(--font-body)',
-                    }}>
-                      +{ALL_BENEFITS.filter(b => b.unlocksAt <= currentVipLevel).length - 4} daha
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          {statusLoading && <HeroSkeleton />}
+          {!statusLoading && statusError && <ErrorCard message={statusError} onRetry={refetchStatus} />}
+          {!statusLoading && !statusError && status && (
+            <HeroCard
+              level={displayLevel}
+              currentXp={currentXp}
+              xpForNext={xpForNext}
+              progressPct={progressPct}
+              hasNext={hasNext}
+              isActive={status.isActive}
+            />
+          )}
         </div>
 
-        {/* ── VIP Level Ladder (horizontal scroll) ─────────────────────── */}
+        {/* Level ladder */}
         <div
           className={clsx('transition-all duration-700 delay-100', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-            fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'var(--color-text-muted)', marginBottom: 10,
-          }}>VIP Seviye Basamağı</div>
-
+          <SectionLabel>VIP Seviye Basamağı</SectionLabel>
           <div
             ref={ladderRef}
             style={{
@@ -356,30 +319,28 @@ export default function VipPage() {
             className="[&::-webkit-scrollbar]:hidden"
           >
             {VIP_LEVELS.map((vl, idx) => {
-              const isActive = vl.level === currentVipLevel;
-              const isCompleted = vl.level < currentVipLevel;
-              const isSelected = vl.level === selectedLevel;
-              const isLocked = vl.level > currentVipLevel;
+              const isActive = vl.level === displayLevel;
+              const isCompleted = vl.level < displayLevel;
+              const isSelected = vl.level === effectiveSelectedLevel;
+              const isLocked = vl.level > displayLevel;
               const tierStyle = TIER_STYLES[
                 vl.level <= 2 ? 'bronze' : vl.level <= 4 ? 'silver' : vl.level <= 6 ? 'gold' : vl.level <= 8 ? 'platinum' : 'legendary'
               ];
 
               return (
                 <div key={vl.level} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                  {/* Connector line */}
                   {idx > 0 && (
                     <div style={{
                       width: 20, height: 3, borderRadius: 9999,
                       background: isCompleted
                         ? `linear-gradient(90deg, ${TIER_STYLES['bronze'].color} 0%, ${tierStyle.color} 100%)`
                         : isActive
-                          ? `linear-gradient(90deg, ${gold} 0%, rgba(255,215,0,0.3) 100%)`
+                          ? `linear-gradient(90deg, ${GOLD} 0%, rgba(255,215,0,0.3) 100%)`
                           : 'rgba(255,255,255,0.08)',
                       flexShrink: 0,
                     }} />
                   )}
 
-                  {/* Level node */}
                   <button
                     data-level={vl.level}
                     onClick={() => setSelectedLevel(vl.level)}
@@ -389,27 +350,26 @@ export default function VipPage() {
                       flexShrink: 0,
                     }}
                   >
-                    {/* Circle */}
                     <div style={{
                       width: isActive ? 52 : 40, height: isActive ? 52 : 40,
                       borderRadius: '50%',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
                       background: isActive
-                        ? `linear-gradient(135deg, ${gold}33 0%, ${gold}22 100%)`
+                        ? `linear-gradient(135deg, ${GOLD}33 0%, ${GOLD}22 100%)`
                         : isCompleted
                           ? `linear-gradient(135deg, ${tierStyle.badge} 0%, transparent 100%)`
                           : isSelected
                             ? 'rgba(255,255,255,0.06)'
                             : 'rgba(255,255,255,0.03)',
                       border: isActive
-                        ? `2px solid ${gold}`
+                        ? `2px solid ${GOLD}`
                         : isCompleted
                           ? `1.5px solid ${tierStyle.color}`
                           : isSelected
                             ? '1.5px solid rgba(255,255,255,0.20)'
                             : '1.5px solid rgba(255,255,255,0.08)',
                       boxShadow: isActive
-                        ? `0 0 24px ${goldGlow}, 0 0 48px ${goldGlow}`
+                        ? `0 0 24px ${GOLD_GLOW}, 0 0 48px ${GOLD_GLOW}`
                         : isCompleted
                           ? `0 0 10px ${tierStyle.glow}`
                           : 'none',
@@ -417,11 +377,10 @@ export default function VipPage() {
                       position: 'relative',
                       overflow: 'hidden',
                     }}>
-                      {/* Active ring pulse */}
                       {isActive && (
                         <div aria-hidden style={{
                           position: 'absolute', inset: -4, borderRadius: '50%',
-                          border: `1.5px solid ${gold}`,
+                          border: `1.5px solid ${GOLD}`,
                           opacity: 0.4,
                           animation: 'vip-ring-pulse 2s ease-in-out infinite',
                         }} />
@@ -434,12 +393,11 @@ export default function VipPage() {
                         }}>🔒</span>
                       )}
                     </div>
-                    {/* Label */}
                     <span style={{
                       fontFamily: 'var(--font-display)', fontSize: '0.55rem',
                       fontWeight: isActive ? 800 : 600,
                       letterSpacing: '0.06em', textTransform: 'uppercase',
-                      color: isActive ? gold : isCompleted ? tierStyle.color : 'var(--color-text-muted)',
+                      color: isActive ? GOLD : isCompleted ? tierStyle.color : 'var(--color-text-muted)',
                     }}>
                       {vl.level === 10 ? 'MAX' : `V${vl.level}`}
                     </span>
@@ -450,48 +408,40 @@ export default function VipPage() {
           </div>
         </div>
 
-        {/* ── Selected Level Benefits Preview ──────────────────────────── */}
+        {/* Benefits for selected level */}
         <div
           className={clsx('transition-all duration-700 delay-150', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
-          }}>
-            <div style={{
-              fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-              fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'var(--color-text-muted)',
-            }}>
-              {selectedLevel === currentVipLevel ? 'Mevcut Avantajlar' : `VIP ${selectedLevel} Avantajları`}
-            </div>
-            {selectedLevel !== currentVipLevel && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <SectionLabel inline>
+              {effectiveSelectedLevel === displayLevel
+                ? 'Mevcut Avantajlar'
+                : `VIP ${effectiveSelectedLevel} Avantajları`}
+            </SectionLabel>
+            {effectiveSelectedLevel !== displayLevel && (
               <div style={{
                 padding: '2px 8px', borderRadius: 9999,
                 fontFamily: 'var(--font-display)', fontSize: '0.55rem',
                 fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-                background: selectedLevel < currentVipLevel ? 'rgba(68,255,136,0.10)' : goldDim,
-                color: selectedLevel < currentVipLevel ? '#44ff88' : gold,
-                border: `1px solid ${selectedLevel < currentVipLevel ? 'rgba(68,255,136,0.25)' : goldGlow}`,
+                background: effectiveSelectedLevel < displayLevel ? 'rgba(68,255,136,0.10)' : GOLD_DIM,
+                color: effectiveSelectedLevel < displayLevel ? '#44ff88' : GOLD,
+                border: `1px solid ${effectiveSelectedLevel < displayLevel ? 'rgba(68,255,136,0.25)' : GOLD_GLOW}`,
               }}>
-                {selectedLevel < currentVipLevel ? '✓ Aktif' : '🔒 Kilitli'}
+                {effectiveSelectedLevel < displayLevel ? '✓ Aktif' : '🔒 Kilitli'}
               </div>
             )}
           </div>
 
-          {/* Benefits grid — 2 cols on mobile, keep compact */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-            {benefitsForSelected.slice(0, 6).map(b => {
+            {benefitsForSelected.slice(0, 6).map((b) => {
               const ts = TIER_STYLES[b.tier];
-              const isCurrentlyActive = b.unlocksAt <= currentVipLevel;
-              return (
-                <BenefitCard key={b.id} benefit={b} tierStyle={ts} isActive={isCurrentlyActive} />
-              );
+              const isCurrentlyActive = b.unlocksAt <= displayLevel;
+              return <BenefitCard key={b.id} benefit={b} tierStyle={ts} isActive={isCurrentlyActive} />;
             })}
           </div>
 
-          {/* Locked preview (next unlocks) */}
-          {lockedBenefits.length > 0 && selectedLevel === currentVipLevel && (
+          {lockedBenefits.length > 0 && effectiveSelectedLevel === displayLevel && (
             <div style={{ marginTop: 8 }}>
               <div style={{
                 fontFamily: 'var(--font-display)', fontSize: '0.55rem',
@@ -499,7 +449,7 @@ export default function VipPage() {
                 color: 'var(--color-text-muted)', marginBottom: 8,
               }}>Yakında Açılacak</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                {lockedBenefits.slice(0, 2).map(b => {
+                {lockedBenefits.slice(0, 2).map((b) => {
                   const ts = TIER_STYLES[b.tier];
                   return <BenefitCard key={b.id} benefit={b} tierStyle={ts} isActive={false} locked />;
                 })}
@@ -508,20 +458,14 @@ export default function VipPage() {
           )}
         </div>
 
-        {/* ── Daily VIP Rewards ─────────────────────────────────────────── */}
+        {/* Daily rewards */}
         <div
           className={clsx('transition-all duration-700 delay-200', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
-          }}>
-            <div style={{
-              fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-              fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'var(--color-text-muted)',
-            }}>Günlük VIP Ödülleri</div>
-            {!todayClaimed && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <SectionLabel inline>Günlük VIP Ödülleri</SectionLabel>
+            {!claimedToday && !statusLoading && status?.isActive && (
               <div style={{
                 padding: '2px 8px', borderRadius: 9999,
                 fontFamily: 'var(--font-display)', fontSize: '0.55rem',
@@ -537,7 +481,7 @@ export default function VipPage() {
             padding: 2,
             background: 'rgba(255,215,0,0.08)',
             borderRadius: '1rem',
-            border: `1px solid ${goldGlow}`,
+            border: `1px solid ${GOLD_GLOW}`,
           }}>
             <div style={{
               background: 'rgba(8,10,16,0.95)',
@@ -547,141 +491,137 @@ export default function VipPage() {
             }}>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}
                 className="[&::-webkit-scrollbar]:hidden">
-                {DAILY_REWARDS.map((r, i) => (
-                  <DailyRewardToken key={i} reward={r} claimed={todayClaimed} />
+                {DAILY_REWARD_PREVIEW.map((r, i) => (
+                  <DailyRewardToken key={i} reward={r} claimed={claimedToday} />
                 ))}
               </div>
               <button
-                onClick={() => setTodayClaimed(true)}
-                disabled={todayClaimed}
+                onClick={handleClaim}
+                disabled={claimedToday || claimLoading || statusLoading || !status?.isActive}
                 style={{
                   width: '100%', marginTop: 12,
                   padding: '10px', borderRadius: 9999,
-                  background: todayClaimed ? 'rgba(255,255,255,0.04)' : `linear-gradient(135deg, ${gold} 0%, #fff8c0 100%)`,
-                  color: todayClaimed ? 'var(--color-text-muted)' : '#080a10',
+                  background: claimedToday || claimLoading || !status?.isActive
+                    ? 'rgba(255,255,255,0.04)'
+                    : `linear-gradient(135deg, ${GOLD} 0%, #fff8c0 100%)`,
+                  color: claimedToday || claimLoading || !status?.isActive ? 'var(--color-text-muted)' : '#080a10',
                   fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 800,
                   letterSpacing: '0.1em', textTransform: 'uppercase',
-                  border: `1px solid ${todayClaimed ? 'rgba(255,255,255,0.07)' : gold}`,
-                  boxShadow: todayClaimed ? 'none' : `0 0 20px ${goldGlow}`,
-                  cursor: todayClaimed ? 'not-allowed' : 'pointer',
+                  border: `1px solid ${claimedToday || claimLoading || !status?.isActive ? 'rgba(255,255,255,0.07)' : GOLD}`,
+                  boxShadow: claimedToday || claimLoading || !status?.isActive ? 'none' : `0 0 20px ${GOLD_GLOW}`,
+                  cursor: claimedToday || claimLoading || !status?.isActive ? 'not-allowed' : 'pointer',
                   transition: 'all 0.4s cubic-bezier(0.32,0.72,0,1)',
                 }}
               >
-                {todayClaimed ? '✓ Bugün Alındı' : '👑 Ödülleri Topla'}
+                {!status?.isActive
+                  ? '🔒 VIP Üyelik Gerekli'
+                  : claimedToday
+                    ? '✓ Bugün Alındı'
+                    : claimLoading
+                      ? 'Talep ediliyor…'
+                      : '👑 Ödülleri Topla'}
               </button>
+              {claimError && (
+                <p style={{
+                  marginTop: 8,
+                  fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+                  color: 'var(--color-danger)', textAlign: 'center',
+                }}>{claimError}</p>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ── Upgrade / Purchase CTA ────────────────────────────────────── */}
+        {/* Purchase */}
         <div
           className={clsx('transition-all duration-700 delay-300', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-            fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'var(--color-text-muted)', marginBottom: 10,
-          }}>VIP Satın Al</div>
+          <SectionLabel>VIP Satın Al</SectionLabel>
 
-          {/* Plan selector */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
-            {PLANS.map(plan => {
-              const isSel = selectedPlan === plan.id;
-              return (
-                <button
+          {plansLoading && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+              {[0, 1, 2].map((i) => <PlanSkeleton key={i} />)}
+            </div>
+          )}
+
+          {!plansLoading && plansError && (
+            <div style={{ marginBottom: 12 }}>
+              <ErrorCard message={plansError} onRetry={refetchPlans} compact />
+            </div>
+          )}
+
+          {!plansLoading && !plansError && plans && plans.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+              {plans.map((plan) => (
+                <PlanTile
                   key={plan.id}
-                  onClick={() => setSelectedPlan(plan.id as typeof selectedPlan)}
-                  style={{
-                    position: 'relative', padding: '12px 8px',
-                    borderRadius: 12, cursor: 'pointer', background: 'none',
-                    border: `1.5px solid ${isSel ? gold : 'rgba(255,255,255,0.08)'}`,
-                    background: isSel ? goldDim : 'rgba(255,255,255,0.02)',
-                    boxShadow: isSel ? `0 0 16px ${goldGlow}` : 'none',
-                    transition: 'all 0.35s cubic-bezier(0.32,0.72,0,1)',
-                    textAlign: 'center',
-                  }}
-                >
-                  {plan.tag && (
-                    <div style={{
-                      position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)',
-                      padding: '2px 8px', borderRadius: 9999,
-                      fontFamily: 'var(--font-display)', fontSize: '0.5rem',
-                      fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
-                      background: plan.popular ? gold : '#cc00ff',
-                      color: '#080a10', whiteSpace: 'nowrap',
-                    }}>{plan.tag}</div>
-                  )}
-                  <div style={{
-                    fontFamily: 'var(--font-display)', fontSize: '0.65rem',
-                    fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: isSel ? gold : 'var(--color-text-secondary)',
-                    marginBottom: 4,
-                  }}>{plan.label}</div>
-                  <div style={{
-                    fontFamily: 'var(--font-display)', fontSize: '0.9rem',
-                    fontWeight: 900, color: isSel ? gold : 'var(--color-text-primary)',
-                    lineHeight: 1.2,
-                  }}>{plan.price}</div>
-                  <div style={{
-                    fontFamily: 'var(--font-body)', fontSize: '0.65rem',
-                    color: 'var(--color-text-muted)', marginTop: 2,
-                  }}>{plan.usd}</div>
-                  {plan.gems > 0 && (
-                    <div style={{
-                      marginTop: 6, padding: '2px 6px', borderRadius: 9999,
-                      background: 'rgba(0,207,255,0.10)', border: '1px solid rgba(0,207,255,0.20)',
-                      fontSize: '0.6rem', fontFamily: 'var(--font-display)',
-                      color: '#00cfff', fontWeight: 700,
-                    }}>+{plan.gems} 💎</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                  plan={plan}
+                  selected={plan.id === selectedPlanId}
+                  onSelect={() => setSelectedPlanId(plan.id)}
+                />
+              ))}
+            </div>
+          )}
 
-          {/* Main CTA — doppelrand gold button */}
           <div style={{
             padding: 2,
-            background: `linear-gradient(135deg, ${gold} 0%, #fff8c0 50%, ${gold} 100%)`,
+            background: `linear-gradient(135deg, ${GOLD} 0%, #fff8c0 50%, ${GOLD} 100%)`,
             borderRadius: 9999,
-            boxShadow: `0 0 32px ${goldGlow}, 0 8px 32px rgba(0,0,0,0.5)`,
+            boxShadow: `0 0 32px ${GOLD_GLOW}, 0 8px 32px rgba(0,0,0,0.5)`,
+            opacity: !selectedPlan || purchaseLoading ? 0.6 : 1,
           }}>
-            <button style={{
-              width: '100%', padding: '14px 24px',
-              borderRadius: 9999,
-              background: 'linear-gradient(135deg, #1a1400 0%, #0f0e00 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              cursor: 'pointer', border: 'none',
-              boxShadow: 'inset 0 1px 1px rgba(255,215,0,0.15)',
-            }}>
+            <button
+              onClick={handlePurchase}
+              disabled={!selectedPlan || purchaseLoading}
+              style={{
+                width: '100%', padding: '14px 24px',
+                borderRadius: 9999,
+                background: 'linear-gradient(135deg, #1a1400 0%, #0f0e00 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                cursor: !selectedPlan || purchaseLoading ? 'not-allowed' : 'pointer',
+                border: 'none',
+                boxShadow: 'inset 0 1px 1px rgba(255,215,0,0.15)',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 20 }}>👑</span>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{
                     fontFamily: 'var(--font-display)', fontSize: '0.8rem',
                     fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-                    color: gold,
-                  }}>VIP Aktifleştir</div>
+                    color: GOLD,
+                  }}>
+                    {purchaseLoading ? 'Yönlendiriliyor…' : 'VIP Aktifleştir'}
+                  </div>
                   <div style={{
                     fontFamily: 'var(--font-body)', fontSize: '0.7rem',
                     color: 'rgba(255,215,0,0.7)',
-                  }}>{PLANS.find(p => p.id === selectedPlan)?.price} · {PLANS.find(p => p.id === selectedPlan)?.label}</div>
+                  }}>
+                    {selectedPlan
+                      ? `${selectedPlan.priceTryFormatted} · ${selectedPlan.label}`
+                      : plansLoading ? 'Planlar yükleniyor…' : 'Plan seçiniz'}
+                  </div>
                 </div>
               </div>
-              {/* Trailing icon — button-in-button */}
               <div style={{
                 width: 36, height: 36, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `${gold}22`,
-                border: `1px solid ${gold}`,
-                fontSize: 16, color: gold,
-                transition: 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
+                background: `${GOLD}22`,
+                border: `1px solid ${GOLD}`,
+                fontSize: 16, color: GOLD,
               }}>↗</div>
             </button>
           </div>
 
-          {/* Fine print */}
+          {purchaseError && (
+            <p style={{
+              marginTop: 8,
+              fontFamily: 'var(--font-body)', fontSize: '0.7rem',
+              color: 'var(--color-danger)', textAlign: 'center',
+            }}>{purchaseError}</p>
+          )}
+
           <p style={{
             fontFamily: 'var(--font-body)', fontSize: '0.65rem',
             color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 8,
@@ -691,24 +631,14 @@ export default function VipPage() {
           </p>
         </div>
 
-        {/* ── VIP Exclusive Content Lock previews ───────────────────────── */}
+        {/* Exclusive content teasers */}
         <div
           className={clsx('transition-all duration-700 delay-[400ms]', visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
           style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
         >
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: '0.6rem',
-            fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'var(--color-text-muted)', marginBottom: 10,
-          }}>Özel VIP İçerikleri</div>
-
+          <SectionLabel>Özel VIP İçerikleri</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {[
-              { icon: '🎭', title: 'Özel Kostümler',     desc: 'VIP 7+ ile açılır', color: '#cc00ff' },
-              { icon: '🌌', title: 'Galaksi Harita Tema', desc: 'VIP 5+ ile açılır', color: '#00cfff' },
-              { icon: '⚔️', title: 'Savaş Giriş Animasyonu', desc: 'VIP 5+ ile açılır', color: '#FFD700' },
-              { icon: '🏆', title: 'Lonca Önceliği',     desc: 'VIP 8+ ile açılır', color: '#e5e4e2' },
-            ].map((item, i) => (
+            {EXCLUSIVE_CONTENT.map((item, i) => (
               <div key={i} style={{
                 padding: '14px 12px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.02)',
@@ -716,7 +646,6 @@ export default function VipPage() {
                 display: 'flex', alignItems: 'center', gap: 10,
                 position: 'relative', overflow: 'hidden',
               }}>
-                {/* Lock overlay */}
                 <div aria-hidden style={{
                   position: 'absolute', inset: 0,
                   background: 'rgba(8,10,16,0.5)',
@@ -758,26 +687,383 @@ export default function VipPage() {
         </div>
       </main>
 
-      {/* ── Keyframe injection ───────────────────────────────────────────── */}
-      <style>{`
-        @keyframes vip-crown-pulse {
-          0%, 100% { box-shadow: 0 0 20px ${goldGlow}, 0 0 40px ${goldGlow}; }
-          50%       { box-shadow: 0 0 32px ${goldGlow}, 0 0 64px rgba(255,215,0,0.25); }
-        }
-        @keyframes vip-ring-pulse {
-          0%, 100% { transform: scale(1); opacity: 0.4; }
-          50%       { transform: scale(1.15); opacity: 0.15; }
-        }
-        @keyframes vip-blink {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.5; }
-        }
-      `}</style>
+      {claimToast && (
+        <ClaimRewardToast rewards={claimToast} onClose={() => setClaimToast(null)} />
+      )}
     </div>
   );
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
+
+const DAILY_REWARD_PREVIEW = [
+  { icon: '💎', label: '+50 Kristal',  color: '#00cfff' },
+  { icon: '⚡', label: '2× XP',       color: '#FFD700' },
+  { icon: '🛡️', label: '4h Kalkan',   color: '#44ff88' },
+  { icon: '⛏️', label: 'Kaynak ×1.2', color: '#ff6600' },
+  { icon: '⭐', label: 'Bonus Görev', color: '#cc00ff' },
+  { icon: '🎁', label: 'Sürpriz Ödül',color: '#FFD700' },
+  { icon: '🔮', label: 'Void Crystal', color: '#44d9c8' },
+];
+
+const EXCLUSIVE_CONTENT = [
+  { icon: '🎭', title: 'Özel Kostümler',     desc: 'VIP 7+ ile açılır', color: '#cc00ff' },
+  { icon: '🌌', title: 'Galaksi Harita Tema', desc: 'VIP 5+ ile açılır', color: '#00cfff' },
+  { icon: '⚔️', title: 'Savaş Giriş Animasyonu', desc: 'VIP 5+ ile açılır', color: '#FFD700' },
+  { icon: '🏆', title: 'Lonca Önceliği',     desc: 'VIP 8+ ile açılır', color: '#e5e4e2' },
+];
+
+function SectionLabel({ children, inline = false }: { children: React.ReactNode; inline?: boolean }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-display)', fontSize: '0.6rem',
+      fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+      color: 'var(--color-text-muted)', marginBottom: inline ? 0 : 10,
+    }}>{children}</div>
+  );
+}
+
+interface HeroCardProps {
+  level: number;
+  currentXp: number;
+  xpForNext: number;
+  progressPct: number;
+  hasNext: boolean;
+  isActive: boolean;
+}
+
+function HeroCard({ level, currentXp, xpForNext, progressPct, hasNext, isActive }: HeroCardProps) {
+  const remaining = Math.max(0, xpForNext - currentXp);
+  return (
+    <div style={{
+      padding: 2,
+      background: `linear-gradient(135deg, ${GOLD}33 0%, ${GOLD_GLOW} 50%, rgba(74,158,255,0.30) 100%)`,
+      borderRadius: '1.25rem',
+      boxShadow: `0 0 40px ${GOLD_GLOW}, 0 0 80px rgba(0,0,0,0.6)`,
+    }}>
+      <div style={{
+        background: 'linear-gradient(160deg, #0f1220 0%, #080a10 100%)',
+        borderRadius: 'calc(1.25rem - 2px)',
+        padding: '20px 20px 16px',
+        boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+        position: 'relative',
+      }}>
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle, rgba(255,215,0,0.04) 1px, transparent 1px)',
+          backgroundSize: '8px 8px',
+        }} />
+        <div aria-hidden style={{
+          position: 'absolute', top: 0, right: 0, width: 80, height: 80,
+          pointerEvents: 'none',
+          background: `radial-gradient(circle at top right, ${GOLD_GLOW} 0%, transparent 70%)`,
+          opacity: 0.5,
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: GOLD_DIM,
+                border: `2px solid ${GOLD}`,
+                boxShadow: `0 0 20px ${GOLD_GLOW}, 0 0 40px ${GOLD_GLOW}`,
+                fontSize: 24,
+                animation: 'vip-crown-pulse 2s ease-in-out infinite',
+              }}>
+                👑
+              </div>
+              <div>
+                <div style={{
+                  fontFamily: 'var(--font-display)', fontSize: '0.6rem',
+                  fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+                  color: GOLD, marginBottom: 2,
+                }}>{isActive ? 'Mevcut Seviye' : 'VIP Üye Değil'}</div>
+                <div style={{
+                  fontFamily: 'var(--font-display)', fontSize: '1.5rem',
+                  fontWeight: 900, letterSpacing: '-0.02em',
+                  background: `linear-gradient(135deg, ${GOLD} 0%, #fff 60%, ${GOLD} 100%)`,
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}>{isActive ? `VIP ${level}` : 'Standart'}</div>
+              </div>
+            </div>
+            {isActive && hasNext && (
+              <div style={{
+                textAlign: 'right',
+                padding: '6px 12px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-display)', fontSize: '0.55rem',
+                  fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color: 'var(--color-text-muted)', marginBottom: 2,
+                }}>Sonraki</div>
+                <div style={{
+                  fontFamily: 'var(--font-display)', fontSize: '1rem',
+                  fontWeight: 800, color: 'var(--color-text-secondary)',
+                }}>VIP {level + 1}</div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: '0.75rem',
+                color: 'var(--color-text-muted)',
+              }}>
+                {!isActive
+                  ? 'VIP üyelik satın al — avantajların kilidini aç'
+                  : hasNext
+                    ? `${remaining.toLocaleString('tr-TR')} XP daha → VIP ${level + 1}`
+                    : 'Maksimum seviyeye ulaştın'}
+              </span>
+              {isActive && (
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: '0.7rem',
+                  fontWeight: 700, color: GOLD,
+                }}>{currentXp.toLocaleString('tr-TR')} / {xpForNext.toLocaleString('tr-TR')}</span>
+              )}
+            </div>
+            <div style={{
+              height: 8, borderRadius: 9999,
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%', borderRadius: 9999,
+                width: `${isActive ? progressPct : 0}%`,
+                background: `linear-gradient(90deg, ${GOLD} 0%, #fff8c0 100%)`,
+                boxShadow: `0 0 12px ${GOLD_GLOW}, 0 0 24px ${GOLD_GLOW}`,
+                transition: 'width 1.2s cubic-bezier(0.32,0.72,0,1)',
+              }} />
+            </div>
+          </div>
+
+          {isActive && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {ALL_BENEFITS.filter((b) => b.unlocksAt <= level).slice(0, 4).map((b) => (
+                <div key={b.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 9999,
+                  background: GOLD_DIM,
+                  border: `1px solid ${GOLD_GLOW}`,
+                  fontSize: '0.65rem', color: GOLD,
+                  fontFamily: 'var(--font-body)', fontWeight: 600,
+                }}>
+                  <span style={{ fontSize: 10 }}>{b.icon}</span>
+                  <span>{b.title.split(' ').slice(0, 2).join(' ')}</span>
+                </div>
+              ))}
+              {ALL_BENEFITS.filter((b) => b.unlocksAt <= level).length > 4 && (
+                <div style={{
+                  padding: '2px 8px', borderRadius: 9999,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  fontSize: '0.65rem', color: 'var(--color-text-muted)',
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  +{ALL_BENEFITS.filter((b) => b.unlocksAt <= level).length - 4} daha
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="VIP durumu yükleniyor"
+      style={{
+        padding: 2,
+        background: 'rgba(255,215,0,0.10)',
+        borderRadius: '1.25rem',
+      }}
+    >
+      <div style={{
+        background: 'linear-gradient(160deg, #0f1220 0%, #080a10 100%)',
+        borderRadius: 'calc(1.25rem - 2px)',
+        padding: '20px',
+        minHeight: 168,
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SkeletonBlock width={48} height={48} radius="50%" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <SkeletonBlock width={90} height={10} />
+            <SkeletonBlock width={120} height={20} />
+          </div>
+        </div>
+        <SkeletonBlock height={10} />
+        <SkeletonBlock height={8} radius={9999} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <SkeletonBlock width={80} height={18} radius={9999} />
+          <SkeletonBlock width={70} height={18} radius={9999} />
+          <SkeletonBlock width={60} height={18} radius={9999} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonBlock({
+  width = '100%',
+  height = 12,
+  radius = 6,
+}: {
+  width?: number | string;
+  height?: number | string;
+  radius?: number | string;
+}) {
+  return (
+    <div style={{
+      width,
+      height,
+      borderRadius: radius,
+      background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 100%)',
+      backgroundSize: '200% 100%',
+      animation: 'vip-skeleton 1.6s ease-in-out infinite',
+    }} />
+  );
+}
+
+interface ErrorCardProps {
+  message: string;
+  onRetry: () => void;
+  compact?: boolean;
+}
+
+function ErrorCard({ message, onRetry, compact }: ErrorCardProps) {
+  return (
+    <div
+      role="alert"
+      style={{
+        padding: compact ? '12px 14px' : '20px',
+        borderRadius: '1rem',
+        background: 'rgba(255,51,85,0.08)',
+        border: '1px solid rgba(255,51,85,0.30)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: '0.7rem',
+            fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+            color: 'var(--color-danger)', marginBottom: 2,
+          }}>Yüklenemedi</div>
+          <div style={{
+            fontFamily: 'var(--font-body)', fontSize: '0.75rem',
+            color: 'var(--color-text-secondary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{message}</div>
+        </div>
+      </div>
+      <button
+        onClick={onRetry}
+        style={{
+          padding: '8px 14px', borderRadius: 9999,
+          background: 'rgba(255,51,85,0.12)',
+          border: '1px solid rgba(255,51,85,0.40)',
+          color: 'var(--color-danger)',
+          fontFamily: 'var(--font-display)', fontSize: '0.65rem',
+          fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+          cursor: 'pointer', flexShrink: 0,
+        }}
+      >
+        Tekrar Dene
+      </button>
+    </div>
+  );
+}
+
+interface PlanTileProps {
+  plan: VipPlan;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+function PlanTile({ plan, selected, onSelect }: PlanTileProps) {
+  return (
+    <button
+      onClick={onSelect}
+      style={{
+        position: 'relative', padding: '12px 8px',
+        borderRadius: 12, cursor: 'pointer',
+        border: `1.5px solid ${selected ? GOLD : 'rgba(255,255,255,0.08)'}`,
+        background: selected ? GOLD_DIM : 'rgba(255,255,255,0.02)',
+        boxShadow: selected ? `0 0 16px ${GOLD_GLOW}` : 'none',
+        transition: 'all 0.35s cubic-bezier(0.32,0.72,0,1)',
+        textAlign: 'center',
+      }}
+    >
+      {plan.tag && (
+        <div style={{
+          position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)',
+          padding: '2px 8px', borderRadius: 9999,
+          fontFamily: 'var(--font-display)', fontSize: '0.5rem',
+          fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+          background: plan.popular ? GOLD : '#cc00ff',
+          color: '#080a10', whiteSpace: 'nowrap',
+        }}>{plan.tag}</div>
+      )}
+      <div style={{
+        fontFamily: 'var(--font-display)', fontSize: '0.65rem',
+        fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: selected ? GOLD : 'var(--color-text-secondary)',
+        marginBottom: 4,
+      }}>{plan.label}</div>
+      <div style={{
+        fontFamily: 'var(--font-display)', fontSize: '0.9rem',
+        fontWeight: 900, color: selected ? GOLD : 'var(--color-text-primary)',
+        lineHeight: 1.2,
+      }}>{plan.priceTryFormatted}</div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: '0.65rem',
+        color: 'var(--color-text-muted)', marginTop: 2,
+      }}>{plan.priceUsdFormatted}</div>
+      {plan.bonusGems > 0 && (
+        <div style={{
+          marginTop: 6, padding: '2px 6px', borderRadius: 9999,
+          background: 'rgba(0,207,255,0.10)', border: '1px solid rgba(0,207,255,0.20)',
+          fontSize: '0.6rem', fontFamily: 'var(--font-display)',
+          color: '#00cfff', fontWeight: 700,
+        }}>+{plan.bonusGems} 💎</div>
+      )}
+    </button>
+  );
+}
+
+function PlanSkeleton() {
+  return (
+    <div style={{
+      padding: '12px 8px',
+      borderRadius: 12,
+      border: '1.5px solid rgba(255,255,255,0.06)',
+      background: 'rgba(255,255,255,0.02)',
+      display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center',
+      minHeight: 88,
+    }}>
+      <SkeletonBlock width={60} height={10} />
+      <SkeletonBlock width={70} height={16} />
+      <SkeletonBlock width={45} height={9} />
+    </div>
+  );
+}
 
 interface BenefitCardProps {
   benefit: VipBenefit;
@@ -805,14 +1091,12 @@ function BenefitCard({ benefit, tierStyle, isActive, locked }: BenefitCardProps)
         display: 'flex', flexDirection: 'column', gap: 6,
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Lock indicator */}
         {locked && (
           <div aria-hidden style={{
             position: 'absolute', top: 6, right: 6,
             fontSize: 11,
           }}>🔒</div>
         )}
-        {/* Active checkmark */}
         {isActive && !locked && (
           <div aria-hidden style={{
             position: 'absolute', top: 6, right: 6,
@@ -844,7 +1128,6 @@ function BenefitCard({ benefit, tierStyle, isActive, locked }: BenefitCardProps)
             color: 'var(--color-text-muted)', lineHeight: 1.4,
           }}>{benefit.description}</div>
         </div>
-        {/* Unlock level badge */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 3,
           padding: '1px 6px', borderRadius: 9999,
@@ -884,6 +1167,83 @@ function DailyRewardToken({ reward, claimed }: DailyRewardTokenProps) {
         color: claimed ? 'var(--color-text-muted)' : reward.color,
         textAlign: 'center', lineHeight: 1.3, whiteSpace: 'nowrap',
       }}>{reward.label}</span>
+    </div>
+  );
+}
+
+interface ClaimRewardToastProps {
+  rewards: VipReward[];
+  onClose: () => void;
+}
+
+function ClaimRewardToast({ rewards, onClose }: ClaimRewardToastProps) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4500);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        left: '50%',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
+        transform: 'translateX(-50%)',
+        zIndex: 50,
+        padding: 2,
+        background: `linear-gradient(135deg, ${GOLD} 0%, #fff8c0 50%, ${GOLD} 100%)`,
+        borderRadius: '1rem',
+        boxShadow: `0 0 32px ${GOLD_GLOW}, 0 12px 40px rgba(0,0,0,0.6)`,
+        maxWidth: 'calc(100vw - 32px)',
+      }}
+    >
+      <div style={{
+        background: 'linear-gradient(160deg, #1a1400 0%, #0f0e00 100%)',
+        borderRadius: 'calc(1rem - 2px)',
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <span style={{ fontSize: 20 }}>🎁</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: '0.7rem',
+            fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
+            color: GOLD,
+          }}>Ödüller Toplandı</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {rewards.map((r, i) => (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 9999,
+                  background: `${r.color}15`,
+                  border: `1px solid ${r.color}40`,
+                  fontFamily: 'var(--font-body)', fontSize: '0.7rem', fontWeight: 600,
+                  color: r.color,
+                }}
+              >
+                <span>{r.icon}</span>
+                <span>{r.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Kapat"
+          style={{
+            marginLeft: 'auto',
+            width: 28, height: 28, borderRadius: '50%',
+            border: '1px solid rgba(255,215,0,0.30)',
+            background: 'rgba(255,215,0,0.08)',
+            color: GOLD, cursor: 'pointer',
+            fontSize: 14, lineHeight: 1, flexShrink: 0,
+          }}
+        >×</button>
+      </div>
     </div>
   );
 }

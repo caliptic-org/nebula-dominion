@@ -1,29 +1,57 @@
-import { HTMLAttributes, forwardRef } from 'react';
 import clsx from 'clsx';
+import type { CSSProperties, ElementType, ReactNode } from 'react';
 
-interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'card' | 'panel';
-  hoverable?: boolean;
-  neon?: boolean;
+interface GlassPanelProps {
+  children: ReactNode;
+  className?: string;
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+  glow?: boolean;
+  glowColor?: string;
+  bordered?: boolean;
+  raceColor?: string;
+  style?: CSSProperties;
+  as?: ElementType;
 }
 
-export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
-  ({ variant = 'card', hoverable, neon, className, children, ...rest }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={clsx(
-          variant === 'card' ? 'glass-card' : 'glass-panel',
-          hoverable && 'hover-glow cursor-pointer',
-          neon && 'neon-border',
-          className,
-        )}
-        {...rest}
-      >
-        {children}
-      </div>
-    );
-  },
-);
+const PADDING_MAP = {
+  none: '0',
+  sm:   '12px',
+  md:   '20px',
+  lg:   '28px',
+};
 
-GlassPanel.displayName = 'GlassPanel';
+export function GlassPanel({
+  children,
+  className,
+  padding = 'md',
+  glow = false,
+  glowColor,
+  bordered = true,
+  raceColor,
+  style,
+  as: Tag = 'div',
+}: GlassPanelProps) {
+  const borderColor = raceColor
+    ? `${raceColor}30`
+    : 'var(--color-border)';
+
+  const boxShadow = glow
+    ? `0 0 24px ${glowColor ?? raceColor ?? 'var(--color-brand-glow)'}`
+    : undefined;
+
+  const Component = Tag as 'div';
+
+  return (
+    <Component
+      className={clsx('glass-card', className)}
+      style={{
+        padding: PADDING_MAP[padding],
+        border: bordered ? `1px solid ${borderColor}` : undefined,
+        boxShadow,
+        ...style,
+      }}
+    >
+      {children}
+    </Component>
+  );
+}

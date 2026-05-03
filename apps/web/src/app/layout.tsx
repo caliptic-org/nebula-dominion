@@ -1,32 +1,29 @@
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
+import { Orbitron, Rajdhani } from 'next/font/google';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Nebula Dominion',
-    template: '%s | Nebula Dominion',
-  },
-  description: 'Uzay strateji oyunu — Irk seç, ordu kur, galaksiyi fethet',
-};
+const orbitron = Orbitron({
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800', '900'],
+});
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  themeColor: '#0a0d14',
+const rajdhani = Rajdhani({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
+});
+
+export const metadata: Metadata = {
+  title: 'Nebula Dominion',
+  description: 'Uzay strateji oyunu — çağ bazlı ilerleme sistemi',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="tr" className={`${orbitron.variable} ${rajdhani.variable}`}>
       <body className="stars-bg">{children}</body>
     </html>
   );

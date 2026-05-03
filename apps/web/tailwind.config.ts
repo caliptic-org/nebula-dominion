@@ -78,22 +78,14 @@ const config: Config = {
           info: 'var(--color-info)',
         },
         race: {
-          human: 'var(--color-race-human)',
-          'human-dim': 'var(--color-race-human-dim)',
-          'human-glow': 'var(--color-race-human-glow)',
-          zerg: 'var(--color-race-zerg)',
-          'zerg-dim': 'var(--color-race-zerg-dim)',
-          'zerg-glow': 'var(--color-race-zerg-glow)',
-          automaton: 'var(--color-race-automaton)',
-          'automaton-dim': 'var(--color-race-automaton-dim)',
-          'automaton-glow': 'var(--color-race-automaton-glow)',
-          monster: 'var(--color-race-monster)',
-          'monster-dim': 'var(--color-race-monster-dim)',
-          'monster-glow': 'var(--color-race-monster-glow)',
-          demon: 'var(--color-race-demon)',
-          'demon-dim': 'var(--color-race-demon-dim)',
-          'demon-glow': 'var(--color-race-demon-glow)',
+          human:     { DEFAULT: 'var(--race-human)',     dim: 'var(--race-human-dim)',     glow: 'var(--race-human-glow)' },
+          zerg:      { DEFAULT: 'var(--race-zerg)',      dim: 'var(--race-zerg-dim)',      glow: 'var(--race-zerg-glow)' },
+          automaton: { DEFAULT: 'var(--race-automaton)', dim: 'var(--race-automaton-dim)', glow: 'var(--race-automaton-glow)' },
+          monster:   { DEFAULT: 'var(--race-monster)',   dim: 'var(--race-monster-dim)',   glow: 'var(--race-monster-glow)' },
+          demon:     { DEFAULT: 'var(--race-demon)',     dim: 'var(--race-demon-dim)',     glow: 'var(--race-demon-glow)' },
         },
+        mineral: 'var(--race-human)',
+        gas:     'var(--color-accent)',
       },
       fontFamily: {
         display: ['var(--font-display)', 'Orbitron', 'system-ui', 'sans-serif'],
@@ -124,14 +116,14 @@ const config: Config = {
         'inner-glow': 'inset 0 1px 0 rgba(255,255,255,0.08)',
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
-        'float': 'float 6s ease-in-out infinite',
-        'star-twinkle': 'twinkle 4s ease-in-out infinite',
-        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
-        'neon-pulse': 'neon-pulse 2.5s ease-in-out infinite',
-        'slide-in-up': 'slideInUp 0.35s ease-out',
-        'fade-in-scale': 'fadeInScale 0.3s ease-out',
-        'spin': 'spin 1s linear infinite',
+        'pulse-slow':    'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'float':         'float 6s ease-in-out infinite',
+        'star-twinkle':  'twinkle 4s ease-in-out infinite',
+        'glow-pulse':    'glow-pulse 2s ease-in-out infinite',
+        'slide-up':      'slideUp 0.4s cubic-bezier(0.32,0.72,0,1) both',
+        'fade-in':       'fadeIn 0.3s cubic-bezier(0.32,0.72,0,1) both',
+        'scale-in':      'scaleIn 0.35s cubic-bezier(0.32,0.72,0,1) both',
+        'resource-tick': 'resourceTick 0.25s cubic-bezier(0.32,0.72,0,1) both',
       },
       keyframes: {
         float: {
@@ -146,28 +138,23 @@ const config: Config = {
           '0%, 100%': { boxShadow: '0 0 10px var(--color-race-glow)' },
           '50%': { boxShadow: '0 0 30px var(--color-race), 0 0 60px var(--color-race-glow)' },
         },
-        'neon-pulse': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.7' },
+        slideUp: {
+          from: { transform: 'translateY(12px)', opacity: '0' },
+          to:   { transform: 'translateY(0)',    opacity: '1' },
         },
-        'slideInUp': {
-          from: { transform: 'translateY(20px)', opacity: '0' },
-          to: { transform: 'translateY(0)', opacity: '1' },
+        fadeIn: {
+          from: { opacity: '0' },
+          to:   { opacity: '1' },
         },
-        'fadeInScale': {
+        scaleIn: {
           from: { transform: 'scale(0.92)', opacity: '0' },
-          to: { transform: 'scale(1)', opacity: '1' },
+          to:   { transform: 'scale(1)',    opacity: '1' },
         },
-        spin: {
-          from: { transform: 'rotate(0deg)' },
-          to: { transform: 'rotate(360deg)' },
+        resourceTick: {
+          '0%':   { transform: 'translateY(0) scale(1)' },
+          '40%':  { transform: 'translateY(-3px) scale(1.12)' },
+          '100%': { transform: 'translateY(0) scale(1)' },
         },
-      },
-      spacing: {
-        'safe-bottom': 'env(safe-area-inset-bottom)',
-      },
-      screens: {
-        'xs': '375px',
       },
     },
   },

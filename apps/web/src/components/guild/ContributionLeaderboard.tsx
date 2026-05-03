@@ -10,8 +10,13 @@ const RANK_TONES = [
   { color: 'var(--color-brand)', dim: 'var(--color-brand-dim)' },
 ]
 
-export function ContributionLeaderboard() {
-  const { leaderboard, summary, loading } = useGuildContribution()
+interface ContributionLeaderboardProps {
+  guildId: string | null
+  me: { id: string }
+}
+
+export function ContributionLeaderboard({ guildId, me }: ContributionLeaderboardProps) {
+  const { leaderboard, summary, loading } = useGuildContribution({ guildId, me })
   const max = leaderboard[0]?.score ?? 1
 
   return (
@@ -88,7 +93,7 @@ export function ContributionLeaderboard() {
           const pct = (entry.score / max) * 100
           return (
             <li
-              key={entry.member.id}
+              key={entry.member.userId}
               className="rounded-lg p-2.5 border border-border flex items-center gap-3"
               style={{ background: idx < 3 ? tone?.dim : 'var(--color-bg-surface)' }}
             >
@@ -129,9 +134,9 @@ export function ContributionLeaderboard() {
                 </div>
               </div>
               <span
-                className={clsx('w-2 h-2 rounded-full shrink-0', entry.member.online && 'animate-pulse-slow')}
-                style={{ background: entry.member.online ? 'var(--color-success)' : 'var(--color-text-muted)' }}
-                aria-label={entry.member.online ? 'Çevrimiçi' : 'Çevrimdışı'}
+                className={clsx('w-2 h-2 rounded-full shrink-0', (entry.member.online ?? entry.member.isOnline) && 'animate-pulse-slow')}
+                style={{ background: (entry.member.online ?? entry.member.isOnline) ? 'var(--color-success)' : 'var(--color-text-muted)' }}
+                aria-label={(entry.member.online ?? entry.member.isOnline) ? 'Çevrimiçi' : 'Çevrimdışı'}
               />
             </li>
           )

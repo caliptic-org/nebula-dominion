@@ -6,11 +6,12 @@ import { DailyLimitsBar } from './DailyLimitsBar'
 import { DonationRequestCard } from './DonationRequestCard'
 
 interface GuildDonationCenterProps {
+  guildId: string | null
   me: { id: string; name: string }
 }
 
-export function GuildDonationCenter({ me }: GuildDonationCenterProps) {
-  const { requests, limits, loading, cooldownFor, createRequest, donate } = useGuildDonations({ me })
+export function GuildDonationCenter({ guildId, me }: GuildDonationCenterProps) {
+  const { requests, limits, loading, cooldownFor, createRequest, donate } = useGuildDonations({ guildId, me })
 
   return (
     <section className="glass-card p-4 space-y-4" aria-labelledby="guild-donations-heading">

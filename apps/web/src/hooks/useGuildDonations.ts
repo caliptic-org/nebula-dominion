@@ -5,6 +5,7 @@ import { GUILD_LIMITS, getGuildClient, type CreateRequestResult, type DonateResu
 import type { DailyLimits, DonationRequest, GuildResource } from '@/types/guild'
 
 interface UseGuildDonationsOptions {
+  guildId: string | null
   me: { id: string; name: string }
 }
 
@@ -17,8 +18,11 @@ export interface UseGuildDonations {
   donate: (input: { requestId: string; amount: number }) => Promise<DonateResult>
 }
 
-export function useGuildDonations({ me }: UseGuildDonationsOptions): UseGuildDonations {
-  const client = useMemo(() => getGuildClient(), [])
+export function useGuildDonations({ guildId, me }: UseGuildDonationsOptions): UseGuildDonations {
+  const client = useMemo(
+    () => (guildId ? getGuildClient({ guildId, userId: me.id }) : getGuildClient()),
+    [guildId, me.id],
+  )
   const [requests, setRequests] = useState<DonationRequest[]>([])
   const [limits, setLimits] = useState<DailyLimits | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,6 +30,7 @@ export function useGuildDonations({ me }: UseGuildDonationsOptions): UseGuildDon
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     Promise.all([client.getDonationRequests(), client.getDailyLimits()]).then(([r, l]) => {
       if (cancelled) return
       setRequests(r)
@@ -34,7 +39,7 @@ export function useGuildDonations({ me }: UseGuildDonationsOptions): UseGuildDon
     })
     const unsub = client.subscribe((event) => {
       if (event.type === 'donation:created') {
-        setRequests((prev) => [event.payload, ...prev])
+        setRequests((prev) => (prev.some((r) => r.id === event.payload.id) ? prev : [event.payload, ...prev]))
       } else if (event.type === 'donation:fulfilled') {
         setRequests((prev) => prev.map((r) => (r.id === event.payload.id ? event.payload : r)))
       } else if (event.type === 'donation:expired') {

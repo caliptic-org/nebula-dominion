@@ -5,6 +5,7 @@ import { GUILD_LIMITS, getGuildClient, type SendResult } from '@/lib/guild-clien
 import type { GuildMember, GuildMessage } from '@/types/guild'
 
 interface UseGuildChatOptions {
+  guildId: string | null
   me: { id: string; name: string; role: GuildMember['role'] }
 }
 
@@ -18,12 +19,15 @@ export interface UseGuildChat {
   lastError: SendResult | null
   send: (content: string) => Promise<SendResult>
   mute: (authorId: string) => Promise<void>
-  report: (messageId: string) => Promise<void>
+  report: (messageId: string, authorId: string) => Promise<void>
   isOfficer: boolean
 }
 
-export function useGuildChat({ me }: UseGuildChatOptions): UseGuildChat {
-  const client = useMemo(() => getGuildClient(), [])
+export function useGuildChat({ guildId, me }: UseGuildChatOptions): UseGuildChat {
+  const client = useMemo(
+    () => (guildId ? getGuildClient({ guildId, userId: me.id }) : getGuildClient()),
+    [guildId, me.id],
+  )
   const [messages, setMessages] = useState<GuildMessage[]>([])
   const [members, setMembers] = useState<GuildMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,15 +38,23 @@ export function useGuildChat({ me }: UseGuildChatOptions): UseGuildChat {
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     Promise.all([client.getMessages(), client.getMembers()]).then(([m, mb]) => {
       if (cancelled) return
       setMessages(m)
       setMembers(mb)
       setLoading(false)
     })
+    const seen = new Set<string>()
     const unsub = client.subscribe((event) => {
       if (event.type === 'message') {
-        setMessages((prev) => [...prev, event.payload].slice(-GUILD_LIMITS.MESSAGE_WINDOW))
+        const incoming = event.payload
+        if (seen.has(incoming.id)) return
+        seen.add(incoming.id)
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev
+          return [...prev, incoming].slice(-GUILD_LIMITS.MESSAGE_WINDOW)
+        })
       }
     })
     return () => {
@@ -54,10 +66,7 @@ export function useGuildChat({ me }: UseGuildChatOptions): UseGuildChat {
   useEffect(() => {
     if (cooldownMs <= 0) return
     cooldownTimer.current = setInterval(() => {
-      setCooldownMs((ms) => {
-        const next = Math.max(0, ms - 200)
-        return next
-      })
+      setCooldownMs((ms) => Math.max(0, ms - 200))
     }, 200)
     return () => {
       if (cooldownTimer.current) clearInterval(cooldownTimer.current)
@@ -96,8 +105,8 @@ export function useGuildChat({ me }: UseGuildChatOptions): UseGuildChat {
   )
 
   const report = useCallback(
-    async (messageId: string) => {
-      await client.reportMessage(messageId)
+    async (messageId: string, authorId: string) => {
+      await client.reportMessage(messageId, authorId)
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, flagged: true } : m)))
     },
     [client],

@@ -9,7 +9,7 @@ interface MessageItemProps {
   isOwn: boolean
   isOfficer: boolean
   onMute: (authorId: string) => void
-  onReport: (messageId: string) => void
+  onReport: (messageId: string, authorId: string) => void
 }
 
 export function MessageItem({ message, isOwn, isOfficer, onMute, onReport }: MessageItemProps) {
@@ -82,7 +82,7 @@ export function MessageItem({ message, isOwn, isOfficer, onMute, onReport }: Mes
           </button>
           <button
             type="button"
-            onClick={() => onReport(message.id)}
+            onClick={() => onReport(message.id, message.authorId)}
             disabled={message.flagged}
             className="btn-ghost text-[10px] px-2 py-1"
             aria-label="Mesajı bildir"

@@ -200,7 +200,7 @@ export default function GuildHubPage() {
           <>
             <GuildDashboard guildId={activeGuildId} />
 
-            <GuildView me={me} />
+            <GuildView guildId={activeGuildId} me={me} />
 
             {callout && state.step !== 'completed' && (
               <div

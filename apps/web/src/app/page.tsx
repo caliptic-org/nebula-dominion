@@ -47,8 +47,8 @@ const RESOURCES = [
   { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
 ];
 
-type Tab = 'base' | 'map' | 'commanders' | 'shop';
-type NavTabId = Tab | 'battle';
+type Tab = 'base' | 'map' | 'commanders';
+type NavTabId = Tab | 'battle' | 'shop';
 
 const TABS: { id: NavTabId; icon: string; label: string }[] = [
   { id: 'base', icon: '🏰', label: 'Ana Üs' },
@@ -449,15 +449,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ── Shop Tab ──────────────────────────────────────── */}
-          {activeTab === 'shop' && (
-            <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <div className="text-6xl mb-4 animate-float">💎</div>
-              <div className="mb-3"><span className="badge badge-race">Premium Mağaza</span></div>
-              <h2 className="font-display text-2xl font-black text-text-primary mb-2">Yakında</h2>
-              <p className="text-text-muted text-sm">Kozmetik item&apos;lar ve premium içerikler geliyor.</p>
-            </div>
-          )}
         </main>
 
         {/* ── Bottom Navigation ─────────────────────────────── */}
@@ -470,10 +461,13 @@ export default function HomePage() {
           }}
         >
           {TABS.map((tab) => {
-            const active = tab.id !== 'battle' && activeTab === tab.id;
+            const active =
+              tab.id !== 'battle' && tab.id !== 'shop' && activeTab === tab.id;
             const handleClick = () => {
               if (tab.id === 'battle') {
                 router.push(battleHref);
+              } else if (tab.id === 'shop') {
+                router.push('/shop');
               } else {
                 setActiveTab(tab.id);
               }

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:4000/api/v1';
+const GAME_BASE = process.env.GAME_BASE_URL ?? 'http://localhost:3001/api';
 const WEB_BASE = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
@@ -21,6 +22,11 @@ export default defineConfig({
       name: 'api',
       testMatch: /auth\.api\.spec\.ts/,
       use: { baseURL: API_BASE },
+    },
+    {
+      name: 'guild-api',
+      testMatch: /guild\.api\.spec\.ts/,
+      use: { baseURL: GAME_BASE },
     },
     {
       name: 'chromium',

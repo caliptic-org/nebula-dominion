@@ -46,7 +46,7 @@ export default function GameCanvas({ race, mode, userId, tutorial = false }: Pro
       callbacks: {
         postBoot: (game) => {
           // Expose game for E2E tests via postBoot (avoids React StrictMode lifecycle issues)
-          (window as typeof window & { __phaserGame?: Phaser.Game }).__phaserGame = game;
+          (window as unknown as Record<string, unknown>).__phaserGame = game;
           game.scene.start('BootScene', {
             socket,
             race: race as Race,

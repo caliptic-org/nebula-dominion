@@ -14,6 +14,38 @@ const nextConfig = {
     NEXT_PUBLIC_GAME_SERVER_URL: process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:3001',
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
   },
+  webpack: (config, { isServer, dev }) => {
+    // Phaser ships an unminified `phaser/dist/phaser.js` (~3MB) as its main
+    // entry. The package also includes a pre-minified `phaser.min.js` (~1MB).
+    // Aliasing to the minified bundle in production client builds shrinks the
+    // initial /battle payload dramatically and speeds up first cache-cold load.
+    if (!isServer && !dev) {
+      config.resolve = config.resolve || {};
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        phaser: 'phaser/dist/phaser.min.js',
+      };
+
+      // Isolate Phaser into its own cacheable chunk so it loads in parallel
+      // with the route bundle and stays cached across deploys that do not
+      // touch the Phaser version.
+      config.optimization = config.optimization || {};
+      config.optimization.splitChunks = config.optimization.splitChunks || {};
+      const splitChunks = config.optimization.splitChunks;
+      splitChunks.cacheGroups = {
+        ...(splitChunks.cacheGroups || {}),
+        phaser: {
+          name: 'phaser',
+          test: /[\\/]node_modules[\\/]phaser[\\/]/,
+          chunks: 'async',
+          priority: 30,
+          reuseExistingChunk: true,
+          enforce: true,
+        },
+      };
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;

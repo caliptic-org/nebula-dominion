@@ -6,7 +6,24 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { RACE_DESCRIPTIONS } from '@/types/units';
 
-const GameCanvas = dynamic(() => import('@/game/GameCanvas'), { ssr: false });
+const GameCanvas = dynamic(() => import('@/game/GameCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="w-full h-full flex items-center justify-center"
+      style={{ minHeight: 320 }}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="text-center">
+        <div className="text-4xl mb-3 animate-pulse" aria-hidden>⚔️</div>
+        <span className="font-display text-[10px] text-text-muted uppercase tracking-widest">
+          Savaş Motoru Yükleniyor…
+        </span>
+      </div>
+    </div>
+  ),
+});
 
 function BattleContent() {
   const params = useSearchParams();

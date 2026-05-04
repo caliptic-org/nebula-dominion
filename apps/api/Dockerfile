@@ -39,4 +39,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD wget -qO- http://localhost:4000/api/docs-json || exit 1
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/apps/api/src/main"]

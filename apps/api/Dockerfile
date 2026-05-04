@@ -13,7 +13,9 @@ COPY apps/web/package.json ./apps/web/
 RUN pnpm install
 
 COPY apps/api ./apps/api
-COPY backend ./backend
+COPY backend/package.json backend/package-lock.json ./backend/
+RUN npm install --prefix ./backend --ignore-scripts
+COPY backend/src ./backend/src
 
 RUN pnpm --filter @nebula-dominion/api run build
 

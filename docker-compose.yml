@@ -182,6 +182,7 @@ services:
       - "${WEB_PORT:-3000}:3000"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
       NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL:-http://localhost:3001}
     depends_on:

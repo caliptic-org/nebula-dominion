@@ -13,6 +13,7 @@ COPY apps/web/package.json ./apps/web/
 RUN pnpm install
 
 COPY apps/api ./apps/api
+COPY backend ./backend
 
 RUN pnpm --filter @nebula-dominion/api run build
 

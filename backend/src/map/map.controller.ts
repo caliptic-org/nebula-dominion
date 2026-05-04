@@ -4,7 +4,7 @@ import { MapActionDto } from './dto/map-action.dto';
 import { MapService } from './map.service';
 
 @ApiTags('map')
-@Controller('api')
+@Controller('map')
 export class MapController {
   constructor(private readonly mapService: MapService) {}
 

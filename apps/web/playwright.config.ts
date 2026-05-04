@@ -33,6 +33,11 @@ export default defineConfig({
       testMatch: /auth\.ui\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: WEB_BASE },
     },
+    {
+      name: 'map',
+      testMatch: /map\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], baseURL: WEB_BASE },
+    },
   ],
 
   webServer: {

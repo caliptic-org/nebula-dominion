@@ -8,7 +8,7 @@ import { MapService } from './map.service';
 export class MapController {
   constructor(private readonly mapService: MapService) {}
 
-  @Get('map/state')
+  @Get('state')
   @ApiOperation({ summary: 'Get full map state: bases, resources, enemies, territories' })
   @ApiQuery({ name: 'playerRace', required: false, description: 'Player race (default: insan)' })
   @ApiResponse({ status: 200, description: 'Map state returned' })

@@ -16,6 +16,7 @@ import { EventsModule } from './modules/events/events.module';
 import { CosmeticsModule } from './modules/cosmetics/cosmetics.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { HealthModule } from './health/health.module';
+import { MapModule } from '../../../backend/src/map/map.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
     CosmeticsModule,
     InventoryModule,
     HealthModule,
+    MapModule,
   ],
 })
 export class AppModule {}

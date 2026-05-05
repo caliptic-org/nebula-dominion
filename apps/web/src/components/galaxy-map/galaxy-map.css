@@ -1,0 +1,337 @@
+/* ──────────────────────────────────────────────────────────────────────
+ * Galaxy Map v2 — layered renderer
+ *
+ * Architecture:
+ *   .galaxy-map           position:relative root, owns `data-zoom` attr
+ *   ├── .galaxy-bg        fixed background nebula
+ *   ├── .galaxy-world-layer  single GPU-composited transform parent
+ *   │   ├── .galaxy-territory-svg
+ *   │   ├── .galaxy-connection-svg
+ *   │   ├── .galaxy-system-layer
+ *   │   ├── .galaxy-fleet-canvas
+ *   │   └── .galaxy-fog-canvas (top of stack within world)
+ *   └── .galaxy-ui-overlay  fixed-to-viewport HUD (zoom buttons, badge)
+ *
+ * LOD strategy: every system node is rendered, CSS hides what each zoom
+ * level shouldn't show. No DOM thrash on zoom — only style recalcs.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.galaxy-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #04060c;
+  color: #e8f4ff;
+  font-family: var(--race-font-ui, 'Share Tech Mono', monospace);
+  /* Disable browser pan-zoom gesture interception so our handlers run */
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.galaxy-map[data-zooming='true'] { cursor: grabbing; }
+
+/* Star-field background — does not pan with the world. Decorative only. */
+.galaxy-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1px 1px at 8% 12%, rgba(255,255,255,0.85) 0%, transparent 100%),
+    radial-gradient(1px 1px at 24% 38%, rgba(255,255,255,0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 67% 22%, rgba(180,200,255,0.65) 0%, transparent 100%),
+    radial-gradient(1px 1px at 88% 75%, rgba(200,180,255,0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 42% 85%, rgba(255,255,255,0.4) 0%, transparent 100%),
+    radial-gradient(2px 2px at 12% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(74,158,255,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(100,50,200,0.05) 0%, transparent 70%);
+  background-color: #04060c;
+}
+
+/* World layer — every coord-space child sits inside this transform parent */
+.galaxy-world-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  /* will-change is toggled by the controller during interaction */
+}
+
+/* ── Territory polygons (Voronoi cells) ─────────────────────────────── */
+.territory-region {
+  fill-opacity: 0.08;
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+  mask: url(#territory-fade-mask);
+  transition: fill-opacity 600ms cubic-bezier(0.32, 0.72, 0, 1),
+              stroke-opacity 300ms ease;
+}
+
+.territory-region:hover {
+  fill-opacity: 0.15;
+  stroke-opacity: 0.6;
+}
+
+@keyframes territory-pulse {
+  0%, 100% { stroke-opacity: 0.35; }
+  50%      { stroke-opacity: 0.7; }
+}
+.territory-region.contested {
+  animation: territory-pulse 2s ease-in-out infinite;
+}
+
+/* LOD: territory styling per zoom */
+.galaxy-map[data-zoom='galaxy'] .territory-region {
+  fill-opacity: 0.18;
+  stroke-opacity: 0.45;
+}
+.galaxy-map[data-zoom='sector'] .territory-region {
+  fill-opacity: 0.10;
+}
+.galaxy-map[data-zoom='system'] .territory-region {
+  fill-opacity: 0.04;
+  stroke-opacity: 0.18;
+}
+.galaxy-map[data-zoom='base'] .galaxy-territory-svg {
+  display: none;
+}
+
+/* ── Connection layer (trade routes & alliances) ────────────────────── */
+.galaxy-map[data-zoom='galaxy'] .galaxy-connection-svg {
+  display: none;
+}
+
+/* ── System nodes — DOM, with LOD ────────────────────────────────────── */
+.galaxy-system-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.system-node {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: inherit;
+  font-family: inherit;
+}
+
+.system-node:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+.system-core {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    #fff 0%,
+    var(--race-primary, #a0c8ff) 30%,
+    rgba(0,0,0,0) 75%
+  );
+  box-shadow:
+    0 0 8px var(--race-primary, #a0c8ff),
+    0 0 18px var(--race-primary, #a0c8ff);
+  transform: scale(0.25); /* default galaxy LOD: 8px visual */
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.system-node[data-race='neutral'] .system-core {
+  background: radial-gradient(circle at 40% 35%, #fff 0%, #8090b0 40%, transparent 75%);
+  box-shadow: 0 0 4px rgba(160,180,200,0.6);
+}
+
+.system-label {
+  position: absolute;
+  top: 100%;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 0 4px rgba(0,0,0,0.9);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.galaxy-map[data-zoom='sector'] .system-core { transform: scale(0.5); }
+.galaxy-map[data-zoom='system'] .system-core { transform: scale(1); }
+.galaxy-map[data-zoom='system'] .system-label,
+.galaxy-map[data-zoom='base']   .system-label { opacity: 1; }
+/* Base zoom hides the system dots — the base-screen UI takes over */
+.galaxy-map[data-zoom='base'] .system-core { opacity: 0.2; }
+
+/* Selected system — outer ring */
+.system-node.is-selected::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid var(--race-primary, #4a9eff);
+  box-shadow: 0 0 12px var(--race-primary, #4a9eff);
+  pointer-events: none;
+}
+
+/* ── Alert pulse (under-attack systems) ──────────────────────────────── */
+@keyframes alert-pulse {
+  0%   { transform: scale(1);   opacity: 0.9; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.system-node.under-attack::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid #ff2244;
+  animation: alert-pulse 1.2s cubic-bezier(0.32, 0, 0.67, 0) infinite;
+  pointer-events: none;
+}
+
+/* Second wave (delayed) */
+.system-node.under-attack > .system-core::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid #ff2244;
+  animation: alert-pulse 1.2s cubic-bezier(0.32, 0, 0.67, 0) 0.4s infinite;
+  pointer-events: none;
+}
+
+/* ── Resource badges ─────────────────────────────────────────────────── */
+.resource-badges {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 240ms ease, transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.galaxy-map[data-zoom='system'] .resource-badges,
+.galaxy-map[data-zoom='base']   .resource-badges {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+.galaxy-map[data-zoom='sector'] .resource-badges {
+  opacity: 0.45;
+}
+
+.resource-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid var(--race-border, rgba(0, 207, 255, 0.25));
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--badge-color, #fff);
+}
+.resource-badge.mineral { --badge-color: #a0c8ff; }
+.resource-badge.gas     { --badge-color: #44ff88; }
+.resource-badge.energy  { --badge-color: #ffcc00; }
+
+.resource-count { font-weight: 600; }
+
+/* ── UI overlay (zoom controls, level badge) ─────────────────────────── */
+.galaxy-ui-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.galaxy-zoom-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.galaxy-zoom-controls button {
+  width: 36px;
+  height: 36px;
+  background: rgba(8, 12, 20, 0.85);
+  border: 1px solid rgba(0, 207, 255, 0.35);
+  color: #00cfff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 150ms ease, transform 100ms ease;
+}
+.galaxy-zoom-controls button:hover {
+  background: rgba(0, 207, 255, 0.15);
+}
+.galaxy-zoom-controls button:active {
+  transform: scale(0.95);
+}
+
+.galaxy-zoom-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  background: rgba(8, 12, 20, 0.85);
+  border: 1px solid rgba(0, 207, 255, 0.25);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.galaxy-zoom-level {
+  color: #00cfff;
+  font-weight: 600;
+}
+.galaxy-zoom-scale {
+  color: rgba(0, 207, 255, 0.55);
+  font-size: 10px;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .territory-region.contested,
+  .system-node.under-attack::after,
+  .system-node.under-attack > .system-core::after {
+    animation: none;
+  }
+  .system-core,
+  .resource-badges,
+  .system-label {
+    transition: none;
+  }
+}
+
+/* ── Mobile fine-tuning ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .galaxy-zoom-controls button { width: 44px; height: 44px; font-size: 18px; }
+  .system-node { width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+  .resource-badges { top: -24px; }
+}

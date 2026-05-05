@@ -374,10 +374,10 @@ export default function StatsPage() {
           </h2>
 
           <div
-            className="manga-panel manga-panel-thick p-6"
+            className="cinematic-panel p-6"
             style={{ borderColor: 'var(--color-race, #4a9eff)', boxShadow: '0 0 24px var(--color-race-glow, rgba(74,158,255,0.2))' }}
           >
-            {/* Corner accent SVGs handled by manga-panel, add extra race-color accent */}
+            {/* Corner accent SVGs handled by cinematic-panel, add extra race-color accent */}
             <div className="flex flex-col sm:flex-row items-center gap-8">
               {/* Donut chart */}
               <div className="shrink-0">
@@ -462,7 +462,7 @@ export default function StatsPage() {
             {BATTLE_STATS.map((stat) => (
               <div
                 key={stat.label}
-                className="manga-panel p-4 group"
+                className="cinematic-panel p-4 group"
                 style={{ transition: 'border-color 0.2s, box-shadow 0.2s' }}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -531,7 +531,7 @@ export default function StatsPage() {
               return (
                 <div
                   key={buff.id}
-                  className="manga-panel p-4 flex items-center gap-4"
+                  className="cinematic-panel p-4 flex items-center gap-4"
                   style={{
                     borderColor: urgency ? 'rgba(255,51,85,0.3)' : `${buffColor}33`,
                     boxShadow: urgency
@@ -608,7 +608,7 @@ export default function StatsPage() {
             {RESOURCE_RATES.map((res) => (
               <div
                 key={res.type}
-                className="manga-panel p-5"
+                className="cinematic-panel p-5"
                 style={{
                   borderColor: `${res.color}33`,
                   background: `linear-gradient(160deg, ${res.color}08 0%, rgba(13,17,23,0.85) 60%)`,

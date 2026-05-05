@@ -156,59 +156,24 @@
 
 .level-up-modal {
   position: relative;
-  background: radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
-  border: 2.5px solid rgba(255, 255, 255, 0.85);
+  background: rgba(4, 8, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
   padding: 40px 48px;
   text-align: center;
   color: var(--color-text-primary);
   max-width: 420px;
   width: 90%;
-  clip-path: polygon(
-    24px 0,
-    100% 0,
-    100% calc(100% - 24px),
-    calc(100% - 24px) 100%,
-    0 100%,
-    0 24px
-  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  filter: drop-shadow(4px 4px 0 rgba(0,0,0,0.85))
-          drop-shadow(0 0 24px rgba(255, 200, 50, 0.4))
-          drop-shadow(0 0 16px var(--color-brand-glow));
+  box-shadow:
+    0 24px 64px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 0 32px rgba(255, 200, 50, 0.15),
+    0 0 16px var(--color-brand-glow);
 }
 
-/* Halftone dot overlay over the modal surface — dots on top, blended */
-.level-up-modal {
-  background-image:
-    radial-gradient(circle, rgba(255,255,255,0.16) 1px, transparent 1px),
-    radial-gradient(ellipse at top, var(--color-bg-elevated) 0%, var(--color-bg) 70%);
-  background-size: 6px 6px, auto;
-  background-blend-mode: screen, normal;
-}
-
-.level-up-modal::before,
-.level-up-modal::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.level-up-modal::before {
-  top: 10px;
-  left: 10px;
-  border-top: 2px solid rgba(0, 207, 255, 0.7);
-  border-left: 2px solid rgba(0, 207, 255, 0.7);
-}
-
-.level-up-modal::after {
-  bottom: 10px;
-  right: 10px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.7);
-  border-right: 2px solid rgba(0, 207, 255, 0.7);
-}
 
 .level-up-title {
   font-size: 11px;
@@ -714,28 +679,6 @@
   100% { transform: scale(0.3) translateY(8%); opacity: 0; filter: blur(16px); }
 }
 
-/* ── Speed lines ──────────────────────────────────────────────────────────── */
-
-.age-speed-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.age-speed-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  animation: age-speed-line 0.45s ease-out both;
-}
-
-@keyframes age-speed-line {
-  0%   { opacity: 0; transform: scaleX(0); transform-origin: left; }
-  50%  { opacity: 1; }
-  100% { opacity: 0; transform: scaleX(1); }
-}
-
 /* ── Content card — Double-Bezel (Doppelrand) ─────────────────────────────── */
 
 .age-card-shell {
@@ -1130,4 +1073,12 @@
   .age-number-stamp {
     font-size: clamp(90px, 35vw, 140px);
   }
+}
+
+/* ── Cinematic flash pulse (age transition) ──────────────────────────────── */
+
+@keyframes age-flash-pulse {
+  0%   { opacity: 0; transform: scale(0.8); }
+  40%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.4); }
 }

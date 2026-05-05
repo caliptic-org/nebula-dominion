@@ -103,8 +103,8 @@ const config: Config = {
         'star-twinkle': 'twinkle 4s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'scan-line': 'scan-line 4s cubic-bezier(0.45,0,0.55,1) infinite',
-        'speed-line': 'speed-line 0.4s ease-out forwards',
-        'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
+        'cinematic-appear': 'cinematic-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
+        'manga-appear': 'cinematic-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
         'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',
       },
       keyframes: {
@@ -129,8 +129,8 @@ const config: Config = {
           '50%': { opacity: '1' },
           '100%': { opacity: '0', transform: 'scaleX(1)' },
         },
-        'manga-appear': {
-          '0%': { opacity: '0', transform: 'scale(0.95) translateY(16px)', filter: 'blur(4px)' },
+        'cinematic-appear': {
+          '0%': { opacity: '0', transform: 'scale(0.96) translateY(16px)', filter: 'blur(4px)' },
           '100%': { opacity: '1', transform: 'scale(1) translateY(0)', filter: 'blur(0)' },
         },
         'slide-up': {

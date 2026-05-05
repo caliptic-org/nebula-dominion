@@ -104,17 +104,11 @@ function BattleContent() {
         </div>
       </header>
 
-      {/* Manga speed lines + halftone — active battle overlay */}
-      <div className="speed-lines-battle-active" aria-hidden />
-      <span
-        className="manga-halftone-overlay"
-        style={{ color: raceDesc?.color ?? '#4a9eff' }}
-        aria-hidden
-      />
+      {/* Active battle overlay */}
 
       {/* Phaser Game Canvas */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-2">
-        <div className="w-full ink-border-race overflow-hidden">
+        <div className="w-full cinematic-border-race overflow-hidden">
           <GameCanvas race={race} mode={mode} userId={userId} tutorial={tutorial} />
         </div>
       </main>

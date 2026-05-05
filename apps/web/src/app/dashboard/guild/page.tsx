@@ -206,7 +206,7 @@ export default function GuildHubPage() {
 
             {callout && state.step !== 'completed' && (
               <div
-                className="glass-card ink-border-race p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="glass-card cinematic-border-race p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 role="status"
               >
                 <div>

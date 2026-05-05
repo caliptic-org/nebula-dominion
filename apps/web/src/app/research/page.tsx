@@ -1125,10 +1125,9 @@ export default function ResearchPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.12 }} aria-hidden />
+      <div className="fixed inset-0 pointer-events-none" style={{ opacity: 0.12 }} aria-hidden />
 
-      {/* Manga horizontal sweep — research-tree atmosphere */}
-      <div className="speed-lines-sweep fixed inset-0 pointer-events-none" style={{ opacity: 0.4 }} aria-hidden />
+      {/* Research-tree atmosphere */}
 
       {/* Scan line ambient effect */}
       <div

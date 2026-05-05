@@ -183,13 +183,6 @@ export default function LeaderboardPage() {
 
   return (
     <div className="leaderboard-page">
-      {/* ── Background speed lines ── */}
-      <div className="lb-speed-bg" aria-hidden>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="lb-speed-line" style={{ '--line-i': i } as React.CSSProperties} />
-        ))}
-      </div>
-
       {/* ── Header ── */}
       <header className="lb-header">
         <Link href="/" className="lb-back-btn" aria-label="Geri dön">

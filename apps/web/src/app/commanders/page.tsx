@@ -36,7 +36,6 @@ export default function CommandersPage() {
   return (
     <div className="commanders-screen h-dvh flex flex-col text-text-primary overflow-hidden">
       <div className="commanders-bg" aria-hidden />
-      <div className="commanders-halftone" aria-hidden />
 
       {/* ── Top bar ────────────────────────────────────── */}
       <header className="relative z-20 flex flex-wrap items-center gap-3 px-5 py-4 border-b border-border bg-bg-overlay backdrop-blur-md">
@@ -199,8 +198,7 @@ function CommanderCard({
       aria-pressed={selected}
       className={[
         'commander-card group relative text-left rounded-xl overflow-hidden border transition-all duration-200 focus:outline-none focus-visible:ring-2',
-        'speed-lines-hover',
-        selected ? 'is-selected ink-border-race' : 'hover:-translate-y-0.5',
+        selected ? 'is-selected cinematic-border-race' : 'hover:-translate-y-0.5',
       ].join(' ')}
       style={
         {
@@ -460,7 +458,7 @@ function DetailPanel({
       {/* Body */}
       <div className="p-5 space-y-5">
         {/* Story */}
-        <section className="manga-panel rounded-lg p-4">
+        <section className="cinematic-panel rounded-lg p-4">
           <div className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-text-muted mb-2">
             Hikaye
           </div>

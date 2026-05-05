@@ -29,7 +29,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
         }}
         aria-hidden
       />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+      <div className="fixed inset-0 pointer-events-none opacity-15" aria-hidden />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div

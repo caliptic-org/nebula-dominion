@@ -485,16 +485,16 @@ export default function WorldMapPage() {
       {/* ── Territory legend (bottom-left) ───────────────────────────────── */}
       <div className="absolute bottom-20 left-3 z-30 flex flex-col gap-1.5 pointer-events-none">
         {LEGEND.map(l=>(
-          <div key={l.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:`${l.color}12`, borderColor: `${l.color}55` }}>
+          <div key={l.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full cinematic-border" style={{ background:`${l.color}12`, borderColor: `${l.color}55` }}>
             <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:l.color, boxShadow:`0 0 5px ${l.color}` }} />
             <span className="manga-label" style={{ color:l.color, opacity: 1 }}>{l.label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:'rgba(255,50,50,0.10)', borderColor:'rgba(255,50,50,0.55)' }}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full cinematic-border" style={{ background:'rgba(255,50,50,0.10)', borderColor:'rgba(255,50,50,0.55)' }}>
           <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:'#ff3333', boxShadow:'0 0 5px #ff3333' }} />
           <span className="manga-label" style={{ color: '#ff8a8a', opacity: 1 }}>Düşman</span>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full ink-border" style={{ background:'rgba(255,200,50,0.10)', borderColor:'rgba(255,200,50,0.55)' }}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full cinematic-border" style={{ background:'rgba(255,200,50,0.10)', borderColor:'rgba(255,200,50,0.55)' }}>
           <div className="w-1.5 h-1.5 rounded-full" style={{ background:'#ffc832', boxShadow:'0 0 4px #ffc832' }} />
           <span className="manga-label" style={{ color: '#ffc832', opacity: 1 }}>Kaynak</span>
         </div>

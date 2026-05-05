@@ -83,9 +83,9 @@ export default function RaceSelectPage() {
         aria-hidden
       />
 
-      {/* Race-tinted manga halftone texture */}
+      {/* Race-tinted cinematic texture */}
       <div
-        className="manga-halftone-race fixed inset-0 pointer-events-none transition-all duration-700"
+        className="fixed inset-0 pointer-events-none transition-all duration-700"
         style={{
           opacity: 0.18,
           maskImage:
@@ -189,7 +189,7 @@ export default function RaceSelectPage() {
                 onFocus={() => setHoveredId(race.id)}
                 onBlur={() => setHoveredId(null)}
                 aria-pressed={isSelected}
-                className="speed-lines-hover relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
+                className="relative shrink-0 lg:w-full text-left rounded-xl border px-4 py-3 flex items-center gap-3 transition-all duration-300 outline-none focus-visible:ring-2"
                 style={{
                   background: isSelected
                     ? race.bg

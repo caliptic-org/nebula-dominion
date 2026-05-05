@@ -76,9 +76,9 @@ export default function DashboardPage() {
       className="h-dvh flex overflow-hidden relative"
       style={{ background: 'var(--color-bg)' }}
     >
-      {/* Race-tinted halftone overlay — manga atmosphere */}
+      {/* Race-tinted overlay — cinematic atmosphere */}
       <div
-        className="manga-halftone-race absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{ zIndex: 0, opacity: 0.12 }}
         aria-hidden
       />
@@ -266,7 +266,7 @@ export default function DashboardPage() {
               {playerStats.map((stat) => (
                 <div
                   key={stat.label}
-                  className="stat-card ink-border-race p-4 transition-all hover-glow"
+                  className="stat-card cinematic-border-race p-4 transition-all hover-glow"
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span

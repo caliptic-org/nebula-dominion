@@ -14,17 +14,17 @@
 
 /* ── Design Tokens ────────────────────────────────────────────────────────── */
 :root {
-  /* Base space theme */
-  --color-bg:          #080a10;
-  --color-bg-surface:  #0a0d14;
-  --color-bg-elevated: #141d2b;
-  --color-bg-overlay:  rgba(8,10,16,0.92);
+  /* Base space theme — cinematic deep space */
+  --color-bg:          #000000;
+  --color-bg-surface:  #05080f;
+  --color-bg-elevated: #080d1a;
+  --color-bg-overlay:  rgba(8,13,26,0.92);
 
   /* Text */
-  --color-text-primary:   #e8e8f0;
+  --color-text-primary:   #ffffff;
   --color-text-secondary: #a0a8c0;
   --color-text-muted:     #555d7a;
-  --color-text-inverse:   #080a10;
+  --color-text-inverse:   #000000;
 
   /* Brand (default: human blue) */
   --color-brand:      #4a9eff;
@@ -32,21 +32,30 @@
   --color-brand-dim:  rgba(74,158,255,0.12);
   --color-brand-glow: rgba(74,158,255,0.35);
 
-  /* Accent */
-  --color-accent:      #00cfff;
-  --color-accent-hover:#33daff;
-  --color-accent-dim:  rgba(0,207,255,0.14);
-  --color-accent-glow: rgba(0,207,255,0.45);
-  --color-accent-soft: rgba(0,207,255,0.06);
+  /* Accent — electric blue engine glow */
+  --color-accent:      #00aaff;
+  --color-accent-hover:#33bbff;
+  --color-accent-dim:  rgba(0,170,255,0.14);
+  --color-accent-glow: rgba(0,170,255,0.45);
+  --color-accent-soft: rgba(0,170,255,0.06);
+
+  /* Gold accent — cinematic UI accent */
+  --color-gold:        #c8a84b;
+  --color-gold-dim:    rgba(200,168,75,0.14);
+  --color-gold-glow:   rgba(200,168,75,0.40);
 
   /* Energy */
   --color-energy:     #ffc832;
   --color-energy-dim: rgba(255,200,50,0.12);
 
+  /* Metallic ship hull tones */
+  --color-hull-dark:  #5a6a7a;
+  --color-hull-light: #7080a0;
+
   /* Borders */
-  --color-border:       rgba(0,207,255,0.08);
-  --color-border-hover: rgba(0,207,255,0.18);
-  --color-border-focus: rgba(0,207,255,0.55);
+  --color-border:       rgba(0,170,255,0.08);
+  --color-border-hover: rgba(0,170,255,0.18);
+  --color-border-focus: rgba(0,170,255,0.55);
 
   /* Status */
   --color-success: #44ff88;
@@ -59,27 +68,24 @@
   --font-body:    'Rajdhani', 'Segoe UI', system-ui, sans-serif;
   --font-mono:    'Cascadia Code', 'Fira Code', monospace;
 
-  /* Gradients */
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.12) 0%, #080a10 70%);
-  --gradient-hero:   linear-gradient(160deg, #0a0f1e 0%, #080a10 50%, #0d0a1e 100%);
-  --gradient-card:   linear-gradient(135deg, rgba(74,158,255,0.06) 0%, rgba(0,207,255,0.03) 100%);
-  --gradient-brand:  linear-gradient(135deg, #4a9eff 0%, #00cfff 100%);
+  /* Gradients — cinematic deep space */
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,100,200,0.10) 0%, #000000 70%);
+  --gradient-hero:   linear-gradient(160deg, #000510 0%, #000000 50%, #05000f 100%);
+  --gradient-card:   linear-gradient(135deg, rgba(0,100,200,0.05) 0%, rgba(0,170,255,0.02) 100%);
+  --gradient-brand:  linear-gradient(135deg, #4a9eff 0%, #00aaff 100%);
   --gradient-race:   linear-gradient(160deg, var(--color-race-dim) 0%, transparent 60%);
 
   /* Race tokens (default: İnsan) */
   --color-race:      #4a9eff;
   --color-race-dim:  rgba(74,158,255,0.10);
   --color-race-glow: rgba(74,158,255,0.30);
-  --color-race-text: #080a10;
+  --color-race-text: #000000;
 
-  /* Manga effects */
-  --manga-border: 3px solid rgba(255,255,255,0.12);
-  --manga-border-ink: 3px solid rgba(255,255,255,0.22);
-  --manga-panel-bg: rgba(13,17,23,0.85);
-  --manga-panel-bg-deep: rgba(8,10,16,0.92);
-  --speed-line-color: rgba(255,255,255,0.06);
-  --manga-halftone-size: 8px;
-  --manga-halftone-opacity: 0.13;
+  /* Glassmorphism panel */
+  --glass-bg:          rgba(8,13,26,0.75);
+  --glass-blur:        blur(12px);
+  --glass-border:      rgba(255,255,255,0.08);
+  --glass-border-race: var(--color-race-glow);
 }
 
 /* ── Race Theme Overrides ───────────────────────────────────────────────── */
@@ -92,7 +98,7 @@
   --color-brand-dim:  rgba(68,255,68,0.12);
   --color-brand-glow: rgba(68,255,68,0.35);
   --color-border-focus: rgba(68,255,68,0.5);
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(68,255,68,0.10) 0%, #080a10 70%);
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(68,255,68,0.08) 0%, #000000 70%);
 }
 
 [data-race="otomat"] {
@@ -104,7 +110,7 @@
   --color-brand-dim:  rgba(0,207,255,0.12);
   --color-brand-glow: rgba(0,207,255,0.35);
   --color-border-focus: rgba(0,207,255,0.5);
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,207,255,0.10) 0%, #080a10 70%);
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,207,255,0.08) 0%, #000000 70%);
 }
 
 [data-race="canavar"] {
@@ -116,7 +122,7 @@
   --color-brand-dim:  rgba(255,102,0,0.12);
   --color-brand-glow: rgba(255,102,0,0.35);
   --color-border-focus: rgba(255,102,0,0.5);
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,102,0,0.10) 0%, #080a10 70%);
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,102,0,0.08) 0%, #000000 70%);
 }
 
 [data-race="insan"] {
@@ -128,7 +134,7 @@
   --color-brand-dim:  rgba(74,158,255,0.12);
   --color-brand-glow: rgba(74,158,255,0.35);
   --color-border-focus: rgba(74,158,255,0.5);
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.10) 0%, #080a10 70%);
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.08) 0%, #000000 70%);
 }
 
 [data-race="seytan"] {
@@ -140,7 +146,7 @@
   --color-brand-dim:  rgba(204,0,255,0.12);
   --color-brand-glow: rgba(204,0,255,0.35);
   --color-border-focus: rgba(204,0,255,0.5);
-  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(204,0,255,0.10) 0%, #080a10 70%);
+  --gradient-nebula: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(204,0,255,0.08) 0%, #000000 70%);
 }
 
 /* ── Base Styles ────────────────────────────────────────────────────────── */
@@ -166,7 +172,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Starfield noise — fixed overlay, pointer-events-none */
+/* Cinematic starfield — fixed, pointer-events-none, realistic multi-layer depth */
 body::before {
   content: '';
   position: fixed;
@@ -174,17 +180,38 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 100%),
-    radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.12) 0%, transparent 100%),
-    radial-gradient(1px 1px at 45% 70%, rgba(255,255,255,0.10) 0%, transparent 100%),
-    radial-gradient(1px 1px at 65% 50%, rgba(255,255,255,0.08) 0%, transparent 100%),
-    radial-gradient(1px 1px at 10% 85%, rgba(255,255,255,0.10) 0%, transparent 100%),
-    radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.08) 0%, transparent 100%),
-    radial-gradient(1px 1px at 35% 15%, rgba(255,255,255,0.12) 0%, transparent 100%),
-    radial-gradient(1px 1px at 75% 90%, rgba(255,255,255,0.09) 0%, transparent 100%);
+    /* Bright foreground stars */
+    radial-gradient(1.5px 1.5px at 12% 18%, rgba(255,255,255,0.85) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 88% 7%,  rgba(255,255,255,0.80) 0%, transparent 100%),
+    radial-gradient(1px   1px   at 55% 35%, rgba(255,255,255,0.70) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 33% 72%, rgba(255,255,255,0.75) 0%, transparent 100%),
+    radial-gradient(1px   1px   at 72% 58%, rgba(255,255,255,0.65) 0%, transparent 100%),
+    /* Mid-layer stars */
+    radial-gradient(1px 1px at 20% 30%,  rgba(255,255,255,0.40) 0%, transparent 100%),
+    radial-gradient(1px 1px at 80% 10%,  rgba(255,255,255,0.35) 0%, transparent 100%),
+    radial-gradient(1px 1px at 45% 70%,  rgba(255,255,255,0.30) 0%, transparent 100%),
+    radial-gradient(1px 1px at 65% 50%,  rgba(255,255,255,0.28) 0%, transparent 100%),
+    radial-gradient(1px 1px at 10% 85%,  rgba(255,255,255,0.32) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 60%,  rgba(255,255,255,0.25) 0%, transparent 100%),
+    radial-gradient(1px 1px at 35% 15%,  rgba(255,255,255,0.38) 0%, transparent 100%),
+    radial-gradient(1px 1px at 75% 90%,  rgba(255,255,255,0.28) 0%, transparent 100%),
+    radial-gradient(1px 1px at 5%  45%,  rgba(255,255,255,0.22) 0%, transparent 100%),
+    radial-gradient(1px 1px at 95% 35%,  rgba(255,255,255,0.20) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 5%,   rgba(255,255,255,0.35) 0%, transparent 100%),
+    radial-gradient(1px 1px at 25% 55%,  rgba(255,255,255,0.18) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 80%,  rgba(255,255,255,0.22) 0%, transparent 100%),
+    /* Deep background stars — faint */
+    radial-gradient(1px 1px at 42% 28%,  rgba(200,220,255,0.15) 0%, transparent 100%),
+    radial-gradient(1px 1px at 18% 62%,  rgba(200,220,255,0.12) 0%, transparent 100%),
+    radial-gradient(1px 1px at 82% 44%,  rgba(200,220,255,0.10) 0%, transparent 100%),
+    radial-gradient(1px 1px at 67% 22%,  rgba(200,220,255,0.14) 0%, transparent 100%),
+    radial-gradient(1px 1px at 38% 88%,  rgba(200,220,255,0.10) 0%, transparent 100%),
+    /* Nebula volumetric glow — subtle background atmosphere */
+    radial-gradient(ellipse 60% 40% at 70% 20%, rgba(0,60,120,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 25% 75%, rgba(40,0,80,0.06) 0%, transparent 70%);
 }
 
-/* HUD grid + tech scan overlay — fixed, pointer-events-none, GPU-safe */
+/* Minimal HUD grid — barely visible, cinematic sci-fi depth */
 body::after {
   content: '';
   position: fixed;
@@ -192,17 +219,10 @@ body::after {
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(0, 207, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 207, 255, 0.025) 1px, transparent 1px),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 2px,
-      rgba(0, 207, 255, 0.035) 2px,
-      rgba(0, 207, 255, 0.035) 3px
-    );
-  background-size: 40px 40px, 40px 40px, 100% 3px;
-  opacity: 0.55;
+    linear-gradient(rgba(0, 170, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 170, 255, 0.012) 1px, transparent 1px);
+  background-size: 60px 60px;
+  opacity: 0.4;
 }
 
 /* Animated scan beam — sweeps top → bottom across the viewport */
@@ -214,22 +234,22 @@ body::after {
   background-image: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(0, 207, 255, 0.06) 46%,
-    rgba(0, 207, 255, 0.18) 50%,
-    rgba(0, 207, 255, 0.06) 54%,
+    rgba(0, 170, 255, 0.04) 46%,
+    rgba(0, 170, 255, 0.12) 50%,
+    rgba(0, 170, 255, 0.04) 54%,
     transparent 100%
   );
   background-size: 100% 220px;
   background-repeat: no-repeat;
   background-position: 0 -220px;
-  animation: hud-scan-sweep 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: hud-scan-sweep 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   mix-blend-mode: screen;
 }
 
 @keyframes hud-scan-sweep {
   0%   { background-position: 0 -240px; opacity: 0; }
-  10%  { opacity: 0.9; }
-  90%  { opacity: 0.9; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.7; }
   100% { background-position: 0 100dvh; opacity: 0; }
 }
 
@@ -241,87 +261,76 @@ body::after {
 }
 
 /* ── HUD Panel Frame System ─────────────────────────────────────────────── */
-/* Angular sci-fi HUD frame with corner-cut clip-path + bracket accents.
-   Apply `.hud-panel` for the frame shape, `.hud-panel-corners` for bracket
-   accents at top-left and bottom-right corners. */
 .hud-panel {
   position: relative;
-  background: rgba(8, 10, 16, 0.85);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  clip-path: polygon(
-    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
-    100% calc(100% - 12px), calc(100% - 12px) 100%,
-    12px 100%, 0 calc(100% - 12px)
-  );
+  background: rgba(8, 13, 26, 0.85);
+  border: 1px solid rgba(0, 170, 255, 0.20);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .hud-panel-corners::before,
 .hud-panel-corners::after {
   content: '';
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   pointer-events: none;
   z-index: 2;
 }
 
 .hud-panel-corners::before {
-  top: 8px;
-  left: 8px;
-  border-top: 2px solid rgba(0, 207, 255, 0.6);
-  border-left: 2px solid rgba(0, 207, 255, 0.6);
+  top: 6px;
+  left: 6px;
+  border-top: 1px solid rgba(0, 170, 255, 0.5);
+  border-left: 1px solid rgba(0, 170, 255, 0.5);
 }
 
 .hud-panel-corners::after {
-  bottom: 8px;
-  right: 8px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.6);
-  border-right: 2px solid rgba(0, 207, 255, 0.6);
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 1px solid rgba(0, 170, 255, 0.5);
+  border-right: 1px solid rgba(0, 170, 255, 0.5);
 }
 
-/* ── Manga Panel System (HUD frame applied) ─────────────────────────────── */
-.manga-panel {
+/* ── Cinematic Glassmorphism Panel System ───────────────────────────────── */
+/* Core glassmorphism panel — minimal, transparent, never blocks gameplay */
+.cinematic-panel {
   position: relative;
-  background: var(--manga-panel-bg);
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  clip-path: polygon(
-    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
-    100% calc(100% - 12px), calc(100% - 12px) 100%,
-    12px 100%, 0 calc(100% - 12px)
-  );
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
-.manga-panel::before,
-.manga-panel::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  pointer-events: none;
-  z-index: 2;
+/* Race-tinted glassmorphism panel */
+.cinematic-panel-race {
+  position: relative;
+  background: rgba(8,13,26,0.75);
+  border: 1px solid var(--color-race-glow);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 20px var(--color-race-dim), inset 0 0 24px rgba(0,0,0,0.2);
 }
 
-.manga-panel::before {
-  top: 8px;
-  left: 8px;
-  border-top: 2px solid rgba(0, 207, 255, 0.6);
-  border-left: 2px solid rgba(0, 207, 255, 0.6);
+/* Modal glassmorphism panel */
+.cinematic-modal-panel {
+  position: relative;
+  background: rgba(4, 8, 18, 0.92);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 24px 64px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 0 32px var(--color-race-glow);
 }
 
-.manga-panel::after {
-  bottom: 8px;
-  right: 8px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.6);
-  border-right: 2px solid rgba(0, 207, 255, 0.6);
-}
-
-.manga-panel-thick {
-  border-width: 2px;
-  border-color: rgba(0, 207, 255, 0.5);
-  box-shadow: 0 0 12px rgba(0,207,255,0.15), inset 0 0 20px rgba(0,0,0,0.25);
-}
-
-/* Double-Bezel card architecture */
+/* ── Double-Bezel card architecture ─────────────────────────────────────── */
 .doppelrand {
   padding: 2px;
   background: rgba(255,255,255,0.04);
@@ -332,46 +341,38 @@ body::after {
 .doppelrand > .doppelrand-inner {
   background: var(--color-bg-surface);
   border-radius: calc(1.25rem - 2px);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.06);
   overflow: hidden;
 }
 
-/* ── Glass Card (HUD frame applied) ─────────────────────────────────────── */
+/* ── Cinematic Border Utilities ─────────────────────────────────────────── */
+.cinematic-border {
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3);
+}
+
+.cinematic-border-race {
+  border: 1px solid var(--color-race-glow);
+  box-shadow:
+    0 0 12px var(--color-race-dim),
+    inset 0 0 0 1px rgba(0,0,0,0.3);
+}
+
+.cinematic-border-accent {
+  border: 1px solid var(--color-accent-glow);
+  box-shadow:
+    0 0 10px var(--color-accent-dim);
+}
+
+/* ── Glass Card (cinematic glassmorphism) ───────────────────────────────── */
 .glass-card {
   position: relative;
-  background: rgba(8, 10, 16, 0.85);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  clip-path: polygon(
-    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
-    100% calc(100% - 12px), calc(100% - 12px) 100%,
-    12px 100%, 0 calc(100% - 12px)
-  );
-}
-
-.glass-card::before,
-.glass-card::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.glass-card::before {
-  top: 8px;
-  left: 8px;
-  border-top: 2px solid rgba(0, 207, 255, 0.6);
-  border-left: 2px solid rgba(0, 207, 255, 0.6);
-}
-
-.glass-card::after {
-  bottom: 8px;
-  right: 8px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.6);
-  border-right: 2px solid rgba(0, 207, 255, 0.6);
+  background: rgba(8, 13, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 
 /* ── Race Glow Effects ──────────────────────────────────────────────────── */
@@ -398,7 +399,7 @@ body::after {
   gap: 0.5rem;
   padding: 0.75rem 1.75rem;
   background: var(--color-race);
-  color: #080a10;
+  color: #000000;
   font-family: var(--font-display);
   font-size: 0.8rem;
   font-weight: 700;
@@ -515,7 +516,7 @@ body::after {
   height: 20px;
   border-radius: 50%;
   background: var(--color-race);
-  border: 2px solid #080a10;
+  border: 2px solid #000000;
   box-shadow:
     0 0 0 1px var(--color-race),
     0 0 12px var(--color-race-glow),
@@ -538,7 +539,7 @@ body::after {
   height: 20px;
   border-radius: 50%;
   background: var(--color-race);
-  border: 2px solid #080a10;
+  border: 2px solid #000000;
   box-shadow:
     0 0 0 1px var(--color-race),
     0 0 12px var(--color-race-glow),
@@ -586,7 +587,7 @@ body::after {
 .badge-accent {
   background: var(--color-accent-dim);
   color: var(--color-accent);
-  border: 1px solid rgba(0,207,255,0.25);
+  border: 1px solid rgba(0,170,255,0.25);
 }
 
 .badge-energy {
@@ -595,762 +596,54 @@ body::after {
   border: 1px solid rgba(255,200,50,0.25);
 }
 
-/* ── Stat card (HUD frame applied) ──────────────────────────────────────── */
+.badge-gold {
+  background: var(--color-gold-dim);
+  color: var(--color-gold);
+  border: 1px solid rgba(200,168,75,0.30);
+}
+
+/* ── Stat Card (cinematic glassmorphism) ────────────────────────────────── */
 .stat-card {
   position: relative;
-  background: rgba(8, 10, 16, 0.85);
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgba(8, 13, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
   padding: 16px;
-  clip-path: polygon(
-    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
-    100% calc(100% - 12px), calc(100% - 12px) 100%,
-    12px 100%, 0 calc(100% - 12px)
-  );
-  transition: border-color 0.25s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .stat-card::before,
 .stat-card::after {
   content: '';
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   pointer-events: none;
   z-index: 2;
 }
 
 .stat-card::before {
-  top: 8px;
-  left: 8px;
-  border-top: 2px solid rgba(0, 207, 255, 0.6);
-  border-left: 2px solid rgba(0, 207, 255, 0.6);
+  top: 6px;
+  left: 6px;
+  border-top: 1px solid rgba(0, 170, 255, 0.45);
+  border-left: 1px solid rgba(0, 170, 255, 0.45);
 }
 
 .stat-card::after {
-  bottom: 8px;
-  right: 8px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.6);
-  border-right: 2px solid rgba(0, 207, 255, 0.6);
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 1px solid rgba(0, 170, 255, 0.45);
+  border-right: 1px solid rgba(0, 170, 255, 0.45);
 }
 
 .stat-card:hover {
-  border-color: rgba(0, 207, 255, 0.45);
-  filter: drop-shadow(0 0 12px var(--color-accent-soft));
+  border-color: rgba(0, 170, 255, 0.18);
+  box-shadow: 0 0 24px var(--color-accent-soft);
 }
 
-/* ── Halftone Backgrounds ───────────────────────────────────────────────── */
-/* Base halftone — neutral white dots, 12% opacity */
-.halftone-bg {
-  background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 6px 6px;
-}
-
-/* Manga halftone — slightly denser, richer dot pattern */
-.manga-halftone {
-  background-image: radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-/* Race-aware halftone — inherits --color-race */
-.manga-halftone-race {
-  background-image: radial-gradient(circle, var(--color-race) 1px, transparent 1px);
-  background-size: 8px 8px;
-  opacity: 0.13;
-}
-
-/* Per-race halftone variants (can be used without data-race context) */
-.manga-halftone-zerg {
-  background-image: radial-gradient(circle, rgba(68,255,68,0.14) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-.manga-halftone-otomat {
-  background-image: radial-gradient(circle, rgba(0,207,255,0.14) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-.manga-halftone-canavar {
-  background-image: radial-gradient(circle, rgba(255,102,0,0.14) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-.manga-halftone-insan {
-  background-image: radial-gradient(circle, rgba(74,158,255,0.14) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-.manga-halftone-seytan {
-  background-image: radial-gradient(circle, rgba(204,0,255,0.14) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-/* ── Speed Lines ────────────────────────────────────────────────────────── */
-/* Legacy – kept for backward compat */
-.speed-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.speed-lines::before,
-.speed-lines::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 300%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
-  transform-origin: left center;
-}
-
-/* Radial burst speed lines — conic gradient from center */
-.speed-lines-radial {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    rgba(255,255,255,0.025) 1deg,
-    transparent 2deg,
-    transparent 10deg,
-    rgba(255,255,255,0.020) 11deg,
-    transparent 12deg,
-    transparent 22deg,
-    rgba(255,255,255,0.018) 23deg,
-    transparent 24deg,
-    transparent 36deg,
-    rgba(255,255,255,0.022) 37deg,
-    transparent 38deg,
-    transparent 50deg,
-    rgba(255,255,255,0.015) 51deg,
-    transparent 52deg,
-    transparent 62deg,
-    rgba(255,255,255,0.020) 63deg,
-    transparent 64deg,
-    transparent 74deg,
-    rgba(255,255,255,0.025) 75deg,
-    transparent 76deg,
-    transparent 88deg,
-    rgba(255,255,255,0.018) 89deg,
-    transparent 90deg,
-    transparent 100deg,
-    rgba(255,255,255,0.022) 101deg,
-    transparent 102deg,
-    transparent 114deg,
-    rgba(255,255,255,0.015) 115deg,
-    transparent 116deg,
-    transparent 128deg,
-    rgba(255,255,255,0.020) 129deg,
-    transparent 130deg,
-    transparent 142deg,
-    rgba(255,255,255,0.025) 143deg,
-    transparent 144deg,
-    transparent 156deg,
-    rgba(255,255,255,0.018) 157deg,
-    transparent 158deg,
-    transparent 170deg,
-    rgba(255,255,255,0.022) 171deg,
-    transparent 172deg,
-    transparent 184deg,
-    rgba(255,255,255,0.015) 185deg,
-    transparent 186deg,
-    transparent 198deg,
-    rgba(255,255,255,0.020) 199deg,
-    transparent 200deg,
-    transparent 212deg,
-    rgba(255,255,255,0.025) 213deg,
-    transparent 214deg,
-    transparent 226deg,
-    rgba(255,255,255,0.018) 227deg,
-    transparent 228deg,
-    transparent 240deg,
-    rgba(255,255,255,0.022) 241deg,
-    transparent 242deg,
-    transparent 252deg,
-    rgba(255,255,255,0.015) 253deg,
-    transparent 254deg,
-    transparent 264deg,
-    rgba(255,255,255,0.020) 265deg,
-    transparent 266deg,
-    transparent 278deg,
-    rgba(255,255,255,0.025) 279deg,
-    transparent 280deg,
-    transparent 292deg,
-    rgba(255,255,255,0.018) 293deg,
-    transparent 294deg,
-    transparent 306deg,
-    rgba(255,255,255,0.022) 307deg,
-    transparent 308deg,
-    transparent 320deg,
-    rgba(255,255,255,0.015) 321deg,
-    transparent 322deg,
-    transparent 334deg,
-    rgba(255,255,255,0.020) 335deg,
-    transparent 336deg,
-    transparent 348deg,
-    rgba(255,255,255,0.025) 349deg,
-    transparent 360deg
-  );
-}
-
-/* Race-tinted radial speed lines for battle screen */
-.speed-lines-battle {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    var(--color-race-glow) 1.5deg,
-    transparent 3deg,
-    transparent 14deg,
-    var(--color-race-glow) 15.5deg,
-    transparent 17deg,
-    transparent 30deg,
-    var(--color-race-glow) 31.5deg,
-    transparent 33deg,
-    transparent 46deg,
-    var(--color-race-glow) 47.5deg,
-    transparent 49deg,
-    transparent 62deg,
-    var(--color-race-glow) 63.5deg,
-    transparent 65deg,
-    transparent 80deg,
-    var(--color-race-glow) 81.5deg,
-    transparent 83deg,
-    transparent 98deg,
-    var(--color-race-glow) 99.5deg,
-    transparent 101deg,
-    transparent 116deg,
-    var(--color-race-glow) 117.5deg,
-    transparent 119deg,
-    transparent 134deg,
-    var(--color-race-glow) 135.5deg,
-    transparent 137deg,
-    transparent 152deg,
-    var(--color-race-glow) 153.5deg,
-    transparent 155deg,
-    transparent 170deg,
-    var(--color-race-glow) 171.5deg,
-    transparent 173deg,
-    transparent 188deg,
-    var(--color-race-glow) 189.5deg,
-    transparent 191deg,
-    transparent 206deg,
-    var(--color-race-glow) 207.5deg,
-    transparent 209deg,
-    transparent 224deg,
-    var(--color-race-glow) 225.5deg,
-    transparent 227deg,
-    transparent 242deg,
-    var(--color-race-glow) 243.5deg,
-    transparent 245deg,
-    transparent 260deg,
-    var(--color-race-glow) 261.5deg,
-    transparent 263deg,
-    transparent 278deg,
-    var(--color-race-glow) 279.5deg,
-    transparent 281deg,
-    transparent 296deg,
-    var(--color-race-glow) 297.5deg,
-    transparent 299deg,
-    transparent 314deg,
-    var(--color-race-glow) 315.5deg,
-    transparent 317deg,
-    transparent 332deg,
-    var(--color-race-glow) 333.5deg,
-    transparent 335deg,
-    transparent 350deg,
-    var(--color-race-glow) 351.5deg,
-    transparent 353deg,
-    transparent 360deg
-  );
-  opacity: 0.5;
-}
-
-/* Horizontal sweep speed lines (for modal open / screen transition) */
-.speed-lines-sweep {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0px,
-    transparent 18px,
-    rgba(255,255,255,0.03) 18px,
-    rgba(255,255,255,0.03) 19px,
-    transparent 19px,
-    transparent 36px,
-    rgba(255,255,255,0.02) 36px,
-    rgba(255,255,255,0.02) 37px
-  );
-}
-
-/* Hover-triggered speed lines overlay (attach to a parent, activate via JS adding .active) */
-.speed-lines-hover {
-  position: relative;
-  overflow: hidden;
-}
-
-.speed-lines-hover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    rgba(255,255,255,0.04) 1deg,
-    transparent 2deg,
-    transparent 18deg,
-    rgba(255,255,255,0.03) 19deg,
-    transparent 20deg,
-    transparent 38deg,
-    rgba(255,255,255,0.04) 39deg,
-    transparent 40deg,
-    transparent 58deg,
-    rgba(255,255,255,0.03) 59deg,
-    transparent 60deg,
-    transparent 78deg,
-    rgba(255,255,255,0.04) 79deg,
-    transparent 80deg,
-    transparent 98deg,
-    rgba(255,255,255,0.03) 99deg,
-    transparent 100deg,
-    transparent 118deg,
-    rgba(255,255,255,0.04) 119deg,
-    transparent 120deg,
-    transparent 138deg,
-    rgba(255,255,255,0.03) 139deg,
-    transparent 140deg,
-    transparent 158deg,
-    rgba(255,255,255,0.04) 159deg,
-    transparent 160deg,
-    transparent 178deg,
-    rgba(255,255,255,0.03) 179deg,
-    transparent 180deg,
-    transparent 198deg,
-    rgba(255,255,255,0.04) 199deg,
-    transparent 200deg,
-    transparent 218deg,
-    rgba(255,255,255,0.03) 219deg,
-    transparent 220deg,
-    transparent 238deg,
-    rgba(255,255,255,0.04) 239deg,
-    transparent 240deg,
-    transparent 258deg,
-    rgba(255,255,255,0.03) 259deg,
-    transparent 260deg,
-    transparent 278deg,
-    rgba(255,255,255,0.04) 279deg,
-    transparent 280deg,
-    transparent 298deg,
-    rgba(255,255,255,0.03) 299deg,
-    transparent 300deg,
-    transparent 318deg,
-    rgba(255,255,255,0.04) 319deg,
-    transparent 320deg,
-    transparent 338deg,
-    rgba(255,255,255,0.03) 339deg,
-    transparent 340deg,
-    transparent 358deg,
-    rgba(255,255,255,0.04) 359deg,
-    transparent 360deg
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.speed-lines-hover:hover::after {
-  opacity: 1;
-}
-
-/* ── Ink Borders (manga thick outline) ─────────────────────────────────── */
-/* Neutral 2px ink border */
-.ink-border {
-  border: 2px solid rgba(255,255,255,0.18);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);
-}
-
-/* Strong manga ink outline — 2.5px white border + offset black drop shadow.
-   Use on cards, tiles and panels that should pop as printed-ink frames. */
-.ink-border-strong {
-  border: 2.5px solid rgba(255,255,255,0.9);
-  box-shadow:
-    3px 3px 0 rgba(0,0,0,0.85),
-    0 0 0 1px rgba(0,0,0,0.4);
-}
-
-/* Strong race-tinted ink — same offset shadow but uses the race color */
-.ink-border-strong-race {
-  border: 2.5px solid var(--color-race);
-  box-shadow:
-    3px 3px 0 rgba(0,0,0,0.85),
-    0 0 14px var(--color-race-glow),
-    0 0 0 1px rgba(0,0,0,0.4);
-}
-
-/* Race-colored 3px ink border + outer glow */
-.ink-border-race {
-  border: 3px solid var(--color-race);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.6),
-    0 0 12px var(--color-race-glow),
-    inset 0 0 0 1px rgba(0,0,0,0.4);
-}
-
-/* Dark manga outline (for hover/selected states) */
-.ink-border-dark {
-  border: 2px solid rgba(0,0,0,0.8);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
-}
-
-/* Brand/accent colored ink border */
-.ink-border-accent {
-  border: 2px solid var(--color-accent);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.6),
-    0 0 10px var(--color-accent-glow);
-}
-
-/* ── Halftone Overlay (full-cover decorative layer) ─────────────────────── */
-/* Apply on a positioned parent — fills it with a halftone dot pattern.
-   Inherits currentColor so a wrapper colored with race/brand color tints. */
-.manga-halftone-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
-  background-size: 6px 6px;
-  opacity: 0.12;
-  mix-blend-mode: screen;
-  z-index: 0;
-}
-
-/* Stronger version for hero panels */
-.manga-halftone-overlay-strong {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, currentColor 1.3px, transparent 1.3px);
-  background-size: 5px 5px;
-  opacity: 0.18;
-  mix-blend-mode: screen;
-  z-index: 0;
-}
-
-/* ── Speed-line Flash (button hover) ────────────────────────────────────── */
-/* Wrap or compose with .btn-primary / .btn-ghost. On hover a thin
-   diagonal speed-line strip sweeps across the surface. */
-.btn-speed-flash {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.btn-speed-flash::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: repeating-linear-gradient(
-    115deg,
-    transparent 0,
-    transparent 7px,
-    rgba(255,255,255,0.18) 7px,
-    rgba(255,255,255,0.18) 8px,
-    transparent 8px,
-    transparent 16px
-  );
-  transform: translateX(-105%);
-  opacity: 0;
-  transition: transform 0.55s cubic-bezier(0.32,0.72,0,1), opacity 0.25s ease;
-}
-
-.btn-speed-flash:hover::before,
-.btn-speed-flash:focus-visible::before {
-  transform: translateX(105%);
-  opacity: 1;
-}
-
-.btn-speed-flash > * {
-  position: relative;
-  z-index: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn-speed-flash::before { transition: opacity 0.2s ease; transform: none; }
-  .btn-speed-flash:hover::before { opacity: 0.6; transform: none; }
-}
-
-/* ── Battle Screen Speed Lines (active overlay) ─────────────────────────── */
-/* Animated radial speed-line layer for the battle stage. Pulses + slowly
-   counter-rotates for a sense of impact without being distracting. */
-.speed-lines-battle-active {
-  position: absolute;
-  inset: -10%;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    var(--color-race-glow) 1.5deg,
-    transparent 3deg,
-    transparent 16deg,
-    rgba(255,255,255,0.10) 17.5deg,
-    transparent 19deg,
-    transparent 32deg,
-    var(--color-race-glow) 33.5deg,
-    transparent 35deg,
-    transparent 50deg,
-    rgba(255,255,255,0.08) 51.5deg,
-    transparent 53deg,
-    transparent 70deg,
-    var(--color-race-glow) 71.5deg,
-    transparent 73deg,
-    transparent 90deg,
-    rgba(255,255,255,0.10) 91.5deg,
-    transparent 93deg,
-    transparent 110deg,
-    var(--color-race-glow) 111.5deg,
-    transparent 113deg,
-    transparent 130deg,
-    rgba(255,255,255,0.08) 131.5deg,
-    transparent 133deg,
-    transparent 150deg,
-    var(--color-race-glow) 151.5deg,
-    transparent 153deg,
-    transparent 170deg,
-    rgba(255,255,255,0.10) 171.5deg,
-    transparent 173deg,
-    transparent 190deg,
-    var(--color-race-glow) 191.5deg,
-    transparent 193deg,
-    transparent 210deg,
-    rgba(255,255,255,0.08) 211.5deg,
-    transparent 213deg,
-    transparent 230deg,
-    var(--color-race-glow) 231.5deg,
-    transparent 233deg,
-    transparent 250deg,
-    rgba(255,255,255,0.10) 251.5deg,
-    transparent 253deg,
-    transparent 270deg,
-    var(--color-race-glow) 271.5deg,
-    transparent 273deg,
-    transparent 290deg,
-    rgba(255,255,255,0.08) 291.5deg,
-    transparent 293deg,
-    transparent 310deg,
-    var(--color-race-glow) 311.5deg,
-    transparent 313deg,
-    transparent 330deg,
-    rgba(255,255,255,0.10) 331.5deg,
-    transparent 333deg,
-    transparent 350deg,
-    var(--color-race-glow) 351.5deg,
-    transparent 360deg
-  );
-  opacity: 0.45;
-  -webkit-mask-image: radial-gradient(
-    ellipse at center,
-    transparent 0%,
-    transparent 22%,
-    rgba(0,0,0,0.85) 55%,
-    rgba(0,0,0,1) 100%
-  );
-          mask-image: radial-gradient(
-    ellipse at center,
-    transparent 0%,
-    transparent 22%,
-    rgba(0,0,0,0.85) 55%,
-    rgba(0,0,0,1) 100%
-  );
-  animation: speed-lines-battle-spin 28s linear infinite,
-             speed-lines-battle-pulse 3.6s cubic-bezier(0.45,0,0.55,1) infinite;
-  transform-origin: 50% 50%;
-}
-
-@keyframes speed-lines-battle-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-@keyframes speed-lines-battle-pulse {
-  0%, 100% { opacity: 0.32; }
-  50%      { opacity: 0.58; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .speed-lines-battle-active {
-    animation: none;
-    opacity: 0.25;
-  }
-}
-
-/* ── Diagonal Modal Panel ───────────────────────────────────────────────── */
-/* Manga "panel pages" — diagonal corner cuts + thick ink frame. Apply to
-   the modal content container; pair with .manga-halftone-overlay child. */
-.modal-diagonal-panel {
-  position: relative;
-  background: linear-gradient(160deg, #0d1117 0%, #080a10 100%);
-  border: 2.5px solid rgba(255,255,255,0.85);
-  box-shadow:
-    4px 4px 0 rgba(0,0,0,0.85),
-    0 0 0 1px rgba(0,0,0,0.6),
-    0 0 32px var(--color-race-glow),
-    inset 0 0 60px rgba(0,0,0,0.55);
-  clip-path: polygon(
-    24px 0,
-    100% 0,
-    100% calc(100% - 24px),
-    calc(100% - 24px) 100%,
-    0 100%,
-    0 24px
-  );
-}
-
-.modal-diagonal-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.16) 1px, transparent 1px);
-  background-size: 6px 6px;
-  opacity: 0.10;
-  mix-blend-mode: screen;
-}
-
-.modal-diagonal-panel > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Race-tinted variant */
-.modal-diagonal-panel-race {
-  border-color: var(--color-race);
-  box-shadow:
-    4px 4px 0 rgba(0,0,0,0.85),
-    0 0 0 1px rgba(0,0,0,0.6),
-    0 0 32px var(--color-race-glow),
-    inset 0 0 60px rgba(0,0,0,0.55);
-}
-
-/* ── Manga Panel Race Variant ───────────────────────────────────────────── */
-/* manga-panel but with race-colored border + corner accents */
-.manga-panel-race {
-  position: relative;
-  background: var(--manga-panel-bg);
-  border: 2px solid var(--color-race);
-  clip-path: polygon(
-    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
-    100% calc(100% - 12px), calc(100% - 12px) 100%,
-    12px 100%, 0 calc(100% - 12px)
-  );
-  box-shadow: 0 0 16px var(--color-race-glow), inset 0 0 24px rgba(0,0,0,0.3);
-}
-
-.manga-panel-race::before,
-.manga-panel-race::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.manga-panel-race::before {
-  top: 8px;
-  left: 8px;
-  border-top: 3px solid var(--color-race);
-  border-left: 3px solid var(--color-race);
-}
-
-.manga-panel-race::after {
-  bottom: 8px;
-  right: 8px;
-  border-bottom: 3px solid var(--color-race);
-  border-right: 3px solid var(--color-race);
-}
-
-/* ── Enhanced Corner Accents (all four corners) ─────────────────────────── */
-/* Add .manga-corners-full to any positioned element for 4-corner L-brackets */
-.manga-corners-full {
-  position: relative;
-}
-
-.manga-corners-full::before,
-.manga-corners-full::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.manga-corners-full::before {
-  top: 6px;
-  left: 6px;
-  border-top: 3px solid var(--color-race);
-  border-left: 3px solid var(--color-race);
-  filter: drop-shadow(0 0 4px var(--color-race-glow));
-}
-
-.manga-corners-full::after {
-  bottom: 6px;
-  right: 6px;
-  border-bottom: 3px solid var(--color-race);
-  border-right: 3px solid var(--color-race);
-  filter: drop-shadow(0 0 4px var(--color-race-glow));
-}
-
-/* Two extra pseudo-elements via a wrapper child for all 4 corners */
-.manga-corners-full > .manga-corner-tl::before {
-  content: '';
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 16px;
-  height: 16px;
-  border-top: 3px solid var(--color-race);
-  border-left: 3px solid var(--color-race);
-  pointer-events: none;
-  z-index: 3;
-  filter: drop-shadow(0 0 4px var(--color-race-glow));
-}
-
-.manga-corners-full > .manga-corner-br::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  right: 6px;
-  width: 16px;
-  height: 16px;
-  border-bottom: 3px solid var(--color-race);
-  border-right: 3px solid var(--color-race);
-  pointer-events: none;
-  z-index: 3;
-  filter: drop-shadow(0 0 4px var(--color-race-glow));
-}
-
-/* ── Manga Typography ────────────────────────────────────────────────────── */
-/* Dramatic Orbitron Black heading for screen titles */
+/* ── Typography utilities ───────────────────────────────────────────────── */
 .manga-title {
   font-family: var(--font-display);
   font-weight: 900;
@@ -1364,7 +657,6 @@ body::after {
     0 2px 4px rgba(0,0,0,0.8);
 }
 
-/* Large dramatic stat number display */
 .manga-number {
   font-family: var(--font-display);
   font-weight: 900;
@@ -1378,7 +670,6 @@ body::after {
     0 2px 8px rgba(0,0,0,0.9);
 }
 
-/* Section label — small Orbitron caps above a panel */
 .manga-label {
   font-family: var(--font-display);
   font-weight: 700;
@@ -1390,7 +681,6 @@ body::after {
 }
 
 /* ── Panel Dividers ──────────────────────────────────────────────────────── */
-/* Sharp horizontal manga panel border */
 .panel-divider {
   width: 100%;
   height: 1px;
@@ -1401,29 +691,27 @@ body::after {
     var(--color-race) 80%,
     transparent 100%
   );
-  opacity: 0.45;
+  opacity: 0.35;
   margin: 0;
   flex-shrink: 0;
 }
 
-/* Thick 2px accent divider */
 .panel-divider-bold {
   width: 100%;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(
     90deg,
     transparent 0%,
     var(--color-race) 15%,
-    rgba(255,255,255,0.9) 50%,
+    rgba(255,255,255,0.7) 50%,
     var(--color-race) 85%,
     transparent 100%
   );
-  opacity: 0.5;
-  box-shadow: 0 0 8px var(--color-race-glow);
+  opacity: 0.4;
+  box-shadow: 0 0 6px var(--color-race-glow);
   flex-shrink: 0;
 }
 
-/* Diagonal slash panel divider (parallelogram cut effect) */
 .panel-divider-diagonal {
   width: 100%;
   height: 24px;
@@ -1444,25 +732,9 @@ body::after {
     transparent 100%
   );
   clip-path: polygon(2% 45%, 98% 45%, 100% 55%, 0% 55%);
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
-.panel-divider-diagonal::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255,255,255,0.6) 40%,
-    rgba(255,255,255,0.6) 60%,
-    transparent 100%
-  );
-  clip-path: polygon(5% 48%, 95% 48%, 97% 52%, 3% 52%);
-  opacity: 0.25;
-}
-
-/* Vertical side accent bar (left edge of a panel section) */
 .panel-accent-bar {
   position: relative;
 }
@@ -1473,10 +745,10 @@ body::after {
   left: 0;
   top: 15%;
   bottom: 15%;
-  width: 3px;
+  width: 2px;
   background: linear-gradient(180deg, transparent 0%, var(--color-race) 30%, var(--color-race) 70%, transparent 100%);
   border-radius: 2px;
-  box-shadow: 0 0 8px var(--color-race-glow);
+  box-shadow: 0 0 6px var(--color-race-glow);
 }
 
 /* ── Text utilities ─────────────────────────────────────────────────────── */
@@ -1489,6 +761,13 @@ body::after {
 
 .text-gradient-race {
   background: linear-gradient(135deg, var(--color-race) 0%, rgba(255,255,255,0.9) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #c8a84b 0%, #f0d070 50%, #c8a84b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1509,14 +788,14 @@ body::after {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
-  background: rgba(10,13,20,0.8);
+  background: rgba(8,13,26,0.80);
   border: 1px solid var(--color-border);
   border-radius: 9999px;
   font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
 }
 
 /* ── Bottom Navigation ──────────────────────────────────────────────────── */
@@ -1530,9 +809,9 @@ body::after {
   align-items: center;
   justify-content: space-around;
   padding: 0.75rem 1rem;
-  background: rgba(10,13,20,0.95);
-  border-top: 1px solid var(--color-border);
-  box-shadow: 0 -1px 0 var(--color-accent-soft), 0 -8px 32px rgba(0,207,255,0.05);
+  background: rgba(4,8,18,0.92);
+  border-top: 1px solid rgba(0,170,255,0.08);
+  box-shadow: 0 -1px 0 rgba(0,170,255,0.05), 0 -8px 32px rgba(0,0,0,0.4);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -1562,7 +841,7 @@ body::after {
   box-shadow:
     inset 0 0 0 1px var(--color-accent-glow),
     0 0 20px var(--color-accent-glow),
-    0 0 40px rgba(0,207,255,0.18);
+    0 0 40px rgba(0,170,255,0.12);
   text-shadow: 0 0 8px var(--color-accent-glow);
 }
 
@@ -1585,27 +864,26 @@ body::after {
   align-items: center;
   justify-content: space-between;
   padding: 0.625rem 1rem;
-  background: rgba(10,13,20,0.9);
-  border-bottom: 1px solid var(--color-border-hover);
+  background: rgba(4,8,18,0.88);
+  border-bottom: 1px solid rgba(0,170,255,0.08);
   box-shadow:
-    0 1px 0 var(--color-accent-soft),
-    0 4px 24px rgba(0,207,255,0.06);
+    0 1px 0 rgba(0,170,255,0.04),
+    0 4px 24px rgba(0,0,0,0.3);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* ── Commander Card (HUD frame applied) ─────────────────────────────────── */
+/* ── Commander Card (cinematic glassmorphism) ───────────────────────────── */
 .commander-card {
   position: relative;
-  background: rgba(8, 10, 16, 0.85);
-  border: 2.5px solid rgba(255, 255, 255, 0.55);
-  clip-path: polygon(
-    0 14px, 14px 0, calc(100% - 14px) 0, 100% 14px,
-    100% calc(100% - 14px), calc(100% - 14px) 100%,
-    14px 100%, 0 calc(100% - 14px)
-  );
+  background: rgba(8, 13, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: border-color 0.35s cubic-bezier(0.32,0.72,0,1),
-              transform 0.35s cubic-bezier(0.32,0.72,0,1);
+              transform 0.35s cubic-bezier(0.32,0.72,0,1),
+              box-shadow 0.35s cubic-bezier(0.32,0.72,0,1);
   cursor: pointer;
 }
 
@@ -1613,34 +891,35 @@ body::after {
 .commander-card::after {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   pointer-events: none;
   z-index: 2;
 }
 
 .commander-card::before {
-  top: 10px;
-  left: 10px;
-  border-top: 2px solid rgba(0, 207, 255, 0.6);
-  border-left: 2px solid rgba(0, 207, 255, 0.6);
+  top: 8px;
+  left: 8px;
+  border-top: 1px solid rgba(0, 170, 255, 0.45);
+  border-left: 1px solid rgba(0, 170, 255, 0.45);
 }
 
 .commander-card::after {
-  bottom: 10px;
-  right: 10px;
-  border-bottom: 2px solid rgba(0, 207, 255, 0.6);
-  border-right: 2px solid rgba(0, 207, 255, 0.6);
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 1px solid rgba(0, 170, 255, 0.45);
+  border-right: 1px solid rgba(0, 170, 255, 0.45);
 }
 
 .commander-card:hover {
-  transform: translateY(-6px);
-  border-color: var(--color-race);
+  transform: translateY(-4px);
+  border-color: var(--color-race-glow);
+  box-shadow: 0 8px 32px var(--color-race-dim), 0 0 0 1px var(--color-race-glow);
 }
 
 .commander-card:hover::before,
 .commander-card:hover::after {
-  border-color: var(--color-race);
+  border-color: var(--color-race-glow);
 }
 
 .commander-card.locked {
@@ -1663,8 +942,8 @@ body::after {
   top: 50%;
   left: 100%;
   width: 4rem;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
   transform: translateY(-50%);
 }
 
@@ -1696,12 +975,12 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.10);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.18);
 }
 
 /* ── Focus visible ──────────────────────────────────────────────────────── */
@@ -1714,7 +993,7 @@ body::after {
 .battle-page {
   width: 100%;
   height: 100dvh;
-  background: #07090f;
+  background: #000000;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1726,12 +1005,11 @@ body::after {
   position: relative;
   width: 100%;
   height: 4px;
-  background: var(--hud-track-bg, rgba(0, 207, 255, 0.08));
-  border: 1px solid var(--hud-track-border, rgba(0, 207, 255, 0.15));
+  background: var(--hud-track-bg, rgba(0, 170, 255, 0.08));
+  border: 1px solid var(--hud-track-border, rgba(0, 170, 255, 0.12));
   overflow: hidden;
 }
 
-/* Tick marks — overlaid on track via ::after */
 .hud-progress-bar::after {
   content: '';
   position: absolute;
@@ -1741,8 +1019,8 @@ body::after {
     90deg,
     transparent,
     transparent 19px,
-    var(--hud-tick-color, rgba(0, 207, 255, 0.15)) 19px,
-    var(--hud-tick-color, rgba(0, 207, 255, 0.15)) 20px
+    var(--hud-tick-color, rgba(0, 170, 255, 0.10)) 19px,
+    var(--hud-tick-color, rgba(0, 170, 255, 0.10)) 20px
   );
 }
 
@@ -1751,14 +1029,13 @@ body::after {
   height: 100%;
   background: var(
     --hud-fill-gradient,
-    linear-gradient(90deg, rgba(0, 207, 255, 0.4), #00cfff)
+    linear-gradient(90deg, rgba(0, 170, 255, 0.4), #00aaff)
   );
-  box-shadow: 0 0 8px var(--hud-fill-glow, rgba(0, 207, 255, 0.6));
+  box-shadow: 0 0 8px var(--hud-fill-glow, rgba(0, 170, 255, 0.6));
   transition: width 0.6s cubic-bezier(0.32, 0.72, 0, 1);
   z-index: 1;
 }
 
-/* Forward edge — leading scanner line */
 .hud-progress-fill::after {
   content: '';
   position: absolute;
@@ -1767,7 +1044,7 @@ body::after {
   right: 0;
   width: 1px;
   background: var(--hud-edge-color, rgba(255, 255, 255, 0.85));
-  box-shadow: 0 0 6px var(--hud-edge-glow, rgba(0, 207, 255, 0.9));
+  box-shadow: 0 0 6px var(--hud-edge-glow, rgba(0, 170, 255, 0.9));
 }
 
 /* Size variants */
@@ -1776,29 +1053,29 @@ body::after {
 .hud-progress-bar--md { height: 6px; }
 .hud-progress-bar--lg { height: 10px; }
 
-/* Variant tokens — recolour without redefining structure */
+/* Variant tokens */
 .hud-progress-bar--brand {
   --hud-track-bg:     rgba(74, 158, 255, 0.08);
-  --hud-track-border: rgba(74, 158, 255, 0.18);
-  --hud-tick-color:   rgba(74, 158, 255, 0.18);
+  --hud-track-border: rgba(74, 158, 255, 0.15);
+  --hud-tick-color:   rgba(74, 158, 255, 0.15);
   --hud-fill-gradient: linear-gradient(90deg, rgba(74, 158, 255, 0.4), #4a9eff);
   --hud-fill-glow:    rgba(74, 158, 255, 0.55);
   --hud-edge-glow:    rgba(74, 158, 255, 0.9);
 }
 
 .hud-progress-bar--accent {
-  --hud-track-bg:     rgba(0, 207, 255, 0.08);
-  --hud-track-border: rgba(0, 207, 255, 0.18);
-  --hud-tick-color:   rgba(0, 207, 255, 0.18);
-  --hud-fill-gradient: linear-gradient(90deg, rgba(0, 207, 255, 0.4), #00cfff);
-  --hud-fill-glow:    rgba(0, 207, 255, 0.6);
-  --hud-edge-glow:    rgba(0, 207, 255, 0.95);
+  --hud-track-bg:     rgba(0, 170, 255, 0.08);
+  --hud-track-border: rgba(0, 170, 255, 0.15);
+  --hud-tick-color:   rgba(0, 170, 255, 0.15);
+  --hud-fill-gradient: linear-gradient(90deg, rgba(0, 170, 255, 0.4), #00aaff);
+  --hud-fill-glow:    rgba(0, 170, 255, 0.6);
+  --hud-edge-glow:    rgba(0, 170, 255, 0.95);
 }
 
 .hud-progress-bar--energy {
   --hud-track-bg:     rgba(255, 200, 50, 0.08);
-  --hud-track-border: rgba(255, 200, 50, 0.20);
-  --hud-tick-color:   rgba(255, 200, 50, 0.20);
+  --hud-track-border: rgba(255, 200, 50, 0.18);
+  --hud-tick-color:   rgba(255, 200, 50, 0.18);
   --hud-fill-gradient: linear-gradient(90deg, rgba(255, 200, 50, 0.4), #ffc832);
   --hud-fill-glow:    rgba(255, 200, 50, 0.55);
   --hud-edge-glow:    rgba(255, 200, 50, 0.9);
@@ -1806,8 +1083,8 @@ body::after {
 
 .hud-progress-bar--health {
   --hud-track-bg:     rgba(68, 255, 136, 0.08);
-  --hud-track-border: rgba(68, 255, 136, 0.20);
-  --hud-tick-color:   rgba(68, 255, 136, 0.20);
+  --hud-track-border: rgba(68, 255, 136, 0.18);
+  --hud-tick-color:   rgba(68, 255, 136, 0.18);
   --hud-fill-gradient: linear-gradient(90deg, rgba(68, 255, 136, 0.4), #44ff88);
   --hud-fill-glow:    rgba(68, 255, 136, 0.55);
   --hud-edge-glow:    rgba(68, 255, 136, 0.9);
@@ -1815,8 +1092,8 @@ body::after {
 
 .hud-progress-bar--danger {
   --hud-track-bg:     rgba(255, 51, 85, 0.08);
-  --hud-track-border: rgba(255, 51, 85, 0.20);
-  --hud-tick-color:   rgba(255, 51, 85, 0.20);
+  --hud-track-border: rgba(255, 51, 85, 0.18);
+  --hud-tick-color:   rgba(255, 51, 85, 0.18);
   --hud-fill-gradient: linear-gradient(90deg, rgba(255, 51, 85, 0.4), #ff3355);
   --hud-fill-glow:    rgba(255, 51, 85, 0.55);
   --hud-edge-glow:    rgba(255, 51, 85, 0.9);
@@ -1824,8 +1101,8 @@ body::after {
 
 .hud-progress-bar--xp {
   --hud-track-bg:     rgba(192, 74, 255, 0.08);
-  --hud-track-border: rgba(192, 74, 255, 0.20);
-  --hud-tick-color:   rgba(192, 74, 255, 0.20);
+  --hud-track-border: rgba(192, 74, 255, 0.18);
+  --hud-tick-color:   rgba(192, 74, 255, 0.18);
   --hud-fill-gradient: linear-gradient(90deg, rgba(192, 74, 255, 0.45), #c04aff 70%, #ff3344);
   --hud-fill-glow:    rgba(192, 74, 255, 0.55);
   --hud-edge-glow:    rgba(192, 74, 255, 0.9);
@@ -1840,8 +1117,8 @@ body::after {
     -45deg,
     transparent 0,
     transparent 6px,
-    rgba(255, 255, 255, 0.18) 6px,
-    rgba(255, 255, 255, 0.18) 7px
+    rgba(255, 255, 255, 0.15) 6px,
+    rgba(255, 255, 255, 0.15) 7px
   );
   animation: hud-scan-stripes 1.6s linear infinite;
   pointer-events: none;
@@ -1858,18 +1135,14 @@ body::after {
 }
 
 /* ── HUD Rings — radar-style decorative concentric rings ────────────────── */
-/* Use as an absolutely positioned, pointer-events:none overlay around any
-   focal element (avatar, icon, slot). Combine .hud-ring with .hud-ring-dashed
-   for a slowly rotating dashed companion ring. Color follows --color-race
-   when set on an ancestor; otherwise falls back to the accent cyan. */
 .hud-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1px solid var(--hud-ring-color, rgba(0, 207, 255, 0.25));
+  border: 1px solid var(--hud-ring-color, rgba(0, 170, 255, 0.20));
   box-shadow:
-    0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.1)),
-    inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.05));
+    0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 170, 255, 0.08)),
+    inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 170, 255, 0.04));
   animation: hud-ring-pulse 4s ease-in-out infinite;
   pointer-events: none;
 }
@@ -1879,32 +1152,30 @@ body::after {
   animation: hud-ring-rotate 20s linear infinite;
 }
 
-/* Inset variant — sits slightly inside its container for layered ring stacks */
 .hud-ring-inset {
   inset: 4px;
   opacity: 0.7;
 }
 
-/* Race-tinted ring — picks up the active race accent via CSS vars */
 .hud-ring-race {
-  border-color: var(--color-race-glow, rgba(0, 207, 255, 0.35));
-  --hud-ring-shadow-outer: var(--color-race-dim, rgba(0, 207, 255, 0.12));
-  --hud-ring-shadow-inner: var(--color-race-dim, rgba(0, 207, 255, 0.08));
+  border-color: var(--color-race-glow, rgba(0, 170, 255, 0.30));
+  --hud-ring-shadow-outer: var(--color-race-dim, rgba(0, 170, 255, 0.10));
+  --hud-ring-shadow-inner: var(--color-race-dim, rgba(0, 170, 255, 0.06));
 }
 
 @keyframes hud-ring-pulse {
   0%, 100% {
-    opacity: 0.7;
+    opacity: 0.6;
     box-shadow:
-      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.1)),
-      inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.05));
+      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 170, 255, 0.08)),
+      inset 0 0 20px var(--hud-ring-shadow-inner, rgba(0, 170, 255, 0.04));
   }
   50% {
     opacity: 1;
     box-shadow:
-      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 207, 255, 0.18)),
-      0 0 12px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.18)),
-      inset 0 0 24px var(--hud-ring-shadow-inner, rgba(0, 207, 255, 0.1));
+      0 0 0 1px var(--hud-ring-shadow-outer, rgba(0, 170, 255, 0.14)),
+      0 0 12px var(--hud-ring-shadow-inner, rgba(0, 170, 255, 0.14)),
+      inset 0 0 24px var(--hud-ring-shadow-inner, rgba(0, 170, 255, 0.08));
   }
 }
 

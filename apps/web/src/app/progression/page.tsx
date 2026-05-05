@@ -61,7 +61,7 @@ export default function ProgressionPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.15 }} aria-hidden />
+      <div className="fixed inset-0 pointer-events-none" style={{ opacity: 0.15 }} aria-hidden />
 
       {/* Header */}
       <header

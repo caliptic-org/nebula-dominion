@@ -373,20 +373,16 @@ export function AgeTransitionScreen({
         </div>{/* /outer bezel */}
       </div>{/* /card shell */}
 
-      {/* ── Speed lines (flash phase only) ─────────────────────────────── */}
+      {/* ── Cinematic flash pulse (replaces speed lines) ──────────────── */}
       {phase === 'flash' && (
-        <div className="age-speed-lines" aria-hidden>
-          {Array.from({ length: 10 }, (_, i) => (
-            <div
-              key={i}
-              className="age-speed-line"
-              style={{
-                top: `${8 + i * 8.5}%`,
-                background: `linear-gradient(90deg, transparent 0%, ${raceColor}14 50%, transparent 100%)`,
-              }}
-            />
-          ))}
-        </div>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden
+          style={{
+            background: `radial-gradient(ellipse 80% 60% at 50% 50%, ${raceColor}18 0%, transparent 70%)`,
+            animation: 'age-flash-pulse 0.4s ease-out both',
+          }}
+        />
       )}
     </div>
   );

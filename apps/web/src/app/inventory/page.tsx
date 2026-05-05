@@ -76,7 +76,7 @@ export default function InventoryPage() {
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
         aria-hidden
       />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-10" aria-hidden />
+      <div className="fixed inset-0 pointer-events-none opacity-10" aria-hidden />
 
       {/* Top bar */}
       <header

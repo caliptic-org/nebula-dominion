@@ -129,8 +129,8 @@ export default function HomePage() {
           style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
           aria-hidden
         />
-        {/* Halftone */}
-        <div className="fixed inset-0 halftone-bg pointer-events-none opacity-15" aria-hidden />
+        {/* Background overlay */}
+        <div className="fixed inset-0 pointer-events-none opacity-15" aria-hidden />
 
         {/* Next-session hook — only shown after a player has finished onboarding. */}
         {shouldShowNextSessionHook && <NextSessionHookBanner />}

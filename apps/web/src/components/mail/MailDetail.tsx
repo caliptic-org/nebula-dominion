@@ -175,7 +175,7 @@ export function MailDetail({ mail, onClose, onClaim, onDelete, claimedIds }: Mai
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
         {/* Manga panel styled body */}
         <div
-          className="manga-panel"
+          className="cinematic-panel"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border)',

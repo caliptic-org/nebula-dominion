@@ -303,7 +303,7 @@ function CommanderDetail({ commander }: { commander: Commander }) {
           {activeTab === 'hikaye' && (
             <>
               <section
-                className="manga-panel rounded-xl p-5"
+                className="cinematic-panel rounded-xl p-5"
                 style={{
                   border: `2px solid ${theme.color}40`,
                   boxShadow: `0 0 24px ${theme.color}18`,

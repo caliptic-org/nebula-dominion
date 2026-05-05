@@ -25,17 +25,13 @@ export function MangaPanel({
   return (
     <div
       className={clsx(
-        'manga-panel',
-        thick && 'manga-panel-thick',
-        ink && 'ink-border-strong',
+        'cinematic-panel',
+        ink && 'cinematic-border',
         glow && 'race-glow',
         className,
       )}
       style={style}
     >
-      {halftone && (
-        <span className="manga-halftone-overlay" aria-hidden="true" />
-      )}
       <div className="relative z-10">{children}</div>
     </div>
   );

@@ -127,7 +127,7 @@ export function RacePreviewModal({ race, onClose, onPick }: RacePreviewModalProp
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="modal-diagonal-panel modal-diagonal-panel-race"
+        className="cinematic-modal-panel modal-diagonal-panel-race"
         style={{
           width: '100%',
           maxWidth: 640,

@@ -50,11 +50,6 @@ export function InventoryItemCard({ item, selected, onClick }: InventoryItemCard
         />
       )}
 
-      <span
-        className="manga-halftone-overlay"
-        style={{ color: rarity.color }}
-        aria-hidden
-      />
 
       <span
         className="text-2xl sm:text-3xl leading-none z-10 transition-transform duration-200 group-hover:scale-110"

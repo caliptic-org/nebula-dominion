@@ -1,0 +1,327 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Race Chrome System — Per-race CSS variable design tokens
+ *
+ * Each race owns a complete visual language: color, typography, panel
+ * geometry, and open-animation. Apply via `data-race` on a root container
+ * and consume tokens through `var(--race-*)` only.
+ *
+ * The dual selector lists (English + Turkish) keep this in sync with the
+ * existing `RACE_DESCRIPTIONS.dataRace` codes in `src/types/units.ts`
+ * (insan/zerg/otomat/canavar/seytan) while matching the spec's English
+ * names so future content can use either.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=IM+Fell+English&family=Share+Tech+Mono&family=Space+Mono:wght@400;700&family=Spectral:wght@300;400;500;600&family=UnifrakturMaguntia&display=swap');
+
+/* ── 1. HUMAN / İNSAN — Military Tech (#4a9eff) ──────────────────────── */
+[data-race="human"],
+[data-race="insan"] {
+  --race-primary:        #4a9eff;
+  --race-secondary:      #00d4ff;
+  --race-bg-deep:        #040810;
+  --race-bg-surface:     #070e1a;
+  --race-bg-elevated:    #0c1829;
+  --race-border:         rgba(74, 158, 255, 0.25);
+  --race-border-glow:    0 0 0 1px rgba(74,158,255,0.4), 0 0 20px rgba(74,158,255,0.15);
+  --race-text-primary:   #e8f4ff;
+  --race-text-muted:     rgba(74, 158, 255, 0.6);
+  --race-glow-color:     #4a9eff;
+  --race-glow-rgb:       74, 158, 255;
+  --race-glow-intensity: 0.6;
+  --race-panel-shape:    polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  --race-font-primary:   'Rajdhani', 'Bebas Neue', monospace;
+  --race-font-ui:        'Share Tech Mono', 'Courier New', monospace;
+  --race-anim-open:      human-panel-slide;
+  --race-anim-duration:  220ms;
+  --race-anim-easing:    cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ── 2. ZERG — Organic Hive (#44ff44) ────────────────────────────────── */
+[data-race="zerg"] {
+  --race-primary:        #44ff44;
+  --race-secondary:      #aaff00;
+  --race-bg-deep:        #020a02;
+  --race-bg-surface:     #061006;
+  --race-bg-elevated:    #0c1e0a;
+  --race-border:         rgba(68, 255, 68, 0.2);
+  --race-border-glow:    0 0 0 1px rgba(68,255,68,0.3), 0 0 24px rgba(68,255,68,0.12), inset 0 0 12px rgba(68,255,68,0.04);
+  --race-text-primary:   #d4ffd4;
+  --race-text-muted:     rgba(68, 255, 68, 0.5);
+  --race-glow-color:     #44ff44;
+  --race-glow-rgb:       68, 255, 68;
+  --race-glow-intensity: 0.8;
+  --race-panel-shape:    none;
+  --race-font-primary:   'Exo 2', sans-serif;
+  --race-font-ui:        'Cousine', monospace;
+  --race-anim-open:      zerg-pulse-open;
+  --race-anim-duration:  350ms;
+  --race-anim-easing:    cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── 3. AUTOMAT / OTOMAT — Geometric Hologram (#00cfff) ──────────────── */
+[data-race="automat"],
+[data-race="otomat"] {
+  --race-primary:        #00cfff;
+  --race-secondary:      #7b61ff;
+  --race-bg-deep:        #020612;
+  --race-bg-surface:     #040d1f;
+  --race-bg-elevated:    #081830;
+  --race-border:         rgba(0, 207, 255, 0.3);
+  --race-border-glow:    0 0 0 1px rgba(0,207,255,0.5), 0 0 30px rgba(0,207,255,0.2), 0 0 60px rgba(123,97,255,0.1);
+  --race-text-primary:   #e0f8ff;
+  --race-text-muted:     rgba(0, 207, 255, 0.55);
+  --race-glow-color:     #00cfff;
+  --race-glow-rgb:       0, 207, 255;
+  --race-glow-intensity: 0.9;
+  --race-panel-shape:    polygon(12px 0%, calc(100% - 12px) 0%, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0% calc(100% - 12px), 0% 12px);
+  --race-font-primary:   'Orbitron', 'Share Tech Mono', monospace;
+  --race-font-ui:        'Space Mono', monospace;
+  --race-anim-open:      automat-teleport;
+  --race-anim-duration:  120ms;
+  --race-anim-easing:    cubic-bezier(0.0, 0.0, 0.2, 1);
+}
+
+/* ── 4. BEAST / CANAVAR — Ancient Stone & Blood (#ff6600) ────────────── */
+[data-race="beast"],
+[data-race="canavar"] {
+  --race-primary:        #ff6600;
+  --race-secondary:      #ff3300;
+  --race-bg-deep:        #0a0200;
+  --race-bg-surface:     #150500;
+  --race-bg-elevated:    #220900;
+  --race-border:         rgba(255, 102, 0, 0.3);
+  --race-border-glow:    0 0 0 1px rgba(255,102,0,0.4), 0 0 20px rgba(255,51,0,0.2), inset 0 1px 0 rgba(255,150,50,0.1);
+  --race-text-primary:   #fff0e8;
+  --race-text-muted:     rgba(255, 102, 0, 0.6);
+  --race-glow-color:     #ff4400;
+  --race-glow-rgb:       255, 68, 0;
+  --race-glow-intensity: 0.7;
+  --race-panel-shape:    polygon(8px 0%, 100% 0%, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0% 100%, 0% 8px);
+  --race-font-primary:   'Cinzel', serif;
+  --race-font-ui:        'IM Fell English', serif;
+  --race-anim-open:      beast-slam;
+  --race-anim-duration:  280ms;
+  --race-anim-easing:    cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* ── 5. DEMON / ŞEYTAN — Gothic Smoke & Curse (#cc00ff) ──────────────── */
+[data-race="demon"],
+[data-race="seytan"] {
+  --race-primary:        #cc00ff;
+  --race-secondary:      #6600cc;
+  --race-bg-deep:        #060008;
+  --race-bg-surface:     #0d0014;
+  --race-bg-elevated:    #160020;
+  --race-border:         rgba(204, 0, 255, 0.25);
+  --race-border-glow:    0 0 0 1px rgba(204,0,255,0.35), 0 0 28px rgba(204,0,255,0.18), 0 0 56px rgba(102,0,204,0.1);
+  --race-text-primary:   #f0e0ff;
+  --race-text-muted:     rgba(204, 0, 255, 0.5);
+  --race-glow-color:     #cc00ff;
+  --race-glow-rgb:       204, 0, 255;
+  --race-glow-intensity: 0.75;
+  --race-panel-shape:    polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  --race-font-primary:   'UnifrakturMaguntia', cursive;
+  --race-font-ui:        'Spectral', serif;
+  --race-anim-open:      demon-dissolve;
+  --race-anim-duration:  400ms;
+  --race-anim-easing:    cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ── Race Panel — universal component, race-themed via tokens ───────── */
+.race-panel {
+  background: var(--race-bg-surface);
+  clip-path: var(--race-panel-shape);
+  box-shadow: var(--race-border-glow);
+  border: 1px solid var(--race-border);
+  font-family: var(--race-font-ui);
+  color: var(--race-text-primary);
+  animation: var(--race-anim-open) var(--race-anim-duration) var(--race-anim-easing) both;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient inner-top glow — uses race rgb tuple for live tint */
+.race-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 60% 40% at 50% 0%,
+    rgba(var(--race-glow-rgb), 0.08) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.race-panel > * { position: relative; z-index: 1; }
+
+/* Zerg override — organic, fluid border-radius instead of clip-path */
+[data-race="zerg"] .race-panel {
+  clip-path: none;
+  border-radius: 40% 60% 55% 45% / 45% 40% 60% 55%;
+}
+
+/* Mobile fallback — clip-path simplified to a small radius for performance */
+@media (max-width: 640px) {
+  .race-panel {
+    clip-path: none;
+    border-radius: 6px;
+  }
+  [data-race="zerg"] .race-panel {
+    border-radius: 24px 36px 28px 32px / 32px 26px 36px 28px;
+  }
+}
+
+/* ── Race-typed headings ────────────────────────────────────────────── */
+.race-heading {
+  font-family: var(--race-font-primary);
+  color: var(--race-primary);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 12px rgba(var(--race-glow-rgb), var(--race-glow-intensity, 0.6));
+}
+
+.race-text-muted { color: var(--race-text-muted); }
+
+/* ── Open animations ────────────────────────────────────────────────── */
+
+/* Human — mechanical slide in from the right */
+@keyframes human-panel-slide {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Zerg — breath pulse + form morph from circle to organic blob */
+@keyframes zerg-pulse-open {
+  0%   { transform: scale(0.85); opacity: 0;   border-radius: 50%; }
+  60%  { transform: scale(1.04); opacity: 0.8; }
+  100% { transform: scale(1.0);  opacity: 1;   border-radius: 40% 60% 55% 45% / 45% 40% 60% 55%; }
+}
+
+/* Zerg active — continuous breathing */
+@keyframes zerg-breathe {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.012); box-shadow: var(--race-border-glow), 0 0 40px rgba(68,255,68,0.3); }
+}
+[data-race="zerg"] .race-panel.is-active {
+  animation: zerg-breathe 3s ease-in-out infinite;
+}
+
+/* Automat — teleport (scale + blur + brightness flash) */
+@keyframes automat-teleport {
+  from { transform: scale(0.88); opacity: 0; filter: blur(4px) brightness(2); }
+  to   { transform: scale(1.0);  opacity: 1; filter: blur(0) brightness(1); }
+}
+
+/* Automat — vertical data stream line passing through the panel */
+@keyframes automat-data-stream {
+  from { transform: translateY(-100%); opacity: 0.6; }
+  to   { transform: translateY(100%);  opacity: 0; }
+}
+[data-race="automat"] .race-panel::after,
+[data-race="otomat"] .race-panel::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--race-primary), transparent);
+  animation: automat-data-stream 2.4s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Beast — heavy slam, drop with bounce + tremor */
+@keyframes beast-slam {
+  0%   { transform: translateY(-16px) scale(0.96); opacity: 0; }
+  70%  { transform: translateY(4px)   scale(1.01); opacity: 1; }
+  85%  { transform: translateY(-2px)  scale(0.99); }
+  100% { transform: translateY(0)     scale(1.0); }
+}
+
+/* Demon — dissolve in from smoke */
+@keyframes demon-dissolve {
+  0%   { opacity: 0;   filter: blur(12px) saturate(3); transform: scale(1.08); }
+  40%  { opacity: 0.6; filter: blur(4px); }
+  100% { opacity: 1;   filter: blur(0) saturate(1);     transform: scale(1.0); }
+}
+
+/* ── Per-race ambient backgrounds (transform/opacity-only) ──────────── */
+
+/* Human — holographic tactical grid + LCD scan lines */
+[data-race="human"] .race-panel,
+[data-race="insan"] .race-panel {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(74, 158, 255, 0.03) 2px,
+      rgba(74, 158, 255, 0.03) 4px
+    ),
+    linear-gradient(var(--race-bg-surface), var(--race-bg-surface));
+}
+
+/* Zerg — radial mycelium nodes */
+[data-race="zerg"] .race-panel {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(68,255,68,0.06) 0%, transparent 28%),
+    radial-gradient(circle at 78% 72%, rgba(170,255,0,0.05) 0%, transparent 30%),
+    radial-gradient(circle at 50% 90%, rgba(68,255,68,0.04) 0%, transparent 25%),
+    linear-gradient(var(--race-bg-surface), var(--race-bg-surface));
+}
+
+/* Automat — wireframe lattice via conic gradient */
+[data-race="automat"] .race-panel,
+[data-race="otomat"] .race-panel {
+  background-image:
+    conic-gradient(
+      from 30deg at 50% 50%,
+      rgba(0,207,255,0.04) 0deg,
+      transparent 30deg,
+      rgba(123,97,255,0.04) 60deg,
+      transparent 90deg,
+      rgba(0,207,255,0.04) 120deg,
+      transparent 150deg,
+      rgba(123,97,255,0.04) 180deg,
+      transparent 210deg,
+      rgba(0,207,255,0.04) 240deg,
+      transparent 270deg,
+      rgba(123,97,255,0.04) 300deg,
+      transparent 330deg,
+      rgba(0,207,255,0.04) 360deg
+    ),
+    linear-gradient(var(--race-bg-surface), var(--race-bg-surface));
+}
+
+/* Beast — volcanic crackle (pure CSS, no asset dependency) */
+[data-race="beast"] .race-panel,
+[data-race="canavar"] .race-panel {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 30% 80%, rgba(255,51,0,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 30% at 80% 20%, rgba(255,102,0,0.06) 0%, transparent 70%),
+    repeating-linear-gradient(
+      135deg,
+      transparent 0,
+      transparent 22px,
+      rgba(255,80,0,0.04) 22px,
+      rgba(255,80,0,0.04) 23px
+    ),
+    linear-gradient(var(--race-bg-surface), var(--race-bg-surface));
+}
+
+/* Demon — gothic violet void with arch shimmer */
+[data-race="demon"] .race-panel,
+[data-race="seytan"] .race-panel {
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(204,0,255,0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 0%, rgba(102,0,204,0.06) 0%, transparent 60%),
+    linear-gradient(var(--race-bg-surface), var(--race-bg-surface));
+}
+
+/* ── Reduced motion — respect user preference ──────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .race-panel { animation: none; }
+  [data-race="zerg"] .race-panel.is-active { animation: none; }
+  [data-race="automat"] .race-panel::after,
+  [data-race="otomat"] .race-panel::after { animation: none; opacity: 0; }
+}

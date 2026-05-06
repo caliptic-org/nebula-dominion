@@ -222,7 +222,7 @@ export default function HomePage() {
               {/* Left: Tilemap */}
               <div className="flex-1 flex flex-col gap-4 min-w-0">
                 {/* Tilemap header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-race">Ana Üs</span>
@@ -231,14 +231,28 @@ export default function HomePage() {
                       {raceDesc.name} <span style={{ color: raceColor }}>İmparatorluğu</span>
                     </h2>
                   </div>
-                  {selectedTile && (
-                    <span
-                      className="font-display text-[10px] uppercase tracking-widest px-3 py-1 rounded-full"
-                      style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}30` }}
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/base"
+                      className="font-display text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition-all hover:brightness-125"
+                      style={{
+                        background: raceDesc.bgColor,
+                        color: raceColor,
+                        border: `1px solid ${raceColor}55`,
+                        boxShadow: `0 0 14px ${raceGlow}`,
+                      }}
                     >
-                      [{selectedTile.col}, {selectedTile.row}] seçili
-                    </span>
-                  )}
+                      🆕 Ana Üs v2 →
+                    </a>
+                    {selectedTile && (
+                      <span
+                        className="font-display text-[10px] uppercase tracking-widest px-3 py-1 rounded-full"
+                        style={{ background: raceDesc.bgColor, color: raceColor, border: `1px solid ${raceColor}30` }}
+                      >
+                        [{selectedTile.col}, {selectedTile.row}] seçili
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Isometric Tilemap */}

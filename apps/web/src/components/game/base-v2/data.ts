@@ -1,18 +1,17 @@
 import { Race } from '@/types/units';
 import { STRUCTURE_ASSETS, type StructureAssetKey } from '@/lib/assets';
+import {
+  ABILITY_ICONS,
+  BUILDING_ISOS,
+  BUILDING_THUMBS,
+} from './asset-manifest';
 import type {
   BaseBuilding,
   CommandAction,
   RaceBaseSnapshot,
 } from './types';
 
-/**
- * The CAL-349 asset batches (race-specific iso sprites, unit icons, ground
- * textures) are not yet committed. Until they land, point at existing
- * structure PNGs and reuse them for both the iso sprite and the thumbnail
- * slot. The component layer will swap to the dedicated assets transparently
- * once the manifest paths exist on disk.
- */
+/** Existing repo PNG used as a deterministic fallback when CAL-349 hasn't shipped that key. */
 const structurePath = (key: StructureAssetKey) => STRUCTURE_ASSETS[key];
 
 const cmdTrain = (
@@ -55,6 +54,7 @@ const cmdUpgrade = (
   hotkey,
   label,
   icon: '⬆',
+  iconAsset: ABILITY_ICONS.special,
   costMineral: cost.mineral,
   costGas: cost.gas,
   costEnergy: cost.energy,
@@ -67,6 +67,7 @@ const cmdRally: CommandAction = {
   hotkey: 'R',
   label: 'Toplanma',
   icon: '⚑',
+  iconAsset: ABILITY_ICONS.rally,
   description: 'Üretilen birimler için toplanma noktası belirle.',
   kind: 'rally',
 };
@@ -94,6 +95,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'cmdctr-01', type: 'command-center',
         name: 'Komuta Merkezi', sprite: structurePath('yutucu_yildiz_akademisi'),
+        assetKey: 'human/command',
         level: 2, maxLevel: 5, hp: 1450, maxHp: 1500, isoX: 6, isoY: 4,
         status: 'producing', queueCapacity: 5,
         queue: [
@@ -110,6 +112,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'barracks-01', type: 'barracks',
         name: 'Kışla I', sprite: structurePath('atalar_magarasi'),
+        assetKey: 'human/barracks',
         level: 3, maxLevel: 5, hp: 820, maxHp: 1000, isoX: 3, isoY: 3,
         status: 'producing', queueCapacity: 5,
         queue: [
@@ -127,6 +130,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'factory-01', type: 'factory',
         name: 'Fabrika', sprite: structurePath('sonsuzluk_cekirdegi'),
+        assetKey: 'human/factory',
         level: 1, maxLevel: 4, hp: 1100, maxHp: 1250, isoX: 9, isoY: 3,
         status: 'idle', queueCapacity: 4,
         queue: [],
@@ -175,6 +179,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'hatchery-01', type: 'hatchery',
         name: 'Kovan Kalbi', sprite: structurePath('kovan_kalbi'),
+        assetKey: 'zerg/hive',
         level: 1, maxLevel: 3, hp: 1500, maxHp: 1500, isoX: 6, isoY: 4,
         status: 'producing', queueCapacity: 6,
         queue: [
@@ -192,6 +197,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'spawning-01', type: 'spawning-pool',
         name: 'Mutasyon Çukuru', sprite: structurePath('mutasyon_cukuru'),
+        assetKey: 'zerg/spawning-pool',
         level: 2, maxLevel: 3, hp: 720, maxHp: 750, isoX: 3, isoY: 6,
         status: 'producing', queueCapacity: 5,
         queue: [
@@ -207,6 +213,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'evolution-01', type: 'evolution',
         name: 'Evrim Odası', sprite: structurePath('atalar_magarasi'),
+        assetKey: 'zerg/spire',
         level: 1, maxLevel: 3, hp: 600, maxHp: 700, isoX: 9, isoY: 5,
         status: 'upgrading', queueCapacity: 0,
         queue: [],
@@ -242,6 +249,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'nexus-01', type: 'nexus',
         name: 'Sonsuzluk Çekirdeği', sprite: structurePath('sonsuzluk_cekirdegi'),
+        assetKey: 'automat/nexus',
         level: 2, maxLevel: 5, hp: 1700, maxHp: 1750, isoX: 6, isoY: 4,
         status: 'producing', queueCapacity: 5,
         queue: [
@@ -257,6 +265,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'gateway-01', type: 'gateway',
         name: 'Geçit', sprite: structurePath('atalar_magarasi'),
+        assetKey: 'automat/forge',
         level: 1, maxLevel: 4, hp: 800, maxHp: 1000, isoX: 4, isoY: 5,
         status: 'producing', queueCapacity: 4,
         queue: [
@@ -284,6 +293,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'pylon-01', type: 'pylon',
         name: 'Sütun', sprite: structurePath('lanet_tapinagi'),
+        assetKey: 'automat/pylon',
         level: 1, maxLevel: 1, hp: 200, maxHp: 200, isoX: 10, isoY: 4,
         status: 'idle', queueCapacity: 0, queue: [],
         commands: [],
@@ -307,6 +317,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'altar-01', type: 'altar',
         name: 'Atalar Mağarası', sprite: structurePath('atalar_magarasi'),
+        assetKey: 'beast/stronghold',
         level: 2, maxLevel: 4, hp: 1300, maxHp: 1400, isoX: 6, isoY: 4,
         status: 'producing', queueCapacity: 5,
         queue: [
@@ -391,6 +402,7 @@ export const BASE_SNAPSHOTS: Record<Race, RaceBaseSnapshot> = {
       makeBuilding({
         id: 'gate-01', type: 'void-gate',
         name: 'Boşluk Kapısı', sprite: structurePath('sonsuzluk_cekirdegi'),
+        assetKey: 'demon/portal',
         level: 1, maxLevel: 3, hp: 460, maxHp: 600, isoX: 9, isoY: 5,
         status: 'idle', queueCapacity: 3, queue: [],
         upgrade: { nextLevel: 2, costMineral: 150, costGas: 100, seconds: 45 },
@@ -406,7 +418,10 @@ interface MakeBuildingArgs {
   id: string;
   type: string;
   name: string;
+  /** Pre-resolved fallback sprite path (existing structure PNG). */
   sprite: string;
+  /** Optional CAL-349 manifest key like `human/command`. */
+  assetKey?: string;
   level: number;
   maxLevel: number;
   hp: number;
@@ -421,12 +436,14 @@ interface MakeBuildingArgs {
 }
 
 function makeBuilding(b: MakeBuildingArgs): BaseBuilding {
+  const iso = (b.assetKey && BUILDING_ISOS[b.assetKey]) || b.sprite;
+  const thumbnail = (b.assetKey && BUILDING_THUMBS[b.assetKey]) || iso;
   return {
     id: b.id,
     type: b.type,
     name: b.name,
-    thumbnail: b.sprite,
-    isoSprite: b.sprite,
+    thumbnail,
+    isoSprite: iso,
     level: b.level,
     maxLevel: b.maxLevel,
     hp: b.hp,

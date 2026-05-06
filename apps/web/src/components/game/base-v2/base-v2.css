@@ -55,6 +55,13 @@
   line-height: 1;
 }
 
+.base-resource-icon-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px rgba(var(--race-glow-rgb, 74,158,255), 0.4));
+}
+
 .base-resource-value {
   font-family: var(--race-font-primary, 'Rajdhani', sans-serif);
   font-size: 14px;
@@ -829,6 +836,12 @@
 .base-cmd-icon {
   font-size: 22px;
   line-height: 1;
+}
+.base-cmd-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(var(--race-glow-rgb, 74,158,255), 0.45));
 }
 .base-cmd-label {
   font-size: 9px;

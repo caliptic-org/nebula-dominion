@@ -103,7 +103,18 @@ export function CommandCard({ building, resources, onCommand }: Props) {
               aria-label={`${action.label} — kısayol ${action.hotkey}`}
             >
               <span className="base-cmd-hotkey">{action.hotkey}</span>
-              <span className="base-cmd-icon" aria-hidden>{action.icon}</span>
+              {action.iconAsset ? (
+                <Image
+                  src={action.iconAsset}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="base-cmd-icon-img"
+                  unoptimized
+                />
+              ) : (
+                <span className="base-cmd-icon" aria-hidden>{action.icon}</span>
+              )}
               <span className="base-cmd-label">{action.label}</span>
               {(action.costMineral || action.costGas) && (
                 <span className="base-cmd-cost">

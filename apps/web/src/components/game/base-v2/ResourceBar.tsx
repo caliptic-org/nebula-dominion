@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { ABILITY_ICONS } from './asset-manifest';
 import type { ResourceState } from './types';
 
 interface Props {
@@ -16,12 +18,14 @@ const formatClock = (totalSeconds: number) => {
 
 function ResourceCounter({
   icon,
+  iconAsset,
   label,
   value,
   rate,
   color,
 }: {
   icon: string;
+  iconAsset?: string;
   label: string;
   value: number | string;
   rate?: number;
@@ -40,7 +44,18 @@ function ResourceCounter({
 
   return (
     <div className="base-resource-item" title={label}>
-      <span className="base-resource-icon" aria-hidden>{icon}</span>
+      {iconAsset ? (
+        <Image
+          src={iconAsset}
+          alt=""
+          width={20}
+          height={20}
+          className="base-resource-icon-img"
+          unoptimized
+        />
+      ) : (
+        <span className="base-resource-icon" aria-hidden>{icon}</span>
+      )}
       <span className={`base-resource-value${bumped ? ' is-bumped' : ''}`} style={color ? { color } : undefined}>
         {typeof value === 'number' ? value.toLocaleString('tr-TR') : value}
       </span>
@@ -66,6 +81,7 @@ export function ResourceBar({ resources, elapsedSeconds }: Props) {
       />
       <ResourceCounter
         icon="⚗️"
+        iconAsset={ABILITY_ICONS.gas}
         label="Gaz"
         value={resources.gas}
         rate={resources.rates.gas}
@@ -73,6 +89,7 @@ export function ResourceBar({ resources, elapsedSeconds }: Props) {
       />
       <ResourceCounter
         icon="⚡"
+        iconAsset={ABILITY_ICONS.energy}
         label="Enerji"
         value={resources.energy}
         rate={resources.rates.energy}
@@ -80,6 +97,7 @@ export function ResourceBar({ resources, elapsedSeconds }: Props) {
       />
       <ResourceCounter
         icon="👥"
+        iconAsset={ABILITY_ICONS.population}
         label="Nüfus"
         value={`${resources.population.current} / ${resources.population.cap}`}
         color={resources.population.current >= resources.population.cap ? '#ff4d6b' : undefined}

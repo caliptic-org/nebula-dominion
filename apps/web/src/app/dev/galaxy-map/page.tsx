@@ -3,6 +3,19 @@
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { buildMockGalaxy } from '@/components/galaxy-map/mockGalaxy';
+import type { RaceCode } from '@/components/galaxy-map/types';
+
+const RACE_COMMANDER: Record<RaceCode, { name: string; portrait: string; title: string }> = {
+  human:   { name: 'Adm. Voss',       portrait: '/assets/characters/insan/voss.png',             title: 'Birleşik Komuta' },
+  zerg:    { name: 'Vex Thara',       portrait: '/assets/characters/zerg/vex_thara.png',          title: 'Kovan Anası' },
+  automat: { name: 'Demiurge Prime',  portrait: '/assets/characters/otomat/demiurge_prime.png',   title: 'Birinci Akıl' },
+  beast:   { name: 'Ulrek',           portrait: '/assets/characters/canavar/ulrek.png',           title: 'Kabile Reisi' },
+  demon:   { name: 'Malphas',         portrait: '/assets/characters/seytan/malphas.png',          title: 'Lanet Lordu' },
+};
+
+const RACE_LABEL: Record<RaceCode, string> = {
+  human: 'İnsan', zerg: 'Zerg', automat: 'Otomat', beast: 'Canavar', demon: 'Şeytan',
+};
 
 // Galaxy map uses canvas + DOM measurements — disable SSR
 const GalaxyMap = dynamic(
@@ -35,13 +48,14 @@ export default function GalaxyMapShowcase() {
 
       {selectedSystem && (
         <div
+          data-race={selectedSystem.owner ?? 'neutral'}
           style={{
             position: 'absolute',
             top: 16,
             right: 16,
             zIndex: 20,
             padding: 16,
-            minWidth: 220,
+            minWidth: 260,
             background: 'rgba(8, 12, 20, 0.92)',
             border: '1px solid rgba(0, 207, 255, 0.35)',
             color: '#e0f8ff',
@@ -50,6 +64,41 @@ export default function GalaxyMapShowcase() {
             backdropFilter: 'blur(8px)',
           }}
         >
+          {selectedSystem.owner && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 12,
+                paddingBottom: 12,
+                borderBottom: '1px solid rgba(0, 207, 255, 0.18)',
+              }}
+            >
+              <img
+                src={RACE_COMMANDER[selectedSystem.owner].portrait}
+                alt={RACE_COMMANDER[selectedSystem.owner].name}
+                width={48}
+                height={48}
+                style={{
+                  width: 48,
+                  height: 48,
+                  objectFit: 'cover',
+                  borderRadius: '50%',
+                  border: '1px solid rgba(0, 207, 255, 0.45)',
+                  background: '#020308',
+                }}
+              />
+              <div>
+                <div style={{ fontSize: 11, letterSpacing: '0.1em', color: '#fff' }}>
+                  {RACE_COMMANDER[selectedSystem.owner].name}
+                </div>
+                <div style={{ fontSize: 10, opacity: 0.6 }}>
+                  {RACE_COMMANDER[selectedSystem.owner].title}
+                </div>
+              </div>
+            </div>
+          )}
           <div
             style={{
               fontSize: 14,
@@ -62,7 +111,7 @@ export default function GalaxyMapShowcase() {
             {selectedSystem.name}
           </div>
           <div style={{ opacity: 0.65, marginBottom: 12 }}>
-            Sahip: {selectedSystem.owner ?? 'Boş bölge'} · Sektör: {selectedSystem.sectorId}
+            Sahip: {selectedSystem.owner ? RACE_LABEL[selectedSystem.owner] : 'Boş bölge'} · Sektör: {selectedSystem.sectorId}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
             <span>Mineral</span><span>{selectedSystem.resources.mineral ?? '—'}</span>

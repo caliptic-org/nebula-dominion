@@ -1,0 +1,113 @@
+'use client';
+
+import clsx from 'clsx';
+import type { ResourceState, WaveState } from './types';
+
+interface Props {
+  resources: ResourceState;
+  rates: ResourceState;
+  populationCap: number;
+  wave: WaveState;
+  speed: 0.5 | 1 | 2;
+  paused: boolean;
+  onSpeedChange: (s: 0.5 | 1 | 2) => void;
+  onTogglePause: () => void;
+}
+
+const SPEEDS: Array<0.5 | 1 | 2> = [0.5, 1, 2];
+
+export function BattleTopBar({
+  resources,
+  rates,
+  populationCap,
+  wave,
+  speed,
+  paused,
+  onSpeedChange,
+  onTogglePause,
+}: Props) {
+  const progress = 1 - wave.nextInSeconds / wave.totalSeconds;
+  const imminent = wave.nextInSeconds <= 10;
+
+  return (
+    <header className="battle-topbar" role="banner">
+      <div className="topbar-resources" aria-label="Kaynaklar">
+        <Resource label="Mineral" kind="mineral" glyph="◆" value={resources.mineral} rate={rates.mineral} />
+        <Resource label="Gas" kind="gas" glyph="❍" value={resources.gas} rate={rates.gas} />
+        <Resource label="Enerji" kind="energy" glyph="⚡" value={resources.energy} rate={rates.energy} />
+        <Resource label="Nüfus" kind="population" glyph="☥" value={populationCap} rate={0} suffix={` / ${populationCap}`} hideRate />
+      </div>
+
+      <div className="topbar-wave" aria-label="Dalga durumu">
+        <span className="wave-label">DALGA</span>
+        <span className="wave-number">
+          {wave.current} / {wave.total}
+        </span>
+        <div className="wave-timer">
+          <div className="wave-timer-bar">
+            <div
+              className={clsx('wave-timer-fill', imminent && 'imminent')}
+              style={{ ['--progress' as string]: progress }}
+            />
+          </div>
+          <span className="wave-next">
+            {imminent ? 'YAKINDA!' : `Sonraki: ${Math.ceil(wave.nextInSeconds)}s`}
+          </span>
+        </div>
+      </div>
+
+      <div className="topbar-controls" role="group" aria-label="Oyun hızı">
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={clsx('speed-btn', s === speed && 'active')}
+            onClick={() => onSpeedChange(s)}
+            aria-pressed={s === speed}
+          >
+            {s}x
+          </button>
+        ))}
+        <button
+          type="button"
+          className={clsx('pause-btn', paused && 'is-paused')}
+          onClick={onTogglePause}
+          aria-label={paused ? 'Devam et' : 'Duraklat'}
+          aria-pressed={paused}
+        >
+          {paused ? '▶' : '❚❚'}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+interface ResourceProps {
+  label: string;
+  kind: 'mineral' | 'gas' | 'energy' | 'population';
+  glyph: string;
+  value: number;
+  rate: number;
+  hideRate?: boolean;
+  suffix?: string;
+}
+
+function Resource({ label, kind, glyph, value, rate, hideRate, suffix }: ResourceProps) {
+  return (
+    <div className={clsx('top-resource', kind)} aria-label={`${label} ${value}`}>
+      <span className="top-resource-glyph" aria-hidden>{glyph}</span>
+      <div className="top-resource-text">
+        <span className="top-resource-value" data-resource={kind}>
+          {Math.floor(value).toLocaleString('tr-TR')}
+          {suffix ?? ''}
+        </span>
+        {!hideRate && (
+          <span className={clsx('top-resource-rate', rate >= 0 ? 'positive' : 'negative')}>
+            {rate >= 0 ? '+' : ''}
+            {rate}/s
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

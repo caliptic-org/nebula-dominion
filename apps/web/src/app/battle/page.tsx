@@ -86,6 +86,18 @@ function BattleContent() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href={`/battle-v2?race=${race}`}
+            className="font-display text-[9px] uppercase tracking-widest px-2 py-1 rounded border transition-colors"
+            style={{
+              color: raceDesc?.color ?? '#4a9eff',
+              borderColor: `${raceDesc?.color ?? '#4a9eff'}55`,
+              background: `${raceDesc?.color ?? '#4a9eff'}10`,
+            }}
+            title="Battle HUD v2 (taktik HUD önizleme)"
+          >
+            ⚔ Taktik HUD v2
+          </Link>
           <span
             className="badge text-[9px]"
             style={{

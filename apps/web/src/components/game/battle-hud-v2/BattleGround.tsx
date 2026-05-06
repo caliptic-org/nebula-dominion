@@ -1,15 +1,30 @@
 'use client';
 
 import clsx from 'clsx';
+import { Race } from '@/types/units';
 import { BATTLEFIELD_BOUNDS } from './types';
 import type { BattleUnit, DamageNumber } from './types';
+import { BATTLEFIELD_TEXTURES, GROUND_TEXTURES, type GroundRaceKey } from '../base-v2/asset-manifest';
 
 interface Props {
   units: BattleUnit[];
   enemies: BattleUnit[];
   selectedUnitId: string | null;
   damageNumbers: DamageNumber[];
+  race: Race;
   onSelectUnit: (id: string) => void;
+}
+
+/** Map Race enum to the English manifest key. */
+function groundKey(race: Race): GroundRaceKey {
+  switch (race) {
+    case Race.INSAN:   return 'human';
+    case Race.ZERG:    return 'zerg';
+    case Race.OTOMAT:  return 'automat';
+    case Race.CANAVAR: return 'beast';
+    case Race.SEYTAN:  return 'demon';
+    default:           return 'human';
+  }
 }
 
 export function BattleGround({
@@ -17,11 +32,18 @@ export function BattleGround({
   enemies,
   selectedUnitId,
   damageNumbers,
+  race,
   onSelectUnit,
 }: Props) {
+  const key = groundKey(race);
+  const groundUrl = BATTLEFIELD_TEXTURES[key as keyof typeof BATTLEFIELD_TEXTURES] ?? GROUND_TEXTURES[key];
   return (
     <section className="battle-arena" aria-label="Savaş alanı">
-      <div className="battle-ground" aria-hidden />
+      <div
+        className="battle-ground"
+        style={groundUrl ? { backgroundImage: `url(${groundUrl})` } : undefined}
+        aria-hidden
+      />
       <div className="battle-ground-haze" aria-hidden />
       <div
         className="battle-world"

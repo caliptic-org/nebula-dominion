@@ -287,6 +287,7 @@ export function BattleScreen() {
         enemies={state.enemies}
         selectedUnitId={state.selectedUnitId}
         damageNumbers={state.damageNumbers}
+        race={race}
         onSelectUnit={(id) => dispatch({ type: 'select-unit', id })}
       />
 

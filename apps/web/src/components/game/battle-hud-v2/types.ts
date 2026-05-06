@@ -25,7 +25,9 @@ export interface AbilityDef {
   id: string;
   name: string;
   hotkey: 'Q' | 'W' | 'E' | 'R' | 'A' | 'S';
-  glyph: string; // emoji/character — swappable for /assets/abilities/*.webp
+  glyph: string; // emoji/character — used as fallback when iconKey has no manifest entry
+  /** Key into ABILITY_ICONS in `base-v2/asset-manifest.ts`. */
+  iconKey?: 'attack' | 'defend' | 'special' | 'ultimate' | 'rally' | 'move';
   cooldownSeconds: number;
   remainingCooldown: number;
   ultimate?: boolean;

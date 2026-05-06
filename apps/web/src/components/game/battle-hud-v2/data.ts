@@ -25,30 +25,36 @@ const COMMON_ABILITIES = (
 ): AbilityDef[] => [
   {
     id: attack.id, name: attack.name, hotkey: 'Q', glyph: attack.glyph,
+    iconKey: 'attack',
     cooldownSeconds: 4, remainingCooldown: 0, description: attack.description,
   },
   {
     id: 'defend', name: 'Mevzilen', hotkey: 'W', glyph: '🛡',
+    iconKey: 'defend',
     cooldownSeconds: 8, remainingCooldown: 3.2,
     description: 'Savunma duruşu — alınan hasar %35 azalır, hareket %50.',
   },
   {
     id: 'rally', name: 'Toplan', hotkey: 'E', glyph: '⚑',
+    iconKey: 'rally',
     cooldownSeconds: 12, remainingCooldown: 0,
     description: 'Yakındaki dost birimleri çağırır, moral +15 verir.',
   },
   {
     id: ultimate.id, name: ultimate.name, hotkey: 'R', glyph: ultimate.glyph,
+    iconKey: 'ultimate',
     cooldownSeconds: 60, remainingCooldown: 0, ultimate: true,
     description: ultimate.description,
   },
   {
     id: 'move', name: 'Yürü', hotkey: 'A', glyph: '↔',
+    iconKey: 'move',
     cooldownSeconds: 0, remainingCooldown: 0,
     description: 'Hedef noktaya yürüyerek ilerle.',
   },
   {
     id: 'special', name: 'Özel', hotkey: 'S', glyph: '✦',
+    iconKey: 'special',
     cooldownSeconds: 18, remainingCooldown: 6.8,
     description: 'Birime özgü ek yetenek.',
   },

@@ -412,6 +412,14 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* When the inline `style` ships a real CAL-349 background-image, dim it slightly
+   so units stay readable against the texture. */
+.battle-ground[style*='background-image'] {
+  filter: brightness(0.85) saturate(0.95);
 }
 .battle-ground-haze {
   position: absolute;
@@ -772,6 +780,21 @@
   color: var(--race-primary);
   text-shadow: 0 0 8px rgba(var(--race-glow-rgb, 74, 158, 255), 0.6);
   font-family: var(--race-font-primary);
+}
+.ability-icon-img {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(var(--race-glow-rgb, 74, 158, 255), 0.45));
+  pointer-events: none;
+}
+.top-resource-img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px rgba(var(--race-glow-rgb, 74, 158, 255), 0.35));
 }
 .cooldown-overlay {
   position: absolute;

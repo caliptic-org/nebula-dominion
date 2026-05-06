@@ -1,7 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import clsx from 'clsx';
+import { ABILITY_ICONS } from '../base-v2/asset-manifest';
 import type { AbilityDef, BattleUnit, ControlGroup } from './types';
+
+function abilityIcon(a: AbilityDef): string | undefined {
+  return a.iconKey ? ABILITY_ICONS[a.iconKey] : undefined;
+}
 
 interface Props {
   unit: BattleUnit | null;
@@ -56,6 +62,7 @@ export function BattleCommandCard({
           const cdRatio = ability.cooldownSeconds > 0
             ? ability.remainingCooldown / ability.cooldownSeconds
             : 0;
+          const iconUrl = abilityIcon(ability);
           return (
             <button
               key={ability.id}
@@ -73,7 +80,18 @@ export function BattleCommandCard({
             >
               <span className="ability-hotkey">{ability.hotkey}</span>
               <div className={clsx('ability-icon', ability.ultimate && 'ultimate-glow')}>
-                <span className="ability-glyph" aria-hidden>{ability.glyph}</span>
+                {iconUrl ? (
+                  <Image
+                    src={iconUrl}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="ability-icon-img"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="ability-glyph" aria-hidden>{ability.glyph}</span>
+                )}
                 <div
                   className="cooldown-overlay"
                   style={{ ['--cd' as string]: cdRatio }}

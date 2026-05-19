@@ -1,8 +1,20 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GlowButton } from '@/components/ui/GlowButton';
+import { FormEvent, useState } from 'react';
+import {
+  Caption,
+  Code,
+  Eyebrow,
+  H2,
+  ND,
+  NDButton,
+  type NDRace,
+  type NDRaceKey,
+  Sigil,
+  useNDRace,
+} from '@/components/handoff';
 import { setTokens } from '@/lib/session';
 
 const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
@@ -19,32 +31,100 @@ function hasRaceCommitment(): boolean {
   }
 }
 
+const LOGIN_COPY: Record<NDRaceKey, {
+  title: string;
+  sub: string;
+  id: string;
+  pw: string;
+  recover: string;
+  cta: string;
+  guest: string;
+  newAccount: string;
+  join: string;
+}> = {
+  insan:   { title: 'KOMUTAYA DÖN',     sub: 'Önceki imparatorluğunun bekleyen mesajları var.', id: 'KOMUTAN KİMLİĞİ', pw: 'ŞİFRE',             recover: 'Şifre kaybı?',    cta: 'GİRİŞ YAP',       guest: 'QUICK START · MİSAFİR',    newAccount: 'Hesabın yok mu?',         join: 'Sürüye katıl' },
+  zerg:    { title: 'KOVANA GERİ DÖN',  sub: 'Kovanın seni hatırlıyor. Damarlar canlı.',         id: 'KOVAN UZANTI',    pw: 'FEROMON ANAHTARI',  recover: 'Feromon kaybı?',  cta: 'KOVANA BAĞLAN',  guest: 'HIZLI BAŞLA · YABANCI',    newAccount: 'Kovan üyesi değil misin?', join: 'Kovana doğ'  },
+  otomat:  { title: '::resume_session', sub: '::cache exists · resume from last build',          id: '::process_id',    pw: '::auth_token',      recover: '::reset_token',   cta: '::login()',       guest: '::guest_session',           newAccount: '::new_process?',            join: '::spawn'      },
+  canavar: { title: 'SÜRÜYE DÖN',       sub: 'Sürü uyumakta. Geri dön, ulu.',                    id: 'AVCI ADI',        pw: 'KAN MÜHRÜ',         recover: 'Mühür kayıp?',    cta: 'SÜRÜYE GİR',      guest: 'AVDA YABANCI · MİSAFİR',   newAccount: 'Sürüsüz mü kaldın?',        join: 'Ulumayı dene' },
+  seytan:  { title: 'PAKTI HATIRLA',    sub: 'Mühür hâlâ kanında. Geri dön.',                    id: 'PAKT SAHİBİ',     pw: 'GİZLİ HECE',        recover: 'Hece unutuldu?',  cta: 'PAKTI YENİLE',    guest: 'GÖLGE GİRİŞ · MİSAFİR',    newAccount: 'Henüz pakt yok mu?',         join: 'Pakt yaz'     },
+};
+
+function CornerHUD({ race }: { race: NDRace }) {
+  const c = race.primary;
+  const baseStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 24,
+    fontFamily: ND.mono,
+    fontSize: 9,
+    letterSpacing: '0.20em',
+    color: c,
+    opacity: 0.7,
+    textTransform: 'uppercase',
+  };
+  switch (race.key) {
+    case 'insan':
+      return (
+        <>
+          <div style={{ ...baseStyle, left: 18 }}>SECTOR<br />ORIGO-0</div>
+          <div style={{ ...baseStyle, right: 18, textAlign: 'right' }}>SIGNAL<br /><span className="nd-blink">/// STABLE</span></div>
+        </>
+      );
+    case 'zerg':
+      return (
+        <>
+          <div style={{ ...baseStyle, left: 18 }}>KOVAN<br />BROOD-1</div>
+          <div style={{ ...baseStyle, right: 18, textAlign: 'right' }}>VİTAL<br /><span className="nd-pulse">~~ %92</span></div>
+        </>
+      );
+    case 'otomat':
+      return (
+        <>
+          <div style={{ ...baseStyle, left: 18, letterSpacing: '0.16em' }}>::node<br />NODE-04</div>
+          <div style={{ ...baseStyle, right: 18, textAlign: 'right', letterSpacing: '0.16em' }}>::heartbeat<br /><span className="nd-tick">OK · OK</span></div>
+        </>
+      );
+    case 'canavar':
+      return (
+        <>
+          <div style={{ ...baseStyle, left: 18, fontFamily: ND.display }}>AVLAK<br />HOWL-1</div>
+          <div style={{ ...baseStyle, right: 18, textAlign: 'right', fontFamily: ND.display }}>AY<br />DOLUNAY</div>
+        </>
+      );
+    case 'seytan':
+      return (
+        <>
+          <div style={{ ...baseStyle, left: 18, letterSpacing: '0.30em', fontFamily: ND.display }}>· MAHKEME ·<br />TEMPLE-2</div>
+          <div style={{ ...baseStyle, right: 18, textAlign: 'right', letterSpacing: '0.30em', fontFamily: ND.display }}>· MÜHÜR ·<br /><span className="nd-sigil">⊕ III</span></div>
+        </>
+      );
+  }
+}
+
 export function LoginForm() {
+  const race = useNDRace('insan');
+  const copy = LOGIN_COPY[race.key];
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
   const [values, setValues] = useState({ identifier: '', password: '' });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
-
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
         throw new Error(data.message ?? 'Giriş başarısız. Tekrar dene.');
       }
-
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-
       router.push(hasRaceCommitment() ? '/' : '/race-select');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
@@ -54,70 +134,192 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Giriş formu" className="flex flex-col gap-4">
-      {error && (
+    <div
+      style={{
+        position: 'relative',
+        minHeight: '100dvh',
+        background: ND.bgDeep,
+        color: ND.text,
+        fontFamily: ND.body,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Background: subtle race-tinted gradient over deep bg */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `radial-gradient(ellipse 80% 50% at 50% -10%, ${race.glow} 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 50% 110%, ${race.primaryDim} 0%, transparent 60%)`,
+          opacity: 0.45,
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(180deg, rgba(3,5,11,0.65) 0%, rgba(3,5,11,0.30) 40%, rgba(3,5,11,0.92) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <CornerHUD race={race} />
+
+      <div
+        className="nd-slide-up"
+        style={{
+          position: 'relative',
+          maxWidth: 420,
+          margin: '0 auto',
+          padding: '72px 24px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100dvh',
+        }}
+      >
+        {/* Brand row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+          <Sigil race={race} size={32} glow />
+          <Eyebrow color={race.primary}>NEBULA DOMINION</Eyebrow>
+        </div>
+
+        <H2 style={{ color: ND.text, marginBottom: 6, fontFamily: race.key === 'otomat' ? ND.mono : ND.display }}>{copy.title}</H2>
+        <Caption style={{ marginBottom: 24 }}>{copy.sub}</Caption>
+
+        <form onSubmit={handleSubmit} noValidate aria-label="Giriş formu" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 4,
+                fontFamily: ND.mono,
+                fontSize: 12,
+                background: 'color-mix(in oklch, oklch(0.65 0.22 25), transparent 84%)',
+                border: '1px solid color-mix(in oklch, oklch(0.65 0.22 25), transparent 60%)',
+                color: ND.danger,
+                clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div>
+            <Eyebrow style={{ marginBottom: 6 }}>{copy.id}</Eyebrow>
+            <label className="nd-field" htmlFor="identifier">
+              <input
+                id="identifier"
+                name="identifier"
+                type="text"
+                className="nd-input"
+                placeholder={race.handle}
+                autoComplete="username"
+                required
+                value={values.identifier}
+                onChange={(e) => setValues((v) => ({ ...v, identifier: e.target.value }))}
+                disabled={isLoading}
+                aria-label={copy.id}
+              />
+            </label>
+          </div>
+
+          <div>
+            <Eyebrow style={{ marginBottom: 6 }}>{copy.pw}</Eyebrow>
+            <label className="nd-field" htmlFor="password">
+              <input
+                id="password"
+                name="password"
+                type={showPw ? 'text' : 'password'}
+                className="nd-input"
+                placeholder="••••••••••"
+                autoComplete="current-password"
+                required
+                minLength={6}
+                value={values.password}
+                onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
+                disabled={isLoading}
+                aria-label={copy.pw}
+                style={{ letterSpacing: showPw ? '0.04em' : '0.3em' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((s) => !s)}
+                aria-pressed={showPw}
+                aria-label={showPw ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontFamily: ND.mono,
+                  fontSize: 10,
+                  letterSpacing: '0.12em',
+                  color: race.primary,
+                }}
+              >
+                {showPw ? 'GİZLE' : 'GÖSTER'}
+              </button>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, marginBottom: 8 }}>
+            <Code style={{ color: ND.textDim }}>☐ Beni hatırla</Code>
+            <Link href="#" style={{ color: race.primary, fontFamily: ND.mono, fontSize: 11, letterSpacing: '0.04em', textDecoration: 'none' }}>
+              {copy.recover}
+            </Link>
+          </div>
+
+          <NDButton race={race} size="lg" type="submit" full disabled={isLoading}>
+            {isLoading ? 'BAĞLANIYOR…' : copy.cta}
+          </NDButton>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 8px' }} aria-hidden>
+            <div style={{ flex: 1, height: 1, background: ND.border }} />
+            <Code>YA DA</Code>
+            <div style={{ flex: 1, height: 1, background: ND.border }} />
+          </div>
+
+          <NDButton
+            race={race}
+            variant="ghost"
+            size="md"
+            full
+            onClick={() => router.push('/race-select')}
+          >
+            {copy.guest}
+          </NDButton>
+        </form>
+
+        <div style={{ flex: 1 }} />
+
+        <Caption style={{ textAlign: 'center', marginTop: 28 }}>
+          {copy.newAccount}{' '}
+          <Link
+            href="/register"
+            style={{ color: race.primary, fontFamily: ND.display, textDecoration: 'none', letterSpacing: '0.08em' }}
+          >
+            {copy.join} →
+          </Link>
+        </Caption>
+
         <div
-          role="alert"
           style={{
-            padding: '10px 14px',
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            background: 'rgba(232,64,48,0.12)',
-            border: '1px solid rgba(232,64,48,0.35)',
-            color: 'var(--color-danger)',
+            marginTop: 14,
+            textAlign: 'center',
+            fontFamily: ND.mono,
+            fontSize: 9,
+            color: ND.textMute,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
           }}
         >
-          ⚠️ {error}
+          v0.1 · MVP · {race.short}-CHANNEL
         </div>
-      )}
-
-      <div>
-        <label htmlFor="identifier" className="form-label">Komutan Adı veya E-posta</label>
-        <input
-          id="identifier"
-          type="text"
-          name="identifier"
-          className="form-input"
-          placeholder="komutan_nova veya komutan@nebula.com"
-          autoComplete="username"
-          required
-          value={values.identifier}
-          onChange={(e) => setValues((v) => ({ ...v, identifier: e.target.value }))}
-          disabled={isLoading}
-        />
       </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label htmlFor="password" className="form-label mb-0">Şifre</label>
-          <a href="#" className="text-xs text-text-muted hover:text-brand transition-colors duration-200">
-            Şifremi unuttum
-          </a>
-        </div>
-        <input
-          id="password"
-          type="password"
-          name="password"
-          className="form-input"
-          placeholder="••••••••"
-          autoComplete="current-password"
-          required
-          minLength={6}
-          value={values.password}
-          onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-          disabled={isLoading}
-        />
-      </div>
-
-      <GlowButton
-        type="submit"
-        className="w-full mt-2"
-        loading={isLoading}
-        icon={!isLoading ? <span>→</span> : undefined}
-      >
-        Galaksiye Gir
-      </GlowButton>
-    </form>
+    </div>
   );
 }

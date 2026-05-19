@@ -6,6 +6,13 @@ import { useRouter } from 'next/navigation';
 import { RACES, RACE_BY_ID, RaceId, RaceConfig } from './races';
 import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
 import { Race } from '@/types/units';
+import {
+  Eyebrow,
+  NDButton,
+  RACES as ND_RACES,
+  Sigil,
+  type NDRaceKey,
+} from '@/components/handoff';
 
 const STAT_LABELS: Array<{ key: keyof RaceConfig['stats']; label: string }> = [
   { key: 'attack', label: 'Saldırı' },
@@ -51,7 +58,7 @@ export default function RaceSelectPage() {
 
   const handleStart = () => {
     commit(selected.id as Race);
-    router.push(`/?race=${selected.id}`);
+    router.push(`/race-select/awakening?race=${selected.id}`);
   };
 
   const activeId = hoveredId ?? selectedId;
@@ -70,6 +77,7 @@ export default function RaceSelectPage() {
 
   return (
     <div
+      data-race={activeId as NDRaceKey}
       className="h-dvh relative overflow-hidden flex flex-col text-text-primary"
       style={{ background: 'var(--color-bg, #07090f)' }}
     >
@@ -208,13 +216,12 @@ export default function RaceSelectPage() {
                 }}
               >
                 <span
-                  className="text-xl leading-none w-7 text-center transition-all duration-300"
+                  className="leading-none w-7 flex items-center justify-center transition-all duration-300"
                   style={{
                     color: isSelected || isActive ? race.color : 'var(--color-text-secondary)',
-                    textShadow: isSelected ? `0 0 10px ${race.glow}` : 'none',
                   }}
                 >
-                  {race.icon}
+                  <Sigil race={ND_RACES[race.id as NDRaceKey]} size={24} glow={isSelected} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div
@@ -429,23 +436,18 @@ export default function RaceSelectPage() {
 
           {/* CTA */}
           <div className="mt-auto pt-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-            <button
+            <NDButton
+              race={ND_RACES[selected.id as NDRaceKey]}
+              size="lg"
+              full
               onClick={handleStart}
-              className="w-full py-3 px-4 rounded-xl font-extrabold text-sm tracking-wider uppercase transition-all duration-200 hover:brightness-110 active:scale-[0.99] outline-none focus-visible:ring-2"
-              style={{
-                background: `linear-gradient(135deg, ${selected.color}cc 0%, ${selected.color} 100%)`,
-                color: '#07090f',
-                boxShadow: `0 6px 28px ${selected.glow}, inset 0 1px 0 rgba(255,255,255,0.4)`,
-              }}
+              icon={<Sigil race={ND_RACES[selected.id as NDRaceKey]} size={18} />}
             >
-              <span className="inline-flex items-center justify-center gap-2">
-                <span>{selected.name} ile Başla</span>
-                <span aria-hidden>→</span>
-              </span>
-            </button>
-            <p className="text-[10px] text-text-muted text-center mt-2 tracking-wide">
-              Seçimini onaylamak için tıkla
-            </p>
+              {selected.name} İLE UYAN →
+            </NDButton>
+            <div className="text-center mt-2">
+              <Eyebrow>SEÇİMİ ONAYLAMAK İÇİN TIKLA</Eyebrow>
+            </div>
           </div>
         </aside>
       </main>

@@ -10,10 +10,11 @@
   display: grid;
   grid-template-areas:
     'resource resource resource'
+    'tier     tier     tier'
     'left     center   right'
     'command  command  command';
   grid-template-columns: 280px minmax(0, 1fr) 320px;
-  grid-template-rows: 52px minmax(0, 1fr) 144px;
+  grid-template-rows: 52px auto minmax(0, 1fr) 144px;
   height: 100dvh;
   background: var(--race-bg-deep, #050810);
   position: relative;
@@ -23,6 +24,7 @@
 }
 
 .base-resource-bar { grid-area: resource; }
+.base-tier-banner  { grid-area: tier;     }
 .base-left-panel   { grid-area: left;     }
 .base-center       { grid-area: center;   }
 .base-right-panel  { grid-area: right;    }

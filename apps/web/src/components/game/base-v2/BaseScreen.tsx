@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { ResourceBar } from './ResourceBar';
+import { TierBannerStrip } from './TierBannerStrip';
 import { BuildingListPanel } from './BuildingListPanel';
 import { IsoMap } from './IsoMap';
 import { BuildingDetailPanel } from './BuildingDetailPanel';
@@ -312,6 +313,7 @@ export function BaseScreen() {
   return (
     <div className="base-screen" data-race={meta.dataRace}>
       <ResourceBar resources={state.snapshot.resources} elapsedSeconds={state.elapsedSeconds} />
+      <TierBannerStrip />
       <BuildingListPanel
         buildings={state.snapshot.buildings}
         selectedId={state.selectedId}

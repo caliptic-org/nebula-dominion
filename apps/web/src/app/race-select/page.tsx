@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { RACES, RACE_BY_ID, RaceId, RaceConfig } from './races';
 import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment';
 import { Race } from '@/types/units';
+import { raceApi } from '@/lib/race-api';
+import { FetchError } from '@/lib/api';
 import {
   Eyebrow,
   NDButton,
@@ -55,10 +57,30 @@ export default function RaceSelectPage() {
   const [selectedId, setSelectedId] = useState<RaceId>('insan');
   const [hoveredId, setHoveredId] = useState<RaceId | null>(null);
   const [imgError, setImgError] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setCommitError(null);
+    // Local commit first so the awakening screen always has a race even if
+    // the API is unreachable (offline/dev). Backend persistence is best-effort.
     commit(selected.id as Race);
-    router.push(`/race-select/awakening?race=${selected.id}`);
+    try {
+      await raceApi.selectRace(selected.id as NDRaceKey);
+    } catch (err) {
+      // 400 = "race already selected" — fine, proceed. Any other error: surface
+      // a hint but don't block the user from continuing the cinematic.
+      if (!(err instanceof FetchError) || err.status !== 400) {
+        const msg =
+          err instanceof Error ? err.message : 'Sunucuya ulaşılamadı';
+        setCommitError(msg);
+      }
+    } finally {
+      setSubmitting(false);
+      router.push(`/race-select/awakening?race=${selected.id}`);
+    }
   };
 
   const activeId = hoveredId ?? selectedId;
@@ -441,12 +463,19 @@ export default function RaceSelectPage() {
               size="lg"
               full
               onClick={handleStart}
+              disabled={submitting}
               icon={<Sigil race={ND_RACES[selected.id as NDRaceKey]} size={18} />}
             >
-              {selected.name} İLE UYAN →
+              {submitting ? 'BAĞLANIYOR...' : `${selected.name} İLE UYAN →`}
             </NDButton>
             <div className="text-center mt-2">
-              <Eyebrow>SEÇİMİ ONAYLAMAK İÇİN TIKLA</Eyebrow>
+              {commitError ? (
+                <Eyebrow style={{ color: 'oklch(0.65 0.22 25)' }}>
+                  ÇEVRİMDIŞI · YEREL DEVAM
+                </Eyebrow>
+              ) : (
+                <Eyebrow>SEÇİMİ ONAYLAMAK İÇİN TIKLA</Eyebrow>
+              )}
             </div>
           </div>
         </aside>

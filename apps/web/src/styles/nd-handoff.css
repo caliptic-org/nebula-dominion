@@ -1,0 +1,149 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Nebula Dominion — Handoff Tokens (Phase 0 Foundation)
+ *
+ * Mirrors `handoff/nebula-dominion/project/nd-tokens.jsx` ND tokens.
+ * Additive layer: lives alongside existing globals.css. New screens use
+ * `--nd-*` variables; legacy screens continue using `--color-*`.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface */
+  --nd-bg:           #06080F;
+  --nd-bg-deep:      #03050B;
+  --nd-surface:      rgba(18, 24, 42, 0.78);
+  --nd-surface-solid:#0E1426;
+  --nd-surface-hi:   rgba(28, 38, 64, 0.85);
+
+  /* Border */
+  --nd-border:       rgba(120, 160, 220, 0.18);
+  --nd-border-hi:    rgba(120, 200, 255, 0.36);
+
+  /* Text */
+  --nd-text:         oklch(0.96 0.01 240);
+  --nd-text-dim:     oklch(0.72 0.02 240);
+  --nd-text-mute:    oklch(0.52 0.02 240);
+
+  /* Status */
+  --nd-danger:       oklch(0.65 0.22 25);
+  --nd-ok:           oklch(0.72 0.16 145);
+  --nd-warn:         oklch(0.80 0.15 80);
+
+  /* Race defaults (İnsan / gold) */
+  --nd-race:         oklch(0.82 0.16 80);
+  --nd-race-dim:     oklch(0.62 0.13 80);
+  --nd-race-glow:    oklch(0.85 0.18 80);
+
+  /* Glass */
+  --nd-glass-blur:   8px;
+}
+
+[data-race="insan"] {
+  --nd-race:      oklch(0.82 0.16 80);
+  --nd-race-dim:  oklch(0.62 0.13 80);
+  --nd-race-glow: oklch(0.85 0.18 80);
+}
+[data-race="zerg"] {
+  --nd-race:      oklch(0.66 0.24 340);
+  --nd-race-dim:  oklch(0.48 0.18 340);
+  --nd-race-glow: oklch(0.72 0.26 340);
+}
+[data-race="otomat"] {
+  --nd-race:      oklch(0.78 0.16 220);
+  --nd-race-dim:  oklch(0.58 0.13 220);
+  --nd-race-glow: oklch(0.82 0.18 220);
+}
+[data-race="canavar"] {
+  --nd-race:      oklch(0.72 0.18 50);
+  --nd-race-dim:  oklch(0.52 0.14 50);
+  --nd-race-glow: oklch(0.78 0.20 50);
+}
+[data-race="seytan"] {
+  --nd-race:      oklch(0.62 0.22 15);
+  --nd-race-dim:  oklch(0.45 0.18 15);
+  --nd-race-glow: oklch(0.70 0.24 15);
+}
+
+/* ── Utility classes ──────────────────────────────────────────────────── */
+
+.nd-panel {
+  position: relative;
+  background: var(--nd-surface);
+  border: 1px solid var(--nd-border);
+  border-radius: 6px;
+  backdrop-filter: blur(var(--nd-glass-blur));
+  -webkit-backdrop-filter: blur(var(--nd-glass-blur));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.nd-panel--hi {
+  background: var(--nd-surface-hi);
+  border-color: var(--nd-border-hi);
+}
+
+.nd-panel--race {
+  border-color: color-mix(in oklch, var(--nd-race), transparent 70%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--nd-race), transparent 75%),
+    0 0 24px -8px var(--nd-race-glow);
+}
+
+/* Notched panel (clip-path corner cut, configurable via --nd-notch) */
+.nd-notch {
+  --nd-notch: 12px;
+  clip-path: polygon(
+    var(--nd-notch) 0,
+    100% 0,
+    100% calc(100% - var(--nd-notch)),
+    calc(100% - var(--nd-notch)) 100%,
+    0 100%,
+    0 var(--nd-notch)
+  );
+}
+.nd-notch--sm { --nd-notch: 6px; }
+.nd-notch--lg { --nd-notch: 20px; }
+
+/* Button clip — small corner-cut variant for NDButton */
+.nd-btn-clip {
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+}
+
+/* Typography helpers */
+.nd-font-display { font-family: var(--font-nd-display), 'Chakra Petch', system-ui, sans-serif; }
+.nd-font-body    { font-family: var(--font-nd-body), 'Inter', system-ui, sans-serif; }
+.nd-font-mono    { font-family: var(--font-nd-mono), 'JetBrains Mono', ui-monospace, monospace; }
+
+.nd-eyebrow {
+  font-family: var(--font-nd-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--nd-text-dim);
+}
+
+/* Motion: animations off honor data-nd-anim="off" (used by tweaks panel) */
+[data-nd-anim="off"] *,
+[data-nd-anim="off"] *::before,
+[data-nd-anim="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Density */
+[data-nd-density="compact"] { --nd-density-pad: 8px; }
+:root, [data-nd-density="comfortable"] { --nd-density-pad: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

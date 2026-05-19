@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { Orbitron, Rajdhani } from 'next/font/google';
+import { Orbitron, Rajdhani, Chakra_Petch, Inter, JetBrains_Mono } from 'next/font/google';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
 import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import '@/styles/globals.css';
+import '@/styles/nd-handoff.css';
 
 const orbitron = Orbitron({
   subsets: ['latin'],
@@ -16,6 +17,27 @@ const rajdhani = Rajdhani({
   variable: '--font-body',
   display: 'swap',
   weight: ['300', '400', '500', '600', '700'],
+});
+
+const chakraPetch = Chakra_Petch({
+  subsets: ['latin'],
+  variable: '--font-nd-display',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-nd-body',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-nd-mono',
+  display: 'swap',
+  weight: ['400', '500'],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +56,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" data-race="insan" className={`${orbitron.variable} ${rajdhani.variable}`}>
+    <html lang="tr" data-race="insan" className={`${orbitron.variable} ${rajdhani.variable} ${chakraPetch.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body>
         <div className="hud-scan-beam" aria-hidden="true" />
         <RaceThemeProvider>

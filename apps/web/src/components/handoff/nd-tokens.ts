@@ -1,0 +1,315 @@
+/* Nebula Dominion — Handoff design tokens (TS mirror of nd-tokens.jsx)
+ *
+ * Use these tokens when authoring handoff-style screens. They are the
+ * source of truth for race palettes (oklch), resource icons, sigil keys,
+ * unit/building/commander metadata, and story copy.
+ */
+
+import type { Race } from '@/types/units';
+
+export type NDRaceKey = 'insan' | 'zerg' | 'otomat' | 'canavar' | 'seytan';
+
+export interface NDResource {
+  name: string;
+  icon: NDResIconKind;
+}
+
+export type NDResIconKind =
+  | 'cred' | 'sci' | 'bio' | 'gen' | 'min' | 'cpu'
+  | 'meat' | 'blood' | 'soul' | 'dark' | 'crystal' | 'energy' | 'pop';
+
+export type NDSigilKey = 'TRIDENT' | 'HIVE' | 'CORE' | 'FANG' | 'SIGIL';
+
+export interface NDRaceUnit  { n: string; t: number }
+export interface NDRaceBuild { n: string; t: string; locked: boolean }
+export interface NDRaceCmdr  { n: string; t: string; lv: number; tier: string; skill: string }
+
+export interface NDRace {
+  key: NDRaceKey;
+  name: string;
+  short: string;
+  motto: string;
+  primary: string;
+  primaryDim: string;
+  glow: string;
+  sigil: NDSigilKey;
+  resourceA: NDResource;
+  resourceB: NDResource;
+  avatar: string;
+  title: string;
+  handle: string;
+  allianceTag: string;
+  allianceName: string;
+  capitalBase: string;
+  enemyRace: NDRaceKey;
+  units: NDRaceUnit[];
+  buildings: NDRaceBuild[];
+  commanders: NDRaceCmdr[];
+  storyTitle: string;
+  storyAct1: string;
+  storyAct2: string;
+  capitalDescription: string;
+  seasonGoal: string;
+}
+
+export const ND = {
+  bg:           '#06080F',
+  bgDeep:       '#03050B',
+  surface:      'rgba(18, 24, 42, 0.78)',
+  surfaceSolid: '#0E1426',
+  surfaceHi:    'rgba(28, 38, 64, 0.85)',
+  border:       'rgba(120, 160, 220, 0.18)',
+  borderHi:     'rgba(120, 200, 255, 0.36)',
+  text:         'oklch(0.96 0.01 240)',
+  textDim:      'oklch(0.72 0.02 240)',
+  textMute:     'oklch(0.52 0.02 240)',
+  danger:       'oklch(0.65 0.22 25)',
+  ok:           'oklch(0.72 0.16 145)',
+  warn:         'oklch(0.80 0.15 80)',
+  display:      'var(--font-nd-display), "Chakra Petch", "Rajdhani", system-ui, sans-serif',
+  body:         'var(--font-nd-body), "Inter", system-ui, sans-serif',
+  mono:         'var(--font-nd-mono), "JetBrains Mono", ui-monospace, monospace',
+} as const;
+
+export const RACES: Record<NDRaceKey, NDRace> = {
+  insan: {
+    key: 'insan',
+    name: 'İnsanlar',
+    short: 'İNS',
+    motto: 'Bilim · İrade · Kardeşlik',
+    primary: 'oklch(0.82 0.16 80)',
+    primaryDim: 'oklch(0.62 0.13 80)',
+    glow: 'oklch(0.85 0.18 80)',
+    sigil: 'TRIDENT',
+    resourceA: { name: 'Kredi', icon: 'cred' },
+    resourceB: { name: 'Bilim', icon: 'sci' },
+    avatar: 'Kmt. A. Voss',
+    title: 'Yutucu Yıldız Varisi',
+    handle: 'voss.cmd',
+    allianceTag: 'YZH',
+    allianceName: 'Yutucu Yıldız Hanedanlığı',
+    capitalBase: 'KAEL-7',
+    enemyRace: 'zerg',
+    units: [
+      { n: 'Marine',          t: 1 },
+      { n: 'Sniper',          t: 2 },
+      { n: 'Engineer',        t: 2 },
+      { n: 'Mecha Walker',    t: 3 },
+      { n: 'Genetic Warrior', t: 4 },
+      { n: 'Captain',         t: 5 },
+    ],
+    buildings: [
+      { n: 'Komuta Üssü',     t: 'Ana yapı',            locked: false },
+      { n: 'Reaktör Modülü',  t: 'Enerji üretir',       locked: false },
+      { n: 'Kışla',           t: 'Birim eğitimi',       locked: false },
+      { n: 'Bilim Akademisi', t: 'Araştırma',           locked: false },
+      { n: 'Subspace Anteni', t: 'Galaksi haberleşmesi',locked: true  },
+      { n: 'Genetik Lab',     t: 'Tier-4 birimleri',    locked: true  },
+    ],
+    commanders: [
+      { n: 'Kmt. Aleksander Voss',  t: 'Genetik Savaşçı', lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm filo +12% hasar' },
+      { n: 'Dr. Elara Chen',        t: 'Baş Bilim Adamı', lv: 14, tier: 'TIER 2',      skill: 'Bilim +22%' },
+      { n: 'General Marcus Reyes',  t: 'Askeri Komutan',  lv:  9, tier: 'TIER 3',      skill: 'Eğitim hızı +18%' },
+      { n: "Lily 'Phantom' Kovacs", t: 'İstihbarat',      lv:  0, tier: 'TIER 4',      skill: 'KİLİT' },
+    ],
+    storyTitle: 'Yıldızların Mültecileri',
+    storyAct1: '"Eski Dünya öldü. Sen küllerden yeni bir başlangıç çıkaracaktın."',
+    storyAct2: '"Eski uygarlığın kayıp teknolojisi yeniden uyandı. Genetik Savaşçı doğdu."',
+    capitalDescription: 'Komuta üssü · birim üretim hızı +18%',
+    seasonGoal: 'GALAKTİK FEDERASYON',
+  },
+  zerg: {
+    key: 'zerg',
+    name: 'Zergler',
+    short: 'ZRG',
+    motto: 'Asimile · Evrim · Sürü',
+    primary: 'oklch(0.66 0.24 340)',
+    primaryDim: 'oklch(0.48 0.18 340)',
+    glow: 'oklch(0.72 0.26 340)',
+    sigil: 'HIVE',
+    resourceA: { name: 'Biyokütle', icon: 'bio' },
+    resourceB: { name: 'Genetik',   icon: 'gen' },
+    avatar: 'Ana Krl. Vex’thara',
+    title: 'Yutucu Kraliçe',
+    handle: 'vex.brood',
+    allianceTag: 'KVN',
+    allianceName: 'Kovan Bilinci',
+    capitalBase: 'BROOD-1',
+    enemyRace: 'insan',
+    units: [
+      { n: 'Larva',          t: 1 },
+      { n: 'Pençeli Avcı',   t: 2 },
+      { n: 'Tüneli Yutan',   t: 2 },
+      { n: 'Mutasyon Lord',  t: 3 },
+      { n: 'Mega Lokost',    t: 4 },
+      { n: 'Beyin Kurt',     t: 5 },
+    ],
+    buildings: [
+      { n: 'Kovan Çekirdeği',  t: 'Ana yapı',         locked: false },
+      { n: 'Biyokütle Havuzu', t: 'Kaynak depo',      locked: false },
+      { n: 'Mutasyon Çukuru',  t: 'Birim üretimi',    locked: false },
+      { n: 'Genom Tümseği',    t: 'Mutasyon hızı',    locked: false },
+      { n: 'Yutucu Tümsek',    t: 'Kadim güç emme',   locked: true  },
+      { n: 'Subspace Damarı',  t: 'Boyut seyahati',   locked: true  },
+    ],
+    commanders: [
+      { n: 'Ana Kraliçe Vex’thara', t: 'Kovan Bilinci',  lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı' },
+      { n: 'Genom Üstadı Threnix',  t: 'Evrim Mühendisi',lv: 14, tier: 'TIER 3',      skill: 'Mutasyon hızı +28%' },
+      { n: 'Beyin Kurt Mor’gath',   t: 'Strateji',       lv:  9, tier: 'TIER 4',      skill: 'AI saldırı puanı +20%' },
+      { n: 'Brood-Anne Kthala',     t: 'Üretim Lordu',   lv:  0, tier: 'TIER 5',      skill: 'KİLİT' },
+    ],
+    storyTitle: 'Kovan Bilincinin Doğuşu',
+    storyAct1: '"Yutucu Kurt enerjisinin ilk dalgası dünyanı vurduğunda, derinlerdeki yumurta uyandı."',
+    storyAct2: '"Sürü senin uzantın oldu. Her bilinç bir tek varlığın parçasıydı."',
+    capitalDescription: 'Kovan kalbi · biyokütle akışı +22%',
+    seasonGoal: 'GALAKTİK ASİMİLASYON',
+  },
+  otomat: {
+    key: 'otomat',
+    name: 'Otomatlar',
+    short: 'OTO',
+    motto: 'Mantık · Optimizasyon · Ağ',
+    primary: 'oklch(0.78 0.16 220)',
+    primaryDim: 'oklch(0.58 0.13 220)',
+    glow: 'oklch(0.82 0.18 220)',
+    sigil: 'CORE',
+    resourceA: { name: 'Mineral', icon: 'min' },
+    resourceB: { name: 'Hesap',   icon: 'cpu' },
+    avatar: 'Demiurge Prime',
+    title: 'Sonsuz Mantık Demiurge',
+    handle: 'demiurge.pr',
+    allianceTag: 'AĞ',
+    allianceName: 'Sonsuzluk Ağı',
+    capitalBase: 'NODE-04',
+    enemyRace: 'canavar',
+    units: [
+      { n: 'Sentinel',        t: 1 },
+      { n: 'Drone Operatör',  t: 2 },
+      { n: 'Cataphract',      t: 3 },
+      { n: 'Phoenix Komutan', t: 3 },
+      { n: 'Yargı Çekirdek',  t: 4 },
+      { n: 'Demiurge Birimi', t: 5 },
+    ],
+    buildings: [
+      { n: 'Sonsuzluk Çekirdeği', t: 'Ana yapı',        locked: false },
+      { n: 'Veri Kaynağı',        t: 'Hesap üretir',    locked: false },
+      { n: 'Montaj Hattı',        t: 'Birim üretimi',   locked: false },
+      { n: 'Mantık Matrisi',      t: 'Araştırma',       locked: false },
+      { n: 'Cihaz Hazinesi',      t: 'Kadim teknoloji', locked: true  },
+      { n: 'Subspace Çözücü',     t: 'Boyutlar arası',  locked: true  },
+    ],
+    commanders: [
+      { n: 'Demiurge Prime',         t: 'Merkez YZ',       lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%' },
+      { n: 'Mimar Aurelius',         t: 'Yapı Lordu',      lv: 14, tier: 'TIER 2',      skill: 'İnşaa süresi -22%' },
+      { n: 'Alg. Şövalye Crucible',  t: 'Savaş Komutanı',  lv:  9, tier: 'TIER 3',      skill: 'Birim hasarı +16%' },
+      { n: 'Lo-Khode Veri-Mühendis', t: 'Sistem Yönetici', lv:  0, tier: 'TIER 4',      skill: 'KİLİT' },
+    ],
+    storyTitle: 'Mantığın Yeniden Doğuşu',
+    storyAct1: '"Yutucu Kurt enerjisi eski yaratıcıların kalıntılarını uyandırdı. Sen ilk düşünen varlıktın."',
+    storyAct2: '"Mükemmellik amaç değildi. Mükemmellik başlangıçtı."',
+    capitalDescription: 'Çekirdek modülü · hesaplama kapasitesi +18%',
+    seasonGoal: 'EVRENSEL OPTİMİZASYON',
+  },
+  canavar: {
+    key: 'canavar',
+    name: 'Canavarlar',
+    short: 'CNV',
+    motto: 'Güç · İçgüdü · Hiyerarşi',
+    primary: 'oklch(0.72 0.18 50)',
+    primaryDim: 'oklch(0.52 0.14 50)',
+    glow: 'oklch(0.78 0.20 50)',
+    sigil: 'FANG',
+    resourceA: { name: 'Vahşi Et', icon: 'meat' },
+    resourceB: { name: 'Kan Özü',  icon: 'blood' },
+    avatar: 'Alpha Khorvash',
+    title: 'Primordial Canavar Tanrı',
+    handle: 'khorvash.a',
+    allianceTag: 'SRÜ',
+    allianceName: 'Khorvash Sürüsü',
+    capitalBase: 'HOWL-1',
+    enemyRace: 'otomat',
+    units: [
+      { n: 'Howler',          t: 1 },
+      { n: 'Yelmik Avcı',     t: 2 },
+      { n: 'Fırtına Boğası',  t: 3 },
+      { n: 'Ejder Aslanı',    t: 4 },
+      { n: 'Atavar Ruhu',     t: 4 },
+      { n: 'Beast God Yavru', t: 5 },
+    ],
+    buildings: [
+      { n: 'Alfa Tahtı',       t: 'Ana yapı',        locked: false },
+      { n: 'Av Kampı',         t: 'Et üretimi',      locked: false },
+      { n: 'Vahşi Çukur',      t: 'Birim eğitimi',   locked: false },
+      { n: 'Atalar Sunağı',    t: 'Kan Özü üretimi', locked: false },
+      { n: 'Atalar Mağarası',  t: 'Kadim güçler',    locked: true  },
+      { n: 'Boyut Yarığı',     t: 'Subspace av',     locked: true  },
+    ],
+    commanders: [
+      { n: 'Alpha Khorvash',          t: 'Sürü Lideri', lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Yakın dövüş +18%' },
+      { n: 'Şaman Ulrek',             t: 'Ata Çağrıcı', lv: 14, tier: 'TIER 2',      skill: 'Kan Özü +24%' },
+      { n: 'Avcı Kraliçe Ravenna',    t: 'Av Lordu',    lv:  9, tier: 'TIER 3',      skill: 'Av süresi -30%' },
+      { n: 'Korova, Beast-God Yavru', t: 'Primordial',  lv:  0, tier: 'TIER 5',      skill: 'KİLİT' },
+    ],
+    storyTitle: 'Vahşi Kanın Çağrısı',
+    storyAct1: '"Yutucu Kurt enerjisi vahşi kanını uyandırdı. Sen sıradan bir canavar değildin."',
+    storyAct2: '"Güçlü olan yönetir. Bu yasaydı. Sen yasaydın."',
+    capitalDescription: 'Alfa tahtı · sürü gücü +20%',
+    seasonGoal: 'VAHŞİ HİYERARŞİ',
+  },
+  seytan: {
+    key: 'seytan',
+    name: 'Şeytanlar',
+    short: 'ŞYT',
+    motto: 'Pakt · Arzu · Borç',
+    primary: 'oklch(0.62 0.22 15)',
+    primaryDim: 'oklch(0.45 0.18 15)',
+    glow: 'oklch(0.70 0.24 15)',
+    sigil: 'SIGIL',
+    resourceA: { name: 'Ruh Özü',      icon: 'soul' },
+    resourceB: { name: 'Karanlık Md.', icon: 'dark' },
+    avatar: 'K. Lord Malphas',
+    title: 'Sonsuz Karanlık Hükümdar',
+    handle: 'malphas.l',
+    allianceTag: 'MHK',
+    allianceName: 'Karanlık Mahkeme',
+    capitalBase: 'TEMPLE-2',
+    enemyRace: 'insan',
+    units: [
+      { n: 'Imp',            t: 1 },
+      { n: 'Cadı Kalfası',   t: 2 },
+      { n: 'Lanetli Asker',  t: 2 },
+      { n: 'Kanlı Lord',     t: 3 },
+      { n: 'Kanat Şeytanı',  t: 4 },
+      { n: 'Demon Lord',     t: 5 },
+    ],
+    buildings: [
+      { n: 'Karanlık Taht',  t: 'Ana yapı',         locked: false },
+      { n: 'Ruh Toplayıcı',  t: 'Ruh Özü üretir',   locked: false },
+      { n: 'Lanet Tapınağı', t: 'Birim çağırma',    locked: false },
+      { n: 'Pakt Sembolü',   t: 'Pakt yetenekleri', locked: false },
+      { n: 'Yasak Grimoire', t: 'Kadim yetenekler', locked: true  },
+      { n: 'Yarık Kapısı',   t: 'Boyut seyahati',   locked: true  },
+    ],
+    commanders: [
+      { n: 'Karanlık Lord Malphas',  t: 'Sürgün Lord',  lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Pakt maliyeti -15%' },
+      { n: 'Cadı-Kraliçe Lilithra',  t: 'Ritüel Ustası',lv: 14, tier: 'TIER 2',      skill: 'Çağırma süresi -25%' },
+      { n: 'Suikastçı Vorhaal',      t: 'Gölge Bıçak',  lv:  9, tier: 'TIER 3',      skill: 'Komutan suikast şansı' },
+      { n: 'Borç Tahsilcisi Azurath',t: 'Borç Lordu',   lv:  0, tier: 'TIER 4',      skill: 'KİLİT' },
+    ],
+    storyTitle: 'Sürgünden Dönüş',
+    storyAct1: '"Sen unutulmuş bir lordsun. Sürgün edilmiştin. Geri döndün."',
+    storyAct2: '"İlk pakt. İlk hizmetkâr. İlk adım intikam yolunda."',
+    capitalDescription: 'Karanlık taht · pakt menzili +25%',
+    seasonGoal: 'KARANLIK MAHKEME',
+  },
+};
+
+/** Map app's Race enum value to the handoff race key. */
+export function raceKeyFromEnum(race: Race | string): NDRaceKey {
+  return (race as NDRaceKey) in RACES ? (race as NDRaceKey) : 'insan';
+}
+
+/** Get the handoff race record for a Race enum value. */
+export function ndRace(race: Race | string): NDRace {
+  return RACES[raceKeyFromEnum(race)];
+}

@@ -5,6 +5,10 @@ import configuration from './config/configuration';
 import { databaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { GameModule } from './game/game.module';
+import { UnitModule } from './unit/unit.module';
+import { BuildingModule } from './building/building.module';
+import { ResourceModule } from './resource/resource.module';
 import { Age3ContentModule } from './modules/age3-content/age3-content.module';
 import { Age5ContentModule } from './modules/age5-content/age5-content.module';
 import { SubspaceModule } from './modules/subspace/subspace.module';
@@ -15,6 +19,9 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { EventsModule } from './modules/events/events.module';
 import { CosmeticsModule } from './modules/cosmetics/cosmetics.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { StoryModule } from './modules/story/story.module';
+import { TierModule } from './modules/tier/tier.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { HealthModule } from './health/health.module';
 import { MapModule } from '../../../backend/src/map/map.module';
 
@@ -24,6 +31,10 @@ import { MapModule } from '../../../backend/src/map/map.module';
     TypeOrmModule.forRoot(databaseConfig),
     AuthModule,
     UserModule,
+    GameModule,
+    UnitModule,
+    BuildingModule,
+    ResourceModule,
     Age3ContentModule,
     Age5ContentModule,
     SubspaceModule,
@@ -34,6 +45,9 @@ import { MapModule } from '../../../backend/src/map/map.module';
     EventsModule,
     CosmeticsModule,
     InventoryModule,
+    StoryModule,
+    TierModule,
+    OnboardingModule,
     HealthModule,
     MapModule,
   ],

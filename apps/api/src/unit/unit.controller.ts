@@ -1,10 +1,25 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
+  Request,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UnitService, CreateUnitDto } from './unit.service';
 import { UnitType } from './entities/unit.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { MergeUnitsDto } from './dto/merge-units.dto';
+import { MutateUnitDto } from './dto/mutate-unit.dto';
 
 class CreateUnitBodyDto implements CreateUnitDto {
   @ApiProperty()
@@ -33,6 +48,28 @@ export class UnitController {
   @ApiOperation({ summary: 'Train a unit' })
   create(@Request() req: any, @Body() dto: CreateUnitBodyDto) {
     return this.unitService.create(req.user.id, dto);
+  }
+
+  @Post('produce')
+  @ApiOperation({ summary: 'Alias of POST /units — produce a unit (mvp.txt contract)' })
+  produce(@Request() req: any, @Body() dto: CreateUnitBodyDto) {
+    return this.unitService.create(req.user.id, dto);
+  }
+
+  @Post('merge')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Merge two same-type, same-level units into a higher-level unit' })
+  @ApiResponse({ status: 400, description: 'Units cannot be merged' })
+  merge(@Request() req: any, @Body() dto: MergeUnitsDto) {
+    return this.unitService.merge(req.user.id, dto);
+  }
+
+  @Post('mutate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mutate a unit (Zerg-only mechanic)' })
+  @ApiResponse({ status: 403, description: 'Mutation is a Zerg-only mechanic' })
+  mutate(@Request() req: any, @Body() dto: MutateUnitDto) {
+    return this.unitService.mutate(req.user.id, dto);
   }
 
   @Get()

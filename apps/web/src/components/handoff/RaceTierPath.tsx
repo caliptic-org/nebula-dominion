@@ -303,17 +303,19 @@ function PathNode({ race, node, done, current, locked }: PathNodeProps) {
   } else if (race.key === 'canavar') {
     shape = (
       <>
-        <path
-          d={`M ${node.x} ${node.y - r} Q ${node.x - r} ${node.y}, ${node.x} ${node.y + r} Q ${node.x + r} ${node.y}, ${node.x} ${node.y - r} Z`}
-          fill={fillBg}
+        <g
+          fill="none"
           stroke={stroke}
           strokeWidth={strokeWidth}
+          strokeLinecap="round"
           style={current ? { filter: `drop-shadow(0 0 10px ${g})` } : {}}
-        />
+        >
+          <line x1={node.x} y1={node.y - r} x2={node.x - 1.5} y2={node.y + r * 0.4} />
+          <line x1={node.x - r * 0.85} y1={node.y + r * 0.5} x2={node.x + 1.5} y2={node.y - r * 0.2} />
+          <line x1={node.x + r * 0.85} y1={node.y + r * 0.5} x2={node.x - 1.5} y2={node.y - r * 0.2} />
+        </g>
         {done && !current && (
-          <g stroke={c} strokeWidth="1" fill="none">
-            <path d={`M ${node.x - 3} ${node.y - 3} L ${node.x - 1} ${node.y + 3} M ${node.x} ${node.y - 4} L ${node.x + 1} ${node.y + 3} M ${node.x + 3} ${node.y - 3} L ${node.x + 2} ${node.y + 3}`} />
-          </g>
+          <circle cx={node.x} cy={node.y} r="1.6" fill={c} />
         )}
         {current && (
           <circle
@@ -435,7 +437,7 @@ export function TierBanner({ race, level, age, ageLabel, xpPercent = 0, trailing
       </div>
       <div
         style={{
-          height: 3,
+          height: 4,
           background: 'rgba(255,255,255,0.06)',
           border: `1px solid ${ND.border}`,
           position: 'relative',
@@ -448,7 +450,7 @@ export function TierBanner({ race, level, age, ageLabel, xpPercent = 0, trailing
             inset: 0,
             width: `${Math.max(0, Math.min(100, xpPercent))}%`,
             background: `linear-gradient(90deg, ${race.primary}88, ${race.primary})`,
-            boxShadow: `0 0 6px ${race.glow}`,
+            filter: `drop-shadow(0 0 10px ${race.glow}cc)`,
           }}
         />
       </div>

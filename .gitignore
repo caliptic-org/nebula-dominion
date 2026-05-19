@@ -2,6 +2,7 @@ node_modules/
 dist/
 .next/
 build/
+!apps/web/src/app/**/build/
 .env
 deploy/.env
 deploy/gitea-db-data/

@@ -49,7 +49,7 @@ export function BattleTopBar({
 
       <div className="topbar-wave" aria-label="Dalga durumu">
         <span className="wave-label">DALGA</span>
-        <span className="wave-number">
+        <span className={clsx('wave-number', imminent && 'imminent')}>
           {wave.current} / {wave.total}
         </span>
         <div className="wave-timer">

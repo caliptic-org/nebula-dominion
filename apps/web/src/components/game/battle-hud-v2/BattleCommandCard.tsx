@@ -28,7 +28,7 @@ export function BattleCommandCard({
 }: Props) {
   return (
     <footer className="battle-command race-panel" aria-label="Komut kartı">
-      <div className="battle-portrait">
+      <div className="battle-portrait" key={unit?.id ?? 'empty'}>
         {unit && unit.portrait ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={unit.portrait} alt={unit.name} />

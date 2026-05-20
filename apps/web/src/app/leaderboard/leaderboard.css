@@ -871,6 +871,6 @@
   .lb-speed-line,
   .lb-podium-ray,
   .lb-podium-avatar-glow,
-  .lb-gold-pulse,
-  .lb-sticky-pulse { animation: none; }
+  .lb-podium-center,
+  .lb-sticky-avatar { animation: none; }
 }

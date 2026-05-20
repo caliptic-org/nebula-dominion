@@ -9,6 +9,7 @@ import { GuildCapacityBar } from './GuildCapacityBar';
 import { GuildMembersList } from './GuildMembersList';
 import { WeeklyRankWidget } from './WeeklyRankWidget';
 import { RaidBossHero } from './RaidBossHero';
+import { GuildMapWidget } from './GuildMapWidget';
 
 interface GuildDashboardProps {
   guildId: string;
@@ -117,6 +118,12 @@ export function GuildDashboard({ guildId }: GuildDashboardProps) {
           </p>
         </section>
       )}
+
+      <GuildMapWidget
+        guildTag={profile.tag}
+        controlledSectorCount={profile.controlledSectors ?? 4}
+        totalSectorCount={profile.totalSectors ?? 12}
+      />
 
       <GuildMembersList members={profile.members} />
     </div>

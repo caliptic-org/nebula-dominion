@@ -65,6 +65,8 @@ export interface GuildProfile extends GuildSummary {
   weeklyRaidAttendance: number;
   researchProjectName: string | null;
   researchProgressPct: number;
+  controlledSectors?: number;
+  totalSectors?: number;
 }
 
 export interface TutorialState {

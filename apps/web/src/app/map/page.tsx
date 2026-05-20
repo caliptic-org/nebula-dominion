@@ -105,6 +105,7 @@ const LEGEND = [
   { label:'Zerg',    color:'#44ff44' },
   { label:'Otomat',  color:'#00cfff' },
   { label:'Canavar', color:'#ff6600' },
+  { label:'İnsan',   color:'#4a9eff' },
   { label:'Şeytan',  color:'#cc00ff' },
 ] as const;
 
@@ -114,7 +115,7 @@ const PLAYER_RESOURCES_URL = '/api/player/resources';
 const MAP_ACTION_URL       = '/api/map/action';
 
 // ── Minimap subcomponent ───────────────────────────────────────────────────
-function MinimapPanel({ worldMapRef }: { worldMapRef: React.RefObject<WorldMapHandle | null> }) {
+function MinimapPanel({ worldMapRef, sectorLabel }: { worldMapRef: React.RefObject<WorldMapHandle | null>; sectorLabel: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Poll minimap at ~10fps
@@ -137,7 +138,7 @@ function MinimapPanel({ worldMapRef }: { worldMapRef: React.RefObject<WorldMapHa
           style={{ background:'rgba(8,10,16,0.9)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}
         >
           <span className="font-display text-[9px] uppercase tracking-[0.18em] text-text-muted">Mini Harita</span>
-          <span className="font-display text-[8px] text-text-muted opacity-50">Sektör-7</span>
+          <span className="font-display text-[8px] text-text-muted opacity-50">{sectorLabel}</span>
         </div>
         <canvas
           ref={canvasRef}
@@ -437,6 +438,14 @@ export default function WorldMapPage() {
     return () => clearTimeout(id);
   }, [feedback]);
 
+  const sectorLabel = (() => {
+    const player = mapState?.bases?.find(b => b.isPlayer);
+    if (!player) return 'Sektör-?';
+    const sectorCol = Math.floor(player.col / 5);
+    const sectorRow = Math.floor(player.row / 5);
+    return `Sektör-${sectorRow * 6 + sectorCol + 1}`;
+  })();
+
   const actions: Action[] = (() => {
     if (!selected) return [];
     // Enemy bases are handled by TargetDetailSheet — don't show duplicate ActionPanel
@@ -551,7 +560,7 @@ export default function WorldMapPage() {
 
       {/* ── Mini-map (bottom-right) ───────────────────────────────────────── */}
       <div className="absolute bottom-20 right-3 z-30">
-        <MinimapPanel worldMapRef={worldMapRef} />
+        <MinimapPanel worldMapRef={worldMapRef} sectorLabel={sectorLabel} />
       </div>
 
       {/* ── Feedback toast ────────────────────────────────────────────────── */}

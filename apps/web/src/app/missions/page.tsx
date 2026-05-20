@@ -7,7 +7,7 @@ import { MangaPanel } from '@/components/ui/MangaPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MissionTab = 'ana' | 'gunluk' | 'haftalik' | 'basarim';
+type MissionTab = 'hikaye' | 'gunluk' | 'haftalik' | 'basarim';
 type MissionState = 'active' | 'completed' | 'locked';
 
 interface Reward {
@@ -29,6 +29,8 @@ interface Mission {
   category: MissionTab;
   difficulty?: 'kolay' | 'orta' | 'zor' | 'efsane';
   xpReward?: number;
+  chapter?: number;
+  estimatedMinutes?: number;
 }
 
 interface Achievement {
@@ -45,6 +47,7 @@ interface Achievement {
 // ── Static Data ───────────────────────────────────────────────────────────────
 
 const MISSIONS: Mission[] = [
+  // Story missions
   {
     id: 'story-1',
     title: "Nebula'nın Uyanışı",
@@ -56,9 +59,11 @@ const MISSIONS: Mission[] = [
       { icon: '💎', label: 'Mineral', amount: 5000, color: '#4a9eff' },
       { icon: '✨', label: 'XP', amount: 1200, color: '#ffc832' },
     ],
-    category: 'ana',
+    category: 'hikaye',
     difficulty: 'kolay',
     xpReward: 1200,
+    chapter: 1,
+    estimatedMinutes: 10,
   },
   {
     id: 'story-2',
@@ -72,9 +77,11 @@ const MISSIONS: Mission[] = [
       { icon: '💎', label: 'Mineral', amount: 8000, color: '#4a9eff' },
       { icon: '✨', label: 'XP', amount: 2500, color: '#ffc832' },
     ],
-    category: 'ana',
+    category: 'hikaye',
     difficulty: 'orta',
     xpReward: 2500,
+    chapter: 1,
+    estimatedMinutes: 25,
   },
   {
     id: 'story-3',
@@ -87,9 +94,10 @@ const MISSIONS: Mission[] = [
       { icon: '⚡', label: 'Enerji', amount: 10000, color: '#ffc832' },
       { icon: '✨', label: 'XP', amount: 5000, color: '#ffc832' },
     ],
-    category: 'ana',
+    category: 'hikaye',
     difficulty: 'zor',
     xpReward: 5000,
+    chapter: 2,
   },
   {
     id: 'story-4',
@@ -102,10 +110,12 @@ const MISSIONS: Mission[] = [
       { icon: '👑', label: 'Efsane Rozet', amount: 1, color: '#cc00ff' },
       { icon: '✨', label: 'XP', amount: 50000, color: '#ffc832' },
     ],
-    category: 'ana',
+    category: 'hikaye',
     difficulty: 'efsane',
     xpReward: 50000,
+    chapter: 3,
   },
+  // Daily missions
   {
     id: 'daily-1',
     title: 'Kaynak Toplayıcı',
@@ -118,6 +128,7 @@ const MISSIONS: Mission[] = [
     category: 'gunluk',
     difficulty: 'kolay',
     xpReward: 400,
+    estimatedMinutes: 5,
   },
   {
     id: 'daily-2',
@@ -134,6 +145,7 @@ const MISSIONS: Mission[] = [
     category: 'gunluk',
     difficulty: 'orta',
     xpReward: 800,
+    estimatedMinutes: 15,
   },
   {
     id: 'daily-3',
@@ -147,7 +159,9 @@ const MISSIONS: Mission[] = [
     category: 'gunluk',
     difficulty: 'kolay',
     xpReward: 350,
+    estimatedMinutes: 8,
   },
+  // Weekly missions
   {
     id: 'weekly-1',
     title: 'Savaş Makinesi',
@@ -164,6 +178,7 @@ const MISSIONS: Mission[] = [
     category: 'haftalik',
     difficulty: 'zor',
     xpReward: 10000,
+    estimatedMinutes: 120,
   },
   {
     id: 'weekly-2',
@@ -180,61 +195,17 @@ const MISSIONS: Mission[] = [
     category: 'haftalik',
     difficulty: 'orta',
     xpReward: 6000,
+    estimatedMinutes: 60,
   },
 ];
 
 const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'ach-1',
-    title: 'İlk Kan',
-    description: 'İlk savaş zaferini kazan',
-    icon: '⚔️',
-    unlocked: true,
-  },
-  {
-    id: 'ach-2',
-    title: 'Kaynak Efendisi',
-    description: '100.000 mineral topla',
-    icon: '💎',
-    unlocked: true,
-    unlocksTitle: 'Madenci',
-  },
-  {
-    id: 'ach-3',
-    title: 'Savaş Tanrısı',
-    description: '1000 düşman birimi yok et',
-    icon: '🔥',
-    unlocked: false,
-    legendary: true,
-    progress: 34,
-    unlocksTitle: 'Savaş Tanrısı',
-  },
-  {
-    id: 'ach-4',
-    title: 'Kaşif',
-    description: "Haritanın %50'sini keşfet",
-    icon: '🗺️',
-    unlocked: false,
-    progress: 62,
-  },
-  {
-    id: 'ach-5',
-    title: 'Diplomat',
-    description: '3 farklı ırkla ittifak kur',
-    icon: '🤝',
-    unlocked: false,
-    progress: 33,
-  },
-  {
-    id: 'ach-6',
-    title: 'Teknoloji Dehası',
-    description: "Tüm tech tree'yi tamamla",
-    icon: '🔬',
-    unlocked: false,
-    legendary: true,
-    progress: 0,
-    unlocksTitle: 'Nebula Bilgesi',
-  },
+  { id: 'ach-1', title: 'İlk Kan', description: 'İlk savaş zaferini kazan', icon: '⚔️', unlocked: true },
+  { id: 'ach-2', title: 'Kaynak Efendisi', description: '100.000 mineral topla', icon: '💎', unlocked: true, unlocksTitle: 'Madenci' },
+  { id: 'ach-3', title: 'Savaş Tanrısı', description: '1000 düşman birimi yok et', icon: '🔥', unlocked: false, legendary: true, progress: 34, unlocksTitle: 'Savaş Tanrısı' },
+  { id: 'ach-4', title: 'Kaşif', description: "Haritanın %50'sini keşfet", icon: '🗺️', unlocked: false, progress: 62 },
+  { id: 'ach-5', title: 'Diplomat', description: '3 farklı ırkla ittifak kur', icon: '🤝', unlocked: false, progress: 33 },
+  { id: 'ach-6', title: 'Teknoloji Dehası', description: "Tüm tech tree'yi tamamla", icon: '🔬', unlocked: false, legendary: true, progress: 0, unlocksTitle: 'Nebula Bilgesi' },
 ];
 
 const DIFFICULTY_CONFIG = {
@@ -244,14 +215,17 @@ const DIFFICULTY_CONFIG = {
   efsane: { label: 'EFSANE', color: '#cc00ff' },
 } as const;
 
-const TABS: { id: MissionTab; label: string; icon: string; shortLabel: string }[] = [
-  { id: 'ana',      label: 'Ana Görev', shortLabel: 'Hikaye', icon: '📖' },
-  { id: 'gunluk',   label: 'Günlük',   shortLabel: 'Günlük', icon: '☀️' },
-  { id: 'haftalik', label: 'Haftalık', shortLabel: 'Haftalık', icon: '📅' },
-  { id: 'basarim',  label: 'Başarım',  shortLabel: 'Başarım', icon: '🏆' },
+const TABS: { id: MissionTab; label: string; shortLabel: string; icon: string }[] = [
+  { id: 'hikaye',   label: 'Hikaye Görevi', shortLabel: 'Hikaye',   icon: '📖' },
+  { id: 'gunluk',   label: 'Günlük',        shortLabel: 'Günlük',   icon: '☀️' },
+  { id: 'haftalik', label: 'Haftalık',      shortLabel: 'Haftalık', icon: '📅' },
+  { id: 'basarim',  label: 'Başarım',       shortLabel: 'Başarım',  icon: '🏆' },
 ];
 
-// ── Daily Reset Countdown ──────────────────────────────────────────────────────
+const DAILY_STREAK = 7;
+const DAILY_BONUS_THRESHOLD = 7;
+
+// ── Daily Reset Countdown ─────────────────────────────────────────────────────
 
 function useDailyReset() {
   const [timeLeft, setTimeLeft] = useState({ h: 14, m: 23, s: 0 });
@@ -259,7 +233,7 @@ function useDailyReset() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
-        let { h, m, s } = prev;
+        const { h, m, s } = prev;
         if (s > 0) return { h, m, s: s - 1 };
         if (m > 0) return { h, m: m - 1, s: 59 };
         if (h > 0) return { h: h - 1, m: 59, s: 59 };
@@ -272,7 +246,7 @@ function useDailyReset() {
   return `${String(timeLeft.h).padStart(2, '0')}:${String(timeLeft.m).padStart(2, '0')}:${String(timeLeft.s).padStart(2, '0')}`;
 }
 
-// ── Segmented HUD Progress Bar ─────────────────────────────────────────────────
+// ── Segmented Progress Bar ────────────────────────────────────────────────────
 
 function SegmentedProgressBar({
   progress,
@@ -297,8 +271,8 @@ function SegmentedProgressBar({
       {Array.from({ length: segments }).map((_, i) => {
         const isFilled = i < filled;
         const isPartial = i === filled && partial > 0;
-        const fillWidth = isPartial ? `${partial * 100}%` : isFilled ? '100%' : '0%';
         const isLeadingEdge = isFilled && i === filled - 1;
+        const fillWidth = isPartial ? `${partial * 100}%` : isFilled ? '100%' : '0%';
 
         return (
           <div
@@ -322,7 +296,7 @@ function SegmentedProgressBar({
                 boxShadow: (isFilled || isPartial) ? `0 0 6px ${color}80` : 'none',
               }}
             />
-            {/* Leading scan line on the active fill edge */}
+            {/* Leading scan line on fill edge */}
             {(isLeadingEdge || isPartial) && (
               <div
                 className="absolute top-0 bottom-0 w-px"
@@ -352,17 +326,278 @@ function RewardChip({ reward }: { reward: Reward }) {
       }}
     >
       <span className="text-xs" aria-hidden>{reward.icon}</span>
-      <span
-        className="font-display text-[10px] font-bold"
-        style={{ color: reward.color }}
-      >
+      <span className="font-display text-[10px] font-bold" style={{ color: reward.color }}>
         +{reward.amount.toLocaleString('tr-TR')}
       </span>
     </div>
   );
 }
 
-// ── Story Path Node ────────────────────────────────────────────────────────────
+// ── Story Chapter Header ──────────────────────────────────────────────────────
+
+function StoryChapterHeader({ raceColor, raceGlow }: { raceColor: string; raceGlow: string }) {
+  const chapters = [
+    { num: 1, title: 'Uyanış',    completed: true },
+    { num: 2, title: 'İttifak',   completed: false },
+    { num: 3, title: 'Hâkimiyet', completed: false },
+  ];
+
+  return (
+    <div
+      className="doppelrand mb-5"
+      style={{
+        borderColor: `${raceColor}30`,
+        boxShadow: `0 0 20px ${raceGlow}12`,
+        animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both',
+      }}
+    >
+      <div className="doppelrand-inner px-4 py-3">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <div
+              className="font-display text-[9px] font-black tracking-[0.24em] uppercase mb-0.5"
+              style={{ color: raceColor }}
+            >
+              Ana Hikaye
+            </div>
+            <div className="font-display text-sm font-black text-text-primary">
+              Bölüm 1: Uyanış
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-display text-[9px] text-text-muted uppercase tracking-widest">İlerleme</div>
+            <div
+              className="font-display text-lg font-black"
+              style={{ color: raceColor, textShadow: `0 0 16px ${raceGlow}60` }}
+            >
+              50%
+            </div>
+          </div>
+        </div>
+
+        {/* Chapter path */}
+        <div className="flex items-center">
+          {chapters.map((ch, i) => (
+            <div key={ch.num} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{
+                    background: ch.completed
+                      ? `linear-gradient(135deg, ${raceColor}30, ${raceColor}15)`
+                      : 'rgba(255,255,255,0.04)',
+                    border: `2px solid ${ch.completed ? raceColor : 'rgba(255,255,255,0.10)'}`,
+                    boxShadow: ch.completed ? `0 0 14px ${raceGlow}55` : 'none',
+                  }}
+                >
+                  <span
+                    className="font-display text-[10px] font-black"
+                    style={{ color: ch.completed ? raceColor : 'rgba(255,255,255,0.18)' }}
+                  >
+                    {ch.completed ? '✓' : ch.num}
+                  </span>
+                </div>
+                <span className="font-display text-[8px] text-text-muted whitespace-nowrap">{ch.title}</span>
+              </div>
+              {i < chapters.length - 1 && (
+                <div
+                  className="flex-1 h-[2px] mx-2 mb-4"
+                  style={{
+                    background: ch.completed
+                      ? `linear-gradient(90deg, ${raceColor}, ${raceColor}25)`
+                      : 'rgba(255,255,255,0.06)',
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Daily Streak Banner ───────────────────────────────────────────────────────
+
+function DailyStreakBanner({
+  streak,
+  resetCountdown,
+  raceColor,
+  raceGlow,
+}: {
+  streak: number;
+  resetCountdown: string;
+  raceColor: string;
+  raceGlow: string;
+}) {
+  const isMaxStreak = streak >= DAILY_BONUS_THRESHOLD;
+  const days = [1, 2, 3, 4, 5, 6, 7];
+
+  return (
+    <div
+      className="doppelrand mb-5"
+      style={{
+        borderColor: isMaxStreak ? `${raceColor}40` : 'rgba(255,165,0,0.28)',
+        boxShadow: isMaxStreak ? `0 0 28px ${raceGlow}22` : '0 0 14px rgba(255,165,0,0.08)',
+        animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both',
+      }}
+    >
+      <div className="doppelrand-inner px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-xl"
+              style={{
+                filter: isMaxStreak
+                  ? `drop-shadow(0 0 10px ${raceGlow})`
+                  : 'drop-shadow(0 0 8px rgba(255,140,0,0.7))',
+              }}
+              aria-hidden
+            >
+              🔥
+            </span>
+            <div>
+              <div
+                className="font-display text-sm font-black"
+                style={{ color: isMaxStreak ? raceColor : '#ffc832' }}
+              >
+                {streak} Günlük Seri
+              </div>
+              <div className="font-display text-[9px] tracking-widest text-text-muted uppercase">
+                {isMaxStreak
+                  ? '⭐ Bonus aktif — +50% XP'
+                  : `${DAILY_BONUS_THRESHOLD - streak} gün kaldı bonus için`}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-display text-[9px] text-text-muted uppercase tracking-widest">Sıfırlanma</div>
+            <div className="font-display text-[11px] font-black" style={{ color: '#ffc832' }}>
+              {resetCountdown}
+            </div>
+          </div>
+        </div>
+
+        {/* 7-day pip row */}
+        <div className="flex gap-1.5">
+          {days.map((d) => {
+            const done    = d <= streak;
+            const isCur   = d === streak;
+            const isBonus = d === DAILY_BONUS_THRESHOLD;
+            return (
+              <div key={d} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className="w-full h-7 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: done
+                      ? isBonus
+                        ? `linear-gradient(135deg, ${raceColor}30, ${raceColor}14)`
+                        : 'rgba(255,165,0,0.14)'
+                      : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${
+                      done
+                        ? isBonus ? `${raceColor}55` : 'rgba(255,165,0,0.38)'
+                        : 'rgba(255,255,255,0.07)'
+                    }`,
+                    boxShadow: isCur
+                      ? `0 0 14px ${isBonus ? raceGlow : 'rgba(255,165,0,0.5)'}`
+                      : 'none',
+                    transform: isCur ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
+                  }}
+                >
+                  {isBonus ? (
+                    <span
+                      className="text-xs"
+                      style={{
+                        filter: done ? `drop-shadow(0 0 6px ${raceGlow})` : 'grayscale(1) brightness(0.4)',
+                      }}
+                    >
+                      ⭐
+                    </span>
+                  ) : (
+                    <span
+                      className="font-display text-[10px] font-black"
+                      style={{ color: done ? '#ffc832' : 'rgba(255,255,255,0.18)' }}
+                    >
+                      {done ? '✓' : d}
+                    </span>
+                  )}
+                </div>
+                <span className="font-display text-[8px] text-text-muted">{d}G</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Weekly Summary Banner ─────────────────────────────────────────────────────
+
+function WeeklySummaryBanner({
+  missions,
+  raceColor,
+  raceGlow,
+}: {
+  missions: Mission[];
+  raceColor: string;
+  raceGlow: string;
+}) {
+  const completed = missions.filter((m) => m.state === 'completed').length;
+  const total     = missions.length;
+  const totalXP   = missions
+    .filter((m) => m.state !== 'locked')
+    .reduce((acc, m) => acc + (m.xpReward ?? 0), 0);
+
+  return (
+    <div
+      className="doppelrand mb-5"
+      style={{
+        borderColor: `${raceColor}25`,
+        boxShadow: `0 0 16px ${raceGlow}10`,
+        animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both',
+      }}
+    >
+      <div className="doppelrand-inner px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="font-display text-[9px] text-text-muted uppercase tracking-widest mb-0.5">
+              Hafta 21 · Sıfırlanma
+            </div>
+            <div className="font-display text-sm font-black text-text-primary">
+              {completed}/{total} Görev Tamamlandı
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="font-display text-[9px] text-text-muted uppercase tracking-widest">Toplam XP</div>
+              <div
+                className="font-display text-base font-black"
+                style={{ color: '#ffc832', textShadow: '0 0 14px rgba(255,200,50,0.45)' }}
+              >
+                +{totalXP.toLocaleString('tr-TR')}
+              </div>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-base" style={{ filter: 'drop-shadow(0 0 6px rgba(255,100,0,0.7))' }}>⏱</span>
+              <span className="font-display text-[10px] font-black" style={{ color: '#ff6600' }}>4g 18s</span>
+            </div>
+          </div>
+        </div>
+
+        <SegmentedProgressBar
+          progress={total > 0 ? (completed / total) * 100 : 0}
+          color={raceColor}
+          segments={total || 2}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Story Path Node (vertical connector for story missions) ───────────────────
 
 function StoryPathNode({
   state,
@@ -380,7 +615,6 @@ function StoryPathNode({
 
   return (
     <div className="flex flex-col items-center shrink-0" aria-hidden>
-      {/* Diamond node */}
       <div
         className="w-3 h-3 rounded-sm"
         style={{
@@ -391,7 +625,6 @@ function StoryPathNode({
           transition: 'all 0.5s cubic-bezier(0.32,0.72,0,1)',
         }}
       />
-      {/* Connector line to next node */}
       {!isLast && (
         <div
           className="w-px"
@@ -424,13 +657,21 @@ function MissionCard({
   showPath?: boolean;
   isLast?: boolean;
 }) {
+  const [claiming, setClaiming] = useState(false);
   const isCompleted = mission.state === 'completed';
   const isLocked    = mission.state === 'locked';
   const difficulty  = mission.difficulty ? DIFFICULTY_CONFIG[mission.difficulty] : null;
 
+  const handleClaim = useCallback(() => {
+    setClaiming(true);
+    setTimeout(() => {
+      onClaim(mission);
+      setClaiming(false);
+    }, 260);
+  }, [mission, onClaim]);
+
   return (
     <div className={`flex gap-2 ${showPath ? 'items-start' : ''}`}>
-      {/* Story path node */}
       {showPath && (
         <StoryPathNode
           state={mission.state}
@@ -440,7 +681,6 @@ function MissionCard({
         />
       )}
 
-      {/* Card */}
       <div
         className={`flex-1 doppelrand transition-all duration-500 ${isLocked ? 'opacity-45' : ''}`}
         style={{
@@ -454,6 +694,7 @@ function MissionCard({
             : isLocked
             ? 'none'
             : `0 0 16px ${raceGlow}18`,
+          transform: claiming ? 'scale(0.97)' : 'scale(1)',
         }}
       >
         <div className="doppelrand-inner p-4">
@@ -491,6 +732,18 @@ function MissionCard({
                   {isLocked && (
                     <span className="text-sm leading-none shrink-0" aria-label="Kilitli">🔒</span>
                   )}
+                  {mission.chapter !== undefined && !isLocked && (
+                    <span
+                      className="font-display text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded shrink-0"
+                      style={{
+                        color: `${raceColor}99`,
+                        background: `${raceColor}10`,
+                        border: `1px solid ${raceColor}18`,
+                      }}
+                    >
+                      B{mission.chapter}
+                    </span>
+                  )}
                   <h3
                     className="font-display text-sm font-bold leading-tight"
                     style={{
@@ -506,18 +759,26 @@ function MissionCard({
                     {mission.title}
                   </h3>
                 </div>
-                {difficulty && !isLocked && (
-                  <span
-                    className="font-display text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full shrink-0"
-                    style={{
-                      color: difficulty.color,
-                      background: `${difficulty.color}15`,
-                      border: `1px solid ${difficulty.color}30`,
-                    }}
-                  >
-                    {difficulty.label}
-                  </span>
-                )}
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {mission.estimatedMinutes && !isLocked && !isCompleted && (
+                    <span className="font-display text-[8px] text-text-muted">
+                      ~{mission.estimatedMinutes}dk
+                    </span>
+                  )}
+                  {difficulty && !isLocked && (
+                    <span
+                      className="font-display text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                      style={{
+                        color: difficulty.color,
+                        background: `${difficulty.color}15`,
+                        border: `1px solid ${difficulty.color}30`,
+                      }}
+                    >
+                      {difficulty.label}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Description */}
@@ -536,9 +797,7 @@ function MissionCard({
                       <span
                         className="font-display text-[9px] uppercase tracking-widest"
                         style={{
-                          color: mission.state === 'completed'
-                            ? 'var(--color-text-muted)'
-                            : '#ffc832',
+                          color: mission.state === 'completed' ? 'var(--color-text-muted)' : '#ffc832',
                         }}
                       >
                         ⏱ {mission.timeLeft}
@@ -563,9 +822,10 @@ function MissionCard({
 
                 {isCompleted && (
                   <button
-                    onClick={() => onClaim(mission)}
+                    onClick={handleClaim}
                     className="mission-claim-btn"
                     aria-label={`${mission.title} ödülünü al`}
+                    disabled={claiming}
                   >
                     ÖDÜL AL ✓
                   </button>
@@ -573,7 +833,11 @@ function MissionCard({
                 {mission.state === 'active' && (
                   <button
                     className="mission-continue-btn"
-                    style={{ borderColor: `${raceColor}50`, color: raceColor, background: `${raceColor}08` }}
+                    style={{
+                      borderColor: `${raceColor}50`,
+                      color: raceColor,
+                      background: `${raceColor}08`,
+                    }}
                   >
                     DEVAM ET →
                   </button>
@@ -603,22 +867,13 @@ function AchievementBadge({
       className={`doppelrand transition-all duration-500 ${ach.unlocked ? '' : 'opacity-55'}`}
       style={{
         borderColor: ach.unlocked
-          ? ach.legendary
-            ? `${raceColor}45`
-            : 'rgba(68,255,136,0.28)'
+          ? ach.legendary ? `${raceColor}45` : 'rgba(68,255,136,0.28)'
           : 'rgba(255,255,255,0.05)',
-        boxShadow:
-          ach.unlocked && ach.legendary
-            ? `0 0 24px ${raceGlow}60`
-            : 'none',
-        animation:
-          ach.unlocked && ach.legendary
-            ? 'glow-pulse 2.5s ease-in-out infinite'
-            : 'none',
+        boxShadow: ach.unlocked && ach.legendary ? `0 0 24px ${raceGlow}60` : 'none',
+        animation: ach.unlocked && ach.legendary ? 'glow-pulse 2.5s ease-in-out infinite' : 'none',
       }}
     >
       <div className="doppelrand-inner p-3 text-center">
-        {/* Icon frame */}
         <div className="relative mx-auto mb-2 w-14 h-14 flex items-center justify-center">
           <div
             className="absolute inset-0 rounded-2xl"
@@ -630,9 +885,7 @@ function AchievementBadge({
                 : 'rgba(255,255,255,0.04)',
               border: `2px solid ${
                 ach.unlocked
-                  ? ach.legendary
-                    ? raceColor
-                    : 'rgba(68,255,136,0.55)'
+                  ? ach.legendary ? raceColor : 'rgba(68,255,136,0.55)'
                   : 'rgba(255,255,255,0.08)'
               }`,
               boxShadow: ach.unlocked
@@ -667,24 +920,18 @@ function AchievementBadge({
           )}
         </div>
 
-        {/* Title */}
         <div
           className="font-display text-[10px] font-black tracking-wide leading-tight mb-0.5"
           style={{
             color: ach.unlocked
-              ? ach.legendary
-                ? raceColor
-                : '#44ff88'
+              ? ach.legendary ? raceColor : '#44ff88'
               : 'var(--color-text-muted)',
           }}
         >
           {ach.title}
         </div>
-        <div className="text-text-muted text-[9px] leading-snug mb-2">
-          {ach.description}
-        </div>
+        <div className="text-text-muted text-[9px] leading-snug mb-2">{ach.description}</div>
 
-        {/* Progress bar for locked with partial progress */}
         {!ach.unlocked && ach.progress !== undefined && ach.progress > 0 && (
           <div className="w-full h-1 bg-white/[0.06] rounded-full overflow-hidden mb-1.5">
             <div
@@ -697,7 +944,6 @@ function AchievementBadge({
           </div>
         )}
 
-        {/* Unlocks title */}
         {ach.unlocksTitle && (
           <div
             className="font-display text-[8px] tracking-widest uppercase"
@@ -706,120 +952,6 @@ function AchievementBadge({
             🏷 {ach.unlocksTitle}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Weekly XP Banner ──────────────────────────────────────────────────────────
-
-function WeeklyXpBanner({
-  missions,
-  raceColor,
-  raceGlow,
-}: {
-  missions: Mission[];
-  raceColor: string;
-  raceGlow: string;
-}) {
-  const totalXp    = missions.reduce((s, m) => s + (m.xpReward ?? 0), 0);
-  const earnedXp   = missions
-    .filter((m) => m.state === 'completed')
-    .reduce((s, m) => s + (m.xpReward ?? 0), 0);
-  const capXp      = 20000;
-  const pct        = Math.min((earnedXp / capXp) * 100, 100);
-
-  return (
-    <div
-      className="doppelrand mb-5"
-      style={{
-        borderColor: `${raceColor}22`,
-        boxShadow: `0 0 20px ${raceGlow}10`,
-      }}
-    >
-      <div className="doppelrand-inner px-4 py-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">
-              Haftalık XP
-            </span>
-            <span
-              className="font-display text-[8px] px-2 py-0.5 rounded-full"
-              style={{
-                background: `${raceColor}15`,
-                border: `1px solid ${raceColor}30`,
-                color: raceColor,
-              }}
-            >
-              4g 18s kaldı
-            </span>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span
-              className="font-display text-sm font-black"
-              style={{ color: '#ffc832', textShadow: '0 0 10px rgba(255,200,50,0.4)' }}
-            >
-              {earnedXp.toLocaleString('tr-TR')}
-            </span>
-            <span className="font-display text-[9px] text-text-muted">
-              / {capXp.toLocaleString('tr-TR')} XP
-            </span>
-          </div>
-        </div>
-        {/* HUD progress bar */}
-        <div
-          className="hud-progress-bar hud-progress-bar--xp hud-progress-bar--md"
-        >
-          <div
-            className="hud-progress-fill"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Daily Reset Header ─────────────────────────────────────────────────────────
-
-function DailyResetBar({
-  resetTime,
-  completedCount,
-  totalCount,
-  raceColor,
-}: {
-  resetTime: string;
-  completedCount: number;
-  totalCount: number;
-  raceColor: string;
-}) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <div>
-        <h1 className="font-display text-lg font-black text-text-primary">Günlük</h1>
-        <p className="text-text-muted text-xs">
-          {completedCount}/{totalCount} tamamlandı
-        </p>
-      </div>
-      <div
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-        style={{
-          background: 'rgba(255,200,50,0.08)',
-          border: '1px solid rgba(255,200,50,0.22)',
-        }}
-      >
-        <span className="text-[10px]" aria-hidden>🔄</span>
-        <div className="flex flex-col items-end">
-          <span className="font-display text-[8px] uppercase tracking-widest text-text-muted">
-            Yenileme
-          </span>
-          <span
-            className="font-display text-sm font-black tabular-nums"
-            style={{ color: '#ffc832', textShadow: '0 0 10px rgba(255,200,50,0.5)', lineHeight: 1 }}
-          >
-            {resetTime}
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -838,46 +970,96 @@ function RewardPopup({
   raceColor: string;
   raceGlow: string;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+  const [phase, setPhase] = useState<'enter' | 'idle' | 'exit'>('enter');
+
+  const handleClose = useCallback(() => {
+    setPhase('exit');
+    setTimeout(onClose, 320);
   }, [onClose]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPhase('idle'), 500);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [handleClose]);
+
+  const totalXP = mission.rewards.find((r) => r.label === 'XP')?.amount ?? 0;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(5,8,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        background: 'rgba(5,8,16,0.88)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        animation:
+          phase === 'exit'
+            ? 'fade-out 0.32s cubic-bezier(0.32,0.72,0,1) both'
+            : 'fade-in 0.28s cubic-bezier(0.32,0.72,0,1) both',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
       role="dialog"
       aria-modal
       aria-label="Ödül Popup"
     >
-      {/* Radial burst particles */}
+      {/* Radial flash on enter */}
+      {phase === 'enter' && (
+        <div
+          className="fixed inset-0 pointer-events-none"
+          aria-hidden
+          style={{
+            background: `radial-gradient(ellipse 60% 60% at 50% 50%, ${raceColor}22 0%, transparent 70%)`,
+            animation: 'flash-burst 0.7s cubic-bezier(0.32,0.72,0,1) both',
+          }}
+        />
+      )}
+
+      {/* Burst particles — 20 shards */}
       <div className="reward-particles" aria-hidden>
-        {Array.from({ length: 12 }).map((_, i) => (
+        {Array.from({ length: 20 }).map((_, i) => (
           <div
             key={i}
             className="reward-particle"
             style={{
-              '--angle': `${i * 30}deg`,
-              '--pcolor': i % 3 === 0 ? raceColor : i % 3 === 1 ? '#ffc832' : '#44ff88',
-              animationDelay: `${i * 0.04}s`,
+              '--angle': `${i * 18}deg`,
+              '--pcolor':
+                i % 4 === 0 ? raceColor
+                : i % 4 === 1 ? '#ffc832'
+                : i % 4 === 2 ? '#44ff88'
+                : '#00cfff',
+              animationDelay: `${i * 0.028}s`,
             } as React.CSSProperties}
           />
         ))}
       </div>
 
       <div
-        className="relative w-full max-w-sm animate-manga-appear"
-        style={{ animationDuration: '0.45s', animationFillMode: 'both' }}
+        className="relative w-full max-w-sm"
+        style={{
+          animation:
+            phase === 'exit'
+              ? 'slide-down 0.32s cubic-bezier(0.32,0.72,0,1) both'
+              : 'manga-appear 0.45s cubic-bezier(0.32,0.72,0,1) both',
+        }}
       >
-        {/* Speed lines SVG behind popup */}
+        {/* Speed-lines radial SVG backdrop */}
         <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none" aria-hidden>
-          <svg className="absolute inset-0 w-full h-full opacity-[0.08]" viewBox="0 0 360 480" preserveAspectRatio="none">
-            {Array.from({ length: 20 }).map((_, i) => {
-              const angle = (i / 20) * 360;
-              const rad = (angle * Math.PI) / 180;
+          <svg
+            className="absolute inset-0 w-full h-full opacity-[0.08]"
+            viewBox="0 0 360 480"
+            preserveAspectRatio="none"
+          >
+            {Array.from({ length: 24 }).map((_, i) => {
+              const angle = (i / 24) * 360;
+              const rad   = (angle * Math.PI) / 180;
               return (
                 <line
                   key={i}
@@ -915,7 +1097,7 @@ function RewardPopup({
               </span>
             </div>
 
-            {/* Main reward icon */}
+            {/* Main icon */}
             <div
               className="w-20 h-20 mx-auto mb-5 rounded-2xl flex items-center justify-center relative"
               style={{
@@ -925,10 +1107,7 @@ function RewardPopup({
                 animation: 'glow-pulse 2s ease-in-out infinite',
               }}
             >
-              <span
-                className="text-4xl"
-                style={{ filter: `drop-shadow(0 0 14px ${raceGlow})` }}
-              >
+              <span className="text-4xl" style={{ filter: `drop-shadow(0 0 14px ${raceGlow})` }}>
                 {mission.rewards[0]?.icon ?? '🎁'}
               </span>
             </div>
@@ -937,11 +1116,30 @@ function RewardPopup({
             <h2 className="font-display text-xl font-black mb-1 text-gradient-race">
               {mission.title}
             </h2>
-            <p className="text-text-muted text-xs mb-5 leading-relaxed">
+            <p className="text-text-muted text-xs mb-4 leading-relaxed">
               Görev başarıyla tamamlandı! Ödüllerin hesabına yatırıldı.
             </p>
 
-            {/* Reward list */}
+            {/* XP highlight */}
+            {totalXP > 0 && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full mb-4"
+                style={{
+                  background: 'rgba(255,200,50,0.09)',
+                  border: '1px solid rgba(255,200,50,0.28)',
+                }}
+              >
+                <span className="text-sm" aria-hidden>✨</span>
+                <span
+                  className="font-display text-xs font-black"
+                  style={{ color: '#ffc832', textShadow: '0 0 10px rgba(255,200,50,0.5)' }}
+                >
+                  +{totalXP.toLocaleString('tr-TR')} XP Kazanıldı
+                </span>
+              </div>
+            )}
+
+            {/* Reward rows */}
             <div className="space-y-2 mb-6">
               {mission.rewards.map((r, i) => (
                 <div
@@ -970,7 +1168,7 @@ function RewardPopup({
 
             {/* Close CTA */}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="group w-full font-display text-sm font-black tracking-widest uppercase py-3 rounded-full
                          flex items-center justify-center gap-2
                          transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
@@ -1002,14 +1200,14 @@ function RewardPopup({
 
 export default function MissionsPage() {
   const { raceColor, raceGlow } = useRaceTheme();
-  const [activeTab, setActiveTab] = useState<MissionTab>('ana');
+  const [activeTab, setActiveTab]           = useState<MissionTab>('hikaye');
   const [claimedMission, setClaimedMission] = useState<Mission | null>(null);
-  const dailyReset = useDailyReset();
+  const resetCountdown = useDailyReset();
 
-  const visibleMissions  = MISSIONS.filter((m) => m.category === activeTab);
-  const completedCount   = visibleMissions.filter((m) => m.state === 'completed').length;
-  const unlockedAch      = ACHIEVEMENTS.filter((a) => a.unlocked).length;
-  const weeklyMissions   = MISSIONS.filter((m) => m.category === 'haftalik');
+  const visibleMissions = MISSIONS.filter((m) => m.category === activeTab);
+  const completedCount  = visibleMissions.filter((m) => m.state === 'completed').length;
+  const unlockedAch     = ACHIEVEMENTS.filter((a) => a.unlocked).length;
+  const claimableCount  = MISSIONS.filter((m) => m.state === 'completed').length;
 
   const handleClaim = useCallback((m: Mission) => setClaimedMission(m), []);
   const handleClose = useCallback(() => setClaimedMission(null), []);
@@ -1019,7 +1217,7 @@ export default function MissionsPage() {
       className="h-dvh flex flex-col relative overflow-y-auto"
       style={{ background: 'var(--color-bg)' }}
     >
-      {/* Background */}
+      {/* Background layers */}
       <div
         className="fixed inset-0 pointer-events-none transition-all duration-700"
         style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
@@ -1056,9 +1254,28 @@ export default function MissionsPage() {
             Görevler
           </span>
         </div>
-        <span className="font-display text-[10px] text-text-muted">
-          {unlockedAch}/{ACHIEVEMENTS.length} Başarım
-        </span>
+
+        <div className="flex items-center gap-3">
+          {claimableCount > 0 && (
+            <div
+              className="flex items-center gap-1.5 font-display text-[9px] font-black px-2.5 py-1 rounded-full"
+              style={{
+                background: 'rgba(68,255,136,0.10)',
+                border: '1px solid rgba(68,255,136,0.32)',
+                color: '#44ff88',
+              }}
+            >
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: '#44ff88', boxShadow: '0 0 6px rgba(68,255,136,0.8)' }}
+              />
+              {claimableCount} Ödül
+            </div>
+          )}
+          <span className="font-display text-[10px] text-text-muted">
+            {unlockedAch}/{ACHIEVEMENTS.length} Başarım
+          </span>
+        </div>
       </header>
 
       {/* ── Tab Bar ── */}
@@ -1098,7 +1315,6 @@ export default function MissionsPage() {
                 <span className="hidden sm:inline">{tab.label}</span>
                 <span className="sm:hidden">{tab.shortLabel}</span>
 
-                {/* Active underline */}
                 {isActive && (
                   <div
                     className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
@@ -1109,15 +1325,10 @@ export default function MissionsPage() {
                   />
                 )}
 
-                {/* Claimable indicator dot */}
                 {hasClaimable && !isActive && tab.id !== 'basarim' && (
                   <div
                     className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full"
-                    style={{
-                      background: '#44ff88',
-                      boxShadow: '0 0 6px rgba(68,255,136,0.8)',
-                      animation: 'glow-pulse 2s ease-in-out infinite',
-                    }}
+                    style={{ background: '#44ff88', boxShadow: '0 0 6px rgba(68,255,136,0.8)' }}
                     aria-label="Tamamlanmış görev mevcut"
                   />
                 )}
@@ -1130,234 +1341,138 @@ export default function MissionsPage() {
       {/* ── Content ── */}
       <main className="relative z-10 flex-1 p-4 max-w-2xl mx-auto w-full pb-24">
 
-        {/* ── Tab: Ana Görev (Story) ── */}
-        {activeTab === 'ana' && (
-          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
-            {/* Story header with chapter label */}
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div
-                  className="font-display text-[8px] font-black tracking-[0.25em] uppercase mb-1"
-                  style={{ color: raceColor }}
-                >
-                  Bölüm I — Uyanış
-                </div>
-                <h1 className="font-display text-lg font-black text-text-primary">Ana Görev</h1>
-                <p className="text-text-muted text-xs">
-                  {completedCount}/{visibleMissions.length} tamamlandı
-                </p>
-              </div>
-              {/* Circular progress ring */}
-              <div className="relative w-12 h-12 shrink-0">
-                <svg
-                  className="w-full h-full"
-                  viewBox="0 0 48 48"
-                  style={{ transform: 'rotate(-90deg)' }}
-                  aria-hidden
-                >
-                  <circle
-                    cx="24" cy="24" r="20"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth="4"
-                  />
-                  <circle
-                    cx="24" cy="24" r="20"
-                    fill="none"
-                    stroke={raceColor}
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeDasharray={`${visibleMissions.length > 0 ? (completedCount / visibleMissions.length) * 125.66 : 0} 125.66`}
-                    style={{
-                      filter: `drop-shadow(0 0 4px ${raceGlow})`,
-                      transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
-                    }}
-                  />
-                </svg>
-                <span
-                  className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
-                  style={{ color: raceColor }}
-                >
-                  {visibleMissions.length > 0
-                    ? Math.round((completedCount / visibleMissions.length) * 100)
-                    : 0}%
-                </span>
-              </div>
-            </div>
-
-            {/* Story arc mission list with path connector */}
-            <div role="list" aria-label="Ana görevler">
-              {visibleMissions.map((mission, i) => (
-                <div
-                  key={mission.id}
-                  role="listitem"
-                  style={{
-                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                    animationDelay: `${i * 75}ms`,
-                  }}
-                >
-                  <MissionCard
-                    mission={mission}
-                    raceColor={raceColor}
-                    raceGlow={raceGlow}
-                    onClaim={handleClaim}
-                    showPath
-                    isLast={i === visibleMissions.length - 1}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Günlük (Daily) ── */}
-        {activeTab === 'gunluk' && (
-          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
-            <DailyResetBar
-              resetTime={dailyReset}
-              completedCount={completedCount}
-              totalCount={visibleMissions.length}
-              raceColor={raceColor}
-            />
-
-            <div className="space-y-3" role="list" aria-label="Günlük görevler">
-              {visibleMissions.map((mission, i) => (
-                <div
-                  key={mission.id}
-                  role="listitem"
-                  style={{
-                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                    animationDelay: `${i * 75}ms`,
-                  }}
-                >
-                  <MissionCard
-                    mission={mission}
-                    raceColor={raceColor}
-                    raceGlow={raceGlow}
-                    onClaim={handleClaim}
-                  />
-                </div>
-              ))}
-              {visibleMissions.length === 0 && (
-                <MangaPanel className="p-10 text-center">
-                  <div className="text-4xl mb-3" aria-hidden>📭</div>
-                  <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
-                </MangaPanel>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Haftalık (Weekly) ── */}
-        {activeTab === 'haftalik' && (
-          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
-            {/* Weekly XP progress banner */}
-            <WeeklyXpBanner
-              missions={weeklyMissions}
-              raceColor={raceColor}
-              raceGlow={raceGlow}
-            />
-
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="font-display text-lg font-black text-text-primary">Haftalık</h1>
-                <p className="text-text-muted text-xs">
-                  {completedCount}/{visibleMissions.length} tamamlandı
-                </p>
-              </div>
-              {/* Circular progress ring */}
-              <div className="relative w-12 h-12 shrink-0">
-                <svg
-                  className="w-full h-full"
-                  viewBox="0 0 48 48"
-                  style={{ transform: 'rotate(-90deg)' }}
-                  aria-hidden
-                >
-                  <circle
-                    cx="24" cy="24" r="20"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth="4"
-                  />
-                  <circle
-                    cx="24" cy="24" r="20"
-                    fill="none"
-                    stroke={raceColor}
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeDasharray={`${visibleMissions.length > 0 ? (completedCount / visibleMissions.length) * 125.66 : 0} 125.66`}
-                    style={{
-                      filter: `drop-shadow(0 0 4px ${raceGlow})`,
-                      transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
-                    }}
-                  />
-                </svg>
-                <span
-                  className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
-                  style={{ color: raceColor }}
-                >
-                  {visibleMissions.length > 0
-                    ? Math.round((completedCount / visibleMissions.length) * 100)
-                    : 0}%
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3" role="list" aria-label="Haftalık görevler">
-              {visibleMissions.map((mission, i) => (
-                <div
-                  key={mission.id}
-                  role="listitem"
-                  style={{
-                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                    animationDelay: `${i * 75}ms`,
-                  }}
-                >
-                  <MissionCard
-                    mission={mission}
-                    raceColor={raceColor}
-                    raceGlow={raceGlow}
-                    onClaim={handleClaim}
-                  />
-                </div>
-              ))}
-              {visibleMissions.length === 0 && (
-                <MangaPanel className="p-10 text-center">
-                  <div className="text-4xl mb-3" aria-hidden>📭</div>
-                  <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
-                </MangaPanel>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Başarım (Achievement) ── */}
-        {activeTab === 'basarim' && (
-          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
-            <div className="mb-5">
-              <h1 className="font-display text-lg font-black text-text-primary mb-0.5">Başarımlar</h1>
+        {/* Summary bar */}
+        {activeTab !== 'basarim' && (
+          <div
+            className="flex items-center justify-between mb-4"
+            style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}
+          >
+            <div>
+              <h1 className="font-display text-lg font-black text-text-primary">
+                {TABS.find((t) => t.id === activeTab)?.label}
+              </h1>
               <p className="text-text-muted text-xs">
-                {unlockedAch}/{ACHIEVEMENTS.length} başarım açıldı
+                {completedCount}/{visibleMissions.length} tamamlandı
               </p>
             </div>
-            <div
-              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-              role="list"
-              aria-label="Başarımlar"
-            >
-              {ACHIEVEMENTS.map((ach, i) => (
-                <div
-                  key={ach.id}
-                  role="listitem"
+
+            {/* Circular completion ring */}
+            <div className="relative w-12 h-12 shrink-0">
+              <svg
+                className="w-full h-full"
+                viewBox="0 0 48 48"
+                style={{ transform: 'rotate(-90deg)' }}
+              >
+                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                <circle
+                  cx="24" cy="24" r="20"
+                  fill="none"
+                  stroke={raceColor}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${
+                    visibleMissions.length > 0
+                      ? (completedCount / visibleMissions.length) * 125.66
+                      : 0
+                  } 125.66`}
                   style={{
-                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                    animationDelay: `${i * 75}ms`,
+                    filter: `drop-shadow(0 0 4px ${raceGlow})`,
+                    transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
                   }}
-                >
-                  <AchievementBadge ach={ach} raceColor={raceColor} raceGlow={raceGlow} />
-                </div>
-              ))}
+                />
+              </svg>
+              <span
+                className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
+                style={{ color: raceColor }}
+              >
+                {visibleMissions.length > 0
+                  ? Math.round((completedCount / visibleMissions.length) * 100)
+                  : 0}%
+              </span>
             </div>
+          </div>
+        )}
+
+        {/* Tab-specific context banners */}
+        {activeTab === 'hikaye' && (
+          <StoryChapterHeader raceColor={raceColor} raceGlow={raceGlow} />
+        )}
+        {activeTab === 'gunluk' && (
+          <DailyStreakBanner
+            streak={DAILY_STREAK}
+            resetCountdown={resetCountdown}
+            raceColor={raceColor}
+            raceGlow={raceGlow}
+          />
+        )}
+        {activeTab === 'haftalik' && (
+          <WeeklySummaryBanner missions={visibleMissions} raceColor={raceColor} raceGlow={raceGlow} />
+        )}
+
+        {/* Achievement tab header */}
+        {activeTab === 'basarim' && (
+          <div
+            className="mb-5"
+            style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}
+          >
+            <h1 className="font-display text-lg font-black text-text-primary mb-0.5">Başarımlar</h1>
+            <p className="text-text-muted text-xs">
+              {unlockedAch}/{ACHIEVEMENTS.length} başarım açıldı
+            </p>
+          </div>
+        )}
+
+        {/* Mission list */}
+        {activeTab !== 'basarim' && (
+          <div className="space-y-3" role="list" aria-label={`${activeTab} görevleri`}>
+            {visibleMissions.map((mission, i) => (
+              <div
+                key={mission.id}
+                role="listitem"
+                style={{
+                  animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                  animationDelay: `${i * 75}ms`,
+                }}
+              >
+                <MissionCard
+                  mission={mission}
+                  raceColor={raceColor}
+                  raceGlow={raceGlow}
+                  onClaim={handleClaim}
+                  showPath={activeTab === 'hikaye'}
+                  isLast={i === visibleMissions.length - 1}
+                />
+              </div>
+            ))}
+
+            {visibleMissions.length === 0 && (
+              <MangaPanel className="p-10 text-center">
+                <div className="text-4xl mb-3" aria-hidden>📭</div>
+                <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
+              </MangaPanel>
+            )}
+          </div>
+        )}
+
+        {/* Achievement grid */}
+        {activeTab === 'basarim' && (
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+            role="list"
+            aria-label="Başarımlar"
+          >
+            {ACHIEVEMENTS.map((ach, i) => (
+              <div
+                key={ach.id}
+                role="listitem"
+                style={{
+                  animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                  animationDelay: `${i * 75}ms`,
+                }}
+              >
+                <AchievementBadge ach={ach} raceColor={raceColor} raceGlow={raceGlow} />
+              </div>
+            ))}
           </div>
         )}
       </main>

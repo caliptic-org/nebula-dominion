@@ -101,7 +101,7 @@ export default function HomePage() {
   const battleHref =
     onboardingHydrated && !shouldShowNextSessionHook
       ? tutorialBattleHref
-      : `/battle?race=${race}&mode=pve`;
+      : `/battle-prep?race=${race}`;
 
   return (
     <>

@@ -131,11 +131,17 @@ export function BattleResultScreen({ data }: { data: BattleResultData }) {
         {/* ── Hero Banner ── */}
         <section className="br-hero">
           <div className="br-hero-image" aria-hidden>
-            {/* Image from CAL-488 Image Generator goes here */}
             <img
-              src="/assets/battle-result/hero-placeholder.jpg"
+              src={`/assets/battle-result/${meta.dataRace}-${outcome}.png`}
               alt=""
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (!img.src.endsWith('hero-placeholder.jpg')) {
+                  img.src = '/assets/battle-result/hero-placeholder.jpg';
+                } else {
+                  img.style.display = 'none';
+                }
+              }}
             />
           </div>
 

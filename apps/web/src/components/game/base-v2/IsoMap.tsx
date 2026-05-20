@@ -2,26 +2,12 @@
 
 import Image from 'next/image';
 import clsx from 'clsx';
-import { Race } from '@/types/units';
-import { GROUND_TEXTURES } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
 
 interface Props {
   snapshot: RaceBaseSnapshot;
   selectedId: string | null;
   onSelect: (id: string) => void;
-}
-
-/** Map a Race enum value to the matching ground-manifest key. */
-function groundKey(race: Race): keyof typeof GROUND_TEXTURES {
-  switch (race) {
-    case Race.INSAN:   return 'human';
-    case Race.ZERG:    return 'zerg';
-    case Race.OTOMAT:  return 'automat';
-    case Race.CANAVAR: return 'beast';
-    case Race.SEYTAN:  return 'demon';
-    default:           return 'human';
-  }
 }
 
 const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
@@ -34,15 +20,16 @@ const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
 export function IsoMap({ snapshot, selectedId, onSelect }: Props) {
   return (
     <main className="base-center" role="region" aria-label="İzometrik üs haritası">
-      <div
-        className="base-ground-layer"
-        aria-hidden
-        style={{
-          backgroundImage: `url(${GROUND_TEXTURES[groundKey(snapshot.race)]})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+      {/* Layer stack (bottom → top, CSS-driven via [data-race] on .base-screen):
+       *   1. Race-tinted ground / CAL-486 backdrop (image chained with gradient fallback)
+       *   2. Neutral readability vignette
+       *   3. CD-spec pulsing race-glow ambient (radial ellipse at 20% 80%)
+       *   4. Faint race sigil watermark in the bottom-right corner
+       * Iso grid + building sprites paint above on z-index 1. */}
+      <div className="base-ground-image" aria-hidden />
+      <div className="base-ground-layer" aria-hidden />
+      <div className="base-ambient-glow" aria-hidden />
+      <div className="base-sigil-watermark" aria-hidden />
       <div className="base-iso-grid">
         <div className="base-grid-overlay" aria-hidden />
         {snapshot.buildings.map((b) => {

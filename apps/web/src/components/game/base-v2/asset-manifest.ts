@@ -78,3 +78,27 @@ export const BUILDING_ISOS: Record<string, string | undefined> = {
 };
 
 export type GroundRaceKey = keyof typeof GROUND_TEXTURES;
+
+/**
+ * Capital-base backdrop images per race (CAL-486 / Screens 06–10).
+ *
+ * IsoMap renders `.base-capital-backdrop` with `background-image: url(slot)`
+ * over the race-tinted ground gradient whenever the slot is non-null. When
+ * null, the IsoMap skips the overlay and the gradient floor + ambient glow
+ * stay as the sole backdrop (CD-approved fallback). Drop the remaining
+ * renders at /public/assets/map/base-bg-<race>.png and flip the slot — no
+ * other code change required.
+ *
+ *   human   → CAL-512 (KAEL-7 Komuta Üssü)              ✔ landed
+ *   zerg    → CAL-513 (BROOD-1 Kovan Kalbi)             ✔ landed
+ *   automat → CAL-514 (NODE-04 Çekirdek İstasyonu)      — pending
+ *   beast   → CAL-515 (HOWL-1 Alfa Tahtı Kampı)         — pending
+ *   demon   → CAL-516 (Karanlık Mahkeme Lanet Tapınağı) — pending
+ */
+export const CAPITAL_BACKDROPS: Record<GroundRaceKey, string | null> = {
+  human:   '/assets/map/base-bg-insan.png',
+  zerg:    '/assets/map/base-bg-zerg.png',
+  automat: null,
+  beast:   null,
+  demon:   null,
+};

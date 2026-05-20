@@ -6,11 +6,13 @@ import { Race } from '@/types/units';
 import { CAPITAL_BACKDROPS, type GroundRaceKey } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
 
-interface Props {
-  snapshot: RaceBaseSnapshot;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}
+const RACE_TO_BACKDROP_KEY: Record<Race, keyof typeof CAPITAL_BACKDROPS> = {
+  [Race.INSAN]:   'human',
+  [Race.ZERG]:    'zerg',
+  [Race.OTOMAT]:  'automat',
+  [Race.CANAVAR]: 'beast',
+  [Race.SEYTAN]:  'demon',
+};
 
 function groundKey(race: Race): GroundRaceKey {
   switch (race) {
@@ -21,6 +23,12 @@ function groundKey(race: Race): GroundRaceKey {
     case Race.SEYTAN:  return 'demon';
     default:           return 'human';
   }
+}
+
+interface Props {
+  snapshot: RaceBaseSnapshot;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
 }
 
 const STATUS_LABEL: Record<BaseBuilding['status'], string> = {

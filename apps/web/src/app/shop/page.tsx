@@ -10,8 +10,21 @@ import { GlowButton } from '@/components/ui/GlowButton';
 import clsx from 'clsx';
 
 // ── Types ───────────────────────────────────────────────────────────────────
-type ShopTab = 'genel' | 'vip' | 'lonca' | 'etkinlik';
+type ShopTab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
+
+interface BattlePassTier {
+  level: number;
+  free?: BattlePassReward;
+  premium: BattlePassReward;
+  milestone?: boolean;
+}
+
+interface BattlePassReward {
+  icon: string;
+  label: string;
+  color?: string;
+}
 
 interface ShopProduct {
   id: string;
@@ -66,9 +79,49 @@ const SHOP_PRODUCTS: ShopProduct[] = [
 
 const TABS: { key: ShopTab; label: string; icon: string }[] = [
   { key: 'genel',    label: 'Genel',    icon: '🛒' },
+  { key: 'gecis',    label: 'Savaş Geçişi', icon: '⚔️' },
   { key: 'vip',      label: 'VIP',      icon: '👑' },
   { key: 'lonca',    label: 'Lonca',    icon: '⚓' },
   { key: 'etkinlik', label: 'Etkinlik', icon: '🌟' },
+];
+
+// ── Battle Pass Data ─────────────────────────────────────────────────────────
+const BATTLE_PASS_PLAYER_LEVEL = 12;
+const BATTLE_PASS_PREMIUM_PRICE = 800;
+const BATTLE_PASS_PREMIUM_PLUS_PRICE = 1200;
+const BATTLE_PASS_IS_PREMIUM = false;
+
+const BATTLE_PASS_TIERS: BattlePassTier[] = [
+  { level: 1,  free: { icon: '⛏️', label: '500 Mineral' },         premium: { icon: '💎', label: '20 Kristal', color: '#00cfff' } },
+  { level: 2,  free: { icon: '⚗️', label: '300 Gas' },             premium: { icon: '⚡', label: '2× XP 1 Saat' } },
+  { level: 3,  free: { icon: '💎', label: '10 Kristal', color: '#00cfff' }, premium: { icon: '🎨', label: 'Irk Renk Paleti' } },
+  { level: 4,  free: { icon: '🛡️', label: '4h Kalkan' },           premium: { icon: '💎', label: '30 Kristal', color: '#00cfff' } },
+  { level: 5,  free: { icon: '🧬', label: 'Komutan XP ×2' },       premium: { icon: '🌟', label: 'Giriş Efekti', color: '#ffc832' }, milestone: true },
+  { level: 6,  free: { icon: '⛏️', label: '1.000 Mineral' },       premium: { icon: '💎', label: '40 Kristal', color: '#00cfff' } },
+  { level: 7,  free: { icon: '🚀', label: 'Hız Kartı ×3' },        premium: { icon: '🎭', label: 'Avatar Çerçevesi' } },
+  { level: 8,  free: { icon: '⚗️', label: '600 Gas' },             premium: { icon: '💎', label: '50 Kristal', color: '#00cfff' } },
+  { level: 9,  free: { icon: '💎', label: '20 Kristal', color: '#00cfff' }, premium: { icon: '🎖️', label: 'Savaşçı Rozeti' } },
+  { level: 10, free: { icon: '⚡', label: '2× Üretim 2 Saat' },    premium: { icon: '🔥', label: 'Irk Özel Skin', color: '#ff6600' }, milestone: true },
+  { level: 11, free: { icon: '⛏️', label: '2.000 Mineral' },       premium: { icon: '💎', label: '60 Kristal', color: '#00cfff' } },
+  { level: 12, free: { icon: '🛡️', label: '8h Kalkan' },           premium: { icon: '✨', label: 'Parçacık İzi Efekti' } },
+  { level: 13, free: { icon: '🧬', label: 'Komutan XP ×5' },       premium: { icon: '💎', label: '80 Kristal', color: '#00cfff' } },
+  { level: 14, free: { icon: '⚗️', label: '1.000 Gas' },           premium: { icon: '🎮', label: 'HUD Renk Teması' } },
+  { level: 15, free: { icon: '💎', label: '30 Kristal', color: '#00cfff' }, premium: { icon: '🏆', label: 'Efsanevi Komutan XP', color: '#ffc832' }, milestone: true },
+  { level: 16, free: { icon: '⛏️', label: '3.000 Mineral' },       premium: { icon: '💎', label: '100 Kristal', color: '#00cfff' } },
+  { level: 17, free: { icon: '🚀', label: 'Hız Kartı ×5' },        premium: { icon: '🌌', label: 'Galaksi Arka Plan' } },
+  { level: 18, free: { icon: '⚗️', label: '1.500 Gas' },           premium: { icon: '💎', label: '120 Kristal', color: '#00cfff' } },
+  { level: 19, free: { icon: '⚡', label: '2× Üretim 4 Saat' },    premium: { icon: '🦅', label: 'Savaş Kartalı Şekli' } },
+  { level: 20, free: { icon: '💎', label: '50 Kristal', color: '#00cfff' }, premium: { icon: '⚔️', label: 'Irk Silah Efekti', color: '#ff3355' }, milestone: true },
+  { level: 21, free: { icon: '⛏️', label: '5.000 Mineral' },       premium: { icon: '💎', label: '150 Kristal', color: '#00cfff' } },
+  { level: 22, free: { icon: '🛡️', label: '12h Kalkan' },          premium: { icon: '🌟', label: 'VIP 3 Gün Denemesi' } },
+  { level: 23, free: { icon: '🧬', label: 'Komutan XP ×10' },      premium: { icon: '💎', label: '180 Kristal', color: '#00cfff' } },
+  { level: 24, free: { icon: '⚗️', label: '2.000 Gas' },           premium: { icon: '🎪', label: 'Animasyonlu Profil' } },
+  { level: 25, free: { icon: '💎', label: '100 Kristal', color: '#00cfff' }, premium: { icon: '👑', label: 'Altın VIP Rozeti', color: '#ffc832' }, milestone: true },
+  { level: 26, free: { icon: '⛏️', label: '8.000 Mineral' },       premium: { icon: '💎', label: '200 Kristal', color: '#00cfff' } },
+  { level: 27, free: { icon: '🚀', label: 'Hız Kartı ×10' },       premium: { icon: '🌠', label: 'Komutan Portre Çerçevesi' } },
+  { level: 28, free: { icon: '⚗️', label: '3.000 Gas' },           premium: { icon: '💎', label: '250 Kristal', color: '#00cfff' } },
+  { level: 29, free: { icon: '⚡', label: '2× Üretim 8 Saat' },    premium: { icon: '🔮', label: 'Boyut Geçişi Efekti' } },
+  { level: 30, free: { icon: '🏆', label: 'Sezon Kupası', color: '#ffc832' }, premium: { icon: '🌌', label: 'Galaksi Fatihi Skin', color: '#cc00ff' }, milestone: true },
 ];
 
 const RACE_BUNDLE_IDS: Record<Race, string> = {
@@ -780,6 +833,271 @@ function PurchaseModal({
   );
 }
 
+// ── Battle Pass Section ───────────────────────────────────────────────────────
+function BattlePassSection({
+  raceColor,
+  raceGlow,
+  onBuyPass,
+}: {
+  raceColor: string;
+  raceGlow: string;
+  onBuyPass: () => void;
+}) {
+  const [isPremium, setIsPremium] = useState(BATTLE_PASS_IS_PREMIUM);
+  const currentLevel = BATTLE_PASS_PLAYER_LEVEL;
+  const seasonProgress = (currentLevel / 30) * 100;
+
+  return (
+    <div className="space-y-5">
+      {/* Season Header */}
+      <MangaPanel className="relative overflow-hidden p-5 sm:p-6" glow>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse 80% 70% at 85% 30%, ${raceGlow} 0%, rgba(204,0,255,0.06) 50%, transparent 80%)` }}
+          aria-hidden
+        />
+        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="badge badge-race">⚔️ Sezon 1</span>
+              <span
+                className="font-display text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(255,200,50,0.15)', color: '#ffc832', border: '1px solid rgba(255,200,50,0.3)' }}
+              >
+                🔥 29 Gün Kaldı
+              </span>
+            </div>
+            <h3 className="font-display text-xl sm:text-2xl font-black text-text-primary mb-1">
+              Galaksi Fatihi Savaş Geçişi
+            </h3>
+            <p className="font-body text-text-secondary text-sm mb-4 max-w-md">
+              30 seviye, 2 iz — Ücretsiz ödüller herkese açık. Premium geçiş ile galaksinin en güçlü skin'lerine ulaş.
+            </p>
+
+            {/* Progress bar */}
+            <div className="max-w-sm">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="font-display text-[10px] uppercase tracking-widest text-text-muted">Seviye {currentLevel} / 30</span>
+                <span className="font-display text-[10px]" style={{ color: raceColor }}>{Math.round(seasonProgress)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-1000 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                  style={{
+                    width: `${seasonProgress}%`,
+                    background: `linear-gradient(90deg, ${raceColor}, #00cfff)`,
+                    boxShadow: `0 0 8px ${raceGlow}`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Premium CTA */}
+          {!isPremium && (
+            <div
+              className="shrink-0 flex flex-col items-center gap-3 p-4 rounded-sm text-center"
+              style={{ background: 'rgba(255,200,50,0.06)', border: '1px solid rgba(255,200,50,0.18)' }}
+            >
+              <span className="font-display text-[9px] uppercase tracking-widest" style={{ color: '#ffc832' }}>Premium Geçiş</span>
+              <div className="flex items-end gap-1.5 justify-center">
+                <span className="font-display text-2xl font-black" style={{ color: '#00cfff' }}>💎 {BATTLE_PASS_PREMIUM_PRICE.toLocaleString()}</span>
+              </div>
+              <GlowButton size="sm" onClick={() => { setIsPremium(true); onBuyPass(); }} icon={<span>→</span>}>
+                Aktif Et
+              </GlowButton>
+              <span className="font-display text-[9px] text-text-muted">+ Plus: 💎 {BATTLE_PASS_PREMIUM_PLUS_PRICE.toLocaleString()}</span>
+            </div>
+          )}
+          {isPremium && (
+            <div
+              className="shrink-0 flex flex-col items-center gap-2 p-4 rounded-sm text-center"
+              style={{ background: 'rgba(68,255,136,0.06)', border: '1px solid rgba(68,255,136,0.2)' }}
+            >
+              <span className="font-display text-2xl">✓</span>
+              <span className="font-display text-xs font-black" style={{ color: '#44ff88' }}>Premium Aktif</span>
+              <span className="font-display text-[9px] text-text-muted">Sezon 1</span>
+            </div>
+          )}
+        </div>
+      </MangaPanel>
+
+      {/* Track Toggle */}
+      <div className="flex items-center gap-3">
+        <span className="badge badge-race">İz Gösterimi</span>
+        <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
+        <div
+          className="flex items-center gap-1 p-1 rounded-sm"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <span className="font-display text-[9px] px-2 py-0.5 rounded-sm" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-secondary)' }}>
+            Ücretsiz + Premium
+          </span>
+        </div>
+      </div>
+
+      {/* Tier Grid */}
+      <div className="space-y-2">
+        {BATTLE_PASS_TIERS.map((tier) => {
+          const isCompleted = tier.level <= currentLevel;
+          const isCurrent   = tier.level === currentLevel + 1;
+          const isPremiumTier = !isPremium;
+
+          return (
+            <div
+              key={tier.level}
+              className={clsx(
+                'relative flex items-stretch gap-2 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
+                tier.milestone && 'scale-[1.01]',
+              )}
+            >
+              {/* Level number */}
+              <div
+                className="shrink-0 w-9 flex flex-col items-center justify-center gap-0.5"
+              >
+                <span
+                  className="font-display text-xs font-black"
+                  style={{ color: isCompleted ? raceColor : 'var(--color-text-muted)' }}
+                >
+                  {tier.level}
+                </span>
+                {tier.milestone && (
+                  <span className="font-display text-[6px] uppercase tracking-widest" style={{ color: '#ffc832' }}>
+                    Kilit
+                  </span>
+                )}
+              </div>
+
+              {/* Connector line */}
+              <div className="shrink-0 flex flex-col items-center py-1 gap-0.5">
+                <div
+                  className="w-0.5 flex-1 rounded-full transition-all duration-700"
+                  style={{ background: isCompleted ? raceColor : 'rgba(255,255,255,0.06)', boxShadow: isCompleted ? `0 0 4px ${raceGlow}` : 'none' }}
+                />
+                <div
+                  className={clsx('w-2.5 h-2.5 rounded-full border shrink-0 transition-all duration-500', isCurrent && 'animate-pulse')}
+                  style={{
+                    background: isCompleted ? raceColor : isCurrent ? `${raceColor}44` : 'rgba(255,255,255,0.06)',
+                    borderColor: isCompleted ? raceColor : isCurrent ? raceColor : 'rgba(255,255,255,0.12)',
+                    boxShadow: isCompleted ? `0 0 6px ${raceGlow}` : isCurrent ? `0 0 8px ${raceGlow}` : 'none',
+                  }}
+                />
+                <div
+                  className="w-0.5 flex-1 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                />
+              </div>
+
+              {/* Free track card */}
+              <div
+                className={clsx(
+                  'flex-1 flex items-center gap-2.5 px-3 py-2.5 rounded-sm transition-all duration-500',
+                  tier.milestone && 'py-3',
+                )}
+                style={{
+                  background: isCompleted ? `${raceColor}0e` : 'rgba(13,17,23,0.8)',
+                  border: `1px solid ${isCompleted ? raceColor + '30' : 'rgba(255,255,255,0.06)'}`,
+                }}
+              >
+                {tier.free ? (
+                  <>
+                    <span
+                      className="text-lg shrink-0 transition-transform duration-500"
+                      style={{ filter: isCompleted ? `drop-shadow(0 0 6px ${raceColor})` : 'none', transform: isCompleted ? 'scale(1.1)' : 'scale(1)' }}
+                    >
+                      {tier.free.icon}
+                    </span>
+                    <span
+                      className="font-display text-[11px] font-bold leading-tight"
+                      style={{ color: isCompleted ? (tier.free.color ?? raceColor) : 'var(--color-text-secondary)' }}
+                    >
+                      {tier.free.label}
+                    </span>
+                    {isCompleted && (
+                      <span className="ml-auto font-display text-[10px] font-black" style={{ color: '#44ff88' }}>✓</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="font-display text-[10px] text-text-muted">—</span>
+                )}
+              </div>
+
+              {/* Premium track card */}
+              <div
+                className={clsx(
+                  'flex-1 flex items-center gap-2.5 px-3 py-2.5 rounded-sm transition-all duration-500',
+                  tier.milestone && 'py-3',
+                  isPremiumTier && 'opacity-60',
+                )}
+                style={{
+                  background: isPremium && isCompleted
+                    ? 'rgba(255,200,50,0.08)'
+                    : isPremiumTier
+                    ? 'rgba(13,17,23,0.5)'
+                    : 'rgba(13,17,23,0.8)',
+                  border: `1px solid ${
+                    isPremium && isCompleted
+                      ? 'rgba(255,200,50,0.25)'
+                      : isPremiumTier
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'rgba(255,200,50,0.12)'
+                  }`,
+                }}
+              >
+                {isPremiumTier && (
+                  <span className="text-sm shrink-0 opacity-50">🔒</span>
+                )}
+                <span className="text-lg shrink-0" style={{ filter: isPremium && isCompleted ? 'drop-shadow(0 0 6px rgba(255,200,50,0.5))' : 'none' }}>
+                  {tier.premium.icon}
+                </span>
+                <span
+                  className="font-display text-[11px] font-bold leading-tight"
+                  style={{
+                    color: isPremium && isCompleted
+                      ? (tier.premium.color ?? '#ffc832')
+                      : isPremiumTier
+                      ? 'var(--color-text-muted)'
+                      : (tier.premium.color ?? 'var(--color-text-secondary)'),
+                  }}
+                >
+                  {tier.premium.label}
+                </span>
+                {isPremium && isCompleted && (
+                  <span className="ml-auto font-display text-[10px] font-black" style={{ color: '#ffc832' }}>✓</span>
+                )}
+                {tier.milestone && !isPremiumTier && (
+                  <span
+                    className="ml-auto font-display text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0"
+                    style={{ background: 'rgba(255,200,50,0.15)', color: '#ffc832', border: '1px solid rgba(255,200,50,0.3)' }}
+                  >
+                    Özel
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer legend */}
+      <div className="flex items-center gap-4 pt-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ background: `${raceColor}20`, border: `1px solid ${raceColor}40` }} />
+          <span className="font-display text-[10px] text-text-muted">Ücretsiz İz</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ background: 'rgba(255,200,50,0.15)', border: '1px solid rgba(255,200,50,0.3)' }} />
+          <span className="font-display text-[10px] text-text-muted">Premium İz</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="font-display text-[10px] font-black" style={{ color: '#ffc832' }}>Özel</span>
+          <span className="font-display text-[10px] text-text-muted">= Dönüm Noktası Ödülü</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ShopPage() {
   const { race, raceColor, raceGlow } = useRaceTheme();
@@ -791,7 +1109,7 @@ export default function ShopPage() {
   const raceDesc = RACE_DESCRIPTIONS[race];
   const raceBundleProduct = SHOP_PRODUCTS.find(p => p.id === RACE_BUNDLE_IDS[race]);
 
-  const tabProducts = SHOP_PRODUCTS.filter(p => p.category === activeTab);
+  const tabProducts = SHOP_PRODUCTS.filter(p => p.category === activeTab && !p.raceExclusive);
 
   function openModal(product: ShopProduct) {
     setSelectedProduct(product);
@@ -907,44 +1225,57 @@ export default function ShopPage() {
         <div className="flex-1 overflow-auto">
           <div className="max-w-5xl mx-auto p-4 sm:p-5 space-y-5 pb-8">
 
-            {/* Featured Banner */}
-            <FeaturedBanner
-              tab={activeTab}
-              race={race}
-              raceColor={raceColor}
-              raceGlow={raceGlow}
-              countdown={countdown}
-              raceBundleProduct={activeTab === 'genel' ? raceBundleProduct : undefined}
-              onBuy={openModal}
-            />
+            {/* Battle Pass Section */}
+            {activeTab === 'gecis' && (
+              <BattlePassSection
+                raceColor={raceColor}
+                raceGlow={raceGlow}
+                onBuyPass={() => {}}
+              />
+            )}
 
-            {/* Section header */}
-            <div className="flex items-center gap-3">
-              <span className="badge badge-race">
-                {TABS.find(t => t.key === activeTab)?.icon} {TABS.find(t => t.key === activeTab)?.label}
-              </span>
-              <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
-              <span className="font-display text-[10px] uppercase tracking-widest text-text-muted">
-                {tabProducts.length} ürün
-              </span>
-            </div>
+            {/* Featured Banner (non-battle-pass tabs) */}
+            {activeTab !== 'gecis' && (
+              <FeaturedBanner
+                tab={activeTab}
+                race={race}
+                raceColor={raceColor}
+                raceGlow={raceGlow}
+                countdown={countdown}
+                raceBundleProduct={activeTab === 'genel' ? raceBundleProduct : undefined}
+                onBuy={openModal}
+              />
+            )}
 
-            {/* ── Product Grid ─────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {tabProducts.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  raceColor={raceColor}
-                  raceGlow={raceGlow}
-                  playerRace={race}
-                  onBuy={openModal}
-                />
-              ))}
-            </div>
+            {/* Section header + Product Grid (non-battle-pass tabs only) */}
+            {activeTab !== 'gecis' && (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="badge badge-race">
+                    {TABS.find(t => t.key === activeTab)?.icon} {TABS.find(t => t.key === activeTab)?.label}
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
+                  <span className="font-display text-[10px] uppercase tracking-widest text-text-muted">
+                    {tabProducts.length} ürün
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {tabProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      raceColor={raceColor}
+                      raceGlow={raceGlow}
+                      playerRace={race}
+                      onBuy={openModal}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* ── All Race Bundles Showcase (Genel only) ───────────────── */}
-            {activeTab === 'genel' && (
+            {activeTab !== 'gecis' && activeTab === 'genel' && (
               <section>
                 <div className="flex items-center gap-3 mb-4">
                   <span className="badge badge-race">🧬 Irk Paketleri</span>

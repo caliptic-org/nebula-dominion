@@ -6,6 +6,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { fetcher, FetchError } from '@/lib/fetcher';
 import useSWR, { mutate } from 'swr';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import type {
   WorldMapHandle,
   HitTarget,
@@ -16,6 +17,7 @@ import type {
   TerritoryZone,
 } from '@/components/game/WorldMap';
 import clsx from 'clsx';
+import { TargetDetailSheet } from '@/components/galaxy-map/TargetDetailSheet';
 
 // WebGL canvas cannot SSR — cast preserves forwardRef generic so `ref` prop typechecks
 const WorldMap = dynamic(
@@ -306,13 +308,16 @@ function ActionPanel({ visible, target, actions, raceColor, onAction, onClose, p
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function WorldMapPage() {
+  const router = useRouter();
   const { race, raceColor, raceGlow } = useRaceTheme();
   const worldMapRef = useRef<WorldMapHandle>(null);
-  const [selected,        setSelected]        = useState<HitTarget|null>(null);
-  const [panelVisible,    setPanelVisible]    = useState(false);
-  const [feedback,        setFeedback]        = useState<{ tone: 'info' | 'error'; text: string }|null>(null);
-  const [pendingActionId, setPendingActionId] = useState<string|null>(null);
-  const [actionError,     setActionError]     = useState<unknown>(null);
+  const [selected,           setSelected]           = useState<HitTarget|null>(null);
+  const [panelVisible,       setPanelVisible]       = useState(false);
+  const [targetSheetBase,    setTargetSheetBase]    = useState<WorldBase|null>(null);
+  const [targetSheetVisible, setTargetSheetVisible] = useState(false);
+  const [feedback,           setFeedback]           = useState<{ tone: 'info' | 'error'; text: string }|null>(null);
+  const [pendingActionId,    setPendingActionId]    = useState<string|null>(null);
+  const [actionError,        setActionError]        = useState<unknown>(null);
 
   // ── Server state ─────────────────────────────────────────────────────────
   const {
@@ -347,7 +352,15 @@ export default function WorldMapPage() {
 
   const handleSelect = useCallback((t: HitTarget|null) => {
     setSelected(t);
-    setPanelVisible(!!t && t.kind !== 'empty');
+    // Enemy bases get the rich TargetDetailSheet; everything else uses ActionPanel
+    if (t?.kind === 'base' && t.base && !t.base.isPlayer) {
+      setTargetSheetBase(t.base);
+      setTargetSheetVisible(true);
+      setPanelVisible(false);
+    } else {
+      setTargetSheetVisible(false);
+      setPanelVisible(!!t && t.kind !== 'empty');
+    }
   }, []);
 
   const handleAction = useCallback(async (action: Action) => {
@@ -381,6 +394,41 @@ export default function WorldMapPage() {
     }
   }, [selected]);
 
+  // ── TargetDetailSheet handlers ───────────────────────────────────────────
+  const handleTargetAttack = useCallback(async (base: WorldBase) => {
+    // Navigate to battle-prep screen with target info encoded
+    router.push(`/battle?targetId=${encodeURIComponent(base.id ?? '')}&targetName=${encodeURIComponent(base.name)}&targetRace=${encodeURIComponent(base.race ?? '')}&targetPower=${base.power}`);
+  }, [router]);
+
+  const handleTargetScout = useCallback(async (base: WorldBase) => {
+    if (!selected) return;
+    setPendingActionId('scout');
+    try {
+      await fetcher(MAP_ACTION_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'scout',
+          targetCol: selected.col,
+          targetRow: selected.row,
+        }),
+      });
+      setFeedback({ tone: 'info', text: `🔭 Keşif komutu verildi` });
+      mutate(PLAYER_RESOURCES_URL);
+      mutate(MAP_STATE_URL);
+      setTargetSheetVisible(false);
+      setSelected(null);
+    } catch (err) {
+      if (err instanceof FetchError && err.status === 401) {
+        setActionError(err);
+        return;
+      }
+      const text = err instanceof Error ? err.message : 'Ağ hatası';
+      setFeedback({ tone: 'error', text: `⚠ ${text}` });
+    } finally {
+      setPendingActionId(null);
+    }
+  }, [selected]);
+
   // Auto-dismiss feedback toast
   useEffect(() => {
     if (!feedback) return;
@@ -391,7 +439,8 @@ export default function WorldMapPage() {
 
   const actions: Action[] = (() => {
     if (!selected) return [];
-    if (selected.kind==='base') return selected.base?.isPlayer ? ACTS_OWN : ACTS_ENEMY_BASE;
+    // Enemy bases are handled by TargetDetailSheet — don't show duplicate ActionPanel
+    if (selected.kind==='base') return selected.base?.isPlayer ? ACTS_OWN : [];
     if (selected.kind==='resource') return ACTS_RESOURCE;
     if (selected.kind==='enemy')    return ACTS_ENEMY;
     return [];
@@ -516,7 +565,7 @@ export default function WorldMapPage() {
         </div>
       )}
 
-      {/* ── Selection action panel ─────────────────────────────────────────── */}
+      {/* ── Selection action panel (own bases, resources, enemies) ──────────── */}
       <ActionPanel
         visible={panelVisible}
         target={selected}
@@ -524,6 +573,17 @@ export default function WorldMapPage() {
         raceColor={raceColor}
         onAction={handleAction}
         onClose={()=>{ setPanelVisible(false); setSelected(null); }}
+        pendingActionId={pendingActionId}
+      />
+
+      {/* ── Target Detail Sheet (enemy bases) ────────────────────────────── */}
+      <TargetDetailSheet
+        visible={targetSheetVisible}
+        base={targetSheetBase}
+        playerRace={race}
+        onAttack={handleTargetAttack}
+        onScout={handleTargetScout}
+        onClose={() => { setTargetSheetVisible(false); setSelected(null); }}
         pendingActionId={pendingActionId}
       />
 

@@ -1231,5 +1231,5 @@
   .base-resource-value.is-bumped { transition: none; animation: none; }
   .base-production-ring  { animation: none; }
   .base-rally-marker     { animation: none; }
-  .base-sigil-watermark  { animation: none; opacity: 0.4; }
+  .base-sigil-watermark  { animation: none; }
 }

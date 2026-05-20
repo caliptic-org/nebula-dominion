@@ -2,12 +2,25 @@
 
 import Image from 'next/image';
 import clsx from 'clsx';
+import { Race } from '@/types/units';
+import { CAPITAL_BACKDROPS, type GroundRaceKey } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
 
 interface Props {
   snapshot: RaceBaseSnapshot;
   selectedId: string | null;
   onSelect: (id: string) => void;
+}
+
+function groundKey(race: Race): GroundRaceKey {
+  switch (race) {
+    case Race.INSAN:   return 'human';
+    case Race.ZERG:    return 'zerg';
+    case Race.OTOMAT:  return 'automat';
+    case Race.CANAVAR: return 'beast';
+    case Race.SEYTAN:  return 'demon';
+    default:           return 'human';
+  }
 }
 
 const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
@@ -18,16 +31,23 @@ const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
 };
 
 export function IsoMap({ snapshot, selectedId, onSelect }: Props) {
+  const backdrop = CAPITAL_BACKDROPS[groundKey(snapshot.race)];
   return (
     <main className="base-center" role="region" aria-label="İzometrik üs haritası">
-      {/* Layer stack (bottom → top, CSS-driven via [data-race] on .base-screen):
-       *   1. Race-tinted ground / CAL-486 backdrop (image chained with gradient fallback)
-       *   2. Neutral readability vignette
-       *   3. CD-spec pulsing race-glow ambient (radial ellipse at 20% 80%)
-       *   4. Faint race sigil watermark in the bottom-right corner
-       * Iso grid + building sprites paint above on z-index 1. */}
-      <div className="base-ground-image" aria-hidden />
+      {/* Backdrop stack (bottom → top, DOM order = paint order):
+       *   1. .base-ground-layer       race-tinted gradient floor (always on; CSS-driven)
+       *   2. .base-capital-backdrop   CAL-486 cinematic artwork (when slot non-null)
+       *   3. .base-ambient-glow       CD-spec pulsing race-glow ellipse
+       *   4. .base-sigil-watermark    faint race sigil in bottom-right
+       * Iso grid + sprites paint above on z-index 1. */}
       <div className="base-ground-layer" aria-hidden />
+      {backdrop && (
+        <div
+          className="base-capital-backdrop"
+          aria-hidden
+          style={{ backgroundImage: `url(${backdrop})` }}
+        />
+      )}
       <div className="base-ambient-glow" aria-hidden />
       <div className="base-sigil-watermark" aria-hidden />
       <div className="base-iso-grid">

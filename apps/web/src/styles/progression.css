@@ -1261,3 +1261,17 @@
     font-size: clamp(90px, 35vw, 140px);
   }
 }
+
+/* ── Accessibility: reduce motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .age-current,
+  .age-card,
+  .age-tier-icon,
+  .age-scene-star,
+  .age-scan-line,
+  .age-shockwave,
+  .age-speed-line,
+  .age-ring,
+  .age-transition-icon { animation: none; transition: none; }
+}

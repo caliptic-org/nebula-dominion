@@ -10,6 +10,7 @@ import { SegmentedControl, SegmentedOption } from '@/components/ui/SegmentedCont
 import { Button } from '@/components/ui/Button';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { clearTokens } from '@/lib/session';
+import { useRaceTheme } from '@/hooks/useRaceTheme';
 
 type GraphicsQuality = 'low' | 'mid' | 'high';
 type Language = 'tr' | 'en';
@@ -43,11 +44,11 @@ const DEFAULT_SETTINGS: SettingsState = {
 };
 
 const SECTIONS = [
-  { id: 'audio',         label: 'Ses',          icon: '🔊' },
-  { id: 'graphics',      label: 'Grafik',       icon: '🎮' },
-  { id: 'language',      label: 'Dil',          icon: '🌐' },
-  { id: 'notifications', label: 'Bildirim',     icon: '🔔' },
-  { id: 'account',       label: 'Hesap',        icon: '👤' },
+  { id: 'audio',         label: 'Ses',          icon: '◈', sublabel: 'Müzik & Efektler' },
+  { id: 'graphics',      label: 'Grafik',       icon: '⬡', sublabel: 'Performans' },
+  { id: 'language',      label: 'Dil',          icon: '◉', sublabel: 'Arayüz Dili' },
+  { id: 'notifications', label: 'Bildirim',     icon: '◆', sublabel: 'Uyarılar' },
+  { id: 'account',       label: 'Hesap',        icon: '◎', sublabel: 'Profil & Güvenlik' },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
@@ -81,6 +82,7 @@ function loadSettings(): SettingsState {
 }
 
 export function SettingsClient() {
+  const { raceColor, raceDim, raceGlow } = useRaceTheme();
   const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [activeSection, setActiveSection] = useState<SectionId>('audio');
@@ -96,7 +98,7 @@ export function SettingsClient() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       setSavedFlash(true);
-      const t = setTimeout(() => setSavedFlash(false), 1200);
+      const t = setTimeout(() => setSavedFlash(false), 1800);
       return () => clearTimeout(t);
     } catch {
       /* storage unavailable */
@@ -114,54 +116,116 @@ export function SettingsClient() {
     setSettings(DEFAULT_SETTINGS);
   }
 
+  function scrollToSection(id: SectionId) {
+    setActiveSection(id);
+    if (typeof document !== 'undefined') {
+      document.getElementById(`section-${id}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }
+
   return (
     <div
-      className="h-dvh overflow-y-auto pb-28 lg:pb-12"
+      className="min-h-dvh overflow-y-auto pb-28 lg:pb-12"
       style={{ background: 'var(--gradient-hero)' }}
     >
-      {/* Header */}
+      {/* ── Cinematic Header ─────────────────────────────────────────── */}
       <header
-        className="sticky top-0 z-30 backdrop-blur-xl border-b"
+        className="sticky top-0 z-30"
         style={{
-          background: 'var(--color-bg-overlay)',
-          borderColor: 'var(--color-border)',
+          background: 'rgba(8,10,16,0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${raceColor}30`,
+          boxShadow: `0 1px 0 ${raceColor}18, 0 4px 24px rgba(0,0,0,0.6)`,
         }}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        {/* Scan beam */}
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          aria-hidden
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '-100%',
+              width: '60%',
+              height: '100%',
+              background: `linear-gradient(90deg, transparent 0%, ${raceColor}08 50%, transparent 100%)`,
+              animation: 'settings-scan 5s ease-in-out infinite',
+            }}
+          />
+          {/* Bottom accent line */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '1px',
+              background: `linear-gradient(90deg, transparent 0%, ${raceColor}60 30%, ${raceColor} 50%, ${raceColor}60 70%, transparent 100%)`,
+            }}
+          />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
+            {/* Back button — double-bezel */}
             <Link
               href="/"
               aria-label="Ana sayfaya dön"
-              className="inline-flex items-center justify-center w-10 h-10 rounded-lg shrink-0 transition-colors"
+              className="shrink-0 relative inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300"
               style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
+                background: raceDim,
+                border: `1px solid ${raceColor}35`,
+                color: raceColor,
+                boxShadow: `inset 0 1px 0 ${raceColor}20`,
               }}
             >
-              <span aria-hidden className="text-lg">←</span>
+              <span aria-hidden className="text-sm font-bold leading-none" style={{ marginTop: '-1px' }}>←</span>
             </Link>
+
             <div className="min-w-0">
-              <h1 className="font-display text-xl sm:text-2xl font-black tracking-wider uppercase truncate">
+              {/* Eyebrow tag */}
+              <p
+                className="text-[9px] font-display font-bold uppercase tracking-[0.25em] mb-0.5 hidden sm:block"
+                style={{ color: `${raceColor}80` }}
+              >
+                Sistem Konfigürasyonu
+              </p>
+              <h1 className="font-display text-lg sm:text-2xl font-black tracking-[0.08em] uppercase truncate" style={{ color: 'var(--color-text-primary)', lineHeight: 1 }}>
                 Ayarlar
               </h1>
-              <p className="text-xs text-text-muted hidden sm:block">
-                Tercihlerin tarayıcına otomatik kaydedilir
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span
+          <div className="flex items-center gap-2.5">
+            {/* Save confirmation badge */}
+            <div
               aria-live="polite"
-              className="text-xs font-display tracking-widest uppercase transition-opacity duration-300"
+              className="flex items-center gap-1.5 transition-all duration-500"
               style={{
-                color: 'var(--color-success)',
                 opacity: savedFlash ? 1 : 0,
+                transform: savedFlash ? 'translateY(0) scale(1)' : 'translateY(-4px) scale(0.95)',
               }}
             >
-              ✓ Kaydedildi
-            </span>
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-display font-bold uppercase tracking-widest"
+                style={{
+                  background: 'rgba(68,255,136,0.10)',
+                  border: '1px solid rgba(68,255,136,0.35)',
+                  color: 'var(--color-success)',
+                  boxShadow: '0 0 10px rgba(68,255,136,0.2)',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block', boxShadow: '0 0 6px var(--color-success)' }} />
+                Kaydedildi
+              </span>
+            </div>
+
             <Button variant="ghost" size="sm" onClick={resetDefaults}>
               Sıfırla
             </Button>
@@ -169,50 +233,129 @@ export function SettingsClient() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 lg:pt-10">
-        <div className="grid lg:grid-cols-[240px_1fr] gap-6 lg:gap-10">
-          {/* Section nav (sidebar on desktop, horizontal scroll on mobile) */}
-          <nav aria-label="Ayar bölümleri" className="lg:sticky lg:top-24 lg:self-start">
-            <ul
-              className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible -mx-4 px-4 lg:mx-0 lg:px-0 pb-2 lg:pb-0"
-              style={{ scrollbarWidth: 'thin' }}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 lg:pt-8">
+        <div className="grid lg:grid-cols-[220px_1fr] gap-6 lg:gap-8">
+
+          {/* ── Section Nav (HUD Tab Bar) ───────────────────────────── */}
+          <nav aria-label="Ayar bölümleri" className="lg:sticky lg:top-[72px] lg:self-start">
+            {/* Desktop: vertical list with double-bezel outer shell */}
+            <div
+              className="hidden lg:block rounded-2xl p-1.5"
+              style={{
+                background: 'rgba(8,10,16,0.7)',
+                border: `1px solid ${raceColor}20`,
+                boxShadow: `inset 0 1px 0 ${raceColor}12`,
+              }}
             >
-              {SECTIONS.map((s) => {
-                const active = activeSection === s.id;
-                return (
-                  <li key={s.id} className="shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSection(s.id);
-                        if (typeof document !== 'undefined') {
-                          document.getElementById(`section-${s.id}`)?.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start',
-                          });
-                        }
-                      }}
-                      aria-current={active ? 'true' : undefined}
-                      className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-display text-sm font-semibold tracking-wide transition-all duration-200 ease-spring"
-                      style={{
-                        background: active ? 'var(--color-race-dim)' : 'transparent',
-                        color: active ? 'var(--color-race)' : 'var(--color-text-secondary)',
-                        border: `1px solid ${active ? 'var(--color-race-glow)' : 'transparent'}`,
-                        boxShadow: active ? 'inset 2px 0 0 var(--color-race)' : undefined,
-                      }}
-                    >
-                      <span aria-hidden className="text-base">{s.icon}</span>
-                      <span>{s.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+              <ul className="flex flex-col gap-0.5">
+                {SECTIONS.map((s, i) => {
+                  const active = activeSection === s.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection(s.id)}
+                        aria-current={active ? 'true' : undefined}
+                        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-300"
+                        style={{
+                          background: active ? raceDim : 'transparent',
+                          border: `1px solid ${active ? raceColor + '40' : 'transparent'}`,
+                          color: active ? raceColor : 'var(--color-text-secondary)',
+                          boxShadow: active ? `inset 0 1px 0 ${raceColor}20, 0 0 12px ${raceColor}10` : 'none',
+                          transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
+                          animationDelay: `${i * 60}ms`,
+                        }}
+                      >
+                        {/* Icon container — double-bezel */}
+                        <span
+                          className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg text-sm font-bold transition-all duration-300"
+                          style={{
+                            background: active ? `${raceColor}20` : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${active ? raceColor + '35' : 'rgba(255,255,255,0.08)'}`,
+                            color: active ? raceColor : 'var(--color-text-muted)',
+                            boxShadow: active ? `0 0 8px ${raceColor}30` : 'none',
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          }}
+                        >
+                          {s.icon}
+                        </span>
+                        <div className="min-w-0 text-left">
+                          <p className="font-display text-xs font-bold uppercase tracking-wide leading-none">{s.label}</p>
+                          <p className="text-[10px] leading-none mt-0.5 opacity-60">{s.sublabel}</p>
+                        </div>
+                        {active && (
+                          <span
+                            className="ml-auto shrink-0"
+                            style={{ color: raceColor, fontSize: 10, opacity: 0.8 }}
+                            aria-hidden
+                          >
+                            ▶
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {/* Mobile: horizontal scroll pill tabs */}
+            <div
+              className="lg:hidden rounded-xl p-1"
+              style={{
+                background: 'rgba(8,10,16,0.70)',
+                border: `1px solid ${raceColor}20`,
+              }}
+            >
+              <ul
+                className="flex gap-1 overflow-x-auto"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                {SECTIONS.map((s) => {
+                  const active = activeSection === s.id;
+                  return (
+                    <li key={s.id} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection(s.id)}
+                        aria-current={active ? 'true' : undefined}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all duration-300 whitespace-nowrap"
+                        style={{
+                          background: active ? raceDim : 'transparent',
+                          border: `1px solid ${active ? raceColor + '40' : 'transparent'}`,
+                          color: active ? raceColor : 'var(--color-text-muted)',
+                          fontSize: 11,
+                          fontFamily: 'var(--font-display)',
+                          fontWeight: 700,
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'monospace', fontSize: 12 }} aria-hidden>{s.icon}</span>
+                        {s.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </nav>
 
-          {/* Sections */}
-          <div className="flex flex-col gap-6">
-            <Section id="audio" title="Ses" icon="🔊" description="Müzik ve efekt seviyelerini ayarla">
+          {/* ── Content Sections ───────────────────────────────────── */}
+          <div className="flex flex-col gap-5">
+
+            {/* Audio */}
+            <SettingsSection
+              id="audio"
+              title="Ses"
+              icon="◈"
+              description="Müzik, ses efektleri ve seviye kontrolü"
+              raceColor={raceColor}
+              raceDim={raceDim}
+              raceGlow={raceGlow}
+            >
               <div className="flex flex-col gap-5">
                 <Toggle
                   label="Sessiz Mod"
@@ -221,7 +364,8 @@ export function SettingsClient() {
                   onChange={(v) => patchAudio({ muted: v })}
                 />
 
-                <Divider />
+                {/* Visual divider with scan line */}
+                <ScanDivider raceColor={raceColor} />
 
                 <Slider
                   label="Ana Ses"
@@ -247,36 +391,77 @@ export function SettingsClient() {
                   disabled={settings.audio.muted}
                   formatValue={(v) => `${v}%`}
                 />
-              </div>
-            </Section>
 
-            <Section id="graphics" title="Grafik" icon="🎮" description="Performans ve kalite tercihi">
+                {/* Audio visualizer — decorative */}
+                <AudioVisualizer
+                  active={!settings.audio.muted}
+                  raceColor={raceColor}
+                  raceGlow={raceGlow}
+                />
+              </div>
+            </SettingsSection>
+
+            {/* Graphics */}
+            <SettingsSection
+              id="graphics"
+              title="Grafik"
+              icon="⬡"
+              description="Performans ve görsel kalite tercihi"
+              raceColor={raceColor}
+              raceDim={raceDim}
+              raceGlow={raceGlow}
+            >
               <SegmentedControl
                 ariaLabel="Grafik kalitesi"
                 value={settings.graphics.quality}
                 options={QUALITY_OPTIONS}
                 onChange={(quality) => setSettings((s) => ({ ...s, graphics: { ...s.graphics, quality } }))}
               />
-              <p className="mt-4 text-xs text-text-muted leading-relaxed">
+              <div
+                className="mt-4 px-3 py-2.5 rounded-lg text-xs leading-relaxed"
+                style={{
+                  background: raceDim,
+                  border: `1px solid ${raceColor}25`,
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
                 {settings.graphics.quality === 'low' &&
-                  'Düşük kalite — mobil ve eski donanım için optimize, partikül efektleri minimumda.'}
+                  '⚙️  Düşük kalite — mobil ve eski donanım için optimize, partikül efektleri minimumda.'}
                 {settings.graphics.quality === 'mid' &&
-                  'Orta kalite — çoğu cihaz için dengeli ayar. Önerilen.'}
+                  '⚡  Orta kalite — çoğu cihaz için dengeli ayar. Önerilen.'}
                 {settings.graphics.quality === 'high' &&
-                  'Yüksek kalite — gelişmiş partiküller, tam çözünürlük dokular ve dinamik aydınlatma.'}
-              </p>
-            </Section>
+                  '✨  Yüksek kalite — gelişmiş partiküller, tam çözünürlük dokular ve dinamik aydınlatma.'}
+              </div>
+            </SettingsSection>
 
-            <Section id="language" title="Dil" icon="🌐" description="Arayüz dilini seç">
+            {/* Language */}
+            <SettingsSection
+              id="language"
+              title="Dil"
+              icon="◉"
+              description="Arayüz dilini seç"
+              raceColor={raceColor}
+              raceDim={raceDim}
+              raceGlow={raceGlow}
+            >
               <SegmentedControl
                 ariaLabel="Dil seçimi"
                 value={settings.language}
                 options={LANGUAGE_OPTIONS}
                 onChange={(language) => setSettings((s) => ({ ...s, language }))}
               />
-            </Section>
+            </SettingsSection>
 
-            <Section id="notifications" title="Bildirimler" icon="🔔" description="Hangi olaylar için bildirim alacağını seç">
+            {/* Notifications */}
+            <SettingsSection
+              id="notifications"
+              title="Bildirimler"
+              icon="◆"
+              description="Hangi olaylar için uyarı alacağını belirle"
+              raceColor={raceColor}
+              raceDim={raceDim}
+              raceGlow={raceGlow}
+            >
               <div className="flex flex-col gap-5">
                 <Toggle
                   label="Push Bildirimleri"
@@ -284,7 +469,7 @@ export function SettingsClient() {
                   checked={settings.notifications.push}
                   onChange={(v) => patchNotifications({ push: v })}
                 />
-                <Divider />
+                <ScanDivider raceColor={raceColor} />
                 <Toggle
                   label="Bildirim Sesi"
                   description="Yeni bildirimde kısa bir uyarı sesi çal."
@@ -307,75 +492,228 @@ export function SettingsClient() {
                   disabled={!settings.notifications.push}
                 />
               </div>
-            </Section>
+            </SettingsSection>
 
-            <Section id="account" title="Hesap" icon="👤" description="Profil bilgilerin ve oturum yönetimi">
-              <AccountSection />
-            </Section>
+            {/* Account */}
+            <SettingsSection
+              id="account"
+              title="Hesap"
+              icon="◎"
+              description="Profil bilgilerin ve oturum yönetimi"
+              raceColor={raceColor}
+              raceDim={raceDim}
+              raceGlow={raceGlow}
+            >
+              <AccountSection raceColor={raceColor} raceDim={raceDim} raceGlow={raceGlow} />
+            </SettingsSection>
 
-            <p className="text-center text-xs text-text-muted pt-2">
-              Nebula Dominion · Sürüm 0.1.0 · Yapım aşamasında
+            {/* Version footer */}
+            <p
+              className="text-center text-[10px] font-display uppercase tracking-widest pb-2"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              Nebula Dominion · v0.1.0 · Alpha
             </p>
           </div>
         </div>
       </div>
 
       <BottomNav />
+
+      {/* Global animation keyframes */}
+      <style>{`
+        @keyframes settings-scan {
+          0%   { left: -100%; opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { left: 200%; opacity: 0; }
+        }
+        @keyframes settings-bar-1 { 0%,100%{height:30%} 50%{height:90%} }
+        @keyframes settings-bar-2 { 0%,100%{height:60%} 33%{height:20%} 66%{height:100%} }
+        @keyframes settings-bar-3 { 0%,100%{height:80%} 40%{height:30%} }
+        @keyframes settings-bar-4 { 0%,100%{height:40%} 60%{height:85%} }
+        @keyframes settings-bar-5 { 0%,100%{height:70%} 25%{height:100%} 75%{height:20%} }
+        @keyframes settings-bar-6 { 0%,100%{height:50%} 50%{height:75%} }
+        @keyframes settings-bar-7 { 0%,100%{height:35%} 45%{height:95%} }
+        @keyframes settings-bar-8 { 0%,100%{height:65%} 30%{height:25%} 70%{height:90%} }
+        @keyframes settings-slide-in {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-/* ── Helpers ───────────────────────────────────────────────────────────── */
+/* ── SettingsSection ─────────────────────────────────────────────────────── */
 
-interface SectionProps {
+interface SettingsSectionProps {
   id: SectionId;
   title: string;
   icon: string;
   description?: string;
   children: React.ReactNode;
+  raceColor: string;
+  raceDim: string;
+  raceGlow: string;
 }
 
-function Section({ id, title, icon, description, children }: SectionProps) {
+function SettingsSection({ id, title, icon, description, children, raceColor, raceDim, raceGlow }: SettingsSectionProps) {
   return (
-    <section id={`section-${id}`} aria-labelledby={`heading-${id}`} className="scroll-mt-28">
-      <GlassPanel padding="lg" className="animate-slide-up">
-        <header className="mb-5 pb-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-lg"
+    <section
+      id={`section-${id}`}
+      aria-labelledby={`heading-${id}`}
+      className="scroll-mt-24"
+      style={{
+        animation: 'settings-slide-in 0.5s cubic-bezier(0.32,0.72,0,1) both',
+      }}
+    >
+      {/* Double-bezel outer shell */}
+      <div
+        className="rounded-2xl p-[3px]"
+        style={{
+          background: `linear-gradient(135deg, ${raceColor}18 0%, transparent 60%, ${raceColor}08 100%)`,
+          boxShadow: `0 0 0 1px ${raceColor}18, 0 8px 32px rgba(0,0,0,0.4)`,
+        }}
+      >
+        {/* Inner core */}
+        <div
+          className="rounded-[calc(1rem-3px)] overflow-hidden"
+          style={{
+            background: 'rgba(10,13,20,0.92)',
+            boxShadow: `inset 0 1px 0 ${raceColor}12`,
+          }}
+        >
+          {/* Section header strip */}
+          <div
+            className="px-5 py-4 flex items-center gap-3"
+            style={{
+              borderBottom: `1px solid ${raceColor}15`,
+              background: `linear-gradient(90deg, ${raceDim} 0%, transparent 100%)`,
+            }}
+          >
+            {/* Icon — nested double-bezel */}
+            <div
+              className="relative shrink-0 rounded-xl p-[2px]"
               style={{
-                background: 'var(--color-race-dim)',
-                border: '1px solid var(--color-race-glow)',
-                color: 'var(--color-race)',
+                background: `linear-gradient(135deg, ${raceColor}30, ${raceColor}10)`,
               }}
             >
-              {icon}
-            </span>
-            <div className="min-w-0">
+              <div
+                className="flex items-center justify-center w-9 h-9 rounded-[calc(0.75rem-2px)]"
+                style={{
+                  background: raceDim,
+                  color: raceColor,
+                  fontSize: 16,
+                  fontFamily: 'monospace',
+                  boxShadow: `inset 0 1px 0 ${raceColor}20, 0 0 12px ${raceColor}25`,
+                  textShadow: `0 0 8px ${raceGlow}`,
+                }}
+                aria-hidden
+              >
+                {icon}
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
               <h2
                 id={`heading-${id}`}
-                className="font-display text-lg font-bold uppercase tracking-wider text-text-primary"
+                className="font-display text-base font-black uppercase tracking-[0.08em] leading-none"
+                style={{ color: 'var(--color-text-primary)' }}
               >
                 {title}
               </h2>
               {description && (
-                <p className="text-xs text-text-muted mt-0.5">{description}</p>
+                <p className="text-[11px] mt-1 leading-none" style={{ color: 'var(--color-text-muted)' }}>
+                  {description}
+                </p>
               )}
             </div>
+
+            {/* Section ID badge */}
+            <span
+              className="shrink-0 font-display text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md"
+              style={{
+                background: raceDim,
+                border: `1px solid ${raceColor}25`,
+                color: `${raceColor}80`,
+              }}
+              aria-hidden
+            >
+              {id.slice(0, 3).toUpperCase()}
+            </span>
           </div>
-        </header>
-        {children}
-      </GlassPanel>
+
+          {/* Content */}
+          <div className="px-5 py-5">
+            {children}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
-function Divider() {
-  return <div className="h-px" style={{ background: 'var(--color-border)' }} aria-hidden />;
+/* ── Divider with scan line accent ──────────────────────────────────────── */
+
+function ScanDivider({ raceColor }: { raceColor: string }) {
+  return (
+    <div className="relative flex items-center gap-3" aria-hidden>
+      <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+      <span
+        className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest"
+        style={{ color: `${raceColor}50` }}
+      >
+        ···
+      </span>
+      <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+    </div>
+  );
 }
 
-/* ── Account ───────────────────────────────────────────────────────────── */
+/* ── Audio Visualizer ────────────────────────────────────────────────────── */
+
+function AudioVisualizer({ active, raceColor, raceGlow }: { active: boolean; raceColor: string; raceGlow: string }) {
+  const bars = [
+    { anim: 'settings-bar-1', delay: '0ms',   height: '30%' },
+    { anim: 'settings-bar-2', delay: '150ms',  height: '60%' },
+    { anim: 'settings-bar-3', delay: '80ms',   height: '80%' },
+    { anim: 'settings-bar-4', delay: '220ms',  height: '40%' },
+    { anim: 'settings-bar-5', delay: '50ms',   height: '70%' },
+    { anim: 'settings-bar-6', delay: '310ms',  height: '50%' },
+    { anim: 'settings-bar-7', delay: '130ms',  height: '35%' },
+    { anim: 'settings-bar-8', delay: '260ms',  height: '65%' },
+  ];
+
+  return (
+    <div
+      className="flex items-end justify-center gap-[3px] h-8 px-4 rounded-lg transition-opacity duration-500"
+      style={{
+        opacity: active ? 0.7 : 0.2,
+        background: `${raceColor}06`,
+        border: `1px solid ${raceColor}15`,
+      }}
+      aria-hidden
+    >
+      {bars.map((b, i) => (
+        <div
+          key={i}
+          className="rounded-sm"
+          style={{
+            width: 3,
+            height: b.height,
+            background: raceColor,
+            boxShadow: active ? `0 0 4px ${raceGlow}` : 'none',
+            animation: active ? `${b.anim} ${1.2 + i * 0.15}s ease-in-out ${b.delay} infinite` : 'none',
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ── Account Section ─────────────────────────────────────────────────────── */
 
 interface ProfileForm {
   displayName: string;
@@ -390,7 +728,15 @@ interface PasswordForm {
 
 const PROFILE_STORAGE_KEY = 'nebula:profile:v1';
 
-function AccountSection() {
+function AccountSection({
+  raceColor,
+  raceDim,
+  raceGlow,
+}: {
+  raceColor: string;
+  raceDim: string;
+  raceGlow: string;
+}) {
   const router = useRouter();
 
   const [profile, setProfile] = useState<ProfileForm>({ displayName: 'Komutan', email: '' });
@@ -476,10 +822,8 @@ function AccountSection() {
     <div className="flex flex-col gap-6">
       {/* Profile */}
       <div>
-        <h3 className="font-display text-xs font-bold uppercase tracking-widest text-text-muted mb-3">
-          Profil
-        </h3>
-        <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4" noValidate>
+        <SubHeading label="Profil" raceColor={raceColor} />
+        <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4 mt-3" noValidate>
           {profileMessage && (
             <Alert kind={profileMessage.type}>{profileMessage.text}</Alert>
           )}
@@ -518,14 +862,12 @@ function AccountSection() {
         </form>
       </div>
 
-      <Divider />
+      <ScanDivider raceColor={raceColor} />
 
       {/* Password */}
       <div>
-        <h3 className="font-display text-xs font-bold uppercase tracking-widest text-text-muted mb-3">
-          Şifre Değiştir
-        </h3>
-        <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4" noValidate>
+        <SubHeading label="Şifre Değiştir" raceColor={raceColor} />
+        <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4 mt-3" noValidate>
           {pwMessage && <Alert kind={pwMessage.type}>{pwMessage.text}</Alert>}
           <div>
             <label htmlFor="pw-current" className="form-label">Mevcut Şifre</label>
@@ -571,7 +913,7 @@ function AccountSection() {
           </div>
           {passwordValidationError && (
             <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
-              ⚠️ {passwordValidationError}
+              ⚠ {passwordValidationError}
             </p>
           )}
           <div>
@@ -582,23 +924,24 @@ function AccountSection() {
         </form>
       </div>
 
-      <Divider />
+      <ScanDivider raceColor={raceColor} />
 
       {/* Danger zone */}
       <div>
-        <h3 className="font-display text-xs font-bold uppercase tracking-widest text-text-muted mb-3">
-          Oturum
-        </h3>
+        <SubHeading label="Oturum" raceColor={raceColor} />
         <div
-          className="rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          className="mt-3 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           style={{
-            background: 'rgba(255,51,85,0.06)',
-            border: '1px solid rgba(255,51,85,0.25)',
+            background: 'rgba(255,51,85,0.05)',
+            border: '1px solid rgba(255,51,85,0.20)',
+            boxShadow: 'inset 0 1px 0 rgba(255,51,85,0.08)',
           }}
         >
           <div className="min-w-0">
-            <p className="font-display text-sm font-bold text-text-primary">Çıkış Yap</p>
-            <p className="text-xs text-text-muted mt-0.5">
+            <p className="font-display text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
+              Çıkış Yap
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
               Bu cihazdaki oturumun sonlanır. Tekrar giriş yapman gerekir.
             </p>
           </div>
@@ -624,19 +967,35 @@ function AccountSection() {
   );
 }
 
+/* ── Sub-heading ────────────────────────────────────────────────────────── */
+
+function SubHeading({ label, raceColor }: { label: string; raceColor: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-1 h-3 rounded-full" style={{ background: raceColor, boxShadow: `0 0 6px ${raceColor}` }} aria-hidden />
+      <h3 className="font-display text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: `${raceColor}90` }}>
+        {label}
+      </h3>
+    </div>
+  );
+}
+
+/* ── Alert ──────────────────────────────────────────────────────────────── */
+
 function Alert({ kind, children }: { kind: 'success' | 'error'; children: React.ReactNode }) {
   const isErr = kind === 'error';
   return (
     <div
       role={isErr ? 'alert' : 'status'}
-      className="rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2"
+      className="rounded-lg px-3 py-2.5 text-xs font-semibold flex items-center gap-2"
       style={{
-        background: isErr ? 'rgba(255,51,85,0.10)' : 'rgba(68,255,136,0.10)',
-        border: `1px solid ${isErr ? 'rgba(255,51,85,0.35)' : 'rgba(68,255,136,0.35)'}`,
+        background: isErr ? 'rgba(255,51,85,0.08)' : 'rgba(68,255,136,0.08)',
+        border: `1px solid ${isErr ? 'rgba(255,51,85,0.30)' : 'rgba(68,255,136,0.30)'}`,
         color: isErr ? 'var(--color-danger)' : 'var(--color-success)',
+        boxShadow: `inset 0 1px 0 ${isErr ? 'rgba(255,51,85,0.10)' : 'rgba(68,255,136,0.10)'}`,
       }}
     >
-      <span aria-hidden>{isErr ? '⚠️' : '✓'}</span>
+      <span aria-hidden className="shrink-0">{isErr ? '⚠' : '✓'}</span>
       <span>{children}</span>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
-import type { AbilityDef, BattleSnapshot, BattleUnit } from './types';
+import type { AbilityDef, BattleSnapshot, BattleUnit, StatusEffect } from './types';
 
 const PORTRAIT = (race: Race, file: string) => `/assets/characters/${RACE_DESCRIPTIONS[race].dataRace}/${file}`;
 
@@ -15,9 +15,19 @@ function unit(
   x: number,
   y: number,
   controlGroup?: number,
+  statusEffects?: StatusEffect[],
 ): BattleUnit {
-  return { id, name, portrait, side, hp, maxHp, morale, status, x, y, controlGroup };
+  return { id, name, portrait, side, hp, maxHp, morale, status, x, y, controlGroup, statusEffects };
 }
+
+/** Demo status effects applied to showcase the system. */
+const DEMO_EFFECTS: StatusEffect[][] = [
+  [{ type: 'shield', duration: 8 }, { type: 'haste', duration: 4 }],
+  [{ type: 'regenerate', duration: 12 }],
+  [{ type: 'poison', duration: 6, stacks: 2 }, { type: 'slow', duration: 5 }],
+  [],
+  [{ type: 'burn', duration: 3 }],
+];
 
 const COMMON_ABILITIES = (
   attack: { id: string; name: string; glyph: string; description: string },
@@ -100,6 +110,7 @@ function friendlyUnits(race: Race): BattleUnit[] {
     positions[i]?.[0] ?? 200,
     positions[i]?.[1] ?? 300,
     i < 3 ? 1 : 2,
+    DEMO_EFFECTS[i] ?? [],
   ));
 }
 

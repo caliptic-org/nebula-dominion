@@ -3,7 +3,7 @@
 import clsx from 'clsx';
 import { Race } from '@/types/units';
 import { BATTLEFIELD_BOUNDS } from './types';
-import type { BattleUnit, DamageNumber } from './types';
+import type { BattleUnit, DamageNumber, StatusEffectType } from './types';
 import { BATTLEFIELD_TEXTURES, GROUND_TEXTURES, type GroundRaceKey } from '../base-v2/asset-manifest';
 
 interface Props {
@@ -26,6 +26,17 @@ function groundKey(race: Race): GroundRaceKey {
     default:           return 'human';
   }
 }
+
+const STATUS_EFFECT_GLYPHS: Record<StatusEffectType, string> = {
+  shield:     '🛡',
+  poison:     '☠',
+  burn:       '🔥',
+  freeze:     '❄',
+  stun:       '⚡',
+  regenerate: '💚',
+  haste:      '💨',
+  slow:       '🐌',
+};
 
 export function BattleGround({
   units,
@@ -57,6 +68,9 @@ export function BattleGround({
           const yPct = (unit.y / BATTLEFIELD_BOUNDS.height) * 100;
           const isFriendly = unit.side === 'friendly';
           const isSelected = unit.id === selectedUnitId;
+          const hpCritical = isFriendly && unit.hp / unit.maxHp < 0.25;
+          const activeEffects = unit.statusEffects?.filter((fx) => fx.duration > 0) ?? [];
+
           return (
             <button
               key={unit.id}
@@ -67,11 +81,26 @@ export function BattleGround({
                 isSelected && 'selected',
                 isFriendly && unit.status === 'attacking' && 'taking-damage',
               )}
+              data-hp-critical={hpCritical ? 'true' : undefined}
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
               onClick={isFriendly ? () => onSelectUnit(unit.id) : undefined}
               aria-label={`${isFriendly ? 'Dost' : 'Düşman'} birim: ${unit.name}`}
               tabIndex={isFriendly ? 0 : -1}
             >
+              {/* Status effect icon strip — only shown for friendly units */}
+              {isFriendly && activeEffects.length > 0 && (
+                <div className="unit-sprite-effects" aria-hidden>
+                  {activeEffects.slice(0, 3).map((fx, idx) => (
+                    <span key={`${fx.type}-${idx}`} className={`status-effect-icon ${fx.type}`}>
+                      {STATUS_EFFECT_GLYPHS[fx.type]}
+                      {fx.stacks && fx.stacks > 1 && (
+                        <span className="status-effect-stacks">{fx.stacks}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <div className="unit-sprite-body">
                 {isFriendly && unit.portrait ? (
                   // eslint-disable-next-line @next/next/no-img-element

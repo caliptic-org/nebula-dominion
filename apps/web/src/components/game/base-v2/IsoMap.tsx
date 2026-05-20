@@ -6,14 +6,6 @@ import { Race } from '@/types/units';
 import { CAPITAL_BACKDROPS, type GroundRaceKey } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
 
-const RACE_TO_BACKDROP_KEY: Record<Race, keyof typeof CAPITAL_BACKDROPS> = {
-  [Race.INSAN]:   'human',
-  [Race.ZERG]:    'zerg',
-  [Race.OTOMAT]:  'automat',
-  [Race.CANAVAR]: 'beast',
-  [Race.SEYTAN]:  'demon',
-};
-
 function groundKey(race: Race): GroundRaceKey {
   switch (race) {
     case Race.INSAN:   return 'human';

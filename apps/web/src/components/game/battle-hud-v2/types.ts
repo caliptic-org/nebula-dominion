@@ -6,6 +6,25 @@ export type BattleSide = 'friendly' | 'enemy';
 export type UnitStatus = 'idle' | 'attacking' | 'defending' | 'moving';
 export type DamageType = 'damage' | 'critical' | 'heal' | 'miss';
 
+/** Buff / debuff status effects displayed as icon strips on units. */
+export type StatusEffectType =
+  | 'shield'      // +def (blue)
+  | 'poison'      // DoT (green)
+  | 'burn'        // DoT (orange)
+  | 'freeze'      // immobilize (cyan)
+  | 'stun'        // no actions (yellow)
+  | 'regenerate'  // HoT (bright green pulse)
+  | 'haste'       // +speed (cyan)
+  | 'slow';       // -speed (grey)
+
+export interface StatusEffect {
+  type: StatusEffectType;
+  /** Remaining duration in seconds. Use Infinity for permanent (e.g. passive auras). */
+  duration: number;
+  /** Stack count — shown as a number badge when > 1. */
+  stacks?: number;
+}
+
 export interface BattleUnit {
   id: string;
   name: string;
@@ -19,6 +38,8 @@ export interface BattleUnit {
   x: number;
   y: number;
   controlGroup?: number;
+  /** Active buffs and debuffs on this unit. */
+  statusEffects?: StatusEffect[];
 }
 
 export interface AbilityDef {

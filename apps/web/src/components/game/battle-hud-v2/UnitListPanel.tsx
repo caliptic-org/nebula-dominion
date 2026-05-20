@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import type { BattleUnit } from './types';
+import type { BattleUnit, StatusEffectType } from './types';
 
 interface Props {
   units: BattleUnit[];
@@ -18,6 +18,17 @@ const STATUS_LABELS: Record<BattleUnit['status'], string> = {
   defending: 'SAVUN',
   idle: 'BOŞTA',
   moving: 'HAREKET',
+};
+
+const STATUS_EFFECT_GLYPHS: Record<StatusEffectType, string> = {
+  shield:     '🛡',
+  poison:     '☠',
+  burn:       '🔥',
+  freeze:     '❄',
+  stun:       '⚡',
+  regenerate: '💚',
+  haste:      '💨',
+  slow:       '🐌',
 };
 
 export function UnitListPanel({
@@ -46,6 +57,7 @@ export function UnitListPanel({
           const hpPct = unit.hp / unit.maxHp;
           const moralePct = unit.morale / 100;
           const moraleCritical = moralePct < 0.35;
+          const hpCritical = hpPct < 0.25;
           const isSelected = unit.id === selectedId;
           return (
             <button
@@ -53,6 +65,7 @@ export function UnitListPanel({
               type="button"
               role="listitem"
               className={clsx('unit-row', isSelected && 'selected')}
+              data-hp-critical={hpCritical ? 'true' : undefined}
               onClick={() => onSelect(unit.id)}
               aria-pressed={isSelected}
               aria-label={`${unit.name} — ${Math.round(hpPct * 100)}% can`}
@@ -87,6 +100,24 @@ export function UnitListPanel({
                   />
                   <span className="stat-label morale-icon">⚡ {unit.morale}</span>
                 </div>
+
+                {unit.statusEffects && unit.statusEffects.length > 0 && (
+                  <div className="unit-status-effects" aria-label="Durum etkileri">
+                    {unit.statusEffects.map((fx, idx) => (
+                      <span
+                        key={`${fx.type}-${idx}`}
+                        className={`status-effect-icon ${fx.type}`}
+                        title={fx.type}
+                        aria-label={fx.type}
+                      >
+                        {STATUS_EFFECT_GLYPHS[fx.type]}
+                        {fx.stacks && fx.stacks > 1 && (
+                          <span className="status-effect-stacks">{fx.stacks}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </button>
           );

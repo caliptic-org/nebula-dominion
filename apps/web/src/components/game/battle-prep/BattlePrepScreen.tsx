@@ -251,7 +251,7 @@ export function BattlePrepScreen() {
         {/* Fleet Selection */}
         <section className="bp-section bp-anim-3">
           <div className="bp-section-label">Komutan Seç</div>
-          <div className="bp-slot-counter">
+          <div className={`bp-slot-counter${selectedUnits.length >= MAX_FLEET ? ' full' : ''}`}>
             {Array.from({ length: MAX_FLEET }).map((_, i) => (
               <div key={i} className={`bp-slot-dot ${i < selectedUnits.length ? 'filled' : ''}`} />
             ))}

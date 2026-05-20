@@ -179,6 +179,15 @@
   overflow: hidden;
   position: relative;
 }
+.bp-enemy-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--race-primary, #4a9eff) 12%, transparent);
+  pointer-events: none;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--race-primary, #4a9eff) 5%, transparent) 0%, transparent 60%);
+}
 .bp-enemy-card-inner {
   display: flex;
   align-items: center;
@@ -782,6 +791,40 @@
 .bp-confirm-meta-dot {
   width: 5px; height: 5px;
   border-radius: 50%;
+}
+
+/* ─── CTA ready-pulse — fires when a commander is selected ─── */
+@keyframes bp-cta-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--race-primary, #4a9eff) 60%, transparent); }
+  50%  { box-shadow: 0 0 0 10px color-mix(in srgb, var(--race-primary, #4a9eff) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--race-primary, #4a9eff) 0%, transparent); }
+}
+@keyframes bp-cta-shimmer {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(300%) skewX(-15deg); }
+}
+.bp-confirm-btn:not(.disabled)::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+  animation: bp-cta-shimmer 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.bp-confirm-btn:not(.disabled) {
+  animation: bp-cta-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Slot counter full-flash ─── */
+@keyframes bp-slot-fill-flash {
+  0%   { background: rgba(255,255,255,0.03); }
+  40%  { background: color-mix(in srgb, var(--race-primary, #4a9eff) 18%, transparent); }
+  100% { background: rgba(255,255,255,0.03); }
+}
+.bp-slot-counter.full {
+  animation: bp-slot-fill-flash 600ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 /* ─── Entry animation ─── */

@@ -129,23 +129,25 @@
   position: absolute;
   left: 0;
   right: 0;
+  top: 0;
   height: 2px;
   background: linear-gradient(180deg, transparent 0%, var(--ss-race, #4a9eff) 50%, transparent 100%);
   opacity: 0.18;
+  transform: translateY(-100%);
   animation: ss-scan 5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 @keyframes ss-scan {
-  0%   { top: -2px; }
-  100% { top: 100%; }
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
 }
 
-/* Film grain (fixed pseudo-element to avoid repaint) */
+/* Film grain (absolute within ss-root to avoid stacking above fade overlay) */
 .ss-grain {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 99;
+  z-index: 5;
   opacity: 0.03;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
@@ -489,7 +491,7 @@
 
 /* Dialog text */
 .ss-dialog-text {
-  font-family: var(--font-nd-body, 'Inter', system-ui, sans-serif);
+  font-family: var(--font-nd-body, 'Rajdhani', system-ui, sans-serif);
   font-size: 13.5px;
   line-height: 1.65;
   color: rgba(232, 232, 240, 0.92);
@@ -610,7 +612,7 @@
   font-weight: 600;
   opacity: 0.6;
   margin-bottom: 28px;
-  font-family: var(--font-nd-body, 'Inter', system-ui);
+  font-family: var(--font-nd-body, 'Rajdhani', system-ui);
 }
 
 /* CTA button for ending */

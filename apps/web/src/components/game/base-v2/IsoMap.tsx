@@ -2,7 +2,17 @@
 
 import Image from 'next/image';
 import clsx from 'clsx';
+import { Race } from '@/types/units';
+import { CAPITAL_BACKDROPS } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
+
+const RACE_TO_BACKDROP_KEY: Record<Race, keyof typeof CAPITAL_BACKDROPS> = {
+  [Race.INSAN]:   'human',
+  [Race.ZERG]:    'zerg',
+  [Race.OTOMAT]:  'automat',
+  [Race.CANAVAR]: 'beast',
+  [Race.SEYTAN]:  'demon',
+};
 
 interface Props {
   snapshot: RaceBaseSnapshot;
@@ -18,16 +28,23 @@ const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
 };
 
 export function IsoMap({ snapshot, selectedId, onSelect }: Props) {
+  const backdropSrc = CAPITAL_BACKDROPS[RACE_TO_BACKDROP_KEY[snapshot.race]];
   return (
     <main className="base-center" role="region" aria-label="İzometrik üs haritası">
       {/* Layer stack (bottom → top, CSS-driven via [data-race] on .base-screen):
-       *   1. Race-tinted ground / CAL-486 backdrop (image chained with gradient fallback)
-       *   2. Neutral readability vignette
+       *   1. Race-tinted gradient floor (always on)
+       *   2. CAL-486 cinematic artwork (only when CAPITAL_BACKDROPS slot is non-null)
        *   3. CD-spec pulsing race-glow ambient (radial ellipse at 20% 80%)
        *   4. Faint race sigil watermark in the bottom-right corner
        * Iso grid + building sprites paint above on z-index 1. */}
-      <div className="base-ground-image" aria-hidden />
       <div className="base-ground-layer" aria-hidden />
+      {backdropSrc && (
+        <div
+          className="base-capital-backdrop"
+          aria-hidden
+          style={{ backgroundImage: `url(${backdropSrc})` }}
+        />
+      )}
       <div className="base-ambient-glow" aria-hidden />
       <div className="base-sigil-watermark" aria-hidden />
       <div className="base-iso-grid">

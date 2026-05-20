@@ -28,6 +28,7 @@ interface Mission {
   rewards: Reward[];
   category: MissionTab;
   difficulty?: 'kolay' | 'orta' | 'zor' | 'efsane';
+  xpReward?: number;
 }
 
 interface Achievement {
@@ -57,6 +58,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'ana',
     difficulty: 'kolay',
+    xpReward: 1200,
   },
   {
     id: 'story-2',
@@ -72,6 +74,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'ana',
     difficulty: 'orta',
+    xpReward: 2500,
   },
   {
     id: 'story-3',
@@ -86,6 +89,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'ana',
     difficulty: 'zor',
+    xpReward: 5000,
   },
   {
     id: 'story-4',
@@ -100,6 +104,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'ana',
     difficulty: 'efsane',
+    xpReward: 50000,
   },
   {
     id: 'daily-1',
@@ -112,6 +117,7 @@ const MISSIONS: Mission[] = [
     rewards: [{ icon: '💎', label: 'Mineral', amount: 2000, color: '#4a9eff' }],
     category: 'gunluk',
     difficulty: 'kolay',
+    xpReward: 400,
   },
   {
     id: 'daily-2',
@@ -127,6 +133,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'gunluk',
     difficulty: 'orta',
+    xpReward: 800,
   },
   {
     id: 'daily-3',
@@ -139,6 +146,7 @@ const MISSIONS: Mission[] = [
     rewards: [{ icon: '⚡', label: 'Enerji', amount: 1000, color: '#ffc832' }],
     category: 'gunluk',
     difficulty: 'kolay',
+    xpReward: 350,
   },
   {
     id: 'weekly-1',
@@ -155,6 +163,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'haftalik',
     difficulty: 'zor',
+    xpReward: 10000,
   },
   {
     id: 'weekly-2',
@@ -170,6 +179,7 @@ const MISSIONS: Mission[] = [
     ],
     category: 'haftalik',
     difficulty: 'orta',
+    xpReward: 6000,
   },
 ];
 
@@ -234,14 +244,35 @@ const DIFFICULTY_CONFIG = {
   efsane: { label: 'EFSANE', color: '#cc00ff' },
 } as const;
 
-const TABS: { id: MissionTab; label: string; icon: string }[] = [
-  { id: 'ana',      label: 'Ana Görev', icon: '📖' },
-  { id: 'gunluk',   label: 'Günlük',    icon: '☀️' },
-  { id: 'haftalik', label: 'Haftalık',  icon: '📅' },
-  { id: 'basarim',  label: 'Başarım',   icon: '🏆' },
+const TABS: { id: MissionTab; label: string; icon: string; shortLabel: string }[] = [
+  { id: 'ana',      label: 'Ana Görev', shortLabel: 'Hikaye', icon: '📖' },
+  { id: 'gunluk',   label: 'Günlük',   shortLabel: 'Günlük', icon: '☀️' },
+  { id: 'haftalik', label: 'Haftalık', shortLabel: 'Haftalık', icon: '📅' },
+  { id: 'basarim',  label: 'Başarım',  shortLabel: 'Başarım', icon: '🏆' },
 ];
 
-// ── Segmented Progress Bar ────────────────────────────────────────────────────
+// ── Daily Reset Countdown ──────────────────────────────────────────────────────
+
+function useDailyReset() {
+  const [timeLeft, setTimeLeft] = useState({ h: 14, m: 23, s: 0 });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        let { h, m, s } = prev;
+        if (s > 0) return { h, m, s: s - 1 };
+        if (m > 0) return { h, m: m - 1, s: 59 };
+        if (h > 0) return { h: h - 1, m: 59, s: 59 };
+        return { h: 23, m: 59, s: 59 };
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return `${String(timeLeft.h).padStart(2, '0')}:${String(timeLeft.m).padStart(2, '0')}:${String(timeLeft.s).padStart(2, '0')}`;
+}
+
+// ── Segmented HUD Progress Bar ─────────────────────────────────────────────────
 
 function SegmentedProgressBar({
   progress,
@@ -267,6 +298,7 @@ function SegmentedProgressBar({
         const isFilled = i < filled;
         const isPartial = i === filled && partial > 0;
         const fillWidth = isPartial ? `${partial * 100}%` : isFilled ? '100%' : '0%';
+        const isLeadingEdge = isFilled && i === filled - 1;
 
         return (
           <div
@@ -290,6 +322,17 @@ function SegmentedProgressBar({
                 boxShadow: (isFilled || isPartial) ? `0 0 6px ${color}80` : 'none',
               }}
             />
+            {/* Leading scan line on the active fill edge */}
+            {(isLeadingEdge || isPartial) && (
+              <div
+                className="absolute top-0 bottom-0 w-px"
+                style={{
+                  right: isPartial ? `${(1 - partial) * 100}%` : '0',
+                  background: 'rgba(255,255,255,0.85)',
+                  boxShadow: `0 0 4px ${color}`,
+                }}
+              />
+            )}
           </div>
         );
       })}
@@ -319,6 +362,51 @@ function RewardChip({ reward }: { reward: Reward }) {
   );
 }
 
+// ── Story Path Node ────────────────────────────────────────────────────────────
+
+function StoryPathNode({
+  state,
+  raceColor,
+  raceGlow,
+  isLast,
+}: {
+  state: MissionState;
+  raceColor: string;
+  raceGlow: string;
+  isLast: boolean;
+}) {
+  const color = state === 'completed' ? '#44ff88' : state === 'active' ? raceColor : 'rgba(255,255,255,0.15)';
+  const glow  = state === 'completed' ? 'rgba(68,255,136,0.6)' : state === 'active' ? raceGlow : 'none';
+
+  return (
+    <div className="flex flex-col items-center shrink-0" aria-hidden>
+      {/* Diamond node */}
+      <div
+        className="w-3 h-3 rounded-sm"
+        style={{
+          transform: 'rotate(45deg)',
+          background: state === 'completed' ? '#44ff88' : 'transparent',
+          border: `1.5px solid ${color}`,
+          boxShadow: state !== 'locked' ? `0 0 8px ${glow}` : 'none',
+          transition: 'all 0.5s cubic-bezier(0.32,0.72,0,1)',
+        }}
+      />
+      {/* Connector line to next node */}
+      {!isLast && (
+        <div
+          className="w-px"
+          style={{
+            height: '2rem',
+            background: state === 'completed'
+              ? 'linear-gradient(180deg, rgba(68,255,136,0.6), rgba(68,255,136,0.15))'
+              : `linear-gradient(180deg, ${color}40, transparent)`,
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Mission Card ──────────────────────────────────────────────────────────────
 
 function MissionCard({
@@ -326,154 +414,171 @@ function MissionCard({
   raceColor,
   raceGlow,
   onClaim,
+  showPath,
+  isLast,
 }: {
   mission: Mission;
   raceColor: string;
   raceGlow: string;
   onClaim: (m: Mission) => void;
+  showPath?: boolean;
+  isLast?: boolean;
 }) {
   const isCompleted = mission.state === 'completed';
   const isLocked    = mission.state === 'locked';
   const difficulty  = mission.difficulty ? DIFFICULTY_CONFIG[mission.difficulty] : null;
 
   return (
-    <div
-      className={`doppelrand transition-all duration-500 ${isLocked ? 'opacity-45' : ''}`}
-      style={{
-        borderColor: isCompleted
-          ? 'rgba(68,255,136,0.30)'
-          : isLocked
-          ? 'rgba(255,255,255,0.04)'
-          : `${raceColor}28`,
-        boxShadow: isCompleted
-          ? '0 0 20px rgba(68,255,136,0.10)'
-          : isLocked
-          ? 'none'
-          : `0 0 16px ${raceGlow}18`,
-      }}
-    >
-      <div className="doppelrand-inner p-4">
-        <div className="flex gap-3">
-          {/* Left accent bar */}
-          <div
-            className="w-[3px] rounded-full shrink-0 self-stretch min-h-[3rem]"
-            style={{
-              background: isCompleted
-                ? 'linear-gradient(180deg, #44ff88, #44ff8844)'
-                : isLocked
-                ? 'rgba(255,255,255,0.08)'
-                : `linear-gradient(180deg, ${raceColor}, ${raceColor}44)`,
-              boxShadow: isCompleted
-                ? '0 0 8px rgba(68,255,136,0.6)'
-                : isLocked
-                ? 'none'
-                : `0 0 8px ${raceGlow}`,
-            }}
-          />
+    <div className={`flex gap-2 ${showPath ? 'items-start' : ''}`}>
+      {/* Story path node */}
+      {showPath && (
+        <StoryPathNode
+          state={mission.state}
+          raceColor={raceColor}
+          raceGlow={raceGlow}
+          isLast={!!isLast}
+        />
+      )}
 
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2 mb-1.5">
-              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                {isCompleted && (
-                  <span
-                    className="text-sm leading-none shrink-0"
-                    aria-label="Tamamlandı"
-                    style={{ filter: 'drop-shadow(0 0 6px rgba(68,255,136,0.7))' }}
-                  >
-                    ✓
-                  </span>
-                )}
-                {isLocked && (
-                  <span className="text-sm leading-none shrink-0" aria-label="Kilitli">🔒</span>
-                )}
-                <h3
-                  className="font-display text-sm font-bold leading-tight"
-                  style={{
-                    color: isCompleted
-                      ? '#44ff88'
-                      : isLocked
-                      ? 'var(--color-text-muted)'
-                      : 'var(--color-text-primary)',
-                    textDecoration: isCompleted ? 'line-through' : 'none',
-                    textDecorationColor: 'rgba(68,255,136,0.45)',
-                  }}
-                >
-                  {mission.title}
-                </h3>
-              </div>
-              {difficulty && !isLocked && (
-                <span
-                  className="font-display text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full shrink-0"
-                  style={{
-                    color: difficulty.color,
-                    background: `${difficulty.color}15`,
-                    border: `1px solid ${difficulty.color}30`,
-                  }}
-                >
-                  {difficulty.label}
-                </span>
-              )}
-            </div>
+      {/* Card */}
+      <div
+        className={`flex-1 doppelrand transition-all duration-500 ${isLocked ? 'opacity-45' : ''}`}
+        style={{
+          borderColor: isCompleted
+            ? 'rgba(68,255,136,0.30)'
+            : isLocked
+            ? 'rgba(255,255,255,0.04)'
+            : `${raceColor}28`,
+          boxShadow: isCompleted
+            ? '0 0 20px rgba(68,255,136,0.10)'
+            : isLocked
+            ? 'none'
+            : `0 0 16px ${raceGlow}18`,
+        }}
+      >
+        <div className="doppelrand-inner p-4">
+          <div className="flex gap-3">
+            {/* Left accent bar */}
+            <div
+              className="w-[3px] rounded-full shrink-0 self-stretch min-h-[3rem]"
+              style={{
+                background: isCompleted
+                  ? 'linear-gradient(180deg, #44ff88, #44ff8844)'
+                  : isLocked
+                  ? 'rgba(255,255,255,0.08)'
+                  : `linear-gradient(180deg, ${raceColor}, ${raceColor}44)`,
+                boxShadow: isCompleted
+                  ? '0 0 8px rgba(68,255,136,0.6)'
+                  : isLocked
+                  ? 'none'
+                  : `0 0 8px ${raceGlow}`,
+              }}
+            />
 
-            {/* Description */}
-            <p className="text-text-muted text-xs leading-relaxed mb-3">
-              {mission.description}
-            </p>
-
-            {/* Progress bar */}
-            {!isLocked && (
-              <div className="mb-3">
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">
-                    {mission.progressLabel}
-                  </span>
-                  {mission.timeLeft && (
+            <div className="flex-1 min-w-0">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  {isCompleted && (
                     <span
-                      className="font-display text-[9px] uppercase tracking-widest"
-                      style={{
-                        color: mission.state === 'completed'
-                          ? 'var(--color-text-muted)'
-                          : '#ffc832',
-                      }}
+                      className="text-sm leading-none shrink-0"
+                      aria-label="Tamamlandı"
+                      style={{ filter: 'drop-shadow(0 0 6px rgba(68,255,136,0.7))' }}
                     >
-                      ⏱ {mission.timeLeft}
+                      ✓
                     </span>
                   )}
+                  {isLocked && (
+                    <span className="text-sm leading-none shrink-0" aria-label="Kilitli">🔒</span>
+                  )}
+                  <h3
+                    className="font-display text-sm font-bold leading-tight"
+                    style={{
+                      color: isCompleted
+                        ? '#44ff88'
+                        : isLocked
+                        ? 'var(--color-text-muted)'
+                        : 'var(--color-text-primary)',
+                      textDecoration: isCompleted ? 'line-through' : 'none',
+                      textDecorationColor: 'rgba(68,255,136,0.45)',
+                    }}
+                  >
+                    {mission.title}
+                  </h3>
                 </div>
-                <SegmentedProgressBar
-                  progress={mission.progress}
-                  color={isCompleted ? '#44ff88' : raceColor}
-                  segments={10}
-                />
-              </div>
-            )}
-
-            {/* Rewards + CTA */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex gap-1.5 flex-wrap">
-                {mission.rewards.map((r) => (
-                  <RewardChip key={r.label} reward={r} />
-                ))}
+                {difficulty && !isLocked && (
+                  <span
+                    className="font-display text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                    style={{
+                      color: difficulty.color,
+                      background: `${difficulty.color}15`,
+                      border: `1px solid ${difficulty.color}30`,
+                    }}
+                  >
+                    {difficulty.label}
+                  </span>
+                )}
               </div>
 
-              {isCompleted && (
-                <button
-                  onClick={() => onClaim(mission)}
-                  className="mission-claim-btn"
-                  aria-label={`${mission.title} ödülünü al`}
-                >
-                  ÖDÜL AL ✓
-                </button>
+              {/* Description */}
+              <p className="text-text-muted text-xs leading-relaxed mb-3">
+                {mission.description}
+              </p>
+
+              {/* Progress bar */}
+              {!isLocked && (
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">
+                      {mission.progressLabel}
+                    </span>
+                    {mission.timeLeft && (
+                      <span
+                        className="font-display text-[9px] uppercase tracking-widest"
+                        style={{
+                          color: mission.state === 'completed'
+                            ? 'var(--color-text-muted)'
+                            : '#ffc832',
+                        }}
+                      >
+                        ⏱ {mission.timeLeft}
+                      </span>
+                    )}
+                  </div>
+                  <SegmentedProgressBar
+                    progress={mission.progress}
+                    color={isCompleted ? '#44ff88' : raceColor}
+                    segments={10}
+                  />
+                </div>
               )}
-              {mission.state === 'active' && (
-                <button
-                  className="mission-continue-btn"
-                  style={{ borderColor: `${raceColor}50`, color: raceColor, background: `${raceColor}08` }}
-                >
-                  DEVAM ET →
-                </button>
-              )}
+
+              {/* Rewards + CTA */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex gap-1.5 flex-wrap">
+                  {mission.rewards.map((r) => (
+                    <RewardChip key={r.label} reward={r} />
+                  ))}
+                </div>
+
+                {isCompleted && (
+                  <button
+                    onClick={() => onClaim(mission)}
+                    className="mission-claim-btn"
+                    aria-label={`${mission.title} ödülünü al`}
+                  >
+                    ÖDÜL AL ✓
+                  </button>
+                )}
+                {mission.state === 'active' && (
+                  <button
+                    className="mission-continue-btn"
+                    style={{ borderColor: `${raceColor}50`, color: raceColor, background: `${raceColor}08` }}
+                  >
+                    DEVAM ET →
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -601,6 +706,120 @@ function AchievementBadge({
             🏷 {ach.unlocksTitle}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Weekly XP Banner ──────────────────────────────────────────────────────────
+
+function WeeklyXpBanner({
+  missions,
+  raceColor,
+  raceGlow,
+}: {
+  missions: Mission[];
+  raceColor: string;
+  raceGlow: string;
+}) {
+  const totalXp    = missions.reduce((s, m) => s + (m.xpReward ?? 0), 0);
+  const earnedXp   = missions
+    .filter((m) => m.state === 'completed')
+    .reduce((s, m) => s + (m.xpReward ?? 0), 0);
+  const capXp      = 20000;
+  const pct        = Math.min((earnedXp / capXp) * 100, 100);
+
+  return (
+    <div
+      className="doppelrand mb-5"
+      style={{
+        borderColor: `${raceColor}22`,
+        boxShadow: `0 0 20px ${raceGlow}10`,
+      }}
+    >
+      <div className="doppelrand-inner px-4 py-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">
+              Haftalık XP
+            </span>
+            <span
+              className="font-display text-[8px] px-2 py-0.5 rounded-full"
+              style={{
+                background: `${raceColor}15`,
+                border: `1px solid ${raceColor}30`,
+                color: raceColor,
+              }}
+            >
+              4g 18s kaldı
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span
+              className="font-display text-sm font-black"
+              style={{ color: '#ffc832', textShadow: '0 0 10px rgba(255,200,50,0.4)' }}
+            >
+              {earnedXp.toLocaleString('tr-TR')}
+            </span>
+            <span className="font-display text-[9px] text-text-muted">
+              / {capXp.toLocaleString('tr-TR')} XP
+            </span>
+          </div>
+        </div>
+        {/* HUD progress bar */}
+        <div
+          className="hud-progress-bar hud-progress-bar--xp hud-progress-bar--md"
+        >
+          <div
+            className="hud-progress-fill"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Daily Reset Header ─────────────────────────────────────────────────────────
+
+function DailyResetBar({
+  resetTime,
+  completedCount,
+  totalCount,
+  raceColor,
+}: {
+  resetTime: string;
+  completedCount: number;
+  totalCount: number;
+  raceColor: string;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <div>
+        <h1 className="font-display text-lg font-black text-text-primary">Günlük</h1>
+        <p className="text-text-muted text-xs">
+          {completedCount}/{totalCount} tamamlandı
+        </p>
+      </div>
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+        style={{
+          background: 'rgba(255,200,50,0.08)',
+          border: '1px solid rgba(255,200,50,0.22)',
+        }}
+      >
+        <span className="text-[10px]" aria-hidden>🔄</span>
+        <div className="flex flex-col items-end">
+          <span className="font-display text-[8px] uppercase tracking-widest text-text-muted">
+            Yenileme
+          </span>
+          <span
+            className="font-display text-sm font-black tabular-nums"
+            style={{ color: '#ffc832', textShadow: '0 0 10px rgba(255,200,50,0.5)', lineHeight: 1 }}
+          >
+            {resetTime}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -785,10 +1004,12 @@ export default function MissionsPage() {
   const { raceColor, raceGlow } = useRaceTheme();
   const [activeTab, setActiveTab] = useState<MissionTab>('ana');
   const [claimedMission, setClaimedMission] = useState<Mission | null>(null);
+  const dailyReset = useDailyReset();
 
-  const visibleMissions = MISSIONS.filter((m) => m.category === activeTab);
-  const completedCount  = visibleMissions.filter((m) => m.state === 'completed').length;
-  const unlockedAch     = ACHIEVEMENTS.filter((a) => a.unlocked).length;
+  const visibleMissions  = MISSIONS.filter((m) => m.category === activeTab);
+  const completedCount   = visibleMissions.filter((m) => m.state === 'completed').length;
+  const unlockedAch      = ACHIEVEMENTS.filter((a) => a.unlocked).length;
+  const weeklyMissions   = MISSIONS.filter((m) => m.category === 'haftalik');
 
   const handleClaim = useCallback((m: Mission) => setClaimedMission(m), []);
   const handleClose = useCallback(() => setClaimedMission(null), []);
@@ -855,7 +1076,7 @@ export default function MissionsPage() {
       >
         <div className="flex">
           {TABS.map((tab) => {
-            const isActive   = activeTab === tab.id;
+            const isActive    = activeTab === tab.id;
             const tabMissions = MISSIONS.filter((m) => m.category === tab.id);
             const hasClaimable = tabMissions.some((m) => m.state === 'completed');
 
@@ -875,7 +1096,7 @@ export default function MissionsPage() {
               >
                 <span aria-hidden>{tab.icon}</span>
                 <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
 
                 {/* Active underline */}
                 {isActive && (
@@ -888,11 +1109,15 @@ export default function MissionsPage() {
                   />
                 )}
 
-                {/* "Has claimable" dot */}
+                {/* Claimable indicator dot */}
                 {hasClaimable && !isActive && tab.id !== 'basarim' && (
                   <div
                     className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full"
-                    style={{ background: '#44ff88', boxShadow: '0 0 6px rgba(68,255,136,0.8)' }}
+                    style={{
+                      background: '#44ff88',
+                      boxShadow: '0 0 6px rgba(68,255,136,0.8)',
+                      animation: 'glow-pulse 2s ease-in-out infinite',
+                    }}
                     aria-label="Tamamlanmış görev mevcut"
                   />
                 )}
@@ -905,121 +1130,234 @@ export default function MissionsPage() {
       {/* ── Content ── */}
       <main className="relative z-10 flex-1 p-4 max-w-2xl mx-auto w-full pb-24">
 
-        {/* Tab summary bar */}
-        {activeTab !== 'basarim' && (
-          <div
-            className="flex items-center justify-between mb-5"
-            style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}
-          >
-            <div>
-              <h1 className="font-display text-lg font-black text-text-primary">
-                {TABS.find((t) => t.id === activeTab)?.label}
-              </h1>
+        {/* ── Tab: Ana Görev (Story) ── */}
+        {activeTab === 'ana' && (
+          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
+            {/* Story header with chapter label */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div
+                  className="font-display text-[8px] font-black tracking-[0.25em] uppercase mb-1"
+                  style={{ color: raceColor }}
+                >
+                  Bölüm I — Uyanış
+                </div>
+                <h1 className="font-display text-lg font-black text-text-primary">Ana Görev</h1>
+                <p className="text-text-muted text-xs">
+                  {completedCount}/{visibleMissions.length} tamamlandı
+                </p>
+              </div>
+              {/* Circular progress ring */}
+              <div className="relative w-12 h-12 shrink-0">
+                <svg
+                  className="w-full h-full"
+                  viewBox="0 0 48 48"
+                  style={{ transform: 'rotate(-90deg)' }}
+                  aria-hidden
+                >
+                  <circle
+                    cx="24" cy="24" r="20"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.06)"
+                    strokeWidth="4"
+                  />
+                  <circle
+                    cx="24" cy="24" r="20"
+                    fill="none"
+                    stroke={raceColor}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={`${visibleMissions.length > 0 ? (completedCount / visibleMissions.length) * 125.66 : 0} 125.66`}
+                    style={{
+                      filter: `drop-shadow(0 0 4px ${raceGlow})`,
+                      transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
+                    }}
+                  />
+                </svg>
+                <span
+                  className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
+                  style={{ color: raceColor }}
+                >
+                  {visibleMissions.length > 0
+                    ? Math.round((completedCount / visibleMissions.length) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+
+            {/* Story arc mission list with path connector */}
+            <div role="list" aria-label="Ana görevler">
+              {visibleMissions.map((mission, i) => (
+                <div
+                  key={mission.id}
+                  role="listitem"
+                  style={{
+                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                    animationDelay: `${i * 75}ms`,
+                  }}
+                >
+                  <MissionCard
+                    mission={mission}
+                    raceColor={raceColor}
+                    raceGlow={raceGlow}
+                    onClaim={handleClaim}
+                    showPath
+                    isLast={i === visibleMissions.length - 1}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Günlük (Daily) ── */}
+        {activeTab === 'gunluk' && (
+          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
+            <DailyResetBar
+              resetTime={dailyReset}
+              completedCount={completedCount}
+              totalCount={visibleMissions.length}
+              raceColor={raceColor}
+            />
+
+            <div className="space-y-3" role="list" aria-label="Günlük görevler">
+              {visibleMissions.map((mission, i) => (
+                <div
+                  key={mission.id}
+                  role="listitem"
+                  style={{
+                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                    animationDelay: `${i * 75}ms`,
+                  }}
+                >
+                  <MissionCard
+                    mission={mission}
+                    raceColor={raceColor}
+                    raceGlow={raceGlow}
+                    onClaim={handleClaim}
+                  />
+                </div>
+              ))}
+              {visibleMissions.length === 0 && (
+                <MangaPanel className="p-10 text-center">
+                  <div className="text-4xl mb-3" aria-hidden>📭</div>
+                  <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
+                </MangaPanel>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Haftalık (Weekly) ── */}
+        {activeTab === 'haftalik' && (
+          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
+            {/* Weekly XP progress banner */}
+            <WeeklyXpBanner
+              missions={weeklyMissions}
+              raceColor={raceColor}
+              raceGlow={raceGlow}
+            />
+
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="font-display text-lg font-black text-text-primary">Haftalık</h1>
+                <p className="text-text-muted text-xs">
+                  {completedCount}/{visibleMissions.length} tamamlandı
+                </p>
+              </div>
+              {/* Circular progress ring */}
+              <div className="relative w-12 h-12 shrink-0">
+                <svg
+                  className="w-full h-full"
+                  viewBox="0 0 48 48"
+                  style={{ transform: 'rotate(-90deg)' }}
+                  aria-hidden
+                >
+                  <circle
+                    cx="24" cy="24" r="20"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.06)"
+                    strokeWidth="4"
+                  />
+                  <circle
+                    cx="24" cy="24" r="20"
+                    fill="none"
+                    stroke={raceColor}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={`${visibleMissions.length > 0 ? (completedCount / visibleMissions.length) * 125.66 : 0} 125.66`}
+                    style={{
+                      filter: `drop-shadow(0 0 4px ${raceGlow})`,
+                      transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
+                    }}
+                  />
+                </svg>
+                <span
+                  className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
+                  style={{ color: raceColor }}
+                >
+                  {visibleMissions.length > 0
+                    ? Math.round((completedCount / visibleMissions.length) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3" role="list" aria-label="Haftalık görevler">
+              {visibleMissions.map((mission, i) => (
+                <div
+                  key={mission.id}
+                  role="listitem"
+                  style={{
+                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                    animationDelay: `${i * 75}ms`,
+                  }}
+                >
+                  <MissionCard
+                    mission={mission}
+                    raceColor={raceColor}
+                    raceGlow={raceGlow}
+                    onClaim={handleClaim}
+                  />
+                </div>
+              ))}
+              {visibleMissions.length === 0 && (
+                <MangaPanel className="p-10 text-center">
+                  <div className="text-4xl mb-3" aria-hidden>📭</div>
+                  <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
+                </MangaPanel>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Başarım (Achievement) ── */}
+        {activeTab === 'basarim' && (
+          <div style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}>
+            <div className="mb-5">
+              <h1 className="font-display text-lg font-black text-text-primary mb-0.5">Başarımlar</h1>
               <p className="text-text-muted text-xs">
-                {completedCount}/{visibleMissions.length} tamamlandı
+                {unlockedAch}/{ACHIEVEMENTS.length} başarım açıldı
               </p>
             </div>
-
-            {/* Circular progress ring */}
-            <div className="relative w-12 h-12 shrink-0">
-              <svg
-                className="w-full h-full"
-                viewBox="0 0 48 48"
-                style={{ transform: 'rotate(-90deg)' }}
-              >
-                <circle
-                  cx="24" cy="24" r="20"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.06)"
-                  strokeWidth="4"
-                />
-                <circle
-                  cx="24" cy="24" r="20"
-                  fill="none"
-                  stroke={raceColor}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={`${visibleMissions.length > 0 ? (completedCount / visibleMissions.length) * 125.66 : 0} 125.66`}
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              role="list"
+              aria-label="Başarımlar"
+            >
+              {ACHIEVEMENTS.map((ach, i) => (
+                <div
+                  key={ach.id}
+                  role="listitem"
                   style={{
-                    filter: `drop-shadow(0 0 4px ${raceGlow})`,
-                    transition: 'stroke-dasharray 0.7s cubic-bezier(0.32,0.72,0,1)',
+                    animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
+                    animationDelay: `${i * 75}ms`,
                   }}
-                />
-              </svg>
-              <span
-                className="absolute inset-0 flex items-center justify-center font-display text-[10px] font-black"
-                style={{ color: raceColor }}
-              >
-                {visibleMissions.length > 0
-                  ? Math.round((completedCount / visibleMissions.length) * 100)
-                  : 0}%
-              </span>
+                >
+                  <AchievementBadge ach={ach} raceColor={raceColor} raceGlow={raceGlow} />
+                </div>
+              ))}
             </div>
-          </div>
-        )}
-
-        {/* Achievement header */}
-        {activeTab === 'basarim' && (
-          <div
-            className="mb-5"
-            style={{ animation: 'slide-up 0.4s cubic-bezier(0.32,0.72,0,1) both' }}
-          >
-            <h1 className="font-display text-lg font-black text-text-primary mb-0.5">Başarımlar</h1>
-            <p className="text-text-muted text-xs">
-              {unlockedAch}/{ACHIEVEMENTS.length} başarım açıldı
-            </p>
-          </div>
-        )}
-
-        {/* Mission list */}
-        {activeTab !== 'basarim' && (
-          <div className="space-y-3" role="list" aria-label={`${activeTab} görevleri`}>
-            {visibleMissions.map((mission, i) => (
-              <div
-                key={mission.id}
-                role="listitem"
-                style={{
-                  animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                  animationDelay: `${i * 75}ms`,
-                }}
-              >
-                <MissionCard
-                  mission={mission}
-                  raceColor={raceColor}
-                  raceGlow={raceGlow}
-                  onClaim={handleClaim}
-                />
-              </div>
-            ))}
-
-            {visibleMissions.length === 0 && (
-              <MangaPanel className="p-10 text-center">
-                <div className="text-4xl mb-3" aria-hidden>📭</div>
-                <p className="font-display text-sm text-text-muted">Bu kategoride görev yok</p>
-              </MangaPanel>
-            )}
-          </div>
-        )}
-
-        {/* Achievement grid */}
-        {activeTab === 'basarim' && (
-          <div
-            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-            role="list"
-            aria-label="Başarımlar"
-          >
-            {ACHIEVEMENTS.map((ach, i) => (
-              <div
-                key={ach.id}
-                role="listitem"
-                style={{
-                  animation: 'manga-appear 0.5s cubic-bezier(0.32,0.72,0,1) both',
-                  animationDelay: `${i * 75}ms`,
-                }}
-              >
-                <AchievementBadge ach={ach} raceColor={raceColor} raceGlow={raceGlow} />
-              </div>
-            ))}
           </div>
         )}
       </main>

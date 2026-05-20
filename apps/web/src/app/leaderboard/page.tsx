@@ -1,5 +1,6 @@
 'use client';
 
+import './leaderboard.css';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
@@ -287,8 +288,8 @@ export default function LeaderboardPage() {
         </div>
 
         <div className="lb-list" role="list">
-          {list.map(entry => (
-            <PlayerRow key={entry.id} entry={entry} isTop10={entry.rank <= 10} />
+          {list.map((entry, idx) => (
+            <PlayerRow key={entry.id} entry={entry} isTop10={entry.rank <= 10} rowIndex={idx} />
           ))}
         </div>
       </section>
@@ -392,9 +393,10 @@ function PodiumCard({ entry, medal, order }: PodiumCardProps) {
 interface PlayerRowProps {
   entry: LeaderboardEntry;
   isTop10: boolean;
+  rowIndex?: number;
 }
 
-function PlayerRow({ entry, isTop10 }: PlayerRowProps) {
+function PlayerRow({ entry, isTop10, rowIndex = 0 }: PlayerRowProps) {
   const deltaSign = entry.deltaRank && entry.deltaRank > 0 ? '+' : '';
   const deltaColor = !entry.deltaRank ? '#666' : entry.deltaRank > 0 ? '#44ff88' : '#ff4455';
 
@@ -402,7 +404,10 @@ function PlayerRow({ entry, isTop10 }: PlayerRowProps) {
     <div
       className={`lb-row${isTop10 ? ' lb-row--top10' : ''}${entry.isMe ? ' lb-row--me' : ''}`}
       role="listitem"
-      style={isTop10 ? { '--race-color': entry.raceColor } as React.CSSProperties : undefined}
+      style={{
+        '--row-index': rowIndex,
+        ...(isTop10 ? { '--race-color': entry.raceColor } : {}),
+      } as React.CSSProperties}
     >
       {/* Rank */}
       <div className="lb-row-rank">

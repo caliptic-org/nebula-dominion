@@ -38,6 +38,17 @@ export default function CommandersPage() {
       <div className="commanders-bg" aria-hidden />
       <div className="commanders-halftone" aria-hidden />
 
+      {/* Dynamic race-ambient glow — shifts when selected commander changes */}
+      <div
+        aria-hidden
+        className="fixed inset-0 z-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(ellipse 65% 45% at 75% 55%, ${selectedTheme.glowColor} 0%, transparent 60%)`,
+          transition: 'background 0.7s cubic-bezier(0.32,0.72,0,1)',
+          opacity: 0.6,
+        }}
+      />
+
       {/* ── Top bar ────────────────────────────────────── */}
       <header className="relative z-20 flex flex-wrap items-center gap-3 px-5 py-4 border-b border-border bg-bg-overlay backdrop-blur-md">
         <Link
@@ -106,8 +117,9 @@ export default function CommandersPage() {
           className="lg:w-[360px] xl:w-[400px] shrink-0 border-t lg:border-t-0 lg:border-l border-border backdrop-blur-md overflow-y-auto"
           style={
             {
-              background: 'rgba(13, 16, 32, 0.7)',
+              background: `linear-gradient(180deg, color-mix(in srgb, ${selectedTheme.color} 5%, rgba(13,16,32,0.78)) 0%, rgba(8,10,16,0.82) 40%)`,
               boxShadow: `inset 1px 0 0 ${selectedTheme.borderColor}`,
+              transition: 'background 0.55s cubic-bezier(0.32,0.72,0,1)',
             } as React.CSSProperties
           }
         >
@@ -491,70 +503,123 @@ function DetailPanel({
           </div>
         </section>
 
-        {/* Abilities */}
+        {/* Abilities — condensed skill tree */}
         <section>
           <div className="text-[10px] font-display font-bold uppercase tracking-[0.2em] text-text-muted mb-3">
-            Yetenekler
+            Yetenek Ağacı
           </div>
-          <ul className="space-y-2">
-            {commander.abilities.map((ab, i) => (
-              <li
-                key={ab}
-                className="flex items-center gap-3 p-3 rounded-lg border border-border"
-                style={{ background: 'rgba(20, 24, 44, 0.6)' }}
-              >
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-display font-black shrink-0"
-                  style={{
-                    background: theme.bgTint,
-                    color: theme.color,
-                    border: `1px solid ${theme.color}55`,
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span className="text-sm text-text-primary font-medium">
-                  {ab}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="relative">
+            {/* Vertical connector rail */}
+            <div
+              aria-hidden
+              className="absolute left-[13px] top-3 bottom-3 w-px"
+              style={{
+                background: `linear-gradient(180deg, ${theme.color}80 0%, ${theme.color}10 100%)`,
+              }}
+            />
+            <ul className="space-y-2">
+              {commander.abilities.map((ab, i) => {
+                const ICONS = ['💥', '⚡', '🌀', '☄️'];
+                const isFirst = i === 0;
+                return (
+                  <li key={ab} className="flex items-center gap-3">
+                    {/* Node */}
+                    <span
+                      className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-[11px] shrink-0"
+                      style={{
+                        background: isFirst ? theme.bgTint : 'rgba(255,255,255,0.04)',
+                        color: isFirst ? theme.color : 'var(--color-text-muted)',
+                        border: `1px solid ${isFirst ? theme.color + '77' : 'rgba(255,255,255,0.10)'}`,
+                        boxShadow: isFirst ? `0 0 10px ${theme.color}44` : 'none',
+                      }}
+                    >
+                      {ICONS[i] ?? ICONS[ICONS.length - 1]}
+                    </span>
+                    {/* Skill row */}
+                    <div
+                      className="flex-1 flex items-center gap-2 p-2.5 rounded-lg border"
+                      style={{
+                        background: isFirst ? `${theme.bgTint}` : 'rgba(20, 24, 44, 0.45)',
+                        borderColor: isFirst ? `${theme.color}30` : 'var(--color-border)',
+                      }}
+                    >
+                      <span
+                        className="flex-1 text-[12px] font-medium"
+                        style={{ color: isFirst ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}
+                      >
+                        {ab}
+                      </span>
+                      {i > 0 && (
+                        <span
+                          className="text-[9px] font-display font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                          style={{
+                            background: 'rgba(255,200,50,0.08)',
+                            color: 'var(--color-text-muted)',
+                            border: '1px solid rgba(255,200,50,0.15)',
+                          }}
+                        >
+                          Lv {[1,3,5,7][i] ?? 7}+
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </section>
 
-        {/* CTAs */}
+        {/* CTAs — Button-in-Button pattern */}
         <div className="flex flex-col gap-2">
           <Link
             href={`/commanders/${commander.id}`}
-            className="block w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm text-center transition-all"
+            className="group flex items-center justify-between w-full py-2.5 pl-5 pr-2.5 rounded-full font-display font-black uppercase tracking-[0.14em] text-[11px] transition-all duration-300"
             style={{
-              background: `${theme.bgTint}`,
+              background: theme.bgTint,
               color: theme.color,
-              border: `1px solid ${theme.color}55`,
-              boxShadow: `0 0 14px ${theme.color}20`,
+              border: `1px solid ${theme.color}45`,
+              boxShadow: `0 0 14px ${theme.color}18`,
             }}
           >
-            ◈  Detay Sayfası
+            <span>◈  Detay Sayfası</span>
+            <span
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-px"
+              style={{
+                background: `${theme.color}22`,
+                border: `1px solid ${theme.color}44`,
+              }}
+            >
+              →
+            </span>
           </Link>
           <button
             type="button"
             disabled={locked}
-            className="w-full py-3 rounded-lg font-display font-black uppercase tracking-[0.18em] text-sm transition-all"
+            className="group flex items-center justify-between w-full py-2.5 pl-5 pr-2.5 rounded-full font-display font-black uppercase tracking-[0.14em] text-[11px] transition-all duration-300 active:scale-[0.98]"
             style={{
               background: locked
-                ? 'rgba(255,200,50,0.18)'
-                : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 60%, #000) 100%)`,
+                ? 'rgba(255,200,50,0.12)'
+                : `linear-gradient(135deg, ${theme.color} 0%, color-mix(in srgb, ${theme.color} 55%, #000) 100%)`,
               color: locked ? 'var(--color-energy)' : '#07090f',
               border: locked
-                ? '1px solid rgba(255,200,50,0.4)'
+                ? '1px solid rgba(255,200,50,0.35)'
                 : `1px solid ${theme.color}`,
               boxShadow: locked
-                ? '0 0 16px rgba(255,200,50,0.25)'
-                : `0 0 24px ${theme.glowColor}`,
+                ? '0 0 16px rgba(255,200,50,0.20)'
+                : `0 0 28px ${theme.glowColor}`,
               cursor: locked ? 'not-allowed' : 'pointer',
-              opacity: locked ? 0.9 : 1,
+              opacity: locked ? 0.85 : 1,
             }}
           >
-            {locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}
+            <span>{locked ? '🔒  Kilidi Aç' : '⚔  Komutan Seç'}</span>
+            {!locked && (
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-px"
+                style={{ background: 'rgba(0,0,0,0.20)', color: '#07090f' }}
+              >
+                ✓
+              </span>
+            )}
           </button>
         </div>
       </div>

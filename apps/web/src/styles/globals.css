@@ -1424,6 +1424,52 @@ body::after {
   -webkit-backdrop-filter: blur(20px);
 }
 
+/* ── Commanders Collection Screen ──────────────────────────────────────── */
+
+/* Screen root — establishes z-context for bg layers */
+.commanders-screen {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Fixed deep-space nebula background — all 5 race ambients layered */
+.commanders-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 55% at 15% 45%, rgba(74, 158, 255, 0.08) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 45% at 85% 25%, rgba(204, 68, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 55% 50% at 50% 100%, rgba(0, 207, 255, 0.05) 0%, transparent 48%),
+    radial-gradient(ellipse 60% 35% at 10% 85%, rgba(68, 255, 102, 0.04) 0%, transparent 42%),
+    radial-gradient(ellipse 50% 40% at 90% 80%, rgba(255, 106, 26, 0.04) 0%, transparent 40%),
+    var(--color-bg);
+}
+
+/* Manga halftone dot overlay — adds tactile print-era texture */
+.commanders-halftone {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.6) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.022;
+  mask-image: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.35) 40%,
+    rgba(0, 0, 0, 0.12) 80%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.35) 40%,
+    rgba(0, 0, 0, 0.12) 80%,
+    transparent 100%
+  );
+}
+
 /* ── Commander Card — cinematic portrait card ────────────────────────────── */
 .commander-card {
   position: relative;
@@ -1445,9 +1491,28 @@ body::after {
   box-shadow: 0 12px 40px rgba(0,0,0,0.75), 0 0 20px var(--color-race-glow);
 }
 
+/* Selected state — dramatic race-colored presence */
+.commander-card.is-selected,
+.commander-card[aria-pressed="true"] {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px var(--race-color, var(--color-brand)),
+    0 0 32px var(--race-glow, var(--color-brand-glow)),
+    0 12px 40px rgba(0,0,0,0.8);
+}
+
 .commander-card.locked {
   filter: grayscale(0.8) brightness(0.6);
   opacity: 0.5;
+}
+
+/* Race ambient wash — subtle race color tint on the card surface */
+.commander-card__wash {
+  transition: opacity 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.commander-card:hover .commander-card__wash,
+.commander-card[aria-pressed="true"] .commander-card__wash {
+  opacity: 1 !important;
 }
 
 /* ── Progression Timeline ───────────────────────────────────────────────── */

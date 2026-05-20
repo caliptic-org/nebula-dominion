@@ -557,3 +557,12 @@
 @media (min-width: 640px) {
   .guild-filter-bar { grid-template-columns: 1.5fr 1fr 1fr auto; }
 }
+
+/* ── Accessibility: reduce motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .guild-badge--champion::after,
+  .raid-hero__silhouette,
+  .tutorial-card__step.is-active,
+  .tutorial-reward__halo { animation: none; transition: none; }
+}

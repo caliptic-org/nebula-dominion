@@ -1106,6 +1106,134 @@
   transform: translate(2px, -1px) scale(1.08);
 }
 
+/* ── Tier Badge (seal-break unlock) ──────────────────────────────────────── */
+
+.age-tier-badge-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.age-tier-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.4) rotate(-18deg);
+  filter: blur(8px);
+  transition: opacity 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.age-tier-badge--open {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  filter: blur(0);
+}
+
+/* Double-bezel outer ring */
+.age-tier-badge-outer {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 1px solid transparent; /* color via style */
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px;
+  animation: age-badge-orbit 4s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes age-badge-orbit {
+  0%   { box-shadow: 3px  0   10px rgba(255,255,255,0.08); }
+  25%  { box-shadow: 0    3px 10px rgba(255,255,255,0.08); }
+  50%  { box-shadow: -3px 0   10px rgba(255,255,255,0.08); }
+  75%  { box-shadow: 0   -3px 10px rgba(255,255,255,0.08); }
+  100% { box-shadow: 3px  0   10px rgba(255,255,255,0.08); }
+}
+
+/* Inner core */
+.age-tier-badge-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid transparent; /* color via style */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.age-tier-badge-label {
+  font-family: var(--font-display);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.age-tier-badge-number {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.age-tier-badge-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── Seal-break shard particles ───────────────────────────────────────────── */
+
+.age-shard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.age-shard--0 { animation: age-shard-0 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.05s both; }
+.age-shard--1 { animation: age-shard-1 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.10s both; }
+.age-shard--2 { animation: age-shard-2 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.07s both; }
+.age-shard--3 { animation: age-shard-3 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.13s both; }
+.age-shard--4 { animation: age-shard-4 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.09s both; }
+.age-shard--5 { animation: age-shard-5 0.55s cubic-bezier(0.32, 0.72, 0, 1) 0.11s both; }
+
+@keyframes age-shard-0 {
+  0%   { transform: translate(-50%, -50%) rotate(  0deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% - 55px), calc(-50% - 38px)) rotate(-42deg); opacity: 0; width: 2px; }
+}
+@keyframes age-shard-1 {
+  0%   { transform: translate(-50%, -50%) rotate( 60deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% + 55px), calc(-50% - 38px)) rotate( 42deg); opacity: 0; width: 2px; }
+}
+@keyframes age-shard-2 {
+  0%   { transform: translate(-50%, -50%) rotate(120deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% + 62px), calc(-50% + 14px)) rotate( 22deg); opacity: 0; width: 2px; }
+}
+@keyframes age-shard-3 {
+  0%   { transform: translate(-50%, -50%) rotate(180deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% + 22px), calc(-50% + 58px)) rotate( 68deg); opacity: 0; width: 2px; }
+}
+@keyframes age-shard-4 {
+  0%   { transform: translate(-50%, -50%) rotate(240deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% - 55px), calc(-50% + 38px)) rotate(-58deg); opacity: 0; width: 2px; }
+}
+@keyframes age-shard-5 {
+  0%   { transform: translate(-50%, -50%) rotate(300deg); opacity: 1; width: 8px; }
+  100% { transform: translate(calc(-50% - 22px), calc(-50% - 60px)) rotate(-28deg); opacity: 0; width: 2px; }
+}
+
 /* ── Responsive mobile collapse ───────────────────────────────────────────── */
 
 @media (max-width: 767px) {

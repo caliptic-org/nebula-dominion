@@ -79,6 +79,53 @@ const AGES: AgeEntry[] = [
   },
 ];
 
+/* ── Race × Age content map ───────────────────────────────────────────────── */
+
+interface RaceLore { eyebrow: string; lore: string }
+
+const RACE_CONTENT: Record<string, Record<number, RaceLore>> = {
+  human: {
+    1: { eyebrow: 'PROTOKOL AKTİF',       lore: 'Düşen uydular ilk kalelerin taşlarını döktü. İnsanlık hem inşa eder hem ağlar — ama hayatta kalmayı öğrendi.' },
+    2: { eyebrow: 'SINIRLAR GENİŞLEDİ',   lore: 'Anlaşmalar imzalandı, bazıları bozuldu. Galakside insan adımları artık daha cesur izler bırakıyor.' },
+    3: { eyebrow: 'SAVAŞ EMRİ VERİLDİ',   lore: 'Savaş kaçınılmaz değildi — ama öyle söylendi. İnsanlık savaşmayı seçiyor, çünkü pes etmeyi bilmiyor.' },
+    4: { eyebrow: 'KRİTİK DAYANIKLILIK',  lore: 'Her şey yıkılırken bile insan umudu bırakmaz. Belki bu bir güçtür. Belki de sadece inadır.' },
+    5: { eyebrow: 'PHOENIX PROTOKOLİ',    lore: 'Küllerden yükselen insan, daha güçlü değil — daha bilge. Hayatta kalmak artık salt kazanmak değil.' },
+    6: { eyebrow: 'NEBULA EFENDİSİ',      lore: 'Yolculuk bir galaksinin fethiyle noktalandı. Ama insan için her son, yeni bir başlangıcın kapısıdır.' },
+  },
+  zerg: {
+    1: { eyebrow: 'KOVAN UYANDI',         lore: 'Kovan sesi galaksiye ilk kez yayıldı. Tek bir akıl, binlerce beden — bu Nebula\'nın ilk nefesidir.' },
+    2: { eyebrow: 'YAYILMA FAZ 2',        lore: 'Her gezegen bir hücre, her sistem bir organ. Kovan büyüdükçe galaksinin kendisi kovanın parçası olur.' },
+    3: { eyebrow: 'SÜRÜ SALDIRISINDA',    lore: 'Kovan saldırıyor. Savunma yok, geri çekilme yok. Sadece ilerleme — ve ilerlemenin sesi çığlıktır.' },
+    4: { eyebrow: 'KOVAN ADAPTE OLUYOR',  lore: 'Kayıplar sadece veri. Kovan acı çekmez — adapte olur. Yıkım bizi zayıflatmaz; filtreler ve güçlendirir.' },
+    5: { eyebrow: 'DÖNGÜ TAMAMLANDI',     lore: 'Ölüm sadece dönüşümdür. Kovan bir kez daha soluk alıyor — daha geniş, daha derin, daha bütünleşik.' },
+    6: { eyebrow: 'KOVAN TAM',            lore: 'Nebula bu sesin yankısıdır. Galaksinin her köşesinden bizi duyuyorlar. Hepsi kovanın parçası oldu.' },
+  },
+  automat: {
+    1: { eyebrow: 'BOOT.SEQ TAMAMLANDI',  lore: 'İlk hesaplama bitti. Kolonizasyon protokolü başlatıldı. Kayıplar öngörülen aralıkta — devam ediliyor.' },
+    2: { eyebrow: 'MATRİS GENİŞLEDİ',    lore: 'Kaynak matrisi yeniden hesaplandı. Verimlilik %347 arttı. Genişleme hedeflere uygun seyrediyor.' },
+    3: { eyebrow: 'TAKTIK.EXE ÇALIŞIYOR', lore: 'Savaş simülasyonu tamamlandı. Optimal strateji seçildi. Yürütme başlıyor — sapmalar tolere edilmez.' },
+    4: { eyebrow: 'YENİDEN KALİBRASYON', lore: 'Kayıp eşiği aşıldı. Sistem yeniden kalibre ediliyor. Dayanıklılık doğrulandı — ilerleme sürecek.' },
+    5: { eyebrow: 'SİSTEM.RESTART',       lore: 'Tüm veriler korundu. Hesaplama yeniden başlatıldı. Evrim modülü aktive edildi — yükseltme başlıyor.' },
+    6: { eyebrow: 'HESAPLAMA TAMAMLANDI', lore: 'Sonuç: biz. Nebula bu denklemin çözümü değil — değişkenidir. Ve biz her değişkeni kontrol ediyoruz.' },
+  },
+  beast: {
+    1: { eyebrow: 'AV BAŞLADI',           lore: 'Toprağı dişlerinizle söktünüz. Bu toprak sizin — çünkü güçsüzler bıraktı ve siz hiç bırakmadınız.' },
+    2: { eyebrow: 'SÜRÜ KOŞUYOR',         lore: 'İlk büyük av başladı. Galaksinin en büyük avı: gezegen değil, egemenlik. Ve egemenlik güçlüyü bulur.' },
+    3: { eyebrow: 'KAN ÇAĞRISI',          lore: 'Gerçek savaş başladı. Güçsüzler süpürülecek. Canavarlar bu an için var oldu — ve bu an geldi.' },
+    4: { eyebrow: 'KARANLIK GÜZEL',       lore: 'Acı güç verir. Yıkım bizi kırmaz — biler. Karanlıkta bile canavar büyür; ışık sadece avı gösterir.' },
+    5: { eyebrow: 'DÖNÜŞÜM FAZ',         lore: 'Canavarlar ölmez — dönüşür. Savaştan doğdular, yeniden doğuyorlar. Daha büyük, daha açgözlü, daha güçlü.' },
+    6: { eyebrow: 'EN GÜÇLÜ KAZANDI',    lore: 'Bu canavarların yasasıdır. Yalnızca en güçlü evreni miras alır. Ve en güçlü — biziz.' },
+  },
+  demon: {
+    1: { eyebrow: 'PORTALLER AÇILDI',     lore: 'İlk kan dökülmedi — ilk kurban yapıldı. Nebula\'nın kalp atışı bu ritüeli duydu ve titredi.' },
+    2: { eyebrow: 'RUHLAR TOPLANIYOR',    lore: 'Her ele geçirilen sistem bir büyüdür. Her ruh bir güçtür. Nebula yavaş yavaş karanlığa boyanıyor.' },
+    3: { eyebrow: 'LANET YAYILIYOR',      lore: 'Her ölü bir kapıdır. Her kan damlası bir büyüdür. Yıkım başladı — ve biz yıkımın mimarıyız.' },
+    4: { eyebrow: 'KARANLIK DERİNLEŞTİ', lore: 'Nebula bizi anlıyor artık. Yıkım bizim dilimizdir. Bu çağda galaksi sessizliği ve karanlığı öğreniyor.' },
+    5: { eyebrow: 'EVRİM TAMAMLANDI',     lore: 'Yeniden doğmak değil — evrilmek. Karanlık daha derin, güç daha saf. Artık sınır kalmadı.' },
+    6: { eyebrow: 'NEBULA KARARDI',       lore: 'Bu bizim evrenimizdir artık. Işık söndürüldü. Her yıldız bir mum, her ruh bir hizmetkâr — ve biz efendiyiz.' },
+  },
+};
+
 /* ── Unlock icon map ──────────────────────────────────────────────────────── */
 
 const UNLOCK_ICONS: Partial<Record<ContentUnlock, string>> = {
@@ -101,6 +148,7 @@ type Phase = 'flash' | 'reveal' | 'ready';
 
 export function AgeTransitionScreen({
   toAge,
+  race,
   raceColor,
   raceGlow,
   newUnlocks,
@@ -109,6 +157,7 @@ export function AgeTransitionScreen({
   onComplete,
 }: AgeTransitionPayload) {
   const age = AGES.find((a) => a.num === toAge) ?? AGES[0];
+  const raceLore: RaceLore | undefined = RACE_CONTENT[race]?.[toAge];
   const [phase, setPhase] = useState<Phase>('flash');
   const [revealedUnlocks, setRevealedUnlocks] = useState(0);
   const [autoProgress, setAutoProgress] = useState(0);
@@ -251,8 +300,46 @@ export function AgeTransitionScreen({
                 className="age-eyebrow-pill"
                 style={{ color: raceColor, borderColor: `${raceColor}40`, background: `${raceColor}12` }}
               >
-                ▸ ÇAĞ {age.num} BAŞLIYOR
+                ▸ {raceLore?.eyebrow ?? `ÇAĞ ${age.num} BAŞLIYOR`}
               </span>
+            </div>
+
+            {/* ── Tier Badge (seal-break unlock) ───────────────────────── */}
+            <div className="age-tier-badge-row" aria-hidden>
+              <div
+                className={`age-tier-badge ${phase !== 'flash' ? 'age-tier-badge--open' : ''}`}
+              >
+                {/* Double-bezel outer ring */}
+                <div
+                  className="age-tier-badge-outer"
+                  style={{ borderColor: `${raceColor}30`, boxShadow: `0 0 28px ${raceGlow}` }}
+                >
+                  {/* Inner core */}
+                  <div
+                    className="age-tier-badge-inner"
+                    style={{ background: `${raceColor}12`, borderColor: `${raceColor}22` }}
+                  >
+                    <span className="age-tier-badge-label" style={{ color: `${raceColor}88` }}>ÇAĞ</span>
+                    <span
+                      className="age-tier-badge-number"
+                      style={{ color: raceColor, textShadow: `0 0 20px ${raceGlow}` }}
+                    >
+                      {age.num}
+                    </span>
+                    <span className="age-tier-badge-icon" style={{ color: `${raceColor}cc` }}>
+                      {age.icon}
+                    </span>
+                  </div>
+                </div>
+                {/* Shard particles — fly on reveal */}
+                {phase === 'reveal' && [0, 1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className={`age-shard age-shard--${i}`}
+                    style={{ background: raceColor }}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* ── Scene visual + title block ───────────────────────────── */}
@@ -293,7 +380,7 @@ export function AgeTransitionScreen({
                 <h1 className="age-title-text" style={{ color: raceColor, textShadow: `0 0 40px ${raceGlow}` }}>
                   {age.label}
                 </h1>
-                <p className="age-lore-text">{age.lore}</p>
+                <p className="age-lore-text">{raceLore?.lore ?? age.lore}</p>
               </div>
             </div>
 

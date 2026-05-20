@@ -103,10 +103,10 @@ const FALLBACK_RACE: RaceMeta = {
 type ThreatLevel = 'düşük' | 'orta' | 'yüksek' | 'kritik';
 
 function getThreatLevel(power: number): { level: ThreatLevel; color: string; pct: number } {
-  if (power < 5_000)  return { level: 'düşük',   color: '#44ff88', pct: 20 };
-  if (power < 20_000) return { level: 'orta',    color: '#ffc832', pct: 50 };
-  if (power < 60_000) return { level: 'yüksek',  color: '#ff8800', pct: 75 };
-  return                     { level: 'kritik',  color: '#ff3355', pct: 96 };
+  if (power < 1_000)  return { level: 'düşük',   color: '#44ff88', pct: Math.round((power / 1000) * 22) + 3  };
+  if (power < 2_500)  return { level: 'orta',    color: '#ffc832', pct: Math.round(((power - 1000) / 1500) * 28) + 25 };
+  if (power < 3_800)  return { level: 'yüksek',  color: '#ff8800', pct: Math.round(((power - 2500) / 1300) * 25) + 53 };
+  return                     { level: 'kritik',  color: '#ff3355', pct: Math.min(97, Math.round(((power - 3800) / 1500) * 18) + 78) };
 }
 
 // ── Resource reward estimate ───────────────────────────────────────────────
@@ -196,6 +196,18 @@ function PlasmaOrb({ color, size = 120 }: { color: string; size?: number }) {
 // ── Stat Bar ──────────────────────────────────────────────────────────────
 
 function StatBar({ label, pct, color, value }: { label: string; pct: number; color: string; value: string }) {
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    bar.style.width = '0%';
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => { bar.style.width = `${pct}%`; });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pct]);
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
@@ -212,9 +224,10 @@ function StatBar({ label, pct, color, value }: { label: string; pct: number; col
         style={{ background: 'rgba(255,255,255,0.06)' }}
       >
         <div
+          ref={barRef}
           className="absolute inset-y-0 left-0 rounded-full"
           style={{
-            width: `${pct}%`,
+            width: '0%',
             background: `linear-gradient(90deg, ${color}aa, ${color})`,
             boxShadow: `0 0 8px ${color}60`,
             transition: 'width 900ms cubic-bezier(0.32,0.72,0,1)',
@@ -457,8 +470,7 @@ export function TargetDetailSheet({
                         color: 'var(--color-text-muted)',
                       }}
                     >
-                      {/* Placeholder coords until WorldBase type exposes them */}
-                      SYS-{String(level * 7 % 99).padStart(2, '0')}
+                      [{base.col},{base.row}]
                     </span>
                   )}
                 </div>

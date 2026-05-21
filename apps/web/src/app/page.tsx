@@ -79,6 +79,15 @@ export default function HomePage() {
   const { progress, loading } = useProgression({
     userId: userId ?? '',
     onLevelUp: (payload) => {
+      const prevAge = Math.min(6, Math.ceil(payload.previousLevel / 9));
+      const nextAge = Math.min(6, Math.ceil(payload.newLevel / 9));
+      if (nextAge > prevAge && nextAge >= 2) {
+        const qs = new URLSearchParams({ toAge: String(nextAge) });
+        if (payload.newUnlocks.length) qs.set('unlocks', payload.newUnlocks.join(','));
+        qs.set('race', RACE_DESCRIPTIONS[race].dataRace);
+        router.push(`/tier-up?${qs.toString()}`);
+        return;
+      }
       setPendingLevelUp(payload);
       if (payload.newUnlocks.length) setPendingUnlocks(payload.newUnlocks);
     },

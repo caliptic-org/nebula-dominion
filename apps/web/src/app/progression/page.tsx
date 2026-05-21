@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTierProgress } from '@/hooks/useTierProgress';
 import { useNDRace } from '@/components/handoff/useNDRace';
+import { AgeTransitionScreen } from '@/components/progression/AgeTransitionScreen';
+import { ContentUnlock } from '@/types/progression';
 import {
   AGES_54,
   Caption,
@@ -20,10 +22,27 @@ import {
   Sigil,
 } from '@/components/handoff';
 
+const ND_RACE_TO_LORE_KEY: Record<string, string> = {
+  insan:   'human',
+  zerg:    'zerg',
+  otomat:  'automat',
+  canavar: 'beast',
+  seytan:  'demon',
+};
+
+const DEFAULT_UNLOCKS_BY_AGE: Record<number, ContentUnlock[]> = {
+  2: [ContentUnlock.CONSTRUCTION_BASICS, ContentUnlock.MODE_RANKED],
+  3: [ContentUnlock.ADVANCED_ABILITIES, ContentUnlock.SPECIAL_MAPS],
+  4: [ContentUnlock.ADVANCED_TACTICS],
+  5: [ContentUnlock.RACE_MONSTER_PREVIEW],
+  6: [],
+};
+
 export default function ProgressionPage() {
   const race = useNDRace();
   const { progress, requirements, levels, loading, error, xpPercent, levelUp } =
     useTierProgress();
+  const [pendingAgeTransition, setPendingAgeTransition] = useState<number | null>(null);
 
   const levelNames = useMemo(() => {
     const map: Record<number, string> = {};
@@ -40,6 +59,18 @@ export default function ProgressionPage() {
     !!progress &&
     !!requirements?.required &&
     BigInt(progress.xp) >= BigInt(requirements.required.xp);
+
+  const handleLevelUp = useCallback(async () => {
+    const prevAge = progress?.currentAge ?? 1;
+    try {
+      const next = await levelUp();
+      if (next.currentAge > prevAge) {
+        setPendingAgeTransition(next.currentAge);
+      }
+    } catch {
+      // Surface errors via existing UI state on the next refresh.
+    }
+  }, [levelUp, progress?.currentAge]);
 
   return (
     <div
@@ -185,7 +216,7 @@ export default function ProgressionPage() {
               <NDButton
                 race={race}
                 size="md"
-                onClick={() => void levelUp()}
+                onClick={() => void handleLevelUp()}
                 disabled={!canLevelUp}
               >
                 {canLevelUp ? 'SEVİYE YÜKSELT' : 'XP YETERSİZ'}
@@ -266,6 +297,18 @@ export default function ProgressionPage() {
           </div>
         </main>
       </div>
+
+      {pendingAgeTransition !== null && (
+        <AgeTransitionScreen
+          toAge={pendingAgeTransition}
+          race={ND_RACE_TO_LORE_KEY[race.key] ?? race.key}
+          raceColor={race.primary}
+          raceGlow={race.glow}
+          newUnlocks={DEFAULT_UNLOCKS_BY_AGE[pendingAgeTransition] ?? []}
+          autoAdvanceMs={0}
+          onComplete={() => setPendingAgeTransition(null)}
+        />
+      )}
     </div>
   );
 }

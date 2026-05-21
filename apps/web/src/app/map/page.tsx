@@ -465,6 +465,16 @@ export default function WorldMapPage() {
   const toastBorder = feedback?.tone === 'error' ? 'rgba(255,80,80,0.55)' : `${raceColor}45`;
   const toastColor  = feedback?.tone === 'error' ? '#ff8a8a' : raceColor;
 
+  // Drive the attack-preview route on the map. We hide it for selections on the
+  // player's own base (no self-routing) and for empty-cell taps where there is
+  // nothing to "target". Resources, enemies, and enemy bases all qualify.
+  const previewTarget = (() => {
+    if (!selected) return null;
+    if (selected.kind === 'empty') return null;
+    if (selected.kind === 'base' && selected.base?.isPlayer) return null;
+    return { col: selected.col, row: selected.row };
+  })();
+
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background:'#04060c' }}>
 
@@ -478,6 +488,7 @@ export default function WorldMapPage() {
           resources={mapState?.resources}
           enemies={mapState?.enemies}
           territories={mapState?.territories}
+          selectedTarget={previewTarget}
         />
       </div>
 

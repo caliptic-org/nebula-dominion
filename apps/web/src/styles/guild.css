@@ -558,11 +558,352 @@
   .guild-filter-bar { grid-template-columns: 1.5fr 1fr 1fr auto; }
 }
 
+/* ── War Panel ──────────────────────────────────────────────────────────── */
+.war-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(20,12,8,0.55) 0%, rgba(8,10,16,0.85) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.5);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.war-card:hover { border-color: rgba(255,255,255,0.14); }
+
+.war-card--active {
+  border-color: rgba(220,38,38,0.45);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.55), 0 0 24px rgba(220,38,38,0.18);
+}
+
+.war-card--preparing {
+  border-color: rgba(0,170,255,0.32);
+}
+
+.war-card--won {
+  border-color: rgba(74,222,128,0.4);
+}
+
+.war-card--lost {
+  border-color: rgba(255,255,255,0.08);
+  opacity: 0.88;
+}
+
+.war-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.war-card__status {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid currentColor;
+}
+
+.war-card__status--preparing { color: #00aaff; }
+.war-card__status--active    { color: #ff5555; }
+.war-card__status--won       { color: #4ade80; }
+.war-card__status--lost      { color: var(--color-text-muted); }
+
+.war-card__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: war-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes war-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+
+.war-card__time {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.war-card__matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.war-card__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.war-card__side--us .war-card__tag {
+  border-color: var(--color-race);
+  color: var(--color-race);
+}
+
+.war-card__tag {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1.5px solid currentColor;
+  background: rgba(0,0,0,0.35);
+  text-transform: uppercase;
+}
+
+.war-card__side-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.war-card__score-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.war-card__score {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.war-card__score--lead  { color: var(--color-race); }
+.war-card__score--trail { color: var(--color-text-secondary); opacity: 0.8; }
+
+.war-card__vs,
+.war-card__vs-pending {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.war-card__vs-pending {
+  padding: 6px 14px;
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: 999px;
+}
+
+.war-card__bar {
+  position: relative;
+  height: 6px;
+  display: flex;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.04);
+}
+
+.war-card__bar-us {
+  background: var(--color-race);
+  box-shadow: 0 0 8px var(--color-race) inset;
+  transition: width 0.6s cubic-bezier(0.32,0.72,0,1);
+}
+
+.war-card__bar-them {
+  background: #cc3333;
+  transition: width 0.6s cubic-bezier(0.32,0.72,0,1);
+}
+
+.war-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.war-card__slots {
+  position: relative;
+  flex: 1;
+  display: block;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.war-card__slots-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-race) 35%, transparent), color-mix(in srgb, var(--color-race) 10%, transparent));
+  transition: width 0.6s cubic-bezier(0.32,0.72,0,1);
+}
+
+.war-card__slots-label {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Shared Objectives ──────────────────────────────────────────────────── */
+.objective-card {
+  height: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.objective-card:hover {
+  border-color: color-mix(in srgb, var(--color-race) 40%, transparent);
+  box-shadow: 0 4px 22px rgba(0,0,0,0.55), 0 0 18px color-mix(in srgb, var(--color-race) 14%, transparent);
+}
+
+.objective-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.objective-card__icon {
+  font-size: 22px;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-race) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-race) 30%, transparent);
+  flex-shrink: 0;
+}
+
+.objective-card__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+
+.objective-card__desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.objective-card__numbers {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.objective-card__current {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--color-race);
+  font-variant-numeric: tabular-nums;
+}
+
+.objective-card__target {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.objective-card__pct {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.objective-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.objective-card__contributors {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.objective-card__reward {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255,255,255,0.08);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.objective-card__reward-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.objective-card__reward-value {
+  font-size: 12px;
+  color: var(--color-energy);
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Accessibility: reduce motion ─────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   .guild-badge--champion::after,
   .raid-hero__silhouette,
   .tutorial-card__step.is-active,
-  .tutorial-reward__halo { animation: none; transition: none; }
+  .tutorial-reward__halo,
+  .war-card__pulse,
+  .war-card__bar-us,
+  .war-card__bar-them,
+  .war-card__slots-fill { animation: none; transition: none; }
 }

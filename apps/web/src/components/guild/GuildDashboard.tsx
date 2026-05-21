@@ -10,6 +10,8 @@ import { GuildMembersList } from './GuildMembersList';
 import { WeeklyRankWidget } from './WeeklyRankWidget';
 import { RaidBossHero } from './RaidBossHero';
 import { GuildMapWidget } from './GuildMapWidget';
+import { GuildWarPanel } from './GuildWarPanel';
+import { GuildSharedObjectives } from './GuildSharedObjectives';
 
 interface GuildDashboardProps {
   guildId: string;
@@ -98,6 +100,10 @@ export function GuildDashboard({ guildId }: GuildDashboardProps) {
           weeklyDropMultiplier={2}
         />
       </section>
+
+      <GuildWarPanel wars={profile.wars ?? []} guildTag={profile.tag} />
+
+      <GuildSharedObjectives objectives={profile.objectives ?? []} />
 
       {profile.researchProjectName && (
         <section aria-labelledby="research-heading" className="glass-card p-5">

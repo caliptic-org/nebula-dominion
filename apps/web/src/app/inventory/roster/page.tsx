@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  Bar,
   BottomNav,
   Caption,
   Chip,
@@ -14,6 +15,7 @@ import {
   NDButton,
   NebulaBg,
   Panel,
+  ResIcon,
   Sigil,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
@@ -38,25 +40,54 @@ const MERGE_VERB: Record<string, string> = {
 const POP_USED = 180;
 const POP_MAX = 240;
 
+type UnitState = 'ready' | 'fleet' | 'wounded';
+type SortKey = 'tier' | 'count' | 'level';
+
 interface RosterUnit {
   id: string;
   name: string;
   tier: number;
   level: number;
   count: number;
-  state: 'ready' | 'fleet' | 'wounded';
+  state: UnitState;
+  atk: number;
+  def: number;
+  spd: number;
 }
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'tier',  label: 'Tier'  },
+  { key: 'count', label: 'Adet'  },
+  { key: 'level', label: 'Sevye' },
+];
+
+const STATE_LABEL: Record<UnitState, string> = {
+  ready:   'HAZIR',
+  wounded: 'YARALI',
+  fleet:   'FİLODA',
+};
 
 export default function RosterPage() {
   const race = useNDRace();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const units: RosterUnit[] = useMemo(() => buildRoster(race), [race]);
+
   const visible = useMemo(() => {
-    if (tierFilter === 'all') return units;
-    return units.filter((u) => u.tier === tierFilter);
-  }, [units, tierFilter]);
+    const filtered = tierFilter === 'all' ? units : units.filter((u) => u.tier === tierFilter);
+    return [...filtered].sort((a, b) => {
+      if (sortKey === 'tier')  return a.tier - b.tier  || b.count - a.count;
+      if (sortKey === 'count') return b.count - a.count;
+      return b.level - a.level;
+    });
+  }, [units, tierFilter, sortKey]);
+
+  const selectedUnit = useMemo(
+    () => units.find((u) => u.id === selectedId) ?? null,
+    [units, selectedId],
+  );
 
   const popRatio = POP_USED / POP_MAX;
 
@@ -145,6 +176,49 @@ export default function RosterPage() {
           </div>
         </div>
 
+        {/* Sort row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px 0',
+          }}
+        >
+          <Eyebrow color={ND.textMute}>SIRALA</Eyebrow>
+          <div style={{ display: 'flex', gap: 4 }} role="radiogroup" aria-label="Sıralama">
+            {SORT_OPTIONS.map((opt) => {
+              const on = opt.key === sortKey;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setSortKey(opt.key)}
+                  style={{
+                    all: 'unset',
+                    cursor: 'pointer',
+                    padding: '4px 10px',
+                    fontFamily: ND.mono,
+                    fontSize: 10,
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                    color: on ? race.primary : ND.textDim,
+                    background: on ? `${race.primary}1A` : 'transparent',
+                    border: `1px solid ${on ? race.primary + '55' : ND.border}`,
+                    borderRadius: 3,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ flex: 1 }} />
+          <Code style={{ color: ND.textMute }}>{visible.length} birim</Code>
+        </div>
+
         {/* Roster grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -154,7 +228,7 @@ export default function RosterPage() {
                 race={race}
                 unit={u}
                 selected={u.id === selectedId}
-                onClick={() => setSelectedId(u.id)}
+                onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
               />
             ))}
           </div>
@@ -173,22 +247,33 @@ export default function RosterPage() {
           </div>
         </div>
 
+        {/* Detail drawer (visible when a unit is selected) */}
+        {selectedUnit && (
+          <UnitDetailDrawer
+            race={race}
+            unit={selectedUnit}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
+
         {/* Bottom action bar */}
-        <div style={{
-          padding: '10px 14px',
-          background: 'rgba(8,10,16,0.92)',
-          borderTop: `1px solid ${ND.border}`,
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          gap: 8,
-        }}>
-          <Link href="/inventory/merge" style={{ flex: 1, textDecoration: 'none' }}>
-            <NDButton race={race} variant="ghost" size="md" full>
-              {MERGE_VERB[race.key] ?? 'Birleştir'}
-            </NDButton>
-          </Link>
-          <NDButton race={race} size="md" style={{ flex: 1 }}>FİLO YAP</NDButton>
-        </div>
+        {!selectedUnit && (
+          <div style={{
+            padding: '10px 14px',
+            background: 'rgba(8,10,16,0.92)',
+            borderTop: `1px solid ${ND.border}`,
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            gap: 8,
+          }}>
+            <Link href="/inventory/merge" style={{ flex: 1, textDecoration: 'none' }}>
+              <NDButton race={race} variant="ghost" size="md" full>
+                {MERGE_VERB[race.key] ?? 'Birleştir'}
+              </NDButton>
+            </Link>
+            <NDButton race={race} size="md" style={{ flex: 1 }}>FİLO YAP</NDButton>
+          </div>
+        )}
 
         <BottomNav race={race} active="base" />
       </div>
@@ -196,24 +281,45 @@ export default function RosterPage() {
   );
 }
 
+/* ─── Roster building & stat derivation ────────────────────────────────── */
+
+function hash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function clamp(n: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, n));
+}
+
 function buildRoster(race: NDRace): RosterUnit[] {
-  const units = race.units;
-  const out: RosterUnit[] = [];
-  units.forEach((u, i) => {
+  const states: UnitState[] = ['ready', 'fleet', 'wounded'];
+  return race.units.map((u, i) => {
+    const id = `${race.key}-${u.n}-${i}`;
+    const seed = hash(id);
     const baseCount = [86, 42, 26, 14, 6, 2][i] ?? 1;
-    const states: RosterUnit['state'][] = ['ready', 'fleet', 'wounded'];
-    const stateIdx = i % states.length;
-    out.push({
-      id: `${race.key}-${u.n}-${i}`,
+    return {
+      id,
       name: u.n,
       tier: u.t,
       level: Math.max(1, 10 - i * 2),
       count: baseCount,
-      state: states[stateIdx],
-    });
+      state: states[i % states.length],
+      atk: clamp(u.t * 14 + (seed % 9) + 8),
+      def: clamp(u.t * 11 + ((seed >> 3) % 8) + 6),
+      spd: clamp(94 - u.t * 12 + ((seed >> 6) % 10)),
+    };
   });
-  return out;
 }
+
+function upgradeCost(unit: RosterUnit): number {
+  return unit.level * unit.tier * 50;
+}
+
+/* ─── Roster card ──────────────────────────────────────────────────────── */
 
 interface RosterCardProps {
   race: NDRace;
@@ -223,17 +329,17 @@ interface RosterCardProps {
 }
 
 function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
-  const stateColor = unit.state === 'ready'
-    ? race.primary
-    : unit.state === 'wounded'
-    ? ND.warn
-    : ND.textDim;
+  const stateColor =
+    unit.state === 'ready'   ? race.primary :
+    unit.state === 'wounded' ? ND.warn      :
+    ND.textDim;
 
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
+      aria-label={`${unit.name}, Tier ${unit.tier}, ${STATE_LABEL[unit.state]}, ${unit.count} adet`}
       style={{ all: 'unset', cursor: 'pointer', display: 'block' }}
     >
       <Panel
@@ -310,5 +416,123 @@ function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
         </div>
       </Panel>
     </button>
+  );
+}
+
+/* ─── Unit detail drawer (stat viewer + actions) ───────────────────────── */
+
+interface UnitDetailDrawerProps {
+  race: NDRace;
+  unit: RosterUnit;
+  onClose: () => void;
+}
+
+function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
+  const cost = upgradeCost(unit);
+  const stateColor =
+    unit.state === 'ready'   ? race.primary :
+    unit.state === 'wounded' ? ND.warn      :
+    ND.textDim;
+
+  return (
+    <section
+      aria-label={`${unit.name} detay`}
+      style={{
+        background: 'rgba(8,10,16,0.96)',
+        borderTop: `1px solid ${race.primary}55`,
+        boxShadow: `0 -8px 24px -8px ${race.glow}`,
+        backdropFilter: 'blur(14px)',
+        padding: '12px 14px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 26,
+            height: 26,
+            background: `${race.primary}22`,
+            border: `1px solid ${race.primary}66`,
+            borderRadius: 3,
+          }}
+        >
+          <Sigil race={race} size={16} />
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontFamily: ND.display,
+              fontSize: 13,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: ND.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {unit.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <Chip color={race.primary}>T{unit.tier}</Chip>
+            <Chip color={stateColor}>{STATE_LABEL[unit.state]}</Chip>
+            <Code>×{unit.count}</Code>
+            <Code>Lv {unit.level}</Code>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Detayı kapat"
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            width: 28,
+            height: 28,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: ND.textDim,
+            border: `1px solid ${ND.border}`,
+            borderRadius: 3,
+            fontFamily: ND.mono,
+            fontSize: 14,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Stat bars */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <Bar value={unit.atk} color={race.primary} label="ATK" trailing={String(unit.atk)} height={5} />
+        <Bar value={unit.def} color={ND.ok}        label="DEF" trailing={String(unit.def)} height={5} />
+        <Bar value={unit.spd} color={ND.warn}      label="SPD" trailing={String(unit.spd)} height={5} />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <NDButton race={race} variant="outline" size="md" style={{ flex: 1 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Yükselt
+            <span style={{ opacity: 0.8 }}>Lv {unit.level} → {unit.level + 1}</span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <ResIcon kind={race.resourceA.icon} size={11} color={race.primary} />
+              {cost}
+            </span>
+          </span>
+        </NDButton>
+        <NDButton race={race} size="md" style={{ flex: 1 }}>
+          Savaşa Gönder
+        </NDButton>
+      </div>
+    </section>
   );
 }

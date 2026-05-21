@@ -8,14 +8,14 @@ import { RACE_DESCRIPTIONS } from '@/types/units';
 import { TIER_NAMES } from '@/types/progression';
 
 const navItems = [
-  { href: '/dashboard', label: 'Komuta Merkezi', icon: '🏠', active: true },
-  { href: '/',                    label: 'Ana Üs',     icon: '🏰' },
-  { href: '/dashboard/fleet',     label: 'Filo',       icon: '🚀' },
-  { href: '/dashboard/battle',    label: 'Savaş',      icon: '⚔️' },
-  { href: '/dashboard/guild',     label: 'Lonca',      icon: '🛡️' },
-  { href: '/dashboard/sectors',   label: 'Sektörler',  icon: '🌍' },
-  { href: '/dashboard/shop',      label: 'Mağaza',     icon: '🛍️' },
-  { href: '/settings',            label: 'Ayarlar',    icon: '⚙️' },
+  { href: '/dashboard',       label: 'Komuta Merkezi', icon: '🏠', active: true },
+  { href: '/',                label: 'Ana Üs',         icon: '🏰' },
+  { href: '/inventory/roster', label: 'Filo',          icon: '🚀' },
+  { href: '/battle',          label: 'Savaş',          icon: '⚔️' },
+  { href: '/dashboard/guild', label: 'Lonca',          icon: '🛡️' },
+  { href: '/map',             label: 'Sektörler',      icon: '🌍' },
+  { href: '/shop',            label: 'Mağaza',         icon: '🛍️' },
+  { href: '/settings',        label: 'Ayarlar',        icon: '⚙️' },
 ]
 
 const playerStats = [

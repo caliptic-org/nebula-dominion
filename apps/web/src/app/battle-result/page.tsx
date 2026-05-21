@@ -33,6 +33,14 @@ function makeMockData(outcome: 'victory' | 'defeat'): BattleResultData {
       levelUp:      isVictory,
       newLevel:     isVictory ? 15 : undefined,
     },
+    mvp: {
+      name:            isVictory ? 'Aegis-VII' : 'Sentinel-IV',
+      className:       isVictory ? 'Ağır Kruvazör' : 'Savunma Droneu',
+      icon:            isVictory ? '🛸' : '🛡',
+      kills:           isVictory ? 14 : 5,
+      damageDealt:     isVictory ? 38400 : 12600,
+      contributionPct: isVictory ? 27 : 36,
+    },
     rewards: isVictory
       ? [
           { id: 'r1', name: 'Kristal',    quantity: 500,  icon: '💎', rarity: 'epic' },

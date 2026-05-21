@@ -374,6 +374,149 @@
   color: var(--race-text-muted);
 }
 
+/* ── MVP Unit ────────────────────────────────────────────────────────── */
+.br-mvp-panel {
+  background:
+    radial-gradient(ellipse 60% 80% at 18% 50%,
+      rgba(var(--race-glow-rgb, 74,158,255), 0.10) 0%,
+      transparent 60%),
+    var(--race-bg-surface, rgba(7,14,26,0.92));
+}
+
+.br-mvp {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.br-mvp-portrait {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--race-glow-rgb, 74,158,255), 0.12);
+  border: 1.5px solid var(--race-primary, #4a9eff);
+  box-shadow:
+    inset 0 0 18px rgba(var(--race-glow-rgb, 74,158,255), 0.18),
+    0 0 24px rgba(var(--race-glow-rgb, 74,158,255), 0.25);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.br-root.is-victory .br-mvp-portrait {
+  animation: br-mvp-glow 2.6s 800ms cubic-bezier(0.32, 0.72, 0, 1) infinite alternate;
+}
+
+@keyframes br-mvp-glow {
+  0%   { box-shadow: inset 0 0 18px rgba(var(--race-glow-rgb), 0.18),
+                     0 0 18px rgba(var(--race-glow-rgb), 0.20); }
+  100% { box-shadow: inset 0 0 28px rgba(var(--race-glow-rgb), 0.35),
+                     0 0 36px rgba(var(--race-glow-rgb), 0.55); }
+}
+
+.br-root.is-defeat .br-mvp-portrait {
+  border-color: rgba(180, 180, 200, 0.4);
+  box-shadow: inset 0 0 12px rgba(120, 120, 140, 0.18);
+  background: rgba(120, 120, 140, 0.10);
+}
+
+.br-mvp-icon {
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.br-mvp-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--race-primary, #4a9eff);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid var(--race-bg-surface, #07101d);
+  box-shadow: 0 0 10px rgba(var(--race-glow-rgb, 74,158,255), 0.6);
+}
+
+.br-root.is-defeat .br-mvp-badge {
+  background: rgba(180, 180, 200, 0.6);
+  box-shadow: none;
+}
+
+.br-mvp-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.br-mvp-name {
+  font-family: var(--race-font-primary, 'Rajdhani', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--race-text-primary);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.br-mvp-class {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--race-text-muted);
+  margin-bottom: 6px;
+}
+
+.br-mvp-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.br-mvp-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.br-mvp-stat-val {
+  font-family: var(--race-font-primary, 'Rajdhani', sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--race-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.br-root.is-defeat .br-mvp-stat-val {
+  color: rgba(200, 200, 220, 0.85);
+}
+
+.br-mvp-stat-label {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--race-text-muted);
+}
+
+.br-mvp-stat-sep {
+  color: var(--race-text-muted);
+  opacity: 0.5;
+  font-size: 12px;
+}
+
 /* ── XP Bar ───────────────────────────────────────────────────────────── */
 .br-xp-section {
   display: flex;

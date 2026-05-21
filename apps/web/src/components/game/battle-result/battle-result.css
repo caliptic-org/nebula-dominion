@@ -842,6 +842,25 @@
   box-shadow: none;
 }
 
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .br-particle,
+  .br-hero,
+  .br-root.is-victory .br-outcome-label,
+  .br-root.is-victory .br-mvp-portrait,
+  .br-stats-row,
+  .br-panel-shell,
+  .br-xp-bar-fill,
+  .br-xp-bar-gain,
+  .br-levelup,
+  .br-reward-card,
+  .br-reward-card[data-rarity="legendary"]::after,
+  .br-actions,
+  .br-btn,
+  .br-btn-icon,
+  .br-bg-radial { animation: none; transition: none; }
+}
+
 /* ── Mobile ───────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .br-content {

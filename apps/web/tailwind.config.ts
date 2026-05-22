@@ -73,6 +73,29 @@ const config: Config = {
           'seytan-dim':  'rgba(204,0,255,0.12)',
           'seytan-glow': 'rgba(204,0,255,0.4)',
         },
+        // Nebula Dominion (ND) foundation tokens — semantic, backed by CSS
+        // custom properties declared in `nd-handoff.css` / `nd-globals.css`.
+        // Use these from new ND screens, e.g. `bg-nd-bg text-nd-text`.
+        nd: {
+          bg:           'var(--nd-bg)',
+          'bg-deep':    'var(--nd-bg-deep)',
+          surface:      'var(--nd-surface)',
+          'surface-solid': 'var(--nd-surface-solid)',
+          'surface-hi': 'var(--nd-surface-hi)',
+          line:         'var(--nd-border)',
+          'line-hi':    'var(--nd-border-hi)',
+          text:         'var(--nd-text)',
+          muted:        'var(--nd-text-dim)',
+          mute:         'var(--nd-text-mute)',
+          danger:       'var(--nd-danger)',
+          ok:           'var(--nd-ok)',
+          warn:         'var(--nd-warn)',
+          // Active race accents — re-themed by RaceThemeProvider via
+          // --nd-primary / --nd-primary-dim / --nd-glow.
+          primary:      'var(--nd-primary, var(--nd-race))',
+          'primary-dim':'var(--nd-primary-dim, var(--nd-race-dim))',
+          glow:         'var(--nd-glow, var(--nd-race-glow))',
+        },
         mineral: 'var(--race-human)',
         gas:     'var(--color-accent)',
       },
@@ -80,6 +103,13 @@ const config: Config = {
         display: ['var(--font-display)', 'system-ui', 'sans-serif'],
         body:    ['var(--font-body)',    'system-ui', 'sans-serif'],
         mono:    ['var(--font-mono)',    'monospace'],
+        // ND foundation typography (Chakra Petch / Inter / JetBrains Mono).
+        // Legacy `font-display` / `font-body` / `font-mono` stay on the
+        // existing Orbitron / Rajdhani / Cascadia stack so older screens
+        // are untouched.
+        'nd-display': ['var(--font-nd-display)', '"Chakra Petch"', 'system-ui', 'sans-serif'],
+        'nd-body':    ['var(--font-nd-body)',    '"Inter"',        'system-ui', 'sans-serif'],
+        'nd-mono':    ['var(--font-nd-mono)',    '"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
         'nebula-gradient': 'var(--gradient-nebula)',
@@ -106,6 +136,11 @@ const config: Config = {
         'speed-line': 'speed-line 0.4s ease-out forwards',
         'manga-appear': 'manga-appear 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
         'slide-up': 'slide-up 0.7s cubic-bezier(0.32,0.72,0,1) forwards',
+        // ND foundation utilities — keyframes defined in nd-globals.css
+        'nd-glow':   'nd-glow 2.8s ease-in-out infinite',
+        'nd-drift':  'nd-drift 6s ease-in-out infinite',
+        'nd-scan':   'nd-scan 4s cubic-bezier(0.45,0,0.55,1) infinite',
+        'nd-ember':  'nd-ember 2.4s ease-out infinite',
       },
       keyframes: {
         float: {

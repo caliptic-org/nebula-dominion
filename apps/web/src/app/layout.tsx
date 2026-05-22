@@ -4,6 +4,7 @@ import { RaceThemeProvider } from '@/hooks/useRaceTheme';
 import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import '@/styles/globals.css';
 import '@/styles/nd-handoff.css';
+import '@/styles/nd-globals.css';
 
 const orbitron = Orbitron({
   subsets: ['latin'],

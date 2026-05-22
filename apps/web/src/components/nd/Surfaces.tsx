@@ -38,7 +38,7 @@ export function Screen({
 }: ScreenProps) {
   const layers = [
     `radial-gradient(60% 60% at 20% 15%, ${race.primary} 0%, transparent 60%)`,
-    `radial-gradient(55% 55% at 85% 80%, oklch(0.55 0.18 280) 0%, transparent 70%)`,
+    `radial-gradient(55% 55% at 85% 80%, ${ND.nebulaAccent} 0%, transparent 70%)`,
     `radial-gradient(80% 80% at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)`,
     ND.bg,
   ].join(', ');

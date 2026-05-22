@@ -88,6 +88,8 @@ export const ND = {
   display:      'var(--font-nd-display), "Chakra Petch", "Rajdhani", system-ui, sans-serif',
   body:         'var(--font-nd-body), "Inter", system-ui, sans-serif',
   mono:         'var(--font-nd-mono), "JetBrains Mono", ui-monospace, monospace',
+  /** Cool violet accent used in non-race-specific nebula gradients. */
+  nebulaAccent: 'oklch(0.55 0.18 280)',
   radii: { sm: 3, md: 6, lg: 12, pill: 999 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 10, lg: 16, xl: 24 },
 } as const;

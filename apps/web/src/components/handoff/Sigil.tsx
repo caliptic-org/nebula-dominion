@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { NDRace } from './nd-tokens';
+import { ND, type NDRace } from './nd-tokens';
 
 interface SigilProps {
   race: NDRace;
@@ -104,7 +104,7 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
             <stop offset="100%" stopColor="#000" stopOpacity="0" />
           </radialGradient>
           <radialGradient id={`neb-${id}-b`} cx="85%" cy="80%" r="55%">
-            <stop offset="0%" stopColor="oklch(0.55 0.18 280)" stopOpacity={0.30 * intensity * dim} />
+            <stop offset="0%" stopColor={ND.nebulaAccent} stopOpacity={0.30 * intensity * dim} />
             <stop offset="100%" stopColor="#000" stopOpacity="0" />
           </radialGradient>
           <radialGradient id={`neb-${id}-c`} cx="50%" cy="50%" r="80%">

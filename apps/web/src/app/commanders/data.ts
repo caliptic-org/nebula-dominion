@@ -303,4 +303,42 @@ export const COMMANDERS: Commander[] = [
       'Boyutlar arası yolcu ve savaş runu ustası. Astral yolculuk ile cepheyi anında değiştirir.',
     abilities: ['Boyut Kapısı', 'Rune Patlaması', 'Astral Yolculuk'],
   },
+
+  // ── Locked Tier-5 entries (driven from RACES tokens; no portraits yet) ──
+  {
+    id: 'kthala',
+    name: 'Kthala',
+    race: 'zerg',
+    level: 0,
+    isUnlocked: false,
+    portrait: '/assets/characters/zerg/kthala.png',
+    traits: ['Üretim Lordu', 'Kovan'],
+    story:
+      'Brood-Anne Kthala — kovanın derin yumurta odasını yöneten üretim lordu. Tier-5 kilidi açıldığında devreye girer.',
+    abilities: ['Brood Çağrısı', 'Yumurta Hızlandırma'],
+  },
+  {
+    id: 'lo_khode',
+    name: 'Lo-Khode',
+    race: 'otomat',
+    level: 0,
+    isUnlocked: false,
+    portrait: '/assets/characters/otomat/lo_khode.png',
+    traits: ['Sistem Yönetici', 'Veri'],
+    story:
+      'Lo-Khode Veri-Mühendis — sonsuzluk ağının ana çekirdek operatörü. Tier-4 kilidi açılınca aktif olur.',
+    abilities: ['Yedek Devre', 'Veri Yağmuru'],
+  },
+  {
+    id: 'korova',
+    name: 'Korova',
+    race: 'canavar',
+    level: 0,
+    isUnlocked: false,
+    portrait: '/assets/characters/canavar/korova.png',
+    traits: ['Primordial', 'Beast-God'],
+    story:
+      'Korova, Beast-God Yavrusu — sürünün gelecekteki tanrısı. Tier-5 kilidi açılana kadar uyur.',
+    abilities: ['Tanrı Çağrısı', 'Primordial Kükremesi'],
+  },
 ];

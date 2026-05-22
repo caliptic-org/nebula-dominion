@@ -7,3 +7,7 @@ export * from './screens/ScrTierUp';
 export * from './screens/ScrStoryScene';
 export * from './screens/ScrStoryGallery';
 export * from './screens/ScrCommanders';
+export * from './race-lex';
+export * from './race-shape';
+export * from './RaceActionIcon';
+export * from './RaceWidgets';

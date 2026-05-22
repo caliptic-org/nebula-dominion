@@ -160,7 +160,7 @@ export default function RosterPage() {
                     fontFamily: ND.display,
                     fontSize: 10,
                     letterSpacing: '0.10em',
-                    color: on ? 'var(--color-bg-elevated)' : ND.textDim,
+                    color: on ? '#0A0E1A' : ND.textDim,
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
                     borderRadius: 3,
@@ -217,93 +217,57 @@ export default function RosterPage() {
           <Code style={{ color: ND.textMute }}>{visible.length} birim</Code>
         </div>
 
-        {/* Roster grid (scroll) + sticky detail drawer */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-          }}
-        >
-          <div style={{ padding: '12px 14px', flex: 1 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {visible.map((u) => (
-                <RosterCard
-                  key={u.id}
-                  race={race}
-                  unit={u}
-                  selected={u.id === selectedId}
-                  onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
-                />
-              ))}
-            </div>
-
-            {visible.length === 0 && (
-              <div
-                role="status"
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '48px 0 56px',
-                  minHeight: 220,
-                }}
-              >
-                <div
-                  aria-hidden
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0.15,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <Sigil race={race} size={180} />
-                </div>
-                <div style={{ position: 'relative', textAlign: 'center' }}>
-                  <div
-                    style={{
-                      fontFamily: ND.display,
-                      fontSize: 14,
-                      letterSpacing: '0.10em',
-                      textTransform: 'uppercase',
-                      color: ND.text,
-                    }}
-                  >
-                    Henüz birim yok
-                  </div>
-                  <Caption style={{ marginTop: 6 }}>
-                    Bu tier ile uyumlu birim bulunamadı.
-                  </Caption>
-                </div>
-              </div>
-            )}
-
-            <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
-              <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
-              <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
-            </div>
+        {/* Roster grid */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {visible.map((u) => (
+              <RosterCard
+                key={u.id}
+                race={race}
+                unit={u}
+                selected={u.id === selectedId}
+                onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
+              />
+            ))}
           </div>
 
-          {/* Sticky detail drawer — floats above the list, scrolls do not push it */}
-          {selectedUnit && (
-            <div style={{ position: 'sticky', bottom: 0, zIndex: 2 }}>
-              <UnitDetailDrawer
-                race={race}
-                unit={selectedUnit}
-                onClose={() => setSelectedId(null)}
-              />
+          {visible.length === 0 && (
+            <div
+              style={{
+                position: 'relative',
+                textAlign: 'center',
+                padding: '56px 0',
+                minHeight: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.15 }} aria-hidden>
+                <Sigil race={race} size={128} />
+              </div>
+              <Caption style={{ position: 'relative', zIndex: 1 }}>
+                Bu tier ile uyumlu birim yok.
+              </Caption>
             </div>
           )}
+
+          <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
+            <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
+            <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
+          </div>
         </div>
+
+        {/* Detail drawer (visible when a unit is selected) */}
+        {selectedUnit && (
+          <UnitDetailDrawer
+            race={race}
+            unit={selectedUnit}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
 
         {/* Bottom action bar */}
         {!selectedUnit && (
@@ -487,6 +451,9 @@ function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
     <section
       aria-label={`${unit.name} detay`}
       style={{
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 5,
         background: 'rgba(8,10,16,0.96)',
         borderTop: `1px solid ${race.primary}55`,
         boxShadow: `0 -8px 24px -8px ${race.glow}`,

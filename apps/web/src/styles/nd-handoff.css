@@ -114,7 +114,9 @@
   );
 }
 
-/* NDButton interactive states — brightness on hover, gentle press scale */
+/* NDButton interactive states — brightness on hover, gentle press scale,
+ * focus-visible outline that picks up the active race accent. GPU-safe;
+ * prefers-reduced-motion drops the press scale and transition. */
 .nd-btn {
   transition: filter 120ms ease, transform 120ms ease;
 }
@@ -124,7 +126,12 @@
 .nd-btn:active:not(:disabled) {
   transform: scale(0.97);
 }
+.nd-btn:focus-visible {
+  outline: 2px solid var(--nd-race-glow, currentColor);
+  outline-offset: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
+  .nd-btn { transition: none; }
   .nd-btn:active:not(:disabled) {
     transform: none;
   }

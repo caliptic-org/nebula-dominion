@@ -11,12 +11,12 @@ import {
   ND,
   NDButton,
   Panel,
-  RACES as ND_RACES,
+  RACES,
   Sigil,
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
-import { RACE_BY_ID, type RaceId } from '../races';
+import { RACE_BY_ID, type RaceId } from '../race-select/races';
 
 const RACE_KEYS: readonly NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 
@@ -36,7 +36,7 @@ const AWAKENING_HEADER: Record<NDRaceKey, { eyebrow: string; title: string }> = 
   seytan:  { eyebrow: '· SAHNE I · ZİNCİR KIRILIR ·',    title: 'SÜRGÜN DÖNÜYOR' },
 };
 
-const CTA_NEXT: Record<NDRaceKey, string> = {
+const FINISH_CTA: Record<NDRaceKey, string> = {
   insan:   'EVRENE GİR',
   zerg:    "KOVAN'A KATIL",
   otomat:  '::initialize',
@@ -69,7 +69,7 @@ function buildScenes(race: NDRace): string[] {
   ];
 }
 
-export function AwakeningClient() {
+export function RaceConfirmClient() {
   const router = useRouter();
   const search = useSearchParams();
   const queryRace = search.get('race');
@@ -93,7 +93,7 @@ export function AwakeningClient() {
     }
   }, [resolvedKey]);
 
-  const race = ND_RACES[resolvedKey];
+  const race = RACES[resolvedKey];
   const header = AWAKENING_HEADER[resolvedKey];
   const scenes = useMemo(() => buildScenes(race), [race]);
   const portrait = RACE_BY_ID[resolvedKey as RaceId]?.primaryPortrait;
@@ -101,9 +101,10 @@ export function AwakeningClient() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
+  const isFinalScene = sceneIndex >= scenes.length - 1;
   const finish = () => router.push(`/?race=${resolvedKey}`);
   const next = () => {
-    if (sceneIndex >= scenes.length - 1) finish();
+    if (isFinalScene) finish();
     else setSceneIndex((i) => Math.min(i + 1, scenes.length - 1));
   };
 
@@ -124,7 +125,10 @@ export function AwakeningClient() {
         style={{
           position: 'absolute',
           inset: 0,
-          background: `radial-gradient(ellipse 90% 60% at 50% 0%, ${race.glow} 0%, transparent 60%), radial-gradient(ellipse 70% 50% at 50% 100%, ${race.primaryDim} 0%, transparent 65%)`,
+          background: `
+            radial-gradient(ellipse 90% 60% at 50% 0%, ${race.glow} 0%, transparent 60%),
+            radial-gradient(ellipse 70% 50% at 50% 100%, ${race.primaryDim} 0%, transparent 65%)
+          `,
           opacity: 0.55,
           pointerEvents: 'none',
         }}
@@ -140,7 +144,7 @@ export function AwakeningClient() {
         }}
       />
 
-      <div
+      <main
         className="nd-slide-up"
         style={{
           position: 'relative',
@@ -156,22 +160,30 @@ export function AwakeningClient() {
           <Sigil race={race} size={36} glow />
           <div>
             <Eyebrow color={race.primary}>{header.eyebrow}</Eyebrow>
-            <H2 style={{ color: ND.text, marginTop: 2, fontSize: 22, fontFamily: race.key === 'otomat' ? ND.mono : ND.display }}>
+            <H2
+              style={{
+                color: ND.text,
+                marginTop: 2,
+                fontSize: 22,
+                fontFamily: race.key === 'otomat' ? ND.mono : ND.display,
+              }}
+            >
               {header.title}
             </H2>
           </div>
         </div>
 
-        {/* Race portrait / awakening art */}
+        {/* Race awakening art */}
         <div
+          className="nd-notch"
           style={{
+            ['--nd-notch' as string]: '14px',
             position: 'relative',
             width: '100%',
             aspectRatio: '4 / 3',
             marginBottom: 16,
             background: `radial-gradient(ellipse 70% 60% at 50% 100%, ${race.glow} 0%, transparent 65%), rgba(8, 12, 26, 0.6)`,
-            border: `1px solid ${race.primary}44`,
-            clipPath: 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)',
+            border: `1px solid color-mix(in oklch, ${race.primary}, transparent 72%)`,
             overflow: 'hidden',
           }}
         >
@@ -200,6 +212,7 @@ export function AwakeningClient() {
             </div>
           )}
           <div
+            aria-hidden
             style={{
               position: 'absolute',
               top: 10,
@@ -210,13 +223,15 @@ export function AwakeningClient() {
               textTransform: 'uppercase',
               color: race.primary,
             }}
-            aria-hidden
           >
-            ◈ {race.short}-{(['insan','zerg','otomat','canavar','seytan'].indexOf(resolvedKey) + 1).toString().padStart(2,'0')}
+            ◈ {race.short}-{(RACE_KEYS.indexOf(resolvedKey) + 1).toString().padStart(2, '0')}
           </div>
         </div>
 
-        <Panel style={{ padding: 14 }}>
+        <Panel
+          aria-live="polite"
+          style={{ padding: 14 }}
+        >
           <Caption style={{ color: ND.text, lineHeight: 1.6, fontSize: 13, minHeight: 84 }}>
             {scenes[sceneIndex]}
           </Caption>
@@ -227,9 +242,12 @@ export function AwakeningClient() {
           </div>
         </Panel>
 
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minHeight: 12 }} />
 
-        <div style={{ display: 'flex', gap: 6, marginTop: 18, marginBottom: 14 }} aria-hidden>
+        <div
+          aria-hidden
+          style={{ display: 'flex', gap: 6, marginTop: 18, marginBottom: 14 }}
+        >
           {scenes.map((_, i) => (
             <div
               key={i}
@@ -249,10 +267,10 @@ export function AwakeningClient() {
             ATLA
           </NDButton>
           <NDButton race={race} size="md" onClick={next} style={{ flex: 2 }}>
-            {sceneIndex >= scenes.length - 1 ? CTA_NEXT[resolvedKey] : 'DEVAM ›'}
+            {isFinalScene ? FINISH_CTA[resolvedKey] : 'DEVAM ›'}
           </NDButton>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

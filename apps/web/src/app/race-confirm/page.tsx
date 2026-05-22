@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { AwakeningClient } from './AwakeningClient';
+import { RaceConfirmClient } from './RaceConfirmClient';
 
 export const metadata: Metadata = {
   title: 'Uyanış',
 };
 
-export default function AwakeningPage() {
+export default function RaceConfirmPage() {
   return (
     <Suspense>
-      <AwakeningClient />
+      <RaceConfirmClient />
     </Suspense>
   );
 }

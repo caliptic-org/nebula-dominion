@@ -15,7 +15,7 @@ export default function AgeTransitionTestPage() {
 
   if (completed) {
     return (
-      <div data-testid="age-transition-completed" style={{ padding: '2rem', color: '#fff', background: '#080a10', minHeight: '100vh' }}>
+      <div data-testid="age-transition-completed" style={{ padding: '2rem', color: 'var(--color-on-race)', background: 'var(--color-bg-base)', minHeight: '100vh' }}>
         <p>Çağ geçişi tamamlandı</p>
       </div>
     );
@@ -25,7 +25,7 @@ export default function AgeTransitionTestPage() {
     <AgeTransitionScreen
       toAge={toAge}
       race="zerg"
-      raceColor="#00ff88"
+      raceColor="var(--color-success-bright)"
       raceGlow="rgba(0,255,136,0.4)"
       newUnlocks={[ContentUnlock.RACE_AUTOMATON, ContentUnlock.MODE_RANKED]}
       autoAdvanceMs={0}

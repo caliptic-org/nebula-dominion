@@ -39,10 +39,10 @@ const STRUCTURES_ON_MAP = [
 ];
 
 const RESOURCES = [
-  { icon: '💎', label: 'Mineral', value: 2400, color: '#4a9eff' },
-  { icon: '⚗️', label: 'Gas', value: 840, color: '#44ff88' },
-  { icon: '⚡', label: 'Enerji', value: 1200, color: '#ffc832' },
-  { icon: '👥', label: 'Nüfus', value: '12/50', color: '#cc00ff' },
+  { icon: '💎', label: 'Mineral', value: 2400, color: 'var(--color-race-insan)' },
+  { icon: '⚗️', label: 'Gas', value: 840, color: 'var(--color-success)' },
+  { icon: '⚡', label: 'Enerji', value: 1200, color: 'var(--color-energy)' },
+  { icon: '👥', label: 'Nüfus', value: '12/50', color: 'var(--color-race-seytan)' },
 ];
 
 type Tab = 'base' | 'commanders';
@@ -295,9 +295,9 @@ export default function HomePage() {
                 {/* Left production stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: 'Mineral/dk', value: '+120', color: '#4a9eff' },
-                    { label: 'Gas/dk', value: '+45', color: '#44ff88' },
-                    { label: 'Enerji/dk', value: '+80', color: '#ffc832' },
+                    { label: 'Mineral/dk', value: '+120', color: 'var(--color-race-insan)' },
+                    { label: 'Gas/dk', value: '+45', color: 'var(--color-success)' },
+                    { label: 'Enerji/dk', value: '+80', color: 'var(--color-energy)' },
                     { label: 'Yapı', value: `${STRUCTURES_ON_MAP.length}/12`, color: raceColor },
                   ].map((s) => (
                     <MangaPanel key={s.label} className="p-3">
@@ -428,7 +428,7 @@ export default function HomePage() {
                           style={{
                             background: active ? d.bgColor : 'rgba(255,255,255,0.03)',
                             border: `1px solid ${active ? d.color : 'rgba(255,255,255,0.08)'}`,
-                            color: active ? d.color : '#555',
+                            color: active ? d.color : 'var(--color-text-muted)',
                           }}
                         >
                           {d.icon} {d.name}

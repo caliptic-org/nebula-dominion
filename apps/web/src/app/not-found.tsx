@@ -119,7 +119,7 @@ export default function NotFound() {
                 style={{
                   color: 'var(--color-text-primary)',
                   background:
-                    'linear-gradient(135deg, var(--color-race) 0%, #cc00ff 55%, #00cfff 100%)',
+                    'linear-gradient(135deg, var(--color-race) 0%, var(--color-race-seytan) 55%, var(--color-race-otomat) 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -164,11 +164,11 @@ export default function NotFound() {
         </div>
 
         <div className="mt-12 flex items-center justify-center gap-2" aria-hidden>
-          <span className="h-1 w-9 rounded-full" style={{ background: '#4a9eff', opacity: 0.4 }} />
-          <span className="h-1 w-9 rounded-full" style={{ background: '#44ff44', opacity: 0.4 }} />
-          <span className="h-1 w-9 rounded-full" style={{ background: '#00cfff', opacity: 0.4 }} />
-          <span className="h-1 w-9 rounded-full" style={{ background: '#ff6600', opacity: 0.4 }} />
-          <span className="h-1 w-9 rounded-full" style={{ background: '#cc00ff', opacity: 0.4 }} />
+          <span className="h-1 w-9 rounded-full" style={{ background: 'var(--color-race-insan)', opacity: 0.4 }} />
+          <span className="h-1 w-9 rounded-full" style={{ background: 'var(--color-race-zerg)', opacity: 0.4 }} />
+          <span className="h-1 w-9 rounded-full" style={{ background: 'var(--color-race-otomat)', opacity: 0.4 }} />
+          <span className="h-1 w-9 rounded-full" style={{ background: 'var(--color-race-canavar)', opacity: 0.4 }} />
+          <span className="h-1 w-9 rounded-full" style={{ background: 'var(--color-race-seytan)', opacity: 0.4 }} />
         </div>
         <p
           className="mt-3 font-mono text-[9px] uppercase tracking-[0.32em]"

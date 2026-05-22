@@ -148,13 +148,13 @@ function NebulaBackdrop({ race }: { race: NDRace }) {
       >
         <defs>
           <pattern id="splash-stars" width="80" height="80" patternUnits="userSpaceOnUse">
-            <circle cx="6" cy="13" r="0.6" fill="#fff" opacity="0.7" />
-            <circle cx="42" cy="28" r="0.4" fill="#fff" opacity="0.5" />
-            <circle cx="64" cy="52" r="0.7" fill="#fff" opacity="0.8" />
-            <circle cx="22" cy="60" r="0.5" fill="#fff" opacity="0.6" />
-            <circle cx="55" cy="9" r="0.3" fill="#fff" opacity="0.4" />
-            <circle cx="11" cy="40" r="0.35" fill="#fff" opacity="0.45" />
-            <circle cx="74" cy="72" r="0.45" fill="#fff" opacity="0.55" />
+            <circle cx="6" cy="13" r="0.6" fill="var(--color-on-race)" opacity="0.7" />
+            <circle cx="42" cy="28" r="0.4" fill="var(--color-on-race)" opacity="0.5" />
+            <circle cx="64" cy="52" r="0.7" fill="var(--color-on-race)" opacity="0.8" />
+            <circle cx="22" cy="60" r="0.5" fill="var(--color-on-race)" opacity="0.6" />
+            <circle cx="55" cy="9" r="0.3" fill="var(--color-on-race)" opacity="0.4" />
+            <circle cx="11" cy="40" r="0.35" fill="var(--color-on-race)" opacity="0.45" />
+            <circle cx="74" cy="72" r="0.45" fill="var(--color-on-race)" opacity="0.55" />
           </pattern>
         </defs>
         <rect width="400" height="800" fill="url(#splash-stars)" />

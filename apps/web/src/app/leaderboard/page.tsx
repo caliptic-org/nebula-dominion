@@ -213,7 +213,7 @@ export default function LeaderboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: 8, alignItems: 'end' }}>
           {[podium[1], podium[0], podium[2]].map((e, i) =>
             e ? (
-              <PodiumCard key={e.id} entry={e} accent={i === 1 ? '#ffd700' : i === 0 ? '#c0c8d8' : '#cd7f32'} />
+              <PodiumCard key={e.id} entry={e} accent={i === 1 ? 'var(--color-rarity-legendary)' : i === 0 ? 'var(--color-rarity-mid)' : 'var(--color-rarity-bronze)'} />
             ) : (
               <div key={i} />
             ),
@@ -323,7 +323,7 @@ function PodiumCard({ entry, accent }: { entry: Entry; accent: string }) {
           height: 28,
           borderRadius: 14,
           background: `linear-gradient(180deg, ${accent}, ${accent}88)`,
-          color: '#0A0E1A',
+          color: 'var(--color-bg-elevated)',
           fontFamily: ND.display,
           fontWeight: 800,
           fontSize: 14,

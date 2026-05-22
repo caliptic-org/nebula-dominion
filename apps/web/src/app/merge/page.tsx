@@ -279,7 +279,7 @@ export default function MergePage() {
                     padding: '3px 8px',
                     fontFamily: ND.mono,
                     fontSize: 10,
-                    color: on ? '#0A0E1A' : ND.textDim,
+                    color: on ? 'var(--color-bg-elevated)' : ND.textDim,
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
                     borderRadius: 2,
@@ -360,7 +360,7 @@ export default function MergePage() {
           <NDButton race={race} size="md" style={{ flex: 2 }} disabled={!canMerge} onClick={performMerge}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'} · {COST_B}
-              <ResIcon kind={race.resourceB.icon} size={12} color="#0A0E1A" />
+              <ResIcon kind={race.resourceB.icon} size={12} color="var(--color-bg-elevated)" />
               <span style={{ letterSpacing: '0.06em' }}>{race.resourceB.name.toUpperCase()}</span>
             </span>
           </NDButton>

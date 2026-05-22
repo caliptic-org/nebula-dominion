@@ -235,7 +235,7 @@ export function RegisterForm() {
                 flexShrink: 0,
                 background: accepted ? race.primary : 'transparent',
                 border: `1px solid ${race.primary}`,
-                color: accepted ? '#0A0E1A' : 'transparent',
+                color: accepted ? 'var(--color-bg-elevated)' : 'transparent',
                 fontFamily: ND.display,
                 fontSize: 12,
                 fontWeight: 800,

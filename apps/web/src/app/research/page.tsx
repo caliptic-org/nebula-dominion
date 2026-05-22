@@ -261,11 +261,11 @@ function getNodeStyle(state: NodeState, raceColor: string, raceGlow: string) {
       };
     case 'researching':
       return {
-        border: '2px solid #ffc832',
+        border: '2px solid var(--color-energy)',
         background: 'linear-gradient(135deg, rgba(255,200,50,0.15) 0%, rgba(255,200,50,0.05) 100%)',
         boxShadow: '0 0 20px rgba(255,200,50,0.4), inset 0 1px 1px rgba(255,255,255,0.12)',
         opacity: 1,
-        iconColor: '#ffc832',
+        iconColor: 'var(--color-energy)',
       };
     case 'available':
       return {
@@ -282,7 +282,7 @@ function getNodeStyle(state: NodeState, raceColor: string, raceGlow: string) {
         background: 'rgba(8,10,16,0.6)',
         boxShadow: 'none',
         opacity: 0.45,
-        iconColor: '#555d7a',
+        iconColor: 'var(--color-text-muted)',
       };
   }
 }
@@ -295,7 +295,7 @@ function getConnectionStyle(fromState: NodeState, toState: NodeState, raceColor:
     return { stroke: raceColor, opacity: 0.25, dasharray: '6 8', animated: false };
   }
   if (fromState === 'researching') {
-    return { stroke: '#ffc832', opacity: 0.5, dasharray: '4 6', animated: true };
+    return { stroke: 'var(--color-energy)', opacity: 0.5, dasharray: '4 6', animated: true };
   }
   return { stroke: 'rgba(255,255,255,0.10)', opacity: 1, dasharray: 'none', animated: false };
 }
@@ -394,7 +394,7 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
         <>
           <circle
             cx={NODE_W - 12} cy={12} r={10}
-            fill={node.state === 'completed' ? raceColor : node.state === 'researching' ? '#ffc832' : raceColor}
+            fill={node.state === 'completed' ? raceColor : node.state === 'researching' ? 'var(--color-energy)' : raceColor}
             opacity={0.95}
           />
           <text
@@ -402,7 +402,7 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize={node.state === 'completed' ? 10 : 11}
-            fill="#080a10"
+            fill="var(--color-bg-base)"
             fontWeight="900"
           >
             {node.state === 'completed' ? '✓' : node.state === 'researching' ? '⚗' : '▶'}
@@ -432,7 +432,7 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
             fontWeight: 700,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            color: style.opacity < 1 ? '#555d7a' : style.iconColor,
+            color: style.opacity < 1 ? 'var(--color-text-muted)' : style.iconColor,
             textAlign: 'center',
             lineHeight: 1.35,
             wordBreak: 'break-word',
@@ -461,7 +461,7 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
             width={Math.max(4, ((NODE_W - 16) * node.progress) / 100)}
             height={6}
             rx={3} ry={3}
-            fill="#ffc832"
+            fill="var(--color-energy)"
             style={{ filter: 'drop-shadow(0 0 4px rgba(255,200,50,0.8))' }}
           />
           <text
@@ -592,7 +592,7 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                       </div>
                       <h2
                         className="font-display text-sm font-black leading-tight"
-                        style={{ color: node.state === 'locked' ? '#a0a8c0' : raceColor }}
+                        style={{ color: node.state === 'locked' ? 'var(--color-text-secondary)' : raceColor }}
                       >
                         {node.name}
                       </h2>
@@ -615,7 +615,7 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                   <div className="mb-4">
                     <div className="flex justify-between mb-1.5">
                       <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">Araştırma İlerlemesi</span>
-                      <span className="font-display text-[9px]" style={{ color: '#ffc832' }}>{node.progress}%</span>
+                      <span className="font-display text-[9px]" style={{ color: 'var(--color-energy)' }}>{node.progress}%</span>
                     </div>
                     <div
                       className="h-2 rounded-full overflow-hidden"
@@ -625,7 +625,7 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                         className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${node.progress}%`,
-                          background: 'linear-gradient(90deg, #ffc83288, #ffc832)',
+                          background: 'linear-gradient(90deg, color-mix(in srgb, var(--color-energy) 53%, transparent), var(--color-energy))',
                           boxShadow: '0 0 8px rgba(255,200,50,0.6)',
                           transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
                         }}
@@ -669,9 +669,9 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                   <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-2">Maliyet</div>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: 'Mineral', value: node.cost.minerals.toLocaleString('tr-TR'), color: '#4a9eff', icon: '💠' },
-                      { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString('tr-TR') : 'Yok', color: '#44ff88', icon: '🟢' },
-                      { label: 'Süre', value: formatTime(node.cost.timeSec), color: '#ffc832', icon: '⏱' },
+                      { label: 'Mineral', value: node.cost.minerals.toLocaleString('tr-TR'), color: 'var(--color-race-insan)', icon: '💠' },
+                      { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString('tr-TR') : 'Yok', color: 'var(--color-success)', icon: '🟢' },
+                      { label: 'Süre', value: formatTime(node.cost.timeSec), color: 'var(--color-energy)', icon: '⏱' },
                     ].map((c) => (
                       <div
                         key={c.label}
@@ -715,7 +715,7 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                           <span className="text-xs">{req.state === 'completed' ? '✓' : '○'}</span>
                           <span
                             className="font-display text-[9px] font-bold uppercase tracking-wide"
-                            style={{ color: req.state === 'completed' ? raceColor : '#555d7a' }}
+                            style={{ color: req.state === 'completed' ? raceColor : 'var(--color-text-muted)' }}
                           >
                             {req.name}
                           </span>
@@ -742,7 +742,7 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
                     style={{
                       background: 'rgba(255,51,85,0.12)',
                       border: '1px solid rgba(255,51,85,0.3)',
-                      color: '#ff3355',
+                      color: 'var(--color-danger)',
                     }}
                     onClick={() => onCancel(node.id)}
                   >
@@ -822,7 +822,7 @@ function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
           {/* Name + progress */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-display text-xs font-bold truncate" style={{ color: '#ffc832' }}>
+              <span className="font-display text-xs font-bold truncate" style={{ color: 'var(--color-energy)' }}>
                 {researching.name}
               </span>
               <span className="font-display text-[9px] text-text-muted ml-2 shrink-0">
@@ -837,7 +837,7 @@ function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
                   width: `${researching.progress ?? 0}%`,
-                  background: 'linear-gradient(90deg, #ffc83266, #ffc832)',
+                  background: 'linear-gradient(90deg, color-mix(in srgb, var(--color-energy) 40%, transparent), var(--color-energy))',
                   boxShadow: '0 0 6px rgba(255,200,50,0.5)',
                   transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
                 }}
@@ -848,7 +848,7 @@ function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
           {/* Percent badge */}
           <div
             className="shrink-0 font-display text-xs font-black px-2 py-1 rounded-full"
-            style={{ background: 'rgba(255,200,50,0.12)', color: '#ffc832', border: '1px solid rgba(255,200,50,0.25)' }}
+            style={{ background: 'rgba(255,200,50,0.12)', color: 'var(--color-energy)', border: '1px solid rgba(255,200,50,0.25)' }}
           >
             {researching.progress ?? 0}%
           </div>
@@ -910,7 +910,7 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
               style={{
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.08)',
-                color: '#555d7a',
+                color: 'var(--color-text-muted)',
               }}
             >
               {label}
@@ -1171,7 +1171,7 @@ export default function ResearchPage() {
               </span>
               <span
                 className="font-display text-[10px] font-black"
-                style={{ color: '#555d7a' }}
+                style={{ color: 'var(--color-text-muted)' }}
               >
                 {totalCompleted}/{totalNodes}
               </span>
@@ -1181,8 +1181,8 @@ export default function ResearchPage() {
           {/* Resource mini-bar */}
           <div className="hidden sm:flex items-center gap-4">
             {[
-              { icon: '💠', label: 'Mineral', value: '12,450', color: '#4a9eff' },
-              { icon: '🟢', label: 'Gaz', value: '3,820', color: '#44ff88' },
+              { icon: '💠', label: 'Mineral', value: '12,450', color: 'var(--color-race-insan)' },
+              { icon: '🟢', label: 'Gaz', value: '3,820', color: 'var(--color-success)' },
             ].map((r) => (
               <div key={r.label} className="flex items-center gap-1.5">
                 <span className="text-sm">{r.icon}</span>
@@ -1215,7 +1215,7 @@ export default function ResearchPage() {
                 }}
                 className="relative flex items-center gap-2 px-5 py-3 font-display text-xs font-bold uppercase tracking-widest transition-all duration-300"
                 style={{
-                  color: active ? raceColor : '#555d7a',
+                  color: active ? raceColor : 'var(--color-text-muted)',
                   transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
                 }}
                 aria-selected={active}
@@ -1226,7 +1226,7 @@ export default function ResearchPage() {
                   className="font-display text-[8px] px-1.5 py-0.5 rounded-full"
                   style={{
                     background: active ? raceDim : 'rgba(255,255,255,0.04)',
-                    color: active ? raceColor : '#555d7a',
+                    color: active ? raceColor : 'var(--color-text-muted)',
                     border: active ? `1px solid ${raceColor}30` : '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
@@ -1319,9 +1319,9 @@ export default function ResearchPage() {
         >
           {[
             { state: 'completed', label: 'Tamamlandı', color: raceColor },
-            { state: 'researching', label: 'Araştırılıyor', color: '#ffc832' },
+            { state: 'researching', label: 'Araştırılıyor', color: 'var(--color-energy)' },
             { state: 'available', label: 'Araştırılabilir', color: raceColor },
-            { state: 'locked', label: 'Kilitli', color: '#555d7a' },
+            { state: 'locked', label: 'Kilitli', color: 'var(--color-text-muted)' },
           ].map((item) => (
             <div key={item.state} className="flex items-center gap-1.5">
               <div
@@ -1334,7 +1334,7 @@ export default function ResearchPage() {
               />
               <span
                 className="font-display text-[9px] uppercase tracking-wider"
-                style={{ color: item.state === 'locked' ? '#555d7a' : item.color }}
+                style={{ color: item.state === 'locked' ? 'var(--color-text-muted)' : item.color }}
               >
                 {item.label}
               </span>

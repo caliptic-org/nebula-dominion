@@ -17,6 +17,7 @@
 :root {
   /* Base space theme */
   --color-bg:          #080a10;
+  --color-bg-base:     #080a10; /* legacy "app dark" hex (#080a10) — race-independent */
   --color-bg-surface:  #0a0d14;
   --color-bg-elevated: #141d2b;
   --color-bg-overlay:  rgba(8,10,16,0.92);
@@ -50,10 +51,28 @@
   --color-border-focus: rgba(0,207,255,0.55);
 
   /* Status */
-  --color-success: #44ff88;
-  --color-danger:  #ff3355;
-  --color-warning: #ffaa22;
-  --color-info:    #4488ff;
+  --color-success:        #44ff88;
+  --color-success-bright: #00ff88;
+  --color-danger:         #ff3355;
+  --color-danger-soft:    #ff4a6e;
+  --color-danger-light:   #ff8a8a;
+  --color-danger-mid:     #ff6464;
+  --color-warning:        #ffaa22;
+  --color-info:           #4488ff;
+  --color-info-soft:      #e0f8ff;
+
+  /* Resource accents */
+  --color-resource-mineral: #44d9c8;
+  --color-resource-crystal: #44d9c8;
+
+  /* Neutral surfaces */
+  --color-neutral-700: #888899;
+  --color-neutral-800: #555d7a;
+  --color-neutral-900: #333344;
+
+  /* Deep gold gradient stops (VIP/legendary backdrops) */
+  --color-gold-deep-1: #1a1400;
+  --color-gold-deep-2: #0f0e00;
 
   /* Typography */
   --font-display: 'Orbitron', 'Segoe UI', system-ui, sans-serif;
@@ -73,14 +92,52 @@
   --color-race-glow: rgba(74,158,255,0.30);
   --color-race-text: #080a10;
 
+  /* Named race tokens (race-independent — use when you need a specific race
+   * color regardless of the active theme, e.g. leaderboards, opponent badges). */
+  --color-race-insan:   #4a9eff;
+  --color-race-zerg:    #44ff44;
+  --color-race-otomat:  #00cfff;
+  --color-race-canavar: #ff6600;
+  --color-race-seytan:  #cc00ff;
+
+  /* Deep race gradient stops — used by event/race-cinematic backdrops. */
+  --color-race-zerg-deep-1:    #003300;
+  --color-race-zerg-deep-2:    #001800;
+  --color-race-otomat-deep-1:  #001a22;
+  --color-race-otomat-deep-2:  #000d18;
+  --color-race-seytan-deep-1:  #1a0022;
+  --color-race-seytan-deep-2:  #0d0015;
+  --color-race-canavar-deep-1: #221000;
+  --color-race-canavar-deep-2: #150800;
+  --color-race-insan-deep-1:   #001530;
+  --color-race-insan-deep-2:   #000c1e;
+
   /* Cinematic space */
   --color-bg:          #000000;
   --color-bg-surface:  #05070f;
   --color-bg-elevated: #0a0d18;
   --color-bg-overlay:  rgba(0,2,10,0.92);
+  --color-bg-deep:     #04060c;
+  --color-bg-pure:     #000000;
   --color-explosion:   #ff6600;
   --color-exhaust:     #00aaff;
   --color-gold:        #c8a84b;
+
+  /* On-race surface foreground (used for text/icons over race-colored fills) */
+  --color-on-race:     #ffffff;
+  --color-on-light:    #080a10;
+
+  /* Rarity */
+  --color-rarity-legendary: #ffd700;
+  --color-rarity-legendary-accent: #fff8c0;
+  --color-rarity-epic:      #cc00ff;
+  --color-rarity-rare:      #4488ff;
+  --color-rarity-uncommon:  #44ff88;
+  --color-rarity-common:    #888888;
+  --color-rarity-bronze:    #cd7f32;
+  --color-rarity-silver:    #e5e4e2;
+  --color-rarity-platinum:  #e5e4e2;
+  --color-rarity-mid:       #c0c8d8;
 
   /* Glass panel */
   --glass-bg:     rgba(5,7,15,0.72);

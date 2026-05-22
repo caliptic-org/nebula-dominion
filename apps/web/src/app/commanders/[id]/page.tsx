@@ -715,11 +715,11 @@ function EquipmentPanel({
         </div>
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Sıradan', color: '#888888' },
-            { label: 'Yaygın', color: '#44ff88' },
-            { label: 'Nadir', color: '#4488ff' },
-            { label: 'Destansı', color: '#cc00ff' },
-            { label: 'Efsanevi', color: '#ffc832' },
+            { label: 'Sıradan', color: 'var(--color-rarity-common)' },
+            { label: 'Yaygın', color: 'var(--color-success)' },
+            { label: 'Nadir', color: 'var(--color-info)' },
+            { label: 'Destansı', color: 'var(--color-race-seytan)' },
+            { label: 'Efsanevi', color: 'var(--color-energy)' },
           ].map((r) => (
             <div key={r.label} className="flex items-center gap-2">
               <div

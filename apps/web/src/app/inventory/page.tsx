@@ -160,7 +160,7 @@ export default function RosterPage() {
                     fontFamily: ND.display,
                     fontSize: 10,
                     letterSpacing: '0.10em',
-                    color: on ? '#0A0E1A' : ND.textDim,
+                    color: on ? 'var(--color-bg-elevated)' : ND.textDim,
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
                     borderRadius: 3,

@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { RacePanel } from '@/components/ui/RacePanel';
 
 const RACES = [
-  { code: 'human',   label: 'HUMAN — İnsan',     primary: '#4a9eff' },
-  { code: 'zerg',    label: 'ZERG — Böcek',      primary: '#44ff44' },
-  { code: 'automat', label: 'AUTOMAT — Otomat',  primary: '#00cfff' },
-  { code: 'beast',   label: 'BEAST — Canavar',   primary: '#ff6600' },
-  { code: 'demon',   label: 'DEMON — Şeytan',    primary: '#cc00ff' },
+  { code: 'human',   label: 'HUMAN — İnsan',     primary: 'var(--color-race-insan)' },
+  { code: 'zerg',    label: 'ZERG — Böcek',      primary: 'var(--color-race-zerg)' },
+  { code: 'automat', label: 'AUTOMAT — Otomat',  primary: 'var(--color-race-otomat)' },
+  { code: 'beast',   label: 'BEAST — Canavar',   primary: 'var(--color-race-canavar)' },
+  { code: 'demon',   label: 'DEMON — Şeytan',    primary: 'var(--color-race-seytan)' },
 ] as const;
 
 export default function RaceChromeShowcase() {
@@ -50,7 +50,7 @@ export default function RaceChromeShowcase() {
               style={{
                 padding: '8px 16px',
                 background: active === r.code ? r.primary : 'transparent',
-                color: active === r.code ? '#000' : r.primary,
+                color: active === r.code ? 'var(--color-bg-pure)' : r.primary,
                 border: `1px solid ${r.primary}`,
                 cursor: 'pointer',
                 fontFamily: 'inherit',

@@ -24,7 +24,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
         className="fixed inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,51,85,0.14) 0%, #080a10 70%)',
+            'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,51,85,0.14) 0%, var(--color-bg-base) 70%)',
           zIndex: 0,
         }}
         aria-hidden
@@ -143,7 +143,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
                 className="font-display text-5xl sm:text-6xl font-black leading-none tracking-[0.10em] uppercase"
                 style={{
                   background:
-                    'linear-gradient(135deg, var(--color-danger) 0%, #ffaa22 100%)',
+                    'linear-gradient(135deg, var(--color-danger) 0%, var(--color-warning) 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -206,7 +206,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
             className="btn-primary w-full sm:w-auto"
             style={{
               background: 'var(--color-danger)',
-              color: '#080a10',
+              color: 'var(--color-bg-base)',
             }}
           >
             <span aria-hidden>↻</span>

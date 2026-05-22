@@ -41,21 +41,21 @@ function isDefaultItem(item: CosmeticItem): boolean {
 
 // ─── Shared color tokens (match design system) ────────────────────────────────
 const TOKEN = {
-  bg:          'var(--color-bg,          #080a10)',
-  bgSurface:   'var(--color-bg-surface,  #0d1117)',
-  bgElevated:  'var(--color-bg-elevated, #141d2b)',
-  textPrimary: 'var(--color-text-primary,   #e8e8f0)',
-  textSecondary:'var(--color-text-secondary, #a0a8c0)',
-  textMuted:   'var(--color-text-muted,    #555d7a)',
+  bg:          'var(--color-bg)',
+  bgSurface:   'var(--color-bg-surface)',
+  bgElevated:  'var(--color-bg-elevated)',
+  textPrimary: 'var(--color-text-primary)',
+  textSecondary:'var(--color-text-secondary)',
+  textMuted:   'var(--color-text-muted)',
   border:      'rgba(255,255,255,0.07)',
   borderHover: 'rgba(255,255,255,0.14)',
-  brand:       'var(--color-brand,      #4a9eff)',
+  brand:       'var(--color-brand)',
   brandDim:    'var(--color-brand-dim,  rgba(74,158,255,0.12))',
   brandGlow:   'var(--color-brand-glow, rgba(74,158,255,0.35))',
-  energy:      'var(--color-energy,     #ffc832)',
+  energy:      'var(--color-energy)',
   energyDim:   'var(--color-energy-dim, rgba(255,200,50,0.12))',
-  success:     'var(--color-success,    #44ff88)',
-  danger:      'var(--color-danger,     #ff4a6e)',
+  success:     'var(--color-success)',
+  danger:      'var(--color-danger)',
   dangerDim:   'rgba(255,74,110,0.12)',
 };
 
@@ -150,7 +150,7 @@ function CosmeticCard({
               borderRadius: '50%',
               background: TOKEN.success,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, color: '#080a10', fontWeight: 800,
+              fontSize: 11, color: 'var(--color-bg-base)', fontWeight: 800,
               boxShadow: `0 0 8px ${TOKEN.success}`,
             }}
             aria-label="Giyili"
@@ -175,7 +175,7 @@ function CosmeticCard({
               style={{
                 width: 16, height: 16,
                 border: '2px solid rgba(255,255,255,0.25)',
-                borderTopColor: '#fff',
+                borderTopColor: 'var(--color-on-race)',
                 borderRadius: '50%',
                 display: 'inline-block',
                 animation: 'spin 0.7s linear infinite',
@@ -705,7 +705,7 @@ function PreviewPanel({
                 background: applying ? `${item.rarityColor}aa` : item.rarityColor,
                 border: 'none',
                 cursor: applying ? 'wait' : 'pointer',
-                color: '#080a10',
+                color: 'var(--color-bg-base)',
                 fontFamily: 'var(--font-display, Orbitron, system-ui)',
                 fontSize: 12,
                 fontWeight: 800,
@@ -725,7 +725,7 @@ function PreviewPanel({
                     style={{
                       width: 14, height: 14,
                       border: '2px solid rgba(0,0,0,0.3)',
-                      borderTopColor: '#080a10',
+                      borderTopColor: 'var(--color-bg-base)',
                       borderRadius: '50%',
                       display: 'inline-block',
                       animation: 'spin 0.7s linear infinite',
@@ -1175,7 +1175,7 @@ export default function CustomizationPage() {
         <div
           style={{
             position: 'fixed', inset: 0,
-            background: 'var(--gradient-nebula, radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.08) 0%, #080a10 70%))',
+            background: 'var(--gradient-nebula, radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.08) 0%, var(--color-bg-base) 70%))',
             pointerEvents: 'none',
             zIndex: 0,
           }}

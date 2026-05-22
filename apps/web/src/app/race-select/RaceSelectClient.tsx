@@ -100,7 +100,7 @@ function RaceCard({ race, selected, onSelect }: RaceCardProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#0A0E1A',
+          color: 'var(--color-bg-elevated)',
           fontFamily: ND.display,
           fontWeight: 900,
           fontSize: 14,

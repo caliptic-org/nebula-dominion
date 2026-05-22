@@ -35,11 +35,11 @@ interface DMConversation {
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 const RACE_COLORS: Record<Race, string> = {
-  insan:   '#4a9eff',
-  zerg:    '#44ff44',
-  otomat:  '#00cfff',
-  canavar: '#ff6600',
-  seytan:  '#cc00ff',
+  insan:   'var(--color-race-insan)',
+  zerg:    'var(--color-race-zerg)',
+  otomat:  'var(--color-race-otomat)',
+  canavar: 'var(--color-race-canavar)',
+  seytan:  'var(--color-race-seytan)',
 };
 
 const RACE_LABELS: Record<Race, string> = {
@@ -275,7 +275,7 @@ function MessageBubble({
   raceColor: string;
 }) {
   const isOwn = message.isOwn;
-  const bubbleColor = isOwn ? raceColor : (message.race ? RACE_COLORS[message.race] : '#a0a8c0');
+  const bubbleColor = isOwn ? raceColor : (message.race ? RACE_COLORS[message.race] : 'var(--color-text-secondary)');
 
   if (message.type === 'system') {
     return (
@@ -284,12 +284,12 @@ function MessageBubble({
         style={{
           background: 'rgba(0,207,255,0.06)',
           border: '1px solid rgba(0,207,255,0.15)',
-          color: '#00cfff',
-          borderLeft: '3px solid #00cfff',
+          color: 'var(--color-race-otomat)',
+          borderLeft: '3px solid var(--color-race-otomat)',
         }}
       >
         <span style={{ opacity: 0.7 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: '#555d7a', flexShrink: 0 }}>
+        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
           {message.timestamp}
         </span>
       </div>
@@ -303,12 +303,12 @@ function MessageBubble({
         style={{
           background: 'rgba(255,51,85,0.06)',
           border: '1px solid rgba(255,51,85,0.18)',
-          color: '#ff6680',
-          borderLeft: '3px solid #ff3355',
+          color: 'var(--color-danger)',
+          borderLeft: '3px solid var(--color-danger)',
         }}
       >
         <span style={{ opacity: 0.85 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: '#555d7a', flexShrink: 0 }}>
+        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
           {message.timestamp}
         </span>
       </div>
@@ -322,12 +322,12 @@ function MessageBubble({
         style={{
           background: 'rgba(255,200,50,0.06)',
           border: '1px solid rgba(255,200,50,0.15)',
-          color: '#ffc832',
-          borderLeft: '3px solid #ffc832',
+          color: 'var(--color-energy)',
+          borderLeft: '3px solid var(--color-energy)',
         }}
       >
         <span style={{ opacity: 0.85 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: '#555d7a', flexShrink: 0 }}>
+        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
           {message.timestamp}
         </span>
       </div>
@@ -350,7 +350,7 @@ function MessageBubble({
             </span>
             {message.race && <RaceBadge race={message.race} size="xs" />}
             {message.level && (
-              <span className="font-display text-[8px]" style={{ color: '#555d7a' }}>
+              <span className="font-display text-[8px]" style={{ color: 'var(--color-text-muted)' }}>
                 Lv.{message.level}
               </span>
             )}
@@ -391,7 +391,7 @@ function MessageBubble({
 
         <span
           className="font-display text-[8px] px-1"
-          style={{ color: '#555d7a' }}
+          style={{ color: 'var(--color-text-muted)' }}
         >
           {message.timestamp}
         </span>
@@ -437,8 +437,8 @@ function DMListItem({ conv, onClick }: { conv: DMConversation; onClick: () => vo
         <div
           className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
           style={{
-            background: conv.online ? '#44ff88' : '#555d7a',
-            borderColor: '#080a10',
+            background: conv.online ? 'var(--color-success)' : 'var(--color-text-muted)',
+            borderColor: 'var(--color-bg-base)',
           }}
         />
       </div>
@@ -456,13 +456,13 @@ function DMListItem({ conv, onClick }: { conv: DMConversation; onClick: () => vo
 
       {/* Meta */}
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        <span className="font-display text-[9px]" style={{ color: '#555d7a' }}>
+        <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
           {conv.timestamp}
         </span>
         {conv.unread > 0 && (
           <span
             className="flex items-center justify-center rounded-full font-display font-black text-[9px] min-w-[16px] h-4 px-1"
-            style={{ background: '#ff3355', color: '#fff' }}
+            style={{ background: 'var(--color-danger)', color: 'var(--color-on-race)' }}
           >
             {conv.unread}
           </span>
@@ -571,9 +571,9 @@ export default function ChatPage() {
         <div className="flex items-center gap-1.5">
           <div
             className="w-1.5 h-1.5 rounded-full animate-pulse"
-            style={{ background: '#44ff88' }}
+            style={{ background: 'var(--color-success)' }}
           />
-          <span className="font-display text-[9px]" style={{ color: '#555d7a' }}>
+          <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
             1,247 çevrimiçi
           </span>
         </div>
@@ -596,7 +596,7 @@ export default function ChatPage() {
               onClick={() => { setActiveTab(tab.id); setActiveDM(null); setNewMessageAlert(false); }}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 relative transition-all duration-200 font-display text-[10px] font-bold uppercase tracking-widest"
               style={{
-                color: isActive ? raceColor : '#555d7a',
+                color: isActive ? raceColor : 'var(--color-text-muted)',
                 borderBottom: isActive ? `2px solid ${raceColor}` : '2px solid transparent',
                 background: isActive ? `${raceColor}08` : 'transparent',
               }}
@@ -606,7 +606,7 @@ export default function ChatPage() {
               {tab.badge ? (
                 <span
                   className="flex items-center justify-center rounded-full min-w-[14px] h-3.5 px-0.5 font-black text-[8px]"
-                  style={{ background: '#ff3355', color: '#fff' }}
+                  style={{ background: 'var(--color-danger)', color: 'var(--color-on-race)' }}
                 >
                   {tab.badge}
                 </span>
@@ -632,7 +632,7 @@ export default function ChatPage() {
         {activeTab === 'dm' && !activeDM && (
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-2">
-              <span className="font-display text-[9px] uppercase tracking-widest" style={{ color: '#555d7a' }}>
+              <span className="font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                 Özel Mesajlar
               </span>
             </div>
@@ -685,9 +685,9 @@ export default function ChatPage() {
                 <div className="flex items-center gap-1">
                   <div
                     className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: activeDM.online ? '#44ff88' : '#555d7a' }}
+                    style={{ background: activeDM.online ? 'var(--color-success)' : 'var(--color-text-muted)' }}
                   />
-                  <span className="font-display text-[8px]" style={{ color: '#555d7a' }}>
+                  <span className="font-display text-[8px]" style={{ color: 'var(--color-text-muted)' }}>
                     {activeDM.online ? 'Çevrimiçi' : 'Çevrimdışı'} · Lv.{activeDM.level}
                   </span>
                 </div>
@@ -698,7 +698,7 @@ export default function ChatPage() {
             <div ref={messageContainerRef} className="flex-1 overflow-y-auto py-2 flex flex-col gap-1">
               <div
                 className="mx-3 my-2 p-2 text-center font-body text-[10px] rounded"
-                style={{ background: 'rgba(255,255,255,0.03)', color: '#555d7a' }}
+                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)' }}
               >
                 Konuşma başladı
               </div>
@@ -754,7 +754,7 @@ export default function ChatPage() {
                 Yeni mesaj
               </span>
             </div>
-            <span className="font-display text-[9px]" style={{ color: '#555d7a' }}>
+            <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
               Alta git ↓
             </span>
           </div>
@@ -780,7 +780,7 @@ export default function ChatPage() {
                 borderTop: `1px solid rgba(255,255,255,0.06)`,
               }}
             >
-              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: '#555d7a' }}>
+              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                 Hızlı yanıtlar
               </span>
               {QUICK_REPLIES.map((reply) => (
@@ -809,7 +809,7 @@ export default function ChatPage() {
                 borderTop: `1px solid rgba(255,255,255,0.06)`,
               }}
             >
-              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: '#555d7a' }}>
+              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                 Emoji
               </span>
               {EMOJIS.map((emoji) => (
@@ -885,7 +885,7 @@ export default function ChatPage() {
               className="flex items-center justify-center w-9 h-9 rounded font-display font-black text-[12px] transition-all duration-200 disabled:opacity-40"
               style={{
                 background: input.trim() ? raceColor : 'rgba(255,255,255,0.06)',
-                color: input.trim() ? '#080a10' : '#555d7a',
+                color: input.trim() ? 'var(--color-bg-base)' : 'var(--color-text-muted)',
                 boxShadow: input.trim() ? `0 0 12px ${raceGlow}` : undefined,
               }}
               title="Gönder"

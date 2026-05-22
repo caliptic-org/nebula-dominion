@@ -51,7 +51,7 @@ interface EventDetail {
 
 const now = Date.now();
 
-const SAFE_BG = 'linear-gradient(135deg, #0d1020 0%, #07090f 100%)';
+const SAFE_BG = 'linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg) 100%)';
 
 const EVENTS_MAP: Record<string, EventDetail> = {
   'zerg-domination-s1': {
@@ -60,8 +60,8 @@ const EVENTS_MAP: Record<string, EventDetail> = {
     subtitle: 'Sezon I · Kovan Savaşları',
     type: 'tournament',
     status: 'active',
-    raceColor: '#44ff44',
-    raceGradient: 'linear-gradient(135deg, #003300 0%, #001800 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-zerg)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-zerg-deep-1) 0%, var(--color-race-zerg-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Zerg',
     endDate: new Date(now + 2 * 86400000 + 14 * 3600000),
     startDate: new Date(now - 3 * 86400000),
@@ -86,13 +86,13 @@ const EVENTS_MAP: Record<string, EventDetail> = {
       { rank: 10, prize: '100 Kristal'  },
     ],
     leaderboard: [
-      { rank: 1, name: 'VexThara_GG',  score: 48720, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 2, name: 'MorgathPrime', score: 44190, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 3, name: 'ThrenixVoid',  score: 41350, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 4, name: 'HiveQueen_X',  score: 38800, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 5, name: 'BioLumine',    score: 35420, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 6, name: 'SynapseHive',  score: 31110, race: 'Zerg', raceColor: '#44ff44' },
-      { rank: 7, name: 'NexusSpore',   score: 28750, race: 'Zerg', raceColor: '#44ff44' },
+      { rank: 1, name: 'VexThara_GG',  score: 48720, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 2, name: 'MorgathPrime', score: 44190, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 3, name: 'ThrenixVoid',  score: 41350, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 4, name: 'HiveQueen_X',  score: 38800, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 5, name: 'BioLumine',    score: 35420, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 6, name: 'SynapseHive',  score: 31110, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
+      { rank: 7, name: 'NexusSpore',   score: 28750, race: 'Zerg', raceColor: 'var(--color-race-zerg)' },
     ],
   },
   'automat-grid-race': {
@@ -101,8 +101,8 @@ const EVENTS_MAP: Record<string, EventDetail> = {
     subtitle: 'Kaynak Toplanması · Sprint Modu',
     type: 'resource',
     status: 'active',
-    raceColor: '#00cfff',
-    raceGradient: 'linear-gradient(135deg, #001a22 0%, #000d18 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-otomat)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-otomat-deep-1) 0%, var(--color-race-otomat-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Otomat',
     endDate: new Date(now + 18 * 3600000),
     startDate: new Date(now - 6 * 3600000),
@@ -122,11 +122,11 @@ const EVENTS_MAP: Record<string, EventDetail> = {
       { rank: 5, prize: '600 Enerji'   },
     ],
     leaderboard: [
-      { rank: 1, name: 'DemiurgePrime', score: 22500, race: 'Otomat', raceColor: '#00cfff' },
-      { rank: 2, name: 'AureliusCore',  score: 20880, race: 'Otomat', raceColor: '#00cfff' },
-      { rank: 3, name: 'CrucibleAI',    score: 19340, race: 'Otomat', raceColor: '#00cfff' },
-      { rank: 4, name: 'GridNode_7',    score: 17200, race: 'Otomat', raceColor: '#00cfff' },
-      { rank: 5, name: 'NanoForge',     score: 14800, race: 'Otomat', raceColor: '#00cfff' },
+      { rank: 1, name: 'DemiurgePrime', score: 22500, race: 'Otomat', raceColor: 'var(--color-race-otomat)' },
+      { rank: 2, name: 'AureliusCore',  score: 20880, race: 'Otomat', raceColor: 'var(--color-race-otomat)' },
+      { rank: 3, name: 'CrucibleAI',    score: 19340, race: 'Otomat', raceColor: 'var(--color-race-otomat)' },
+      { rank: 4, name: 'GridNode_7',    score: 17200, race: 'Otomat', raceColor: 'var(--color-race-otomat)' },
+      { rank: 5, name: 'NanoForge',     score: 14800, race: 'Otomat', raceColor: 'var(--color-race-otomat)' },
     ],
   },
   'guild-nebula-clash': {
@@ -135,8 +135,8 @@ const EVENTS_MAP: Record<string, EventDetail> = {
     subtitle: 'Lonca Ligası · Grup Aşaması',
     type: 'guild',
     status: 'active',
-    raceColor: '#cc00ff',
-    raceGradient: 'linear-gradient(135deg, #1a0022 0%, #0d0015 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-seytan)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-seytan-deep-1) 0%, var(--color-race-seytan-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Şeytan',
     endDate: new Date(now + 5 * 86400000),
     startDate: new Date(now - 1 * 86400000),
@@ -156,11 +156,11 @@ const EVENTS_MAP: Record<string, EventDetail> = {
       { rank: 5, prize: '2,000 Kristal'  },
     ],
     leaderboard: [
-      { rank: 1, name: 'KaranlıkSipahi', score: 98400, race: 'Şeytan', raceColor: '#cc00ff' },
-      { rank: 2, name: 'VorhaalLegion',  score: 91200, race: 'Şeytan', raceColor: '#cc00ff' },
-      { rank: 3, name: 'AzurathCult',    score: 84700, race: 'Şeytan', raceColor: '#cc00ff' },
-      { rank: 4, name: 'MalphasGuild',   score: 78900, race: 'Şeytan', raceColor: '#cc00ff' },
-      { rank: 5, name: 'LilithraSect',   score: 65300, race: 'Şeytan', raceColor: '#cc00ff' },
+      { rank: 1, name: 'KaranlıkSipahi', score: 98400, race: 'Şeytan', raceColor: 'var(--color-race-seytan)' },
+      { rank: 2, name: 'VorhaalLegion',  score: 91200, race: 'Şeytan', raceColor: 'var(--color-race-seytan)' },
+      { rank: 3, name: 'AzurathCult',    score: 84700, race: 'Şeytan', raceColor: 'var(--color-race-seytan)' },
+      { rank: 4, name: 'MalphasGuild',   score: 78900, race: 'Şeytan', raceColor: 'var(--color-race-seytan)' },
+      { rank: 5, name: 'LilithraSect',   score: 65300, race: 'Şeytan', raceColor: 'var(--color-race-seytan)' },
     ],
   },
 };
@@ -238,8 +238,8 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
           <span
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0"
             style={{
-              background: entry.rank === 1 ? '#ffc83222' : entry.rank === 2 ? '#c0c0c022' : entry.rank === 3 ? '#cd7f3222' : 'rgba(255,255,255,0.05)',
-              color: entry.rank === 1 ? '#ffc832' : entry.rank === 2 ? '#c0c0c0' : entry.rank === 3 ? '#cd7f32' : 'var(--color-text-muted)',
+              background: entry.rank === 1 ? 'color-mix(in srgb, var(--color-energy) 13%, transparent)' : entry.rank === 2 ? 'color-mix(in srgb, var(--color-rarity-silver) 13%, transparent)' : entry.rank === 3 ? 'color-mix(in srgb, var(--color-rarity-bronze) 13%, transparent)' : 'rgba(255,255,255,0.05)',
+              color: entry.rank === 1 ? 'var(--color-energy)' : entry.rank === 2 ? 'var(--color-rarity-silver)' : entry.rank === 3 ? 'var(--color-rarity-bronze)' : 'var(--color-text-muted)',
             }}
           >
             {entry.rank}
@@ -265,7 +265,7 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
 
           <span
             className="font-display font-black text-sm shrink-0"
-            style={{ color: entry.rank <= 3 ? (entry.rank === 1 ? '#ffc832' : entry.rank === 2 ? '#c0c0c0' : '#cd7f32') : 'var(--color-text-secondary)' }}
+            style={{ color: entry.rank <= 3 ? (entry.rank === 1 ? 'var(--color-energy)' : entry.rank === 2 ? 'var(--color-rarity-silver)' : 'var(--color-rarity-bronze)') : 'var(--color-text-secondary)' }}
           >
             {entry.score.toLocaleString()}
           </span>
@@ -296,7 +296,7 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
         className="flex items-center gap-3 rounded-full font-black text-sm px-7 py-3.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-500"
         style={{
           background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-          color: '#000',
+          color: 'var(--color-bg-pure)',
           boxShadow: `0 0 40px ${color}55`,
           transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
         }}

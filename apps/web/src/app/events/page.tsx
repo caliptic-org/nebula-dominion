@@ -35,8 +35,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Sezon I · Kovan Savaşları',
     type: 'tournament',
     status: 'active',
-    raceColor: '#44ff44',
-    raceGradient: 'linear-gradient(135deg, #003300 0%, #001800 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-zerg)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-zerg-deep-1) 0%, var(--color-race-zerg-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Zerg',
     endDate: new Date(now + 2 * 86400000 + 14 * 3600000),
     startDate: new Date(now - 3 * 86400000),
@@ -50,8 +50,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Kaynak Toplanması · Sprint Modu',
     type: 'resource',
     status: 'active',
-    raceColor: '#00cfff',
-    raceGradient: 'linear-gradient(135deg, #001a22 0%, #000d18 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-otomat)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-otomat-deep-1) 0%, var(--color-race-otomat-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Otomat',
     endDate: new Date(now + 18 * 3600000),
     startDate: new Date(now - 6 * 3600000),
@@ -65,8 +65,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Lonca Ligası · Grup Aşaması',
     type: 'guild',
     status: 'active',
-    raceColor: '#cc00ff',
-    raceGradient: 'linear-gradient(135deg, #1a0022 0%, #0d0015 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-seytan)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-seytan-deep-1) 0%, var(--color-race-seytan-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Şeytan',
     endDate: new Date(now + 5 * 86400000),
     startDate: new Date(now - 1 * 86400000),
@@ -79,8 +79,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'PvE Özel Etkinlik',
     type: 'special',
     status: 'upcoming',
-    raceColor: '#ff6600',
-    raceGradient: 'linear-gradient(135deg, #221000 0%, #150800 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-canavar)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-canavar-deep-1) 0%, var(--color-race-canavar-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'Canavar',
     endDate: new Date(now + 8 * 86400000),
     startDate: new Date(now + 3 * 86400000),
@@ -93,8 +93,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Araştırma Yarışması',
     type: 'resource',
     status: 'upcoming',
-    raceColor: '#4a9eff',
-    raceGradient: 'linear-gradient(135deg, #001530 0%, #000c1e 40%, #07090f 100%)',
+    raceColor: 'var(--color-race-insan)',
+    raceGradient: 'linear-gradient(135deg, var(--color-race-insan-deep-1) 0%, var(--color-race-insan-deep-2) 40%, var(--color-bg) 100%)',
     raceLabel: 'İnsan',
     endDate: new Date(now + 12 * 86400000),
     startDate: new Date(now + 7 * 86400000),
@@ -107,8 +107,8 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Sezon 0 · Tamamlandı',
     type: 'tournament',
     status: 'archive',
-    raceColor: '#888899',
-    raceGradient: 'linear-gradient(135deg, #111118 0%, #0a0a10 100%)',
+    raceColor: 'var(--color-neutral-700)',
+    raceGradient: 'linear-gradient(135deg, var(--color-bg-deep) 0%, var(--color-bg-base) 100%)',
     raceLabel: 'Tüm Irklar',
     endDate: new Date(now - 5 * 86400000),
     startDate: new Date(now - 12 * 86400000),
@@ -144,7 +144,7 @@ function SpeedLines({ color }: { color: string }) {
   );
 }
 
-const SAFE_BG = 'linear-gradient(135deg, #0d1020 0%, #07090f 100%)';
+const SAFE_BG = 'linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg) 100%)';
 
 /* ── Featured banner ─────────────────────────────────────────────── */
 function FeaturedBanner({ event }: { event: GameEvent }) {
@@ -188,7 +188,7 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
                 </span>
                 <span
                   className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,100,100,0.15)', color: '#ff6464', border: '1px solid rgba(255,100,100,0.3)' }}
+                  style={{ background: 'rgba(255,100,100,0.15)', color: 'var(--color-danger-mid)', border: '1px solid rgba(255,100,100,0.3)' }}
                 >
                   ● AKTİF
                 </span>
@@ -227,7 +227,7 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
                 className="flex items-center gap-3 rounded-full font-bold text-sm px-5 py-3 transition-all duration-500 group-hover:scale-105 active:scale-95"
                 style={{
                   background: `linear-gradient(135deg, ${c}, ${c}bb)`,
-                  color: '#000',
+                  color: 'var(--color-bg-pure)',
                   boxShadow: `0 0 30px ${c}55`,
                   transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
                 }}
@@ -267,7 +267,7 @@ function EventCard({ event }: { event: GameEvent }) {
       <div
         className="relative rounded-xl overflow-hidden transition-all duration-500 hover-glow"
         style={{
-          border: `1px solid ${isArchive ? '#333344' : c + '30'}`,
+          border: `1px solid ${isArchive ? 'var(--color-neutral-900)' : c + '30'}`,
           background: isArchive ? 'rgba(10,10,18,0.8)' : bg,
           transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
           opacity: isArchive ? 0.65 : 1,
@@ -380,7 +380,7 @@ export default function EventsPage() {
         </div>
         <span
           className="text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded-full"
-          style={{ background: 'rgba(255,100,100,0.12)', color: '#ff6464', border: '1px solid rgba(255,100,100,0.25)' }}
+          style={{ background: 'rgba(255,100,100,0.12)', color: 'var(--color-danger-mid)', border: '1px solid rgba(255,100,100,0.25)' }}
         >
           ● {EVENTS.filter(e => e.status === 'active').length} AKTİF
         </span>

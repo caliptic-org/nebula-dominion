@@ -41,9 +41,8 @@ const SECTIONS: DrawerSection[] = [
   {
     title: 'Ordu',
     links: [
-      { href: '/inventory',         icon: '🎒', label: 'Envanter',    description: 'Eşyalar' },
-      { href: '/inventory/roster',  icon: '🛡️', label: 'Birlik Roster', description: 'Tüm birlikler' },
-      { href: '/inventory/merge',   icon: '⚗️', label: 'Birleştirme',  description: 'Birim birleşimi' },
+      { href: '/inventory',         icon: '🛡️', label: 'Birim Envanteri', description: 'Roster + birim detayı' },
+      { href: '/merge',             icon: '⚗️', label: 'Birleştirme',     description: 'Slot tabanlı birleştirme' },
       { href: '/formation',         icon: '🎯', label: 'Formasyon',    description: 'Savaş düzeni' },
       { href: '/battle-prep',       icon: '⚔️', label: 'Savaş Hazırlık', description: 'Loadout' },
     ],
@@ -61,7 +60,7 @@ const SECTIONS: DrawerSection[] = [
   {
     title: 'Komuta',
     links: [
-      { href: '/dashboard',        icon: '🛰️', label: 'Komuta Merkezi', description: 'Genel bakış' },
+      { href: '/base',             icon: '🛰️', label: 'Ana Üs',          description: 'Komuta merkezi' },
       { href: '/dashboard/guild',  icon: '🏛️', label: 'Lonca Yönetimi', description: 'Üyeler & izinler' },
       { href: '/stats',            icon: '📊', label: 'İstatistikler',   description: 'Detaylı veriler' },
       { href: '/base/production',  icon: '🏭', label: 'Üretim',         description: 'Kaynak çıktısı' },

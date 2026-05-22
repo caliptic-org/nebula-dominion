@@ -1,272 +1,538 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  InventoryItem,
-  ItemCategory,
-  ItemRarity,
-  SortMode,
-  CATEGORY_CONFIG,
-  RARITY_CONFIG,
-  DEMO_INVENTORY,
-} from '@/types/inventory';
-import { MangaPanel } from '@/components/ui/MangaPanel';
-import { InventoryItemCard } from '@/components/ui/InventoryItemCard';
-import { ItemDetailPanel } from '@/components/ui/ItemDetailPanel';
-import clsx from 'clsx';
+  Bar,
+  BottomNav,
+  Caption,
+  Chip,
+  Code,
+  Eyebrow,
+  H3,
+  HUD,
+  ND,
+  NDButton,
+  NebulaBg,
+  Panel,
+  ResIcon,
+  Sigil,
+} from '@/components/handoff';
+import { useNDRace } from '@/components/handoff/useNDRace';
+import type { NDRace } from '@/components/handoff/nd-tokens';
 
-const CAPACITY_MAX = 200;
-const CAPACITY_USED = 170;
-const CAPACITY_WARN_THRESHOLD = 0.8;
+const ROSTER_NAMES: Record<string, string> = {
+  insan:   'Birim Envanteri',
+  zerg:    'Sürü Vücudu',
+  otomat:  'Birim Kataloğu',
+  canavar: 'Av Topluluğu',
+  seytan:  'Bağlı Ruhlar',
+};
 
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: SortMode.NADIR,      label: 'Nadir' },
-  { value: SortMode.ADET,       label: 'Adet'  },
-  { value: SortMode.SON_ALINAN, label: 'Son Alınan' },
+const MERGE_VERB: Record<string, string> = {
+  insan:   'Birleştir',
+  zerg:    'Mutate',
+  otomat:  'Derle',
+  canavar: 'Yut',
+  seytan:  'Bağla',
+};
+
+const POP_USED = 180;
+const POP_MAX = 240;
+
+type UnitState = 'ready' | 'fleet' | 'wounded';
+type SortKey = 'tier' | 'count' | 'level';
+
+interface RosterUnit {
+  id: string;
+  name: string;
+  tier: number;
+  level: number;
+  count: number;
+  state: UnitState;
+  atk: number;
+  def: number;
+  spd: number;
+}
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'tier',  label: 'Tier'  },
+  { key: 'count', label: 'Adet'  },
+  { key: 'level', label: 'Sevye' },
 ];
 
-const RARITY_ORDER: ItemRarity[] = [
-  ItemRarity.EFSANEVI,
-  ItemRarity.DESTANSI,
-  ItemRarity.NADIR,
-  ItemRarity.YAYGIN,
-  ItemRarity.SIRADAN,
-];
+const STATE_LABEL: Record<UnitState, string> = {
+  ready:   'HAZIR',
+  wounded: 'YARALI',
+  fleet:   'FİLODA',
+};
 
-export default function InventoryPage() {
-  const [activeCategory, setActiveCategory] = useState<ItemCategory>(ItemCategory.TUMSU);
-  const [sortMode, setSortMode] = useState<SortMode>(SortMode.NADIR);
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(DEMO_INVENTORY[4]);
+export default function RosterPage() {
+  const race = useNDRace();
+  const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('tier');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const categories = Object.values(ItemCategory) as ItemCategory[];
+  const units: RosterUnit[] = useMemo(() => buildRoster(race), [race]);
 
-  const filteredItems = useMemo(() => {
-    const items = activeCategory === ItemCategory.TUMSU
-      ? DEMO_INVENTORY
-      : DEMO_INVENTORY.filter(i => i.category === activeCategory);
-
-    return [...items].sort((a, b) => {
-      if (sortMode === SortMode.NADIR) {
-        return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity);
-      }
-      if (sortMode === SortMode.ADET) {
-        return b.quantity - a.quantity;
-      }
-      return b.acquiredAt - a.acquiredAt;
+  const visible = useMemo(() => {
+    const filtered = tierFilter === 'all' ? units : units.filter((u) => u.tier === tierFilter);
+    return [...filtered].sort((a, b) => {
+      if (sortKey === 'tier')  return a.tier - b.tier  || b.count - a.count;
+      if (sortKey === 'count') return b.count - a.count;
+      return b.level - a.level;
     });
-  }, [activeCategory, sortMode]);
+  }, [units, tierFilter, sortKey]);
 
-  const capacityRatio = CAPACITY_USED / CAPACITY_MAX;
-  const isNearFull = capacityRatio >= CAPACITY_WARN_THRESHOLD;
-  const isFull = capacityRatio >= 1;
+  const selectedUnit = useMemo(
+    () => units.find((u) => u.id === selectedId) ?? null,
+    [units, selectedId],
+  );
 
-  function handleItemClick(item: InventoryItem) {
-    setSelectedItem(item);
-  }
+  const popRatio = POP_USED / POP_MAX;
 
   return (
     <div
-      className="h-dvh flex flex-col relative overflow-hidden"
-      style={{ background: 'var(--color-bg)' }}
+      data-race={race.key}
+      style={{
+        position: 'relative',
+        minHeight: '100dvh',
+        background: ND.bg,
+        color: ND.text,
+        fontFamily: ND.body,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
     >
-      {/* Backgrounds */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
-        aria-hidden
-      />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-10" aria-hidden />
+      <NebulaBg race={race} intensity={0.7} dim={0.65} />
 
-      {/* Top bar */}
-      <header
-        className="relative z-40 sticky top-0 flex items-center justify-between px-4 py-3 gap-3"
-        style={{
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Back strip */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '10px 14px',
           background: 'rgba(8,10,16,0.92)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(20px)',
-        }}
-      >
-        <div className="flex items-center gap-3 shrink-0">
+          borderBottom: `1px solid ${ND.border}`,
+          backdropFilter: 'blur(12px)',
+        }}>
           <Link
-            href="/"
-            className="font-display text-[11px] uppercase tracking-widest hover:text-text-primary transition-colors flex items-center gap-1"
-            style={{ color: 'var(--color-text-muted)' }}
+            href="/base"
+            style={{
+              fontFamily: ND.display,
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              color: ND.textDim,
+              textDecoration: 'none',
+              textTransform: 'uppercase',
+            }}
           >
             ← Ana Üs
           </Link>
-          <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-          <h1
-            className="font-display font-black text-sm uppercase tracking-widest"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            Envanter
-          </h1>
+          <div style={{ width: 1, height: 14, background: ND.border }} aria-hidden />
+          <Sigil race={race} size={16} />
+          <H3 style={{ color: ND.text }}>{ROSTER_NAMES[race.key] ?? 'Birim Envanteri'}</H3>
+          <div style={{ flex: 1 }} />
+          <Chip color={popRatio > 0.85 ? ND.warn : race.primary}>
+            {POP_USED} / {POP_MAX} POP
+          </Chip>
         </div>
 
-        {/* Capacity bar */}
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className="text-[10px] font-display uppercase tracking-wider shrink-0"
-            style={{ color: isNearFull ? 'var(--color-warning)' : 'var(--color-text-muted)' }}
-          >
-            {CAPACITY_USED}/{CAPACITY_MAX}
-          </span>
-          <div
-            className="w-24 h-2 rounded-full overflow-hidden shrink-0"
-            style={{ background: 'rgba(255,255,255,0.08)' }}
-            role="progressbar"
-            aria-valuenow={CAPACITY_USED}
-            aria-valuemax={CAPACITY_MAX}
-            aria-label="Depo kapasitesi"
-          >
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(capacityRatio * 100, 100)}%`,
-                background: isFull
-                  ? 'var(--color-danger)'
-                  : isNearFull
-                  ? 'var(--color-warning)'
-                  : 'var(--color-success)',
-                boxShadow: isFull
-                  ? '0 0 6px var(--color-danger)'
-                  : isNearFull
-                  ? '0 0 6px var(--color-warning)'
-                  : undefined,
-              }}
-            />
+        <HUD race={race} level={9} levelName="Metropol" />
+
+        {/* Tier filter strip */}
+        <div style={{ padding: '12px 14px 0' }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['all', 1, 2, 3, 4, 5] as const).map((t) => {
+              const on = t === tierFilter;
+              const label = t === 'all' ? 'TÜM' : `T${t}`;
+              return (
+                <button
+                  key={String(t)}
+                  type="button"
+                  onClick={() => setTierFilter(t)}
+                  aria-pressed={on}
+                  style={{
+                    all: 'unset',
+                    cursor: 'pointer',
+                    flex: 1,
+                    padding: '7px 0',
+                    textAlign: 'center',
+                    fontFamily: ND.display,
+                    fontSize: 10,
+                    letterSpacing: '0.10em',
+                    color: on ? '#0A0E1A' : ND.textDim,
+                    background: on ? race.primary : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${on ? race.primary : ND.border}`,
+                    borderRadius: 3,
+                    fontWeight: on ? 700 : 500,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-          {isNearFull && (
-            <span
-              className="text-[9px] font-display font-black uppercase tracking-wider shrink-0 animate-pulse"
-              style={{ color: isFull ? 'var(--color-danger)' : 'var(--color-warning)' }}
-            >
-              {isFull ? '! DOLU' : '! Yakın'}
-            </span>
-          )}
-        </div>
-      </header>
-
-      {/* Filter + Sort row */}
-      <div
-        className="relative z-30 sticky top-[53px] px-4 py-2 flex items-center gap-3 overflow-x-auto"
-        style={{
-          background: 'rgba(8,10,16,0.88)',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        {/* Category tabs */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {categories.map((cat) => {
-            const cfg = CATEGORY_CONFIG[cat];
-            const active = cat === activeCategory;
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-display font-bold shrink-0 transition-all duration-200"
-                style={{
-                  background: active ? cfg.dimColor : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${active ? cfg.color : 'rgba(255,255,255,0.07)'}`,
-                  color: active ? cfg.color : 'var(--color-text-muted)',
-                  boxShadow: active ? `0 0 8px ${cfg.color}40` : 'none',
-                }}
-              >
-                <span>{cfg.icon}</span>
-                <span className="hidden sm:inline">{cfg.label}</span>
-              </button>
-            );
-          })}
         </div>
 
+        {/* Sort row */}
         <div
-          className="h-4 w-px shrink-0"
-          style={{ background: 'rgba(255,255,255,0.08)' }}
-          aria-hidden
-        />
-
-        {/* Sort buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          {SORT_OPTIONS.map((opt) => {
-            const active = opt.value === sortMode;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setSortMode(opt.value)}
-                className="px-2.5 py-1 rounded-lg text-[10px] font-display font-bold shrink-0 transition-all duration-150"
-                style={{
-                  background: active ? 'rgba(123,140,222,0.15)' : 'transparent',
-                  color: active ? 'var(--color-brand)' : 'var(--color-text-muted)',
-                  border: `1px solid ${active ? 'rgba(123,140,222,0.3)' : 'transparent'}`,
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px 0',
+          }}
+        >
+          <Eyebrow color={ND.textMute}>SIRALA</Eyebrow>
+          <div style={{ display: 'flex', gap: 4 }} role="radiogroup" aria-label="Sıralama">
+            {SORT_OPTIONS.map((opt) => {
+              const on = opt.key === sortKey;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setSortKey(opt.key)}
+                  style={{
+                    all: 'unset',
+                    cursor: 'pointer',
+                    padding: '4px 10px',
+                    fontFamily: ND.mono,
+                    fontSize: 10,
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                    color: on ? race.primary : ND.textDim,
+                    background: on ? `${race.primary}1A` : 'transparent',
+                    border: `1px solid ${on ? race.primary + '55' : ND.border}`,
+                    borderRadius: 3,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ flex: 1 }} />
+          <Code style={{ color: ND.textMute }}>{visible.length} birim</Code>
         </div>
 
-        <span
-          className="ml-auto text-[10px] font-display shrink-0"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          {filteredItems.length} eşya
-        </span>
-      </div>
-
-      {/* Main layout */}
-      <main className="relative z-10 flex-1 flex flex-col lg:flex-row min-h-0">
-        {/* Item Grid */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-            {filteredItems.map((item) => (
-              <InventoryItemCard
-                key={item.id}
-                item={item}
-                selected={selectedItem?.id === item.id}
-                onClick={() => handleItemClick(item)}
+        {/* Roster grid */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {visible.map((u) => (
+              <RosterCard
+                key={u.id}
+                race={race}
+                unit={u}
+                selected={u.id === selectedId}
+                onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
               />
             ))}
           </div>
 
-          {filteredItems.length === 0 && (
-            <div
-              className="flex flex-col items-center justify-center py-24 gap-3"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              <span className="text-5xl opacity-20">◈</span>
-              <p className="font-display text-xs uppercase tracking-widest opacity-50">
-                Bu kategoride eşya yok
-              </p>
-            </div>
+          {visible.length === 0 && (
+            <Caption style={{ textAlign: 'center', padding: '40px 0' }}>
+              Bu tier ile uyumlu birim yok.
+            </Caption>
           )}
+
+          <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
+            <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
+            <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
+          </div>
         </div>
 
-        {/* Detail panel — desktop side, mobile bottom sheet */}
-        <aside
-          className={clsx(
-            'lg:w-80 xl:w-96 shrink-0',
-            'transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
-            'lg:border-l',
-          )}
+        {/* Detail drawer (visible when a unit is selected) */}
+        {selectedUnit && (
+          <UnitDetailDrawer
+            race={race}
+            unit={selectedUnit}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
+
+        {/* Bottom action bar */}
+        {!selectedUnit && (
+          <div style={{
+            padding: '10px 14px',
+            background: 'rgba(8,10,16,0.92)',
+            borderTop: `1px solid ${ND.border}`,
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            gap: 8,
+          }}>
+            <Link href="/merge" style={{ flex: 1, textDecoration: 'none' }}>
+              <NDButton race={race} variant="ghost" size="md" full>
+                {MERGE_VERB[race.key] ?? 'Birleştir'}
+              </NDButton>
+            </Link>
+            <NDButton race={race} size="md" style={{ flex: 1 }}>FİLO YAP</NDButton>
+          </div>
+        )}
+
+        <BottomNav race={race} active="base" />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Roster building & stat derivation ────────────────────────────────── */
+
+function hash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function clamp(n: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function buildRoster(race: NDRace): RosterUnit[] {
+  const states: UnitState[] = ['ready', 'fleet', 'wounded'];
+  return race.units.map((u, i) => {
+    const id = `${race.key}-${u.n}-${i}`;
+    const seed = hash(id);
+    const baseCount = [86, 42, 26, 14, 6, 2][i] ?? 1;
+    return {
+      id,
+      name: u.n,
+      tier: u.t,
+      level: Math.max(1, 10 - i * 2),
+      count: baseCount,
+      state: states[i % states.length],
+      atk: clamp(u.t * 14 + (seed % 9) + 8),
+      def: clamp(u.t * 11 + ((seed >> 3) % 8) + 6),
+      spd: clamp(94 - u.t * 12 + ((seed >> 6) % 10)),
+    };
+  });
+}
+
+function upgradeCost(unit: RosterUnit): number {
+  return unit.level * unit.tier * 50;
+}
+
+/* ─── Roster card ──────────────────────────────────────────────────────── */
+
+interface RosterCardProps {
+  race: NDRace;
+  unit: RosterUnit;
+  selected: boolean;
+  onClick: () => void;
+}
+
+function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
+  const stateColor =
+    unit.state === 'ready'   ? race.primary :
+    unit.state === 'wounded' ? ND.warn      :
+    ND.textDim;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${unit.name}, Tier ${unit.tier}, ${STATE_LABEL[unit.state]}, ${unit.count} adet`}
+      style={{ all: 'unset', cursor: 'pointer', display: 'block' }}
+    >
+      <Panel
+        race={race}
+        glow={selected}
+        style={{
+          padding: 8,
+          border: selected ? `1px solid ${race.primary}` : `1px solid ${ND.border}`,
+        }}
+      >
+        <div
+          aria-hidden
           style={{
-            background: 'rgba(13,17,23,0.92)',
-            borderColor: 'rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(20px)',
+            width: '100%',
+            aspectRatio: '1',
+            background: `linear-gradient(180deg, ${race.primary}1f, transparent)`,
+            border: `1px dashed ${race.primary}55`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
           }}
         >
-          <MangaPanel className="h-full min-h-[320px]">
-            <ItemDetailPanel
-              item={selectedItem}
-              onClose={() => setSelectedItem(null)}
-              onUse={(item) => alert(`Kullanıldı: ${item.name}`)}
-              onSell={(item) => alert(`Satıldı: ${item.name} — 💎 ${item.sellValue}`)}
-            />
-          </MangaPanel>
-        </aside>
-      </main>
-    </div>
+          <Sigil race={race} size={28} />
+          <span
+            style={{
+              position: 'absolute',
+              top: 4,
+              left: 4,
+              fontFamily: ND.mono,
+              fontSize: 8,
+              color: race.primary,
+              background: 'rgba(8,12,26,0.7)',
+              padding: '2px 4px',
+              border: `1px solid ${race.primary}55`,
+              letterSpacing: '0.08em',
+            }}
+          >
+            T{unit.tier}
+          </span>
+          <span
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: stateColor,
+              boxShadow: `0 0 4px ${stateColor}`,
+            }}
+            aria-label={unit.state}
+          />
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <div
+            style={{
+              fontFamily: ND.display,
+              fontSize: 10,
+              letterSpacing: '0.06em',
+              color: ND.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              textTransform: 'uppercase',
+            }}
+          >
+            {unit.name}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+            <Code style={{ color: race.primary, fontSize: 10 }}>×{unit.count}</Code>
+            <Code style={{ fontSize: 10 }}>Lv {unit.level}</Code>
+          </div>
+        </div>
+      </Panel>
+    </button>
+  );
+}
+
+/* ─── Unit detail drawer (stat viewer + actions) ───────────────────────── */
+
+interface UnitDetailDrawerProps {
+  race: NDRace;
+  unit: RosterUnit;
+  onClose: () => void;
+}
+
+function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
+  const cost = upgradeCost(unit);
+  const stateColor =
+    unit.state === 'ready'   ? race.primary :
+    unit.state === 'wounded' ? ND.warn      :
+    ND.textDim;
+
+  return (
+    <section
+      aria-label={`${unit.name} detay`}
+      style={{
+        background: 'rgba(8,10,16,0.96)',
+        borderTop: `1px solid ${race.primary}55`,
+        boxShadow: `0 -8px 24px -8px ${race.glow}`,
+        backdropFilter: 'blur(14px)',
+        padding: '12px 14px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 26,
+            height: 26,
+            background: `${race.primary}22`,
+            border: `1px solid ${race.primary}66`,
+            borderRadius: 3,
+          }}
+        >
+          <Sigil race={race} size={16} />
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontFamily: ND.display,
+              fontSize: 13,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: ND.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {unit.name}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <Chip color={race.primary}>T{unit.tier}</Chip>
+            <Chip color={stateColor}>{STATE_LABEL[unit.state]}</Chip>
+            <Code>×{unit.count}</Code>
+            <Code>Lv {unit.level}</Code>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Detayı kapat"
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            width: 28,
+            height: 28,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: ND.textDim,
+            border: `1px solid ${ND.border}`,
+            borderRadius: 3,
+            fontFamily: ND.mono,
+            fontSize: 14,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Stat bars */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <Bar value={unit.atk} color={race.primary} label="ATK" trailing={String(unit.atk)} height={5} />
+        <Bar value={unit.def} color={ND.ok}        label="DEF" trailing={String(unit.def)} height={5} />
+        <Bar value={unit.spd} color={ND.warn}      label="SPD" trailing={String(unit.spd)} height={5} />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <NDButton race={race} variant="outline" size="md" style={{ flex: 1 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Yükselt
+            <span style={{ opacity: 0.8 }}>Lv {unit.level} → {unit.level + 1}</span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <ResIcon kind={race.resourceA.icon} size={11} color={race.primary} />
+              {cost}
+            </span>
+          </span>
+        </NDButton>
+        <NDButton race={race} size="md" style={{ flex: 1 }}>
+          Savaşa Gönder
+        </NDButton>
+      </div>
+    </section>
   );
 }

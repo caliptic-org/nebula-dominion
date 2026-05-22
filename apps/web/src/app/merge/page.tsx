@@ -20,6 +20,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
+import { useMergePreview } from '@/hooks/useMergePreview';
 
 const MERGE_NAMES: Record<NDRaceKey, string> = {
   insan:   'Promosyon Töreni',
@@ -56,16 +57,10 @@ const MERGE_HINT: Record<NDRaceKey, string> = {
 const SLOT_COUNT = 3;
 const COST_B = 200;
 
-const BASE_SUCCESS: Record<number, number> = {
-  2: 92,
-  3: 78,
-  4: 55,
-};
-
-function riskTheme(rate: number) {
-  if (rate >= 80) return { color: ND.ok, label: 'GÜVENLİ' };
-  if (rate >= 60) return { color: ND.warn, label: 'RİSKLİ' };
-  return { color: ND.danger, label: 'KRİTİK' };
+function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
+  if (label === 'GÜVENLİ') return ND.ok;
+  if (label === 'RİSKLİ') return ND.warn;
+  return ND.danger;
 }
 
 export default function MergePage() {
@@ -74,13 +69,14 @@ export default function MergePage() {
   const [sourceTier, setSourceTier] = useState(3);
 
   const pool = useMemo(() => buildPool(race, sourceTier), [race, sourceTier]);
-  const canMerge = selected.length === SLOT_COUNT;
-  const promotedTier = Math.min(5, sourceTier + 1);
-  const promotedName = race.units.find((u) => u.t === promotedTier)?.n ?? race.units[race.units.length - 1].n;
-  const successRate = BASE_SUCCESS[sourceTier] ?? 60;
-  const slotProgress = selected.length / SLOT_COUNT;
-  const projectedRate = Math.round(successRate * slotProgress);
-  const risk = riskTheme(successRate);
+  const preview = useMergePreview({
+    race,
+    sourceTier,
+    selectedCount: selected.length,
+    slotCount: SLOT_COUNT,
+  });
+  const { promotedTier, promotedName, successRate, projectedRate, canMerge, riskLabel } = preview;
+  const risk = { color: riskColor(riskLabel), label: riskLabel };
 
   function toggle(idx: number) {
     setSelected((prev) => {
@@ -122,7 +118,7 @@ export default function MergePage() {
           backdropFilter: 'blur(12px)',
         }}>
           <Link
-            href="/inventory/roster"
+            href="/inventory"
             style={{
               fontFamily: ND.display,
               fontSize: 11,
@@ -132,7 +128,7 @@ export default function MergePage() {
               textTransform: 'uppercase',
             }}
           >
-            ← Roster
+            ← Birim Envanteri
           </Link>
           <div style={{ width: 1, height: 14, background: ND.border }} aria-hidden />
           <Sigil race={race} size={16} />

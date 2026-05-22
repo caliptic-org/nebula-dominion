@@ -11,3 +11,4 @@ export * from './race-lex';
 export * from './race-shape';
 export * from './RaceActionIcon';
 export * from './RaceWidgets';
+export * from './RaceTierBadge';

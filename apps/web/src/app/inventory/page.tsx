@@ -16,8 +16,10 @@ import {
   NDButton,
   NebulaBg,
   Panel,
+  RaceTierBadge,
   ResIcon,
   Sigil,
+  raceShape,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
@@ -158,35 +160,55 @@ export default function RosterPage() {
           crystal={hud.crystal}
         />
 
-        {/* Tier filter strip */}
+        {/* Tier filter strip — race-shaped buttons with RaceTierBadge */}
         <div style={{ padding: '12px 14px 0' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {(['all', 1, 2, 3, 4, 5] as const).map((t) => {
               const on = t === tierFilter;
-              const label = t === 'all' ? 'TÜM' : `T${t}`;
+              const tierCount = typeof t === 'number'
+                ? units.filter((u) => u.tier === t).length
+                : units.length;
+              const locked = typeof t === 'number' && tierCount === 0;
               return (
                 <button
                   key={String(t)}
                   type="button"
                   onClick={() => setTierFilter(t)}
                   aria-pressed={on}
+                  aria-label={
+                    t === 'all'
+                      ? `Tüm tier'ları göster (${tierCount} birim)`
+                      : `Tier ${t}${locked ? ' (kilitli)' : ''} · ${tierCount} birim`
+                  }
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
                     flex: 1,
-                    padding: '7px 0',
-                    textAlign: 'center',
+                    minHeight: 32,
+                    padding: '5px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
                     fontFamily: ND.display,
                     fontSize: 10,
                     letterSpacing: '0.10em',
-                    color: on ? '#0A0E1A' : ND.textDim,
+                    color: on ? '#0A0E1A' : locked ? ND.textMute : ND.textDim,
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
-                    borderRadius: 3,
                     fontWeight: on ? 700 : 500,
+                    boxShadow: on ? `0 0 10px ${race.glow}44` : 'none',
+                    ...raceShape(race.key, 'tab'),
                   }}
                 >
-                  {label}
+                  {t === 'all' ? (
+                    <span>TÜM</span>
+                  ) : (
+                    <>
+                      <RaceTierBadge race={race} tier={t} size={16} locked={locked} active={on} />
+                      <span>T{t}</span>
+                    </>
+                  )}
                 </button>
               );
             })}

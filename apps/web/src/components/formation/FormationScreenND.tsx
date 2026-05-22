@@ -499,7 +499,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
             transform: 'translateX(-50%)',
             zIndex: 60,
             padding: '8px 14px',
-            background: 'rgba(6,8,15,0.92)',
+            background: ND.scrim(0.92),
             border: `1px solid ${race.primary}66`,
             color: race.primary,
             fontFamily: ND.display,
@@ -567,7 +567,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
           gap: 10,
           padding: '12px 14px',
           borderBottom: `1px solid ${ND.border}`,
-          background: 'linear-gradient(180deg, rgba(6,8,15,0.94), rgba(6,8,15,0.55))',
+          background: `linear-gradient(180deg, ${ND.scrim(0.94)}, ${ND.scrim(0.55)})`,
           backdropFilter: 'blur(10px)',
         }}
       >
@@ -815,7 +815,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
                       fontSize: 10,
                       letterSpacing: '0.10em',
                       textTransform: 'uppercase',
-                      color: rosterMode === m ? '#0A0E1A' : ND.textDim,
+                      color: rosterMode === m ? ND.textInverted : ND.textDim,
                       background: rosterMode === m ? race.primary : 'transparent',
                       borderRadius: 3,
                       fontWeight: rosterMode === m ? 700 : 500,
@@ -936,7 +936,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
           bottom: 0,
           zIndex: 20,
           padding: 12,
-          background: 'linear-gradient(0deg, rgba(6,8,15,0.96), rgba(6,8,15,0.55))',
+          background: `linear-gradient(0deg, ${ND.scrim(0.96)}, ${ND.scrim(0.55)})`,
           borderTop: `1px solid ${ND.border}`,
           backdropFilter: 'blur(10px)',
         }}
@@ -1121,7 +1121,7 @@ function NDPowerReadout({
             position: 'absolute',
             inset: 0,
             width: `${pct}%`,
-            background: `linear-gradient(90deg, ${race.primary}66 0%, ${race.primary} 60%, #ffffff33 100%)`,
+            background: `linear-gradient(90deg, ${race.primary}66 0%, ${race.primary} 60%, ${ND.lineFade} 100%)`,
             boxShadow: `0 0 12px ${race.glow}`,
             transition: 'width 320ms cubic-bezier(0.32, 0.72, 0, 1)',
           }}
@@ -1193,7 +1193,7 @@ function NDUnitSlot({ unit, slotId, pendingUnit, onDrop, onSlotClick }: NDUnitSl
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: unit ? `${unitRace?.primary ?? ND.border}18` : 'rgba(6,8,15,0.55)',
+    background: unit ? `${unitRace?.primary ?? ND.border}18` : ND.scrim(0.55),
     border: `1px solid ${unit ? (unitRace?.primary ?? ND.border) + '77' : ND.border}`,
     clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
     cursor: pendingUnit || unit ? 'pointer' : 'default',
@@ -1286,7 +1286,7 @@ function NDUnitSlot({ unit, slotId, pendingUnit, onDrop, onSlotClick }: NDUnitSl
                 fontFamily: ND.display,
                 fontSize: 9,
                 fontWeight: 700,
-                color: '#0A0E1A',
+                color: ND.textInverted,
                 background: unitRace.primary,
                 lineHeight: 1,
               }}
@@ -1319,7 +1319,7 @@ function NDUnitSlot({ unit, slotId, pendingUnit, onDrop, onSlotClick }: NDUnitSl
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              background: 'rgba(6,8,15,0.6)',
+              background: ND.scrim(0.6),
             }}
           >
             {unit.name.split(' ')[0]}
@@ -1364,7 +1364,7 @@ function NDCommanderSlot({ commander, slotId, index, pendingCommander, onDrop, o
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: commander ? `${cmdRace?.primary ?? ND.border}1c` : 'rgba(6,8,15,0.55)',
+    background: commander ? `${cmdRace?.primary ?? ND.border}1c` : ND.scrim(0.55),
     border: `1px solid ${commander ? (cmdRace?.primary ?? ND.border) + '88' : ND.border}`,
     clipPath: 'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
     cursor: pendingCommander || commander ? 'pointer' : 'default',
@@ -1471,7 +1471,7 @@ function NDCommanderSlot({ commander, slotId, index, pendingCommander, onDrop, o
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              background: 'rgba(6,8,15,0.65)',
+              background: ND.scrim(0.65),
             }}
           >
             {commander.name.split(' ')[0]}

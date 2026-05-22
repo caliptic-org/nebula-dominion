@@ -82,6 +82,10 @@ export const ND = {
   text:         'oklch(0.96 0.01 240)',
   textDim:      'oklch(0.72 0.02 240)',
   textMute:     'oklch(0.52 0.02 240)',
+  /** Inverted text colour for use on a race-primary fill (buttons, level chips). */
+  textInverted: '#0A0E1A',
+  /** Soft white fade end-stop for connector / progress gradients. */
+  lineFade:     'rgba(255, 255, 255, 0.2)',
   danger:       'oklch(0.65 0.22 25)',
   ok:           'oklch(0.72 0.16 145)',
   warn:         'oklch(0.80 0.15 80)',
@@ -90,6 +94,13 @@ export const ND = {
   mono:         'var(--font-nd-mono), "JetBrains Mono", ui-monospace, monospace',
   /** Cool violet accent used in non-race-specific nebula gradients. */
   nebulaAccent: 'oklch(0.55 0.18 280)',
+  /**
+   * Translucent scrim layer over content, anchored to the deep base bg
+   * (`#06080F`). Use for sticky headers, action bars, slot empties and other
+   * surfaces that need to dim what is behind without introducing a new
+   * arbitrary alpha. Common alphas: 0.55, 0.6, 0.65, 0.92, 0.94, 0.96.
+   */
+  scrim:        (alpha: number) => `rgba(6, 8, 15, ${alpha})`,
   radii: { sm: 3, md: 6, lg: 12, pill: 999 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 10, lg: 16, xl: 24 },
 } as const;

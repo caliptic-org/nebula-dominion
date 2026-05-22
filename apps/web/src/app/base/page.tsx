@@ -77,10 +77,10 @@ export default function BaseHomePage() {
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '14px 14px 18px',
+            padding: 'var(--nd-density-pad-y) var(--nd-density-pad-x) calc(var(--nd-density-pad-y) + 8px)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 12,
+            gap: 'var(--nd-density-gap)',
           }}
         >
           {/* Capital identity */}

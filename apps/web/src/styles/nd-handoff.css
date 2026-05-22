@@ -135,9 +135,10 @@
   transition: none !important;
 }
 
-/* Density */
-[data-nd-density="compact"] { --nd-density-pad: 8px; }
-:root, [data-nd-density="comfortable"] { --nd-density-pad: 12px; }
+/* Density: canonical tokens live in nd-globals.css. The legacy
+ * `--nd-density-pad` alias is kept for any handoff code still reading it. */
+:root, [data-nd-density="comfortable"] { --nd-density-pad: var(--nd-density-pad-x, 12px); }
+[data-nd-density="compact"]            { --nd-density-pad: var(--nd-density-pad-x, 8px); }
 
 @media (prefers-reduced-motion: reduce) {
   *,

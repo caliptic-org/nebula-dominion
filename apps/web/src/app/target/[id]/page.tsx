@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { BattlePrepScreen } from '@/components/nd/screens';
+import { TargetDetailScreen } from '@/components/nd/screens';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import type { NDRaceKey } from '@/components/handoff';
@@ -13,12 +13,9 @@ function isNDRaceKey(value: string | null): value is NDRaceKey {
   return value != null && (ND_RACE_KEYS as readonly string[]).includes(value);
 }
 
-function Inner() {
+function Inner({ id }: { id: string }) {
   const params = useSearchParams();
   const raceParam = params.get('race');
-  const targetId = params.get('target');
-  const outcomeParam = params.get('outcome');
-  const projectedOutcome = outcomeParam === 'defeat' ? 'defeat' : outcomeParam === 'victory' ? 'victory' : undefined;
   const { race, setRace } = useRaceTheme();
 
   useEffect(() => {
@@ -29,19 +26,13 @@ function Inner() {
     if (wanted && wanted !== race) setRace(wanted);
   }, [raceParam, race, setRace]);
 
-  return (
-    <BattlePrepScreen
-      targetId={targetId}
-      forcedRace={isNDRaceKey(raceParam) ? raceParam : undefined}
-      projectedOutcome={projectedOutcome}
-    />
-  );
+  return <TargetDetailScreen nodeId={id} forcedRace={isNDRaceKey(raceParam) ? raceParam : undefined} />;
 }
 
-export default function BattlePrepPage() {
+export default function TargetPage({ params }: { params: { id: string } }) {
   return (
     <Suspense fallback={null}>
-      <Inner />
+      <Inner id={params.id} />
     </Suspense>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   BottomNav,
   Caption,
@@ -49,6 +50,14 @@ const SLOT_TOTAL = 5;
 const SWIPE_CANCEL_PX = 80;
 const SWIPE_THRESHOLD_PX = 56;
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 interface QueueItem {
   id: string;
   unitName: string;
@@ -69,6 +78,7 @@ interface UnitDef {
 
 export default function ProductionPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState(0);
   const [selected, setSelected] = useState(0);
   const [count, setCount] = useState(1);
@@ -457,7 +467,11 @@ export default function ProductionPage() {
           </Caption>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

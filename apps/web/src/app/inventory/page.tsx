@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bar,
   BottomNav,
@@ -65,8 +66,17 @@ const STATE_LABEL: Record<UnitState, string> = {
   fleet:   'FİLODA',
 };
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function RosterPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -288,7 +298,11 @@ export default function RosterPage() {
           </div>
         )}
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

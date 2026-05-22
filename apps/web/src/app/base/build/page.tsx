@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   BaseField,
   BottomNav,
@@ -32,8 +33,17 @@ interface BuildEntry {
   level: number;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function BuildMenuPage() {
   const race = useNDRace();
+  const router = useRouter();
   const lex = raceLex(race.key);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -181,7 +191,11 @@ export default function BuildMenuPage() {
           </div>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </Screen>
     </div>
   );

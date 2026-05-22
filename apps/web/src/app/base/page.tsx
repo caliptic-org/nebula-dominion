@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bar,
   BaseField,
@@ -26,8 +27,17 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function BaseHomePage() {
   const race = useNDRace();
+  const router = useRouter();
   const lex = raceLex(race.key);
   const [focusedIdx, setFocusedIdx] = useState(1);
   const focusedBuilding = race.buildings[focusedIdx] ?? race.buildings[0];
@@ -154,7 +164,11 @@ export default function BaseHomePage() {
           </div>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </Screen>
     </div>
   );

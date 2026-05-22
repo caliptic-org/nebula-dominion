@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bar,
   BottomNav,
@@ -57,6 +58,14 @@ const MERGE_HINT: Record<NDRaceKey, string> = {
 const SLOT_COUNT = 3;
 const COST_B = 200;
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
   if (label === 'GÜVENLİ') return ND.ok;
   if (label === 'RİSKLİ') return ND.warn;
@@ -65,6 +74,7 @@ function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
 
 export default function MergePage() {
   const race = useNDRace();
+  const router = useRouter();
   const [selected, setSelected] = useState<number[]>([]);
   const [sourceTier, setSourceTier] = useState(3);
 
@@ -366,7 +376,11 @@ export default function MergePage() {
           </NDButton>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

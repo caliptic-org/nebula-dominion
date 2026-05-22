@@ -22,6 +22,7 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
 import { useMergePreview } from '@/hooks/useMergePreview';
+import { useHudState } from '@/hooks/useHudState';
 
 const MERGE_NAMES: Record<NDRaceKey, string> = {
   insan:   'Promosyon Töreni',
@@ -75,6 +76,7 @@ function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
 export default function MergePage() {
   const race = useNDRace();
   const router = useRouter();
+  const hud = useHudState();
   const [selected, setSelected] = useState<number[]>([]);
   const [sourceTier, setSourceTier] = useState(3);
 
@@ -147,7 +149,14 @@ export default function MergePage() {
           <Chip color={race.primary}>×3 → +1</Chip>
         </div>
 
-        <HUD race={race} level={9} levelName="Metropol" />
+        <HUD
+          race={race}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
+        />
 
         {/* Hint */}
         <div style={{ padding: '12px 14px 0' }}>

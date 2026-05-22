@@ -22,6 +22,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useHudState } from '@/hooks/useHudState';
 
 interface BuildEntry {
   name: string;
@@ -45,6 +46,7 @@ export default function BuildMenuPage() {
   const race = useNDRace();
   const router = useRouter();
   const lex = raceLex(race.key);
+  const hud = useHudState();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedName, setSelectedName] = useState<string | null>(null);
 
@@ -57,11 +59,11 @@ export default function BuildMenuPage() {
       <Screen race={race} dim={0.55} style={{ minHeight: '100dvh' }}>
         <HUD
           race={race}
-          level={9}
-          levelName="Metropol"
-          resA="12,480"
-          resB="3,210"
-          crystal="42"
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
         />
 
         <div

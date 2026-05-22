@@ -26,6 +26,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useHudState } from '@/hooks/useHudState';
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base: '/base',
@@ -39,6 +40,7 @@ export default function BaseHomePage() {
   const race = useNDRace();
   const router = useRouter();
   const lex = raceLex(race.key);
+  const hud = useHudState();
   const [focusedIdx, setFocusedIdx] = useState(1);
   const focusedBuilding = race.buildings[focusedIdx] ?? race.buildings[0];
 
@@ -47,14 +49,14 @@ export default function BaseHomePage() {
       <Screen race={race} dim={0.5} style={{ minHeight: '100dvh' }}>
         <HUD
           race={race}
-          level={9}
-          levelName="Metropol"
-          resA="12,480"
-          resB="3,210"
-          crystal="42"
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
         />
 
-        <TierBanner race={race} level={9} age={1} xpPercent={92} trailing="9 / 9 → ÇAĞ 2" />
+        <TierBanner race={race} level={hud.level} age={hud.age} xpPercent={hud.xpPercent} />
 
         {/* Main field — race-themed iso silhouette + floating widgets */}
         <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>

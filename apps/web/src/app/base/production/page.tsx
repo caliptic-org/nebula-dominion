@@ -20,6 +20,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useHudState } from '@/hooks/useHudState';
 import '@/styles/production-queue.css';
 
 const PRODUCTION_NAMES: Record<string, string> = {
@@ -79,6 +80,7 @@ interface UnitDef {
 export default function ProductionPage() {
   const race = useNDRace();
   const router = useRouter();
+  const hud = useHudState();
   const [tab, setTab] = useState(0);
   const [selected, setSelected] = useState(0);
   const [count, setCount] = useState(1);
@@ -243,8 +245,8 @@ export default function ProductionPage() {
 
         <HUD
           race={race}
-          level={9}
-          levelName="Metropol"
+          level={hud.level}
+          levelName={hud.levelName}
           resA={formatNumber(resA)}
           resB={formatNumber(resB)}
           crystal={String(crystal)}

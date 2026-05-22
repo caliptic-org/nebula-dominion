@@ -22,6 +22,7 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
+import { useHudState } from '@/hooks/useHudState';
 
 const ROSTER_NAMES: Record<string, string> = {
   insan:   'Birim Envanteri',
@@ -77,6 +78,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 export default function RosterPage() {
   const race = useNDRace();
   const router = useRouter();
+  const hud = useHudState();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -147,7 +149,14 @@ export default function RosterPage() {
           </Chip>
         </div>
 
-        <HUD race={race} level={9} levelName="Metropol" />
+        <HUD
+          race={race}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
+        />
 
         {/* Tier filter strip */}
         <div style={{ padding: '12px 14px 0' }}>

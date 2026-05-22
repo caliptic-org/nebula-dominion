@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Orbitron, Rajdhani, Chakra_Petch, Inter, JetBrains_Mono } from 'next/font/google';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
 import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
+import { NDTweaksProvider } from '@/hooks/useNDTweaks';
 import '@/styles/globals.css';
 import '@/styles/nd-handoff.css';
 import '@/styles/nd-globals.css';
@@ -60,11 +61,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" data-race="insan" className={`${orbitron.variable} ${rajdhani.variable} ${chakraPetch.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body>
         <div className="hud-scan-beam" aria-hidden="true" />
-        <RaceThemeProvider>
-          <GuildTutorialProvider>
-            {children}
-          </GuildTutorialProvider>
-        </RaceThemeProvider>
+        <NDTweaksProvider>
+          <RaceThemeProvider>
+            <GuildTutorialProvider>
+              {children}
+            </GuildTutorialProvider>
+          </RaceThemeProvider>
+        </NDTweaksProvider>
       </body>
     </html>
   );

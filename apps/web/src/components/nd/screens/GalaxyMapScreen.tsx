@@ -143,7 +143,7 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
         }}
       >
         <a
-          href="/"
+          href="/base"
           aria-label="Geri"
           style={{
             display: 'inline-flex',

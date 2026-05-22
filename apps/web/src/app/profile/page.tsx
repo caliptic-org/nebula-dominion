@@ -15,10 +15,10 @@ import {
   Caption,
   Chip,
   Code,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 
 type Tab = 'stats' | 'achievements' | 'history';
 
@@ -339,7 +339,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav race={race} active="more" />
     </Screen>
   );
 }

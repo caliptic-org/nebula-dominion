@@ -17,11 +17,11 @@ import {
   Chip,
   Code,
   NDButton,
+  BottomNav,
   useNDRace,
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 
 type Tab = 'genel' | 'savas' | 'uyeler' | 'haberler';
 
@@ -300,7 +300,7 @@ export default function AlliancePage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav race={race} active="cmd" />
     </Screen>
   );
 }

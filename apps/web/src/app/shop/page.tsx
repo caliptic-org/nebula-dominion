@@ -17,10 +17,10 @@ import {
   Code,
   NDButton,
   ResPill,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
@@ -237,7 +237,7 @@ export default function ShopPage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav race={race} active="more" />
     </Screen>
   );
 }

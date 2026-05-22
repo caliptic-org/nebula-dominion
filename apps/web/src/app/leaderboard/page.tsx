@@ -15,11 +15,11 @@ import {
   Caption,
   Chip,
   Code,
+  BottomNav,
   useNDRace,
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 
 type Category = 'power' | 'pvp' | 'alliance';
 
@@ -235,7 +235,7 @@ export default function LeaderboardPage() {
         </Panel>
       </div>
 
-      <BottomNav />
+      <BottomNav race={playerRace} active="more" />
     </Screen>
   );
 }

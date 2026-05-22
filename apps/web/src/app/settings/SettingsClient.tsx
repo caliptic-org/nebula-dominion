@@ -17,10 +17,10 @@ import {
   Chip,
   Code,
   NDButton,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 import { clearTokens } from '@/lib/session';
 import { useNDTweaks, type NDDensity, type NDOnOff } from '@/hooks/useNDTweaks';
 
@@ -255,7 +255,7 @@ export function SettingsClient() {
         </Caption>
       </div>
 
-      <BottomNav />
+      <BottomNav race={race} active="more" />
     </Screen>
   );
 }

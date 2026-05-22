@@ -16,10 +16,10 @@ import {
   Chip,
   Code,
   NDButton,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 
 type Tab = 'story' | 'daily' | 'weekly' | 'achievement';
 type State = 'active' | 'completed' | 'locked';
@@ -186,7 +186,7 @@ export default function MissionsPage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav race={race} active="story" />
     </Screen>
   );
 }

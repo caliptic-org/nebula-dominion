@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Nebula Dominion — Tüm Ekranlar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #03050B; color: #fff;
+    font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(120,200,255,0.18); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="nd-tokens.jsx"></script>
+<script type="text/babel" src="nd-animations.jsx"></script>
+<script type="text/babel" src="nd-race-atoms.jsx"></script>
+<script type="text/babel" src="nd-race-views.jsx"></script>
+<script type="text/babel" src="nd-race-extra.jsx"></script>
+<script type="text/babel" src="nd-race-stories.jsx"></script>
+<script type="text/babel" src="nd-race-tierpath.jsx"></script>
+<script type="text/babel" src="nd-screens-auth.jsx"></script>
+<script type="text/babel" src="nd-screens-base.jsx"></script>
+<script type="text/babel" src="nd-screens-world.jsx"></script>
+<script type="text/babel" src="nd-screens-story.jsx"></script>
+<script type="text/babel" src="nd-screens-meta.jsx"></script>
+<script type="text/babel" data-presets="react">
+// Nebula Dominion — Canvas composition + Tweaks
+
+const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "race": "insan",
+  "density": "comfortable",
+  "animations": "on",
+  "sigilGlow": "on"
+}/*EDITMODE-END*/;
+
+const DEV_W = 390;
+const DEV_H = 844;
+
+function DevFrame({ children }) {
+  return (
+    <IOSDevice width={DEV_W} height={DEV_H} dark={true}>
+      <div style={{ width: '100%', height: DEV_H, position: 'relative' }}>
+        {children}
+      </div>
+    </IOSDevice>
+  );
+}
+
+function ScrPlaceholder({ race, label, n }) {
+  return (
+    <Screen race={race} dim={0.5}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: 24, textAlign: 'center' }}>
+        <Eyebrow style={{ color: race.primary, marginBottom: 8 }}>EKRAN {String(n).padStart(2,'0')}</Eyebrow>
+        <H2 style={{ color: ND.text, marginBottom: 8 }}>{label}</H2>
+        <Caption>Bu ekran üretiliyor — bir sonraki turda tamamlanacak.</Caption>
+      </div>
+    </Screen>
+  );
+}
+
+function RaceSwitcher({ current, onChange }) {
+  const races = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'].map(k => RACES[k]);
+  return (
+    <div style={{
+      position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 9000,
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '6px 8px',
+      background: 'rgba(6,8,15,0.92)',
+      border: `1px solid ${current.primary}66`,
+      borderRadius: 6,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      boxShadow: `0 8px 32px -8px ${current.glow}aa, 0 0 0 1px rgba(255,255,255,0.04) inset`,
+      fontFamily: 'Chakra Petch, system-ui, sans-serif',
+    }}>
+      <div style={{
+        fontSize: 9, color: '#9aa4bf', letterSpacing: '0.18em',
+        textTransform: 'uppercase', padding: '0 6px 0 4px',
+        borderRight: '1px solid rgba(120,160,220,0.18)',
+        marginRight: 2,
+      }}>IRK</div>
+      {races.map(r => {
+        const on = r.key === current.key;
+        return (
+          <button key={r.key} onClick={() => onChange(r.key)}
+            title={r.name}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 10px 6px 6px',
+              background: on
+                ? `linear-gradient(180deg, ${r.primary}33, ${r.primary}11)`
+                : 'transparent',
+              border: `1px solid ${on ? r.primary : 'rgba(120,160,220,0.16)'}`,
+              borderRadius: 4,
+              color: on ? r.primary : '#9aa4bf',
+              fontFamily: 'inherit', fontSize: 11, fontWeight: 600,
+              letterSpacing: '0.10em', textTransform: 'uppercase',
+              cursor: 'pointer',
+              boxShadow: on ? `0 0 16px -4px ${r.glow}99` : 'none',
+              transition: 'all 0.15s',
+            }}>
+            <Sigil race={r} size={18} glow={on}/>
+            <span>{r.short}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAKS_DEFAULTS);
+  const race = RACES[t.race] || RACES.insan;
+
+  // Apply density / motion to root via data attributes (consumed by injected CSS)
+  React.useEffect(() => {
+    const r = document.documentElement;
+    r.setAttribute('data-nd-density', t.density || 'comfortable');
+    r.setAttribute('data-nd-anim', t.animations || 'on');
+    r.setAttribute('data-nd-glow', t.sigilGlow || 'on');
+  }, [t.density, t.animations, t.sigilGlow]);
+
+  const sections = [
+    { id: 'auth',  title: '01. Auth & Onboarding', sub: 'Yeni komutan girişi, ırk seçimi, uyanış hikayesi',
+      screens: [
+        { id: '01-splash',    label: '01 · Splash',         el: <ScrSplash race={race}/> },
+        { id: '02-login',     label: '02 · Giriş',          el: <ScrLogin race={race}/> },
+        { id: '03-register',  label: '03 · Kayıt',          el: <ScrRegister race={race}/> },
+        { id: '04-race-sel',  label: '04 · Irk Seçimi',     el: <ScrRaceSelect race={race}/> },
+        { id: '05-race-conf', label: '05 · Uyanış Sahnesi', el: <ScrRaceConfirm race={race}/> },
+      ]},
+    { id: 'base',  title: '02. Üs / Base Loop', sub: 'Ana hub, inşaa, üretim, envanter, birleştirme',
+      screens: [
+        { id: '06-base-home',  label: '06 · Ana Üs',          el: <ScrBaseHome race={race}/> },
+        { id: '07-build',      label: '07 · İnşaa Menüsü',    el: <ScrBuildMenu race={race}/> },
+        { id: '08-production', label: '08 · Üretim Kuyruğu',  el: <ScrProduction race={race}/> },
+        { id: '09-roster',     label: '09 · Birim Envanteri', el: <ScrRoster race={race}/> },
+        { id: '10-merge',      label: '10 · Birleştirme',     el: <ScrMerge race={race}/> },
+      ]},
+    { id: 'world', title: '03. Dünya & Savaş', sub: 'Galaktik harita, hedef, savaş, sonuç',
+      screens: [
+        { id: '11-galaxy', label: '11 · Galaktik Harita', el: <ScrGalaxyMap race={race}/> },
+        { id: '12-target', label: '12 · Hedef Detay',     el: <ScrTargetDetail race={race}/> },
+        { id: '13-prep',   label: '13 · Savaş Hazırlık',  el: <ScrBattlePrep race={race}/> },
+        { id: '14-battle', label: '14 · Savaş',           el: <ScrBattle race={race}/> },
+        { id: '15-result', label: '15 · Sonuç',           el: <ScrBattleResult race={race}/> },
+      ]},
+    { id: 'story', title: '04. İlerleme & Hikaye', sub: 'Tier yükselişi, sinematik sahneler, komutanlar',
+      screens: [
+        { id: '16-tier',    label: '16 · Tier Yükseliş',   el: <ScrTierUp race={race}/> },
+        { id: '17-scene',   label: '17 · Hikaye Sahnesi',  el: <ScrStoryScene race={race}/> },
+        { id: '18-gallery', label: '18 · Hikaye Galerisi', el: <ScrStoryGallery race={race}/> },
+        { id: '19-cmd',     label: '19 · Komutanlar',      el: <ScrCommanders race={race}/> },
+      ]},
+    { id: 'meta', title: '05. Sosyal & Meta', sub: 'Liderboard, profil, görev, ittifak, mağaza, ayarlar',
+      screens: [
+        { id: '20-leaderboard', label: '20 · Liderboard', el: <ScrLeaderboard race={race}/> },
+        { id: '21-profile',     label: '21 · Profil',     el: <ScrProfile race={race}/> },
+        { id: '22-quests',      label: '22 · Görevler',   el: <ScrQuests race={race}/> },
+        { id: '23-alliance',    label: '23 · İttifak',    el: <ScrAlliance race={race}/> },
+        { id: '24-shop',        label: '24 · Mağaza',     el: <ScrShop race={race}/> },
+        { id: '25-settings',    label: '25 · Ayarlar',    el: <ScrSettings race={race}/> },
+      ]},
+  ];
+
+  return (
+    <React.Fragment>
+      <RaceSwitcher current={race} onChange={v => setTweak('race', v)}/>
+      <DesignCanvas>
+      {sections.map(sec => (
+        <DCSection key={sec.id} id={sec.id} title={sec.title} subtitle={sec.sub}>
+          {sec.screens.map(s => (
+            <DCArtboard key={s.id} id={s.id} label={s.label} width={DEV_W + 24} height={DEV_H + 24}>
+              <div style={{ padding: 12, background: '#06080F', width: DEV_W + 24, height: DEV_H + 24,
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <DevFrame>{s.el}</DevFrame>
+              </div>
+            </DCArtboard>
+          ))}
+        </DCSection>
+      ))}
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Irk Teması">
+          <TweakRadio
+            value={t.race}
+            onChange={v => setTweak('race', v)}
+            options={[
+              { value: 'insan',   label: 'İnsan' },
+              { value: 'zerg',    label: 'Zerg' },
+              { value: 'otomat',  label: 'Otomat' },
+              { value: 'canavar', label: 'Canavar' },
+              { value: 'seytan',  label: 'Şeytan' },
+            ]}
+          />
+        </TweakSection>
+
+        <TweakSection label="Yoğunluk">
+          <TweakRadio
+            value={t.density || 'comfortable'}
+            onChange={v => setTweak('density', v)}
+            options={[
+              { value: 'compact',     label: 'Sıkı' },
+              { value: 'comfortable', label: 'Rahat' },
+            ]}
+          />
+        </TweakSection>
+
+        <TweakSection label="Animasyonlar">
+          <TweakRadio
+            value={t.animations || 'on'}
+            onChange={v => setTweak('animations', v)}
+            options={[
+              { value: 'on',  label: 'Açık' },
+              { value: 'off', label: 'Kapalı' },
+            ]}
+          />
+        </TweakSection>
+
+        <TweakSection label="Sigil & Glow">
+          <TweakRadio
+            value={t.sigilGlow || 'on'}
+            onChange={v => setTweak('sigilGlow', v)}
+            options={[
+              { value: 'on',  label: 'Parlak' },
+              { value: 'off', label: 'Sade' },
+            ]}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </DesignCanvas>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

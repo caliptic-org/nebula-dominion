@@ -1,0 +1,1019 @@
+NEBULA DOMINION
+Web Tabanlı MVP
+Teknik Mimari ve Tier Sistemi Güncellemesi
+Next.js + Phaser.js + Socket.io + PostgreSQL + Redis
+54 Seviye Tier Sistemi (6 Çağ × 9 Seviye)
+Endgame Süresi: ~6 Ay
+v2.0 - Web MVP
+İÇİNDEKİLER
+Bu doküman önceki tasarım taslağının teknik mimari ve tier sistemi bölümlerini günceller. Hikaye, ırklar, karakterler, mekanikler önceki dokümandaki gibi aynen geçerlidir.
+1. Güncellenen Tier Sistemi (54 Seviye)
+2. Web Tabanlı Teknoloji Yığını
+3. Mimari Yapı
+4. Veritabanı Şeması
+5. Proje Klasör Yapısı
+6. Frontend Detayları (Next.js + Phaser)
+7. Backend Detayları (NestJS + Socket.io)
+8. Hosting ve Deployment
+9. Maliyet Analizi
+10. Geliştirme Yol Haritası
+1. GÜNCELLENEN TIER SİSTEMİ - 54 SEVİYE
+1.1. Genel Yapı
+Önceki 6 tier sistemi 6 çağ olarak korundu, ancak her çağ 9 alt seviyeye bölündü. Toplam 54 seviye var. Her seviyenin kendi ismi var; oyuncu yükseldikçe yeni unvanlar kazanıyor.
+Endgame Süresi: Yoğun oyuncu ~5 ay, normal oyuncu ~6 ay, rahat oyuncu 6+ ay.
+1.2. Çağ 1: Gezegensel Uyanış (Seviye 1-9)
+Oyuncu kendi gezegeninde başlangıç yapıyor. Toplam süre yaklaşık 9-12 gün.
+Seviye
+İsim
+Açıklama
+Süre
+1
+Tohum
+İlk uyanış, başlangıç
+Anlık
+2
+Filiz
+Temel kaynak toplama
+6-12 saat
+3
+Çekirdek
+İlk birim üretimi
+12-24 saat
+4
+Yuva
+Savunma kuruluşu
+1 gün
+5
+Yerleşim
+Üs genişleme
+1-2 gün
+6
+Köy
+Çoklu yapı yönetimi
+1-2 gün
+7
+Kasaba
+Birleştirme/mutasyon başlar
+2 gün
+8
+Şehir
+Komutan tanıtımı
+2 gün
+9
+Metropol
+Çağ 1 zirvesi, geçiş hikaye seti
+2 gün
+
+1.3. Çağ 2: Yıldız Sistemi Hakimiyeti (Seviye 10-18)
+Ana yıldız sistemini ele geçirme. Toplam süre yaklaşık 12-18 gün.
+Seviye
+İsim
+Açıklama
+Süre
+10
+Yörünge
+Uzaya çıkış
+1 gün
+11
+Uydu
+İlk yörünge yapısı
+1-2 gün
+12
+İkiz Gezegen
+İkinci gezegen kolonisi
+2 gün
+13
+Üçlü Sistem
+Üç gezegen kontrol
+2 gün
+14
+İç Sistem
+Yıldıza yakın bölge
+2 gün
+15
+Dış Sistem
+Uzak gezegenler
+2 gün
+16
+Asteroid Kuşağı
+Madencilik üssü
+2 gün
+17
+Sistem Komutanı
+Tüm sistem fethedildi
+2-3 gün
+18
+Yıldız Hakimi
+Çağ 2 zirvesi, geçiş hikaye seti
+2-3 gün
+
+1.4. Çağ 3: Sektör Genişlemesi (Seviye 19-27)
+Yıldızlar arası uçuş. Diğer ırklarla ilk büyük temaslar. Toplam süre yaklaşık 18-25 gün.
+Seviye
+İsim
+Açıklama
+Süre
+19
+Keşifçi
+İlk yıldız sistemleri arası gemi
+2 gün
+20
+Öncü
+İkinci sistem keşfi
+2 gün
+21
+Kolonist
+İkinci sistem kolonileştirme
+2-3 gün
+22
+Sektör Beyi
+Üç sistem kontrol
+2-3 gün
+23
+Çoklu Sistem
+Beş sistem hakimiyeti
+3 gün
+24
+Bölge Lordu
+Mini sektör kontrol
+3 gün
+25
+Sektör Lordu
+Tam bir sektörü kontrol
+3 gün
+26
+Yıldız Generali
+Askeri zafer büyük PvP
+3 gün
+27
+Sektör Hakimi
+Çağ 3 zirvesi, geçiş hikaye seti
+3-4 gün
+
+1.5. Çağ 4: Galaktik Çatışma (Seviye 28-36)
+Galaksi çapında savaşlar. Büyük PvP içerikleri. Toplam süre yaklaşık 25-35 gün.
+Seviye
+İsim
+Açıklama
+Süre
+28
+Galaktik Şövalye
+Galaktik arenaya giriş
+3 gün
+29
+Yıldız Mareşali
+Galaktik filo komutanı
+3 gün
+30
+Spiral Kolu Lordu
+Galaksi kolu kontrol
+3-4 gün
+31
+Galaktik Komutan
+Çoklu sektör askeri
+4 gün
+32
+Çekirdek Hakimi
+Galaksi merkezi
+4 gün
+33
+Halo Lordu
+Galaksi kenarı
+4 gün
+34
+Galaksi Generali
+Galaksi savaşı zaferi
+4-5 gün
+35
+Galaksi Mareşali
+Galaksi-çapı kontrol
+4-5 gün
+36
+Galaktik İmparator
+Çağ 4 zirvesi, geçiş hikaye seti
+5 gün
+
+1.6. Çağ 5: Boyutlar Arası Keşif (Seviye 37-45)
+Subspace teknolojileri. Paralel evrenler. Toplam süre yaklaşık 30-40 gün.
+Seviye
+İsim
+Açıklama
+Süre
+37
+Boyut Kâşifi
+İlk subspace yarığı
+4 gün
+38
+Subspace Yolcusu
+Boyutlar arası seyahat
+4 gün
+39
+Paralel Lord
+İkinci evren keşfi
+4-5 gün
+40
+Çoklu-Evren Komutanı
+Üç evren kontrol
+5 gün
+41
+Boyut Mareşali
+Boyutlar arası filo
+5 gün
+42
+Yarık Hakimi
+Subspace yarık ustası
+5 gün
+43
+Boyutlar Arası Lord
+Beş evren kontrol
+5 gün
+44
+Çok-Boyutlu Hakim
+Boyutlar arası savaş zaferi
+5-6 gün
+45
+Boyut Tanrısı
+Çağ 5 zirvesi, geçiş hikaye seti
+6 gün
+
+1.7. Çağ 6: Kozmik Üstünlük (Seviye 46-54)
+Endgame içeriği. Universe Master seviyesi. Toplam süre yaklaşık 30-40 gün.
+Seviye
+İsim
+Açıklama
+Süre
+46
+Evren Kâşifi
+Kozmik bilinç uyanışı
+5 gün
+47
+Kozmik Şövalye
+Kozmik savaş arenası
+5 gün
+48
+Kozmik Lord
+Çoklu galaksi kontrol
+5 gün
+49
+Universe Master
+Donghua referansı, tam evren ustası
+5-6 gün
+50
+Kozmik İmparator
+Tüm evren komutası
+6 gün
+51
+Çok-Evrenli Hakim
+Tüm paralel evrenler
+6 gün
+52
+Sonsuz Hakim
+Sonsuzluk konsepti
+6 gün
+53
+Kozmik Konsey Üyesi
+Sezon sonu olayı
+6-7 gün
+54
+Tier 9 Hakimi
+Irk-spesifik mutlak güç (final)
+Sürekli
+
+1.8. Tier 9 (Seviye 54) Irk-Spesifik İsimleri
+Final seviyenin her ırk için kendi ismi var, donghua temasına uygun:
+Irk
+Tier 9 Unvanı
+Donghua Referansı
+Zergler
+Yutucu Kraliçe
+Yutucu Kurt evrim zirvesi
+Otomatlar
+Sonsuz Mantık Demiurge
+Cihaz Hazineleri zirve formu
+Canavarlar
+Primordial Canavar Tanrı
+Beast God seviyesi
+İnsanlar
+Yutucu Yıldız Varisi
+Luo Feng tarzı, Hanedanlık zirvesi
+Şeytanlar
+Sonsuz Karanlık Hükümdar
+Demon God seviyesi
+
+1.9. Hikaye Setleri Güncellemesi
+Önceki 5 büyük tier geçişi (1→2, 2→3, 3→4, 4→5, 5→6) hikaye seti hala geçerli. Bunlara ek olarak her çağ içinde de mini hikaye anları olacak:
+Çağ Geçişleri (5 ana set): 5 sahnelik tam sinematik (önceki dokümandaki gibi)
+Çağ İçi Mini Sahneler: Her 3 seviyede bir kısa sahne (1-2 görsel + metin)
+Toplam: 5 ana set (25 sahne) + 18 mini set (~36 sahne) = ~61 anlatı momentumu
+MVP&apos;de: Sadece 5 ana çağ geçişi, mini sahneler sonra eklenir
+1.10. Seviye Atlama Mekaniği
+Her seviyenin gerekli koşulları var:
+Belirli bir kaynak miktarı
+Belirli sayıda yapı yükseltmesi
+Belirli sayıda PvE/PvP zafer
+Anahtar görevin tamamlanması
+Çağ geçişinde özel boss (örn: Yutucu Kurt mini-boss)
+2. WEB TABANLI TEKNOLOJİ YIĞINI
+2.1. Genel Bakış
+Önceki Unity tabanlı stack tamamen değişti. Web tabanlı yaklaşımla MVP daha hızlı geliştirilecek.
+Katman
+Teknoloji
+Görev
+Frontend Framework
+Next.js 14 (App Router)
+Sayfa yönetimi, SSR, routing
+Oyun Motoru
+Phaser.js 3.80
+2D oyun render, fizik, animasyon
+UI Library
+TailwindCSS + shadcn/ui
+Modern, responsive UI
+State Management
+Zustand
+Global state yönetimi
+Programlama Dili
+TypeScript
+Tip güvenliği (frontend + backend)
+Backend Framework
+NestJS
+Modüler backend mimarisi
+Real-time
+Socket.io
+WebSocket, gerçek zamanlı PvP
+Veritabanı
+PostgreSQL (Supabase)
+Birincil veri
+Cache &amp; Real-time
+Redis (Upstash)
+Hızlı veri, sayaçlar
+ORM
+Prisma
+Type-safe database
+Auth
+Supabase Auth
+Kimlik doğrulama
+Asset Hosting
+Cloudflare R2
+Sprite, ses dosyaları
+Hosting Frontend
+Vercel
+Next.js deployment
+Hosting Backend
+Railway veya Render
+NestJS deployment
+
+2.2. Frontend - Next.js 14
+Neden Next.js?
+React tabanlı, en geniş ekosistem
+App Router: Modern routing, server components
+Built-in optimization: Image, font, code splitting
+API routes: Backend ile birleşik geliştirme
+Vercel&apos;de tek tıkla deploy
+SEO friendly (landing page için kritik)
+PWA desteği: Mobil cihazda native app gibi
+Kullanılacak Next.js Özellikleri
+App Router (app/ dizini)
+Server Components: Performans için
+Client Components: Phaser oyun için (&apos;use client&apos;)
+API Routes: Basit backend endpoint&apos;leri için
+Image Optimization: Sprite&apos;lar için
+Middleware: Auth kontrolü
+2.3. Oyun Motoru - Phaser.js 3.80
+Neden Phaser?
+Web için en popüler 2D oyun motoru
+Top War tarzı izometrik oyunlar için ideal
+WebGL render: Yüksek performans
+Canvas fallback: Eski cihazlarda da çalışır
+Tilemap desteği: Üs grid sistemi için
+Particle effects: Savaş efektleri için
+Tween system: Pürüzsüz animasyonlar
+Physics engines: Arcade, Matter.js
+Phaser Yapı Taşları
+Scene: Oyunun farklı bölümleri (Üs, Savaş, Galaktik Harita)
+GameObjects: Birim, yapı, UI elementleri
+Sprites: 2D karakterler
+Tweens: Pürüzsüz hareket animasyonları
+Particles: Patlama, mutasyon efektleri
+Sound: Müzik ve SFX
+2.4. Backend - NestJS
+Neden NestJS?
+Angular-benzeri modüler yapı
+TypeScript native
+Dependency injection built-in
+Decorators ile temiz kod
+Built-in WebSocket desteği (Socket.io entegrasyonu)
+Swagger/OpenAPI otomatik üretimi
+Microservice&apos;lere kolay geçiş
+NestJS Modül Yapısı
+AuthModule: Kimlik doğrulama
+UserModule: Oyuncu yönetimi
+GameModule: Oyun durumu, üs
+UnitModule: Birim üretimi, birleştirme
+BattleModule: Savaş simülasyonu
+TierModule: Seviye atlama mantığı
+StoryModule: Hikaye sahne yönetimi
+SocketModule: Gerçek zamanlı iletişim
+2.5. Real-time - Socket.io
+Neden Socket.io?
+WebSocket abstraction
+Auto-reconnect
+Room concept (PvP odaları için ideal)
+Fallback: Long-polling (eski tarayıcılar)
+Rich messaging (binary, JSON)
+NestJS ile mükemmel entegrasyon
+Socket.io Kullanım Alanları
+PvP eşleştirme ve savaş
+İttifak sohbeti (sonraki fazda)
+Anlık bildirimler (saldırı, üretim tamamlandı)
+Gerçek zamanlı liderboard güncellemeleri
+2.6. Veritabanı
+PostgreSQL via Supabase
+Yönetilen PostgreSQL: Sıfır altyapı yönetimi
+Built-in auth: Kullanıcı yönetimi hazır
+Row-level security: Güvenlik built-in
+Real-time subscriptions: Bonus özellik
+Free tier: 500MB DB, 1GB transfer/ay
+Pro tier: $25/ay, MVP sonrası
+Redis via Upstash
+Serverless Redis: Sadece kullandığın kadar öde
+Pay-per-request: 10K commands/gün ücretsiz
+Global edge locations: Düşük gecikme
+REST API: Firewall-friendly
+Free tier MVP için yeterli
+Cloudflare R2 (Asset Storage)
+S3 uyumlu, daha ucuz
+Çıkış ücreti YOK
+CDN entegre
+Free tier: 10GB depolama
+Sprite, müzik, hikaye görselleri burada
+3. MİMARİ YAPI
+3.1. Yüksek Seviye Mimari
+Sistem üç ana bileşenden oluşuyor:
+1. Web Frontend (Next.js + Phaser): Kullanıcının gördüğü her şey
+2. Backend API (NestJS): Oyun mantığı, veri doğrulama
+3. Real-time Server (Socket.io): PvP, anlık güncellemeler
+3.2. Server-Authoritative Yaklaşım
+Tüm önemli kararlar serverda alınır. Frontend sadece görselleştirir. Bu cheat&apos;i önler:
+Kaynak miktarları: Sadece serverda tutulur
+Birim sağlığı: Server hesaplar
+Savaş sonuçları: Server belirler
+Tier yükseltme: Server doğrular
+Frontend manipülasyonu hiçbir avantaj sağlamaz
+3.3. Veri Akışı Örnekleri
+Senaryo 1: Birim Üretimi
+1. Oyuncu UI&apos;da &apos;Üret&apos; butonuna tıklar
+2. Frontend NestJS API&apos;sine istek gönderir
+3. Backend kaynak kontrolü yapar (PostgreSQL)
+4. Yeterliyse: Kaynaklar düşülür, üretim kuyruğa eklenir
+5. Redis&apos;te üretim sayacı başlar (TTL ile)
+6. Süre sonunda backend birim oluşturur
+7. Socket.io ile oyuncuya &apos;Birim hazır&apos; bildirimi gider
+8. Frontend Phaser scene&apos;de birim görselleşir
+Senaryo 2: Birleştirme/Mutasyon
+1. Oyuncu iki birimi sürükle-bırak ile birleştirir (frontend)
+2. Frontend backend&apos;e &apos;merge&apos; isteği gönderir
+3. Backend birimlerin uygun olduğunu kontrol eder
+4. Eski birimler silinir, yeni Tier birim oluşur
+5. Veritabanı güncellenir
+6. Frontend güncellenmiş birimi gösterir
+Senaryo 3: PvP Savaş
+1. İki oyuncu Socket.io &apos;matchmaking&apos; kuyruğuna girer
+2. Eşleşen oyuncular özel &apos;battle room&apos; oluşturur
+3. Backend savaş simülasyonunu başlatır (saniyede 30 tick)
+4. Her tick&apos;te birim hareketleri ve hasar hesaplanır
+5. Sonuçlar her iki oyuncuya broadcast edilir
+6. Frontend Phaser ile gerçek zamanlı render
+7. Savaş sonu: Skor PostgreSQL&apos;e yazılır
+3.4. Monorepo Yapısı
+Tüm proje tek bir Git deposunda yönetilecek (pnpm workspaces ile):
+nebula-dominion/
+├── apps/
+│   ├── web/                    # Next.js frontend
+│   │   ├── app/                # App Router pages
+│   │   │   ├── (auth)/         # Login, register
+│   │   │   ├── (game)/         # Game pages
+│   │   │   │   ├── base/       # Üs ekranı
+│   │   │   │   ├── battle/     # Savaş ekranı
+│   │   │   │   └── galaxy/     # Galaktik harita
+│   │   │   └── page.tsx        # Landing
+│   │   ├── components/         # React componentleri
+│   │   │   ├── ui/             # shadcn/ui
+│   │   │   └── game/           # Oyun UI
+│   │   ├── game/               # Phaser oyun kodu
+│   │   │   ├── scenes/         # BaseScene, BattleScene
+│   │   │   ├── entities/       # Unit, Building sınıfları
+│   │   │   ├── systems/        # Production, Combat
+│   │   │   └── config.ts       # Phaser config
+│   │   ├── stores/             # Zustand stores
+│   │   ├── lib/                # Utilities
+│   │   └── public/             # Static assets
+│   └── api/                    # NestJS backend
+│       ├── src/
+│       │   ├── modules/
+│       │   │   ├── auth/
+│       │   │   ├── user/
+│       │   │   ├── game/
+│       │   │   ├── unit/
+│       │   │   ├── battle/
+│       │   │   ├── tier/
+│       │   │   └── socket/
+│       │   ├── prisma/         # DB client
+│       │   ├── common/         # Guards, interceptors
+│       │   └── main.ts
+│       └── prisma/
+│           ├── schema.prisma
+│           └── migrations/
+├── packages/
+│   ├── shared-types/           # TypeScript tipleri
+│   ├── game-config/            # Oyun sabitleri (tier, kaynak)
+│   └── game-logic/             # Paylaşılan oyun mantığı
+├── package.json
+├── pnpm-workspace.yaml
+└── turbo.json                  # Turborepo config
+4. VERİTABANI ŞEMASI
+4.1. Ana Tablolar
+Prisma ile yönetilecek temel tablolar:
+users (Kullanıcılar)
+id: UUID (primary key)
+email: string (unique)
+username: string (unique)
+race: enum (HUMAN, ZERG, AUTOMATON, BEAST, DEMON)
+created_at, updated_at: timestamp
+bases (Üsler)
+id: UUID
+user_id: UUID (foreign key)
+level: int (1-54 arası, mevcut tier seviyesi)
+tier_name: string (ör: &apos;Metropol&apos;, &apos;Yıldız Hakimi&apos;)
+primary_resource: bigint (Biyokütle/Mineral/vb.)
+secondary_resource: bigint
+cosmic_crystal: int (premium)
+coordinates: jsonb (galaksi konumu)
+units (Birimler)
+id: UUID
+base_id: UUID
+type: string (ör: &apos;marine&apos;, &apos;larva&apos;)
+tier: int (1-6)
+count: int
+hp_current, hp_max: int
+attack, defense: int
+buildings (Yapılar)
+id: UUID
+base_id: UUID
+type: string
+level: int
+position: jsonb (üs içi koordinat)
+status: enum (ACTIVE, BUILDING, UPGRADING)
+production_queue (Üretim Kuyruğu)
+id: UUID
+base_id: UUID
+item_type: string
+started_at: timestamp
+ends_at: timestamp
+status: enum (QUEUED, IN_PROGRESS, COMPLETED)
+commanders (Komutanlar)
+id: UUID
+user_id: UUID
+name: string
+level: int (1-100)
+experience: bigint
+skills: jsonb
+battles (Savaşlar)
+id: UUID
+attacker_id, defender_id: UUID
+type: enum (PVE, PVP)
+result: enum (ATTACKER_WIN, DEFENDER_WIN, DRAW)
+started_at, ended_at: timestamp
+replay_data: jsonb
+tier_progression (Tier İlerlemesi)
+id: UUID
+user_id: UUID
+current_level: int (1-54)
+current_tier_name: string
+current_age: int (1-6)
+xp: bigint
+xp_to_next_level: bigint
+achievements: jsonb
+story_progress (Hikaye İlerlemesi)
+id: UUID
+user_id: UUID
+seen_scenes: jsonb (görülmüş sahneler)
+current_chapter: int
+4.2. Redis Veri Yapıları
+Key Pattern
+Değer Tipi
+Kullanım
+session:{user_id}
+Hash
+Aktif oturum bilgisi
+resource:{base_id}
+Hash
+Anlık kaynak miktarları
+production:{base_id}
+Sorted Set
+Üretim kuyruğu (zaman sıralı)
+online:users
+Set
+Çevrimiçi oyuncular
+leaderboard:weekly
+Sorted Set
+Haftalık sıralama
+matchmaking:queue
+List
+PvP eşleştirme kuyruğu
+battle_room:{id}
+Hash
+Aktif savaş odası verisi
+5. FRONTEND DETAYLARI - NEXT.JS + PHASER
+5.1. Sayfa Yapısı
+/ - Landing page (oyun tanıtımı)
+/login, /register - Kimlik doğrulama
+/race-select - Irk seçim ekranı
+/base - Ana üs ekranı (Phaser scene)
+/galaxy - Galaktik harita
+/battle/:id - Aktif savaş ekranı
+/commanders - Komutan yönetimi
+/story - Hikaye galerisi
+/leaderboard - Sıralamalar
+/profile - Oyuncu profili
+/settings - Ayarlar
+5.2. Phaser Scene Yapısı
+BootScene
+Asset preloading
+Yükleme ekranı
+Sonra MenuScene&apos;e geçiş
+BaseScene
+Üs görselleştirmesi (izometrik)
+Yapılar tıklanabilir
+Birim üretimi UI
+Kaynak göstergeleri
+BattleScene
+Savaş alanı render
+Birimler animasyonlu
+Patlama efektleri
+Hasar göstergeleri
+GalaxyScene
+Yıldızlar arası harita
+Diğer oyuncuların üsleri
+Saldırı/keşif arayüzü
+StoryScene
+Tier geçiş hikaye sahneleri
+5 sahnelik geçişli anlatım
+Skip butonu
+5.3. State Management - Zustand Stores
+useUserStore: Kullanıcı, ırk, profil
+useBaseStore: Üs durumu, kaynaklar
+useUnitsStore: Birim envanteri
+useBattleStore: Aktif savaş durumu
+useTierStore: Mevcut tier ve ilerleme
+useStoryStore: Hikaye ilerlemesi
+useUIStore: UI durumu (modaller, sekmeler)
+5.4. Responsive Tasarım
+Mobile-first yaklaşım
+TailwindCSS breakpoint&apos;leri: sm, md, lg, xl
+Dokunmatik kontroller mobile&apos;da otomatik
+Phaser canvas otomatik ölçeklenir
+PWA: Mobile cihaza ana ekrana eklenebilir
+6. BACKEND DETAYLARI - NESTJS + SOCKET.IO
+6.1. NestJS Modül Detayları
+AuthModule
+POST /auth/register - Kayıt
+POST /auth/login - Giriş
+POST /auth/logout - Çıkış
+GET /auth/me - Mevcut kullanıcı
+Supabase Auth entegrasyonu
+JWT token yönetimi
+UserModule
+GET /users/profile
+PATCH /users/profile
+POST /users/select-race - Irk seçimi (tek seferlik)
+GameModule
+GET /game/state - Mevcut oyun durumu
+POST /game/build - Yapı inşa et
+POST /game/upgrade - Yapı yükselt
+POST /game/collect - Kaynakları topla
+UnitModule
+POST /units/produce - Birim üret
+POST /units/merge - İki birimi birleştir
+POST /units/mutate - Mutasyon (Zerg)
+GET /units - Tüm birimleri listele
+BattleModule
+POST /battles/pve/start - PvE savaş başlat
+POST /battles/pvp/queue - PvP kuyruğa gir
+GET /battles/:id - Savaş detayı
+GET /battles/history - Savaş geçmişi
+TierModule
+GET /tier/progress - Mevcut tier durumu
+POST /tier/level-up - Seviye atla (eğer koşullar sağlandıysa)
+GET /tier/requirements - Sonraki seviye için gereksinimler
+StoryModule
+GET /story/scenes/:id - Hikaye sahnesi getir
+POST /story/seen - Sahne görüldü işaretle
+GET /story/progress - Hikaye ilerlemesi
+6.2. Socket.io Events
+Client → Server
+&apos;join_lobby&apos; - Genel sohbet
+&apos;matchmaking_join&apos; - PvP kuyruğa gir
+&apos;matchmaking_leave&apos; - Kuyruktan çık
+&apos;battle_action&apos; - Savaşta aksiyon
+&apos;chat_message&apos; - Sohbet mesajı
+Server → Client
+&apos;production_complete&apos; - Üretim tamamlandı
+&apos;attack_received&apos; - Saldırıya uğradınız
+&apos;tier_unlocked&apos; - Yeni tier açıldı
+&apos;battle_start&apos; - Savaş başlıyor
+&apos;battle_tick&apos; - Savaş güncellemesi
+&apos;battle_end&apos; - Savaş bitti
+&apos;notification&apos; - Genel bildirim
+6.3. Cron Jobs (Zamanlanmış Görevler)
+Her dakika: Üretim kuyruğunu kontrol et, tamamlananları işle
+Her 5 dakika: Pasif kaynak üretimi
+Her saat: Online oyuncu sayacı
+Her gün: Liderboard güncellemesi, günlük görev reset
+Her hafta: Haftalık liderboard kapanışı, ödül dağıtımı
+6.4. Rate Limiting
+Auth endpoints: 5 istek/dakika
+Game actions: 30 istek/dakika
+Socket.io: 100 mesaj/dakika
+Public API: 60 istek/dakika
+Tool: @nestjs/throttler
+7. HOSTING VE DEPLOYMENT
+7.1. Hosting Platformları
+Bileşen
+Platform
+Plan
+Aylık Maliyet
+Frontend (Next.js)
+Vercel
+Hobby (free) → Pro
+$0 → $20
+Backend (NestJS)
+Railway
+Hobby → Developer
+$5 → $20
+PostgreSQL
+Supabase
+Free → Pro
+$0 → $25
+Redis
+Upstash
+Free → Pay-as-go
+$0 → $10
+Asset Storage
+Cloudflare R2
+Free → Pro
+$0 → $5
+Domain
+Namecheap/Cloudflare
+Yıllık
+$1/ay
+Monitoring
+Sentry
+Free → Team
+$0 → $26
+TOPLAM (MVP)
+
+Free tier
+$0-6/ay
+TOPLAM (Production)
+
+Paid
+$80-110/ay
+
+7.2. CI/CD Pipeline
+GitHub Actions
+Push to main: Otomatik deploy (production)
+Push to develop: Staging deploy
+Pull request: Preview deploy (Vercel)
+Tüm branch&apos;lerde: Test + lint + type-check
+Pipeline Adımları
+1. Code commit
+2. Install dependencies (cache ile hızlı)
+3. Type check (TypeScript)
+4. Lint (ESLint, Prettier)
+5. Run tests (Jest)
+6. Build (Next.js + NestJS)
+7. Deploy (Vercel + Railway)
+8. Smoke tests
+9. Slack/Discord bildirimi
+7.3. Environment Yönetimi
+Local development: .env.local
+Staging: Vercel preview + Railway staging
+Production: Vercel + Railway production
+Secrets: Vercel/Railway environment variables
+Asla Git&apos;e commit edilmez (.env .gitignore&apos;da)
+7.4. Monitoring
+Sentry: Hata takibi (hem frontend hem backend)
+Vercel Analytics: Web performans
+Supabase Dashboard: Database metrikleri
+Railway Dashboard: Backend metrikleri
+Upstash Console: Redis kullanım
+LogRocket (opsiyonel): Session replay
+8. MALİYET ANALİZİ
+8.1. MVP Geliştirme Aşaması (0-6 hafta)
+Servis
+Plan
+Aylık Maliyet
+Vercel
+Hobby (free)
+$0
+Railway
+Hobby starter
+$5
+Supabase
+Free
+$0
+Upstash Redis
+Free
+$0
+Cloudflare R2
+Free
+$0
+Domain
+Namecheap
+$1
+GitHub
+Free
+$0
+Sentry
+Free
+$0
+TOPLAM
+
+$6/ay
+
+8.2. Soft Launch (100-1,000 kullanıcı)
+Servis
+Plan
+Aylık Maliyet
+Vercel
+Pro
+$20
+Railway
+Developer
+$20
+Supabase
+Pro
+$25
+Upstash
+Pay-as-go
+$10
+Cloudflare R2
+Pro
+$5
+Sentry
+Team
+$26
+Domain + email
+
+$5
+TOPLAM
+
+~$111/ay
+
+8.3. Büyüme Aşaması (10,000 kullanıcı)
+Servis
+Plan
+Aylık Maliyet
+Vercel
+Pro + bandwidth
+$50
+Railway
+Pro
+$80
+Supabase
+Pro + addons
+$100
+Upstash
+Pay-as-go
+$50
+Cloudflare R2
+Pro
+$30
+Sentry
+Business
+$80
+TOPLAM
+
+~$390/ay
+
+8.4. Maliyet Karşılaştırması
+Önceki AWS planında 100K kullanıcı için $11,000-23,000/ay tahmin edilmişti. Web tabanlı yaklaşımda 10K kullanıcı için sadece ~$390/ay.
+MVP: %99.97 daha ucuz
+Büyüme: %96 daha ucuz
+Sebep: Managed servisler, sunucu yönetimi yok
+Trade-off: Yüksek ölçek için bazı sınırlamalar
+Çözüm: 100K kullanıcı sonrası AWS&apos;ye migrasyon planı
+9. GELİŞTİRME YOL HARİTASI
+9.1. MVP Sprint Planı (6 Hafta)
+Hafta 1: Temel Altyapı
+Monorepo kurulumu (pnpm + Turborepo)
+Next.js + NestJS başlangıç
+Supabase entegrasyonu, Prisma şeması
+Auth sistemi (kayıt, giriş)
+Temel UI (TailwindCSS + shadcn/ui)
+Landing page
+Deploy pipeline&apos;ı kurma
+Hafta 2: Oyun Çekirdeği
+Phaser entegrasyonu
+BaseScene: Üs görselleştirmesi
+Yapı inşa sistemi
+Kaynak yönetimi
+Üretim kuyruğu (Redis ile)
+Real-time kaynak göstergeleri
+Hafta 3: Birim ve Birleştirme
+Birim sınıfları (İnsanlar + Zergler)
+Birim üretimi mekaniği
+Top War tarzı drag-drop birleştirme
+Tier 1-3 birimleri tam
+Mutasyon sistemi (Zerg)
+Komutan sistemi temel
+Hafta 4: Savaş Sistemi
+BattleScene: Savaş alanı
+Birim AI (otomatik hareket, saldırı)
+PvE savaşları (10 görev)
+Hasar hesaplaması, animasyonlar
+Savaş sonu rapor ekranı
+Server-side savaş simülasyonu
+Hafta 5: PvP ve Tier Sistemi
+Socket.io PvP eşleştirme
+1v1 gerçek zamanlı savaş
+Tier 1-9 (Çağ 1) ilerleme sistemi
+Seviye atlama mekaniği
+İlk hikaye seti (Çağ 1 → Çağ 2 geçişi)
+Liderboard
+Hafta 6: Polish ve Launch
+Bug fixing
+Performance optimization
+Mobile-responsive iyileştirmeler
+Tutorial/onboarding flow
+Analytics entegrasyonu
+Closed beta launch (10-50 oyuncu)
+Geri bildirim toplama
+9.2. MVP Sonrası Yol Haritası (6+ ay)
+Faz 2: İçerik Genişlemesi (Ay 2-3)
+Çağ 2-3 içeriği tam (Seviye 10-27)
+3. ırk: Otomatlar
+Daha fazla PvE görevi
+İttifak sistemi temel
+Sohbet sistemi
+Faz 3: Sosyal Özellikler (Ay 4-5)
+4. ırk: Canavarlar
+İttifak savaşları
+Çağ 4 içeriği
+Daha gelişmiş PvP (3v3)
+Mağaza ve premium para birimi
+Faz 4: Endgame (Ay 6+)
+5. ırk: Şeytanlar
+Çağ 5-6 içeriği (subspace, kozmik)
+Yutucu Kurt boss savaşları
+Sektör Savaşları
+Kozmik Konsey olayı
+Mobile native app (Capacitor)
+9.3. Risk Yönetimi
+Risk
+Olasılık
+Etki
+Azaltma
+Phaser performans sorunu
+Orta
+Yüksek
+Erken benchmark
+Mobile uyumsuzluk
+Orta
+Orta
+Test cihazları, BrowserStack
+Denge sorunları
+Yüksek
+Yüksek
+Beta test, telemetri
+Hosting limitleri
+Düşük
+Orta
+Auto-scale planı
+Cheating
+Yüksek
+Yüksek
+Server-authoritative kod
+Düşük kullanıcı bağlılığı
+Yüksek
+Çok yüksek
+Onboarding, retention özellikleri
+9.4. Başarı Kriterleri (MVP)
+MVP 6 hafta içinde tamamlanır
+Closed beta&apos;da 10+ aktif oyuncu
+Crash rate &lt;%2
+Average session 15+ dakika
+D1 retention %30+
+Geri bildirim Net Promoter Score &gt;5/10
+SONUÇ
+Bu doküman Nebula Dominion&apos;ın web tabanlı MVP yaklaşımı için teknik mimari ve güncellenmiş tier sistemini tanımlar. Önceki dokümandaki oyun tasarımı, hikayeler, ırklar, karakterler ve mekanikler aynen geçerlidir; sadece teknik tercihler ve tier yapısı değiştirilmiştir.
+Kritik kararlar özeti:
+Stack: Next.js + Phaser.js + NestJS + Socket.io + PostgreSQL + Redis
+Hosting: Vercel + Railway + Supabase (managed servisler)
+Tier sistemi: 6 çağ × 9 seviye = 54 seviye, ~6 ay endgame
+MVP süresi: 4-6 hafta
+MVP maliyeti: $6/ay (free tier&apos;lar)
+Production maliyeti: ~$110-390/ay (kullanıcı sayısına göre)
+
+Sonraki adım: Geliştirmeye başlamak. İlk hafta için somut görev kartları çıkarmak, GitHub repo kurmak, ilk commit&apos;i atmak.
+— Doküman Sonu —

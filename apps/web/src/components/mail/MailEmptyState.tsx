@@ -1,19 +1,22 @@
 'use client'
 
+import { Caption, Eyebrow, H3, ND, type NDRace } from '@/components/handoff'
+
 interface MailEmptyStateProps {
   activeFilter: string
+  race: NDRace
 }
 
 const FILTER_MESSAGES: Record<string, { icon: string; title: string; sub: string }> = {
-  all: { icon: '📭', title: 'Posta Kutunuz Boş', sub: 'Sistem mesajları ve ödüller burada görünecek.' },
-  unread: { icon: '✉️', title: 'Okunmamış Posta Yok', sub: 'Tüm postalar okundu. Harika!' },
-  system: { icon: '📦', title: 'Sistem Postası Yok', sub: 'Ödüller ve bildirimler burada görünecek.' },
-  battle_report: { icon: '⚔️', title: 'Savaş Raporu Yok', sub: 'Savaşa katılınca raporlar burada birikir.' },
-  guild: { icon: '🛡️', title: 'Lonca Mesajı Yok', sub: 'Lonca üyelerinden gelen mesajlar burada görünür.' },
-  event: { icon: '✨', title: 'Etkinlik Mesajı Yok', sub: 'Etkinlik bildirimleri burada görünecek.' },
+  all:           { icon: '📭', title: 'Posta Kutusu Boş',      sub: 'Sistem mesajları ve ödüller burada görünecek.' },
+  unread:        { icon: '✉️', title: 'Okunmamış Posta Yok',   sub: 'Tüm postalar okundu. Harika!' },
+  system:        { icon: '📦', title: 'Sistem Postası Yok',    sub: 'Ödüller ve bildirimler burada görünecek.' },
+  battle_report: { icon: '⚔️', title: 'Savaş Raporu Yok',      sub: 'Savaşa katılınca raporlar burada birikir.' },
+  guild:         { icon: '🛡️', title: 'Lonca Mesajı Yok',     sub: 'Lonca üyelerinden gelen mesajlar burada görünür.' },
+  event:         { icon: '✨', title: 'Etkinlik Mesajı Yok',   sub: 'Etkinlik bildirimleri burada görünecek.' },
 }
 
-export function MailEmptyState({ activeFilter }: MailEmptyStateProps) {
+export function MailEmptyState({ activeFilter, race }: MailEmptyStateProps) {
   const msg = FILTER_MESSAGES[activeFilter] ?? FILTER_MESSAGES.all
 
   return (
@@ -31,31 +34,29 @@ export function MailEmptyState({ activeFilter }: MailEmptyStateProps) {
       aria-live="polite"
       aria-label={msg.title}
     >
-      {/* Stardust ring illustration */}
-      <div style={{ position: 'relative', width: 88, height: 88, marginBottom: 4 }}>
-        {/* Outer orbit ring */}
+      {/* Hex sigil-style frame */}
+      <div style={{ position: 'relative', width: 96, height: 96, marginBottom: 4 }}>
         <div
           aria-hidden
           style={{
             position: 'absolute',
             inset: 0,
-            borderRadius: '50%',
-            border: '1px dashed rgba(123,140,222,0.25)',
-            animation: 'spin 16s linear infinite',
+            border: `1px solid ${race.primary}55`,
+            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+            background: `radial-gradient(circle at center, ${race.primary}1a 0%, transparent 65%)`,
+            animation: 'glow-pulse 3s ease-in-out infinite',
           }}
         />
-        {/* Inner pulse */}
         <div
           aria-hidden
           style={{
             position: 'absolute',
-            inset: 12,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle at center, rgba(123,140,222,0.12) 0%, transparent 70%)',
-            animation: 'glow-pulse 3s ease-in-out infinite',
+            inset: 10,
+            border: `1px dashed ${ND.borderHi}`,
+            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+            animation: 'spin 20s linear infinite',
           }}
         />
-        {/* Center icon */}
         <div
           style={{
             position: 'absolute',
@@ -63,54 +64,16 @@ export function MailEmptyState({ activeFilter }: MailEmptyStateProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 34,
+            fontSize: 32,
           }}
         >
           {msg.icon}
         </div>
-        {/* Particle dots */}
-        {[0, 72, 144, 216, 288].map((deg, i) => (
-          <div
-            key={i}
-            aria-hidden
-            style={{
-              position: 'absolute',
-              width: 4,
-              height: 4,
-              borderRadius: '50%',
-              background: 'rgba(123,140,222,0.5)',
-              top: `${50 - 44 * Math.sin((deg * Math.PI) / 180)}%`,
-              left: `${50 + 44 * Math.cos((deg * Math.PI) / 180)}%`,
-              transform: 'translate(-50%, -50%)',
-              animation: `twinkle ${1.8 + i * 0.3}s ease-in-out infinite`,
-            }}
-          />
-        ))}
       </div>
 
-      <h3
-        style={{
-          fontSize: 15,
-          fontWeight: 700,
-          color: 'var(--color-text-secondary)',
-          fontFamily: 'var(--font-display)',
-          letterSpacing: '0.04em',
-          textAlign: 'center',
-        }}
-      >
-        {msg.title}
-      </h3>
-      <p
-        style={{
-          fontSize: 12,
-          color: 'var(--color-text-muted)',
-          textAlign: 'center',
-          maxWidth: 200,
-          lineHeight: 1.6,
-        }}
-      >
-        {msg.sub}
-      </p>
+      <Eyebrow color={race.primary}>İLETİŞİM AĞI</Eyebrow>
+      <H3 style={{ color: ND.text, textAlign: 'center' }}>{msg.title}</H3>
+      <Caption style={{ textAlign: 'center', maxWidth: 220 }}>{msg.sub}</Caption>
     </div>
   )
 }

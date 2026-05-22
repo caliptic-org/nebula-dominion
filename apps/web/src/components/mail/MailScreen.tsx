@@ -1,6 +1,19 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
+import {
+  Caption,
+  Chip,
+  Eyebrow,
+  NDButton,
+  Panel,
+  Screen,
+  Sigil,
+  ND,
+  useNDRace,
+  type NDRace,
+} from '@/components/handoff'
 import type { Mail, MailType } from './types'
 import { DEMO_MAILS } from './mailData'
 import { MailListItem } from './MailListItem'
@@ -11,15 +24,16 @@ import { MailEmptyState } from './MailEmptyState'
 type FilterKey = 'all' | 'unread' | MailType
 
 const FILTERS: { key: FilterKey; label: string; icon: string }[] = [
-  { key: 'all', label: 'Tümü', icon: '📬' },
-  { key: 'unread', label: 'Okunmamış', icon: '🔴' },
-  { key: 'system', label: 'Sistem', icon: '📦' },
-  { key: 'battle_report', label: 'Savaş', icon: '⚔️' },
-  { key: 'guild', label: 'Lonca', icon: '🛡️' },
-  { key: 'event', label: 'Etkinlik', icon: '✨' },
+  { key: 'all',           label: 'Tümü',       icon: '📬' },
+  { key: 'unread',        label: 'Okunmamış',  icon: '🔴' },
+  { key: 'system',        label: 'Sistem',     icon: '📦' },
+  { key: 'battle_report', label: 'Savaş',      icon: '⚔️' },
+  { key: 'guild',         label: 'Lonca',      icon: '🛡️' },
+  { key: 'event',         label: 'Etkinlik',   icon: '✨' },
 ]
 
 export function MailScreen() {
+  const race = useNDRace()
   const [mails, setMails] = useState<Mail[]>(DEMO_MAILS)
   const [activeMail, setActiveMail] = useState<Mail | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
@@ -30,7 +44,7 @@ export function MailScreen() {
 
   const unreadCount = useMemo(
     () => mails.filter((m) => !m.isRead).length,
-    [mails]
+    [mails],
   )
 
   const filteredMails = useMemo(() => {
@@ -39,18 +53,15 @@ export function MailScreen() {
     return mails.filter((m) => m.type === activeFilter)
   }, [mails, activeFilter])
 
-  const handleSelectMail = useCallback(
-    (mail: Mail) => {
-      setActiveMail(mail)
-      setMobileView('detail')
-      if (!mail.isRead) {
-        setMails((prev) =>
-          prev.map((m) => (m.id === mail.id ? { ...m, isRead: true } : m))
-        )
-      }
-    },
-    []
-  )
+  const handleSelectMail = useCallback((mail: Mail) => {
+    setActiveMail(mail)
+    setMobileView('detail')
+    if (!mail.isRead) {
+      setMails((prev) =>
+        prev.map((m) => (m.id === mail.id ? { ...m, isRead: true } : m)),
+      )
+    }
+  }, [])
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -88,7 +99,7 @@ export function MailScreen() {
 
   const handleMarkReadSelected = useCallback(() => {
     setMails((prev) =>
-      prev.map((m) => (selectedIds.has(m.id) ? { ...m, isRead: true } : m))
+      prev.map((m) => (selectedIds.has(m.id) ? { ...m, isRead: true } : m)),
     )
     setSelectMode(false)
     setSelectedIds(new Set())
@@ -113,25 +124,17 @@ export function MailScreen() {
   }, [filteredMails, claimedIds])
 
   const claimableCount = filteredMails.filter(
-    (m) => m.rewards?.length && !claimedIds.has(m.id)
+    (m) => m.rewards?.length && !claimedIds.has(m.id),
   ).length
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: 'var(--color-bg)',
-        fontFamily: 'var(--font-body)',
-      }}
-    >
-      {/* ── Top bar ─────────────────────────────────────────── */}
+    <Screen race={race} style={{ minHeight: '100dvh' }}>
+      {/* ── Header ────────────────────────────────────────────── */}
       <header
         style={{
-          padding: '16px 20px 0',
-          background: 'var(--color-bg-surface)',
-          borderBottom: '1px solid var(--color-border)',
+          padding: '14px 18px 0',
+          background: `linear-gradient(180deg, rgba(6,8,15,0.92) 0%, rgba(6,8,15,0.55) 100%)`,
+          borderBottom: `1px solid ${race.primary}33`,
           flexShrink: 0,
         }}
       >
@@ -139,94 +142,83 @@ export function MailScreen() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 14,
-            gap: 10,
+            gap: 12,
+            marginBottom: 12,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 20 }} aria-hidden>📬</span>
-            <h1
+          <Link
+            href="/dashboard"
+            aria-label="Geri"
+            style={iconBtn()}
+          >
+            ‹
+          </Link>
+          <Sigil race={race} size={28} glow />
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <Eyebrow color={race.primary}>İLETİŞİM AĞI</Eyebrow>
+            <div
               style={{
-                fontSize: 17,
-                fontWeight: 800,
-                letterSpacing: '0.08em',
-                color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-display)',
-              }}
-            >
-              POSTA
-            </h1>
-            {unreadCount > 0 && (
-              <UnreadBadge count={unreadCount} />
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-            {claimableCount > 0 && (
-              <button
-                onClick={handleClaimAll}
-                aria-label={`Tüm ödülleri talep et (${claimableCount})`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '6px 12px',
-                  borderRadius: 20,
-                  border: '1px solid rgba(255,200,50,0.4)',
-                  background: 'rgba(255,200,50,0.1)',
-                  color: 'var(--color-energy)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  transition: 'all 0.25s cubic-bezier(0.32,0.72,0,1)',
-                  fontFamily: 'var(--font-display)',
-                }}
-              >
-                <span aria-hidden>📥</span>
-                Hepsini Talep Et
-                <span
-                  style={{
-                    background: 'var(--color-energy)',
-                    color: '#0a0a0a',
-                    borderRadius: 10,
-                    padding: '0 5px',
-                    fontSize: 10,
-                    fontWeight: 800,
-                  }}
-                >
-                  {claimableCount}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                setSelectMode((v) => !v)
-                setSelectedIds(new Set())
-              }}
-              aria-pressed={selectMode}
-              aria-label={selectMode ? 'Seçim modundan çık' : 'Seçim modu'}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                border: `1px solid ${selectMode ? 'var(--color-brand)' : 'var(--color-border)'}`,
-                background: selectMode ? 'var(--color-brand-dim)' : 'var(--color-bg-elevated)',
-                color: selectMode ? 'var(--color-brand)' : 'var(--color-text-muted)',
-                cursor: 'pointer',
-                fontSize: 14,
+                marginTop: 2,
+                fontFamily: ND.display,
+                fontSize: 18,
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                color: ND.text,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
+                gap: 8,
               }}
-              title="Toplu seçim"
             >
-              ☑
-            </button>
+              Posta
+              {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
+            </div>
           </div>
+
+          {claimableCount > 0 && (
+            <NDButton
+              race={race}
+              variant="outline"
+              size="sm"
+              onClick={handleClaimAll}
+              icon={<span aria-hidden>📥</span>}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                Hepsi
+                <Chip color={ND.warn}>{claimableCount}</Chip>
+              </span>
+            </NDButton>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectMode((v) => !v)
+              setSelectedIds(new Set())
+            }}
+            aria-pressed={selectMode}
+            aria-label={selectMode ? 'Seçim modundan çık' : 'Seçim modu'}
+            title="Toplu seçim"
+            style={{
+              width: 32,
+              height: 32,
+              border: `1px solid ${selectMode ? race.primary : ND.border}`,
+              background: selectMode ? `${race.primary}1f` : ND.surface,
+              color: selectMode ? race.primary : ND.textDim,
+              cursor: 'pointer',
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              fontFamily: ND.display,
+              clipPath:
+                'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+              boxShadow: selectMode ? `0 0 8px ${race.glow}55` : 'none',
+            }}
+          >
+            ☑
+          </button>
         </div>
 
         {/* Filter tabs */}
@@ -234,7 +226,7 @@ export function MailScreen() {
           aria-label="Posta filtresi"
           style={{
             display: 'flex',
-            gap: 2,
+            gap: 4,
             overflowX: 'auto',
             scrollbarWidth: 'none',
             paddingBottom: 0,
@@ -245,50 +237,23 @@ export function MailScreen() {
               key === 'all'
                 ? mails.length
                 : key === 'unread'
-                ? mails.filter((m) => !m.isRead).length
-                : mails.filter((m) => m.type === key).length
+                  ? mails.filter((m) => !m.isRead).length
+                  : mails.filter((m) => m.type === key).length
             const isActive = activeFilter === key
             return (
               <button
                 key={key}
+                type="button"
                 onClick={() => setActiveFilter(key)}
                 aria-current={isActive ? 'page' : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '7px 12px',
-                  borderRadius: '8px 8px 0 0',
-                  border: isActive ? '1px solid var(--color-border)' : '1px solid transparent',
-                  borderBottom: isActive ? '2px solid var(--color-brand)' : '2px solid transparent',
-                  background: isActive ? 'var(--color-bg-elevated)' : 'transparent',
-                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  fontWeight: isActive ? 700 : 500,
-                  letterSpacing: '0.03em',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s cubic-bezier(0.32,0.72,0,1)',
-                  flexShrink: 0,
-                }}
+                style={tabStyle(isActive, race)}
               >
-                <span aria-hidden style={{ fontSize: 13 }}>{icon}</span>
+                <span aria-hidden style={{ fontSize: 12 }}>{icon}</span>
                 {label}
                 {count > 0 && key === 'unread' && (
-                  <span
-                    style={{
-                      background: 'var(--color-danger)',
-                      color: '#fff',
-                      borderRadius: 10,
-                      padding: '0 5px',
-                      fontSize: 9,
-                      fontWeight: 800,
-                      lineHeight: '16px',
-                    }}
-                    aria-label={`${count} okunmamış`}
-                  >
+                  <Chip color={ND.danger} style={{ padding: '0 5px' }}>
                     {count}
-                  </span>
+                  </Chip>
                 )}
               </button>
             )
@@ -296,7 +261,7 @@ export function MailScreen() {
         </nav>
       </header>
 
-      {/* ── Content split ───────────────────────────────────── */}
+      {/* ── Content split ─────────────────────────────────────── */}
       <div
         style={{
           flex: 1,
@@ -309,22 +274,22 @@ export function MailScreen() {
         <div
           style={{
             width: activeMail ? '38%' : '100%',
-            minWidth: activeMail ? 220 : 'unset',
-            borderRight: activeMail ? '1px solid var(--color-border)' : 'none',
+            minWidth: activeMail ? 240 : 'unset',
+            borderRight: activeMail ? `1px solid ${ND.border}` : 'none',
             overflowY: 'auto',
             overflowX: 'hidden',
             display: mobileView === 'detail' ? 'none' : 'block',
             position: 'relative',
-            paddingBottom: selectMode ? 60 : 0,
+            paddingBottom: selectMode ? 64 : 0,
             transition: 'width 0.35s cubic-bezier(0.32,0.72,0,1)',
             scrollbarWidth: 'thin',
-            scrollbarColor: 'var(--color-border) transparent',
+            scrollbarColor: `${ND.border} transparent`,
+            background: `linear-gradient(180deg, transparent, rgba(0,0,0,0.15))`,
           }}
-          // Show list on md+ always
           className="md:!block"
         >
           {filteredMails.length === 0 ? (
-            <MailEmptyState activeFilter={activeFilter} />
+            <MailEmptyState activeFilter={activeFilter} race={race} />
           ) : (
             filteredMails.map((mail) => (
               <MailListItem
@@ -333,17 +298,18 @@ export function MailScreen() {
                 isActive={activeMail?.id === mail.id}
                 isSelected={selectedIds.has(mail.id)}
                 selectMode={selectMode}
+                race={race}
                 onClick={() => handleSelectMail(mail)}
                 onToggleSelect={() => handleToggleSelect(mail.id)}
               />
             ))
           )}
 
-          {/* Bulk action bar (overlays bottom of list) */}
           {selectMode && selectedIds.size > 0 && (
             <BulkActionBar
               selectedCount={selectedIds.size}
               hasClaimable={hasClaimableSelected}
+              race={race}
               onClaimSelected={handleClaimSelected}
               onDeleteSelected={handleDeleteSelected}
               onMarkRead={handleMarkReadSelected}
@@ -364,12 +330,13 @@ export function MailScreen() {
               display: mobileView === 'list' ? 'none' : 'flex',
               flexDirection: 'column',
               scrollbarWidth: 'thin',
-              scrollbarColor: 'var(--color-border) transparent',
+              scrollbarColor: `${ND.border} transparent`,
             }}
             className="md:!flex"
           >
             <MailDetail
               mail={activeMail}
+              race={race}
               onClose={() => setMobileView('list')}
               onClaim={handleClaim}
               onDelete={handleDelete}
@@ -384,19 +351,77 @@ export function MailScreen() {
               alignItems: 'center',
               justifyContent: 'center',
               flexDirection: 'column',
-              gap: 10,
-              color: 'var(--color-text-muted)',
+              gap: 12,
+              color: ND.textMute,
+              padding: 24,
             }}
             className="hidden md:flex"
             aria-hidden
           >
-            <span style={{ fontSize: 32 }}>✉️</span>
-            <p style={{ fontSize: 12, letterSpacing: '0.05em' }}>Okumak için bir posta seçin</p>
+            <Panel
+              race={race}
+              style={{
+                width: 88,
+                height: 88,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 32,
+              }}
+            >
+              ✉️
+            </Panel>
+            <Caption>Okumak için bir posta seçin</Caption>
           </div>
         )}
       </div>
-    </div>
+    </Screen>
   )
+}
+
+/* ── helpers ──────────────────────────────────────────────────────────── */
+
+function iconBtn(): React.CSSProperties {
+  return {
+    width: 32,
+    height: 32,
+    border: `1px solid ${ND.border}`,
+    background: ND.surface,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: ND.text,
+    fontFamily: ND.display,
+    fontSize: 18,
+    textDecoration: 'none',
+    clipPath:
+      'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+  }
+}
+
+function tabStyle(on: boolean, race: NDRace): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '8px 12px',
+    fontFamily: ND.display,
+    fontSize: 10,
+    letterSpacing: '0.10em',
+    textTransform: 'uppercase',
+    background: on
+      ? `linear-gradient(180deg, ${race.primary}28, ${race.primary}10)`
+      : 'transparent',
+    border: `1px solid ${on ? race.primary : ND.border}`,
+    color: on ? race.primary : ND.textDim,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s cubic-bezier(0.32,0.72,0,1)',
+    flexShrink: 0,
+    clipPath:
+      'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
+    boxShadow: on ? `0 0 10px ${race.glow}33` : 'none',
+  }
 }
 
 function UnreadBadge({ count }: { count: number }) {
@@ -405,19 +430,20 @@ function UnreadBadge({ count }: { count: number }) {
       aria-label={`${count} okunmamış posta`}
       style={{
         minWidth: 20,
-        height: 20,
-        borderRadius: 10,
-        background: 'var(--color-danger)',
+        height: 18,
+        background: ND.danger,
         color: '#fff',
         fontSize: 10,
         fontWeight: 800,
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '0 5px',
-        boxShadow: '0 0 8px rgba(255,68,68,0.6)',
-        animation: 'glow-pulse 2s ease-in-out infinite',
-        fontFamily: 'var(--font-display)',
+        padding: '0 6px',
+        boxShadow: `0 0 8px ${ND.danger}88`,
+        fontFamily: ND.display,
+        letterSpacing: '0.04em',
+        clipPath:
+          'polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px)',
       }}
     >
       {count}

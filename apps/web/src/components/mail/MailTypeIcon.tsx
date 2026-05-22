@@ -1,38 +1,20 @@
 'use client'
 
+import { ND, type NDRace } from '@/components/handoff'
 import type { MailType } from './types'
 
 interface MailTypeIconProps {
   type: MailType
   size?: 'sm' | 'md' | 'lg'
   animated?: boolean
+  race?: NDRace
 }
 
-const TYPE_CONFIG: Record<MailType, { icon: string; color: string; glow: string; label: string }> = {
-  system: {
-    icon: '📦',
-    color: 'var(--color-energy)',
-    glow: 'rgba(255, 200, 50, 0.35)',
-    label: 'Sistem',
-  },
-  battle_report: {
-    icon: '⚔️',
-    color: 'var(--color-danger)',
-    glow: 'rgba(255, 68, 68, 0.35)',
-    label: 'Savaş Raporu',
-  },
-  guild: {
-    icon: '🛡️',
-    color: 'var(--color-accent)',
-    glow: 'rgba(68, 217, 200, 0.35)',
-    label: 'Lonca',
-  },
-  event: {
-    icon: '✨',
-    color: 'var(--color-brand)',
-    glow: 'rgba(123, 140, 222, 0.35)',
-    label: 'Etkinlik',
-  },
+export interface MailTypeConfig {
+  icon: string
+  color: string
+  glow: string
+  label: string
 }
 
 const SIZE_MAP = {
@@ -41,8 +23,27 @@ const SIZE_MAP = {
   lg: { outer: 52, inner: 34, text: 22 },
 }
 
-export function MailTypeIcon({ type, size = 'md', animated = false }: MailTypeIconProps) {
-  const config = TYPE_CONFIG[type]
+export function getMailTypeConfig(type: MailType, race?: NDRace): MailTypeConfig {
+  switch (type) {
+    case 'system':
+      return { icon: '📦', color: ND.warn,   glow: ND.warn,   label: 'Sistem' }
+    case 'battle_report':
+      return { icon: '⚔️', color: ND.danger, glow: ND.danger, label: 'Savaş Raporu' }
+    case 'guild':
+      return { icon: '🛡️', color: ND.ok,     glow: ND.ok,     label: 'Lonca' }
+    case 'event':
+    default:
+      return {
+        icon: '✨',
+        color: race?.primary ?? 'oklch(0.78 0.16 220)',
+        glow:  race?.glow    ?? 'oklch(0.82 0.18 220)',
+        label: 'Etkinlik',
+      }
+  }
+}
+
+export function MailTypeIcon({ type, size = 'md', animated = false, race }: MailTypeIconProps) {
+  const config = getMailTypeConfig(type, race)
   const dim = SIZE_MAP[size]
 
   return (
@@ -50,10 +51,13 @@ export function MailTypeIcon({ type, size = 'md', animated = false }: MailTypeIc
       style={{
         width: dim.outer,
         height: dim.outer,
-        borderRadius: '50%',
-        background: `radial-gradient(circle at 35% 35%, ${config.color}22, ${config.color}08)`,
-        border: `1px solid ${config.color}44`,
-        boxShadow: animated ? `0 0 14px ${config.glow}, inset 0 1px 1px rgba(255,255,255,0.08)` : `0 0 8px ${config.glow}55`,
+        borderRadius: 3,
+        clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+        background: `linear-gradient(180deg, ${config.color}22, ${config.color}08)`,
+        border: `1px solid ${config.color}55`,
+        boxShadow: animated
+          ? `0 0 14px ${config.glow}44, inset 0 1px 0 rgba(255,255,255,0.06)`
+          : `0 0 6px ${config.glow}22, inset 0 1px 0 rgba(255,255,255,0.04)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -65,8 +69,4 @@ export function MailTypeIcon({ type, size = 'md', animated = false }: MailTypeIc
       <span style={{ fontSize: dim.text, lineHeight: 1 }}>{config.icon}</span>
     </div>
   )
-}
-
-export function getMailTypeConfig(type: MailType) {
-  return TYPE_CONFIG[type]
 }

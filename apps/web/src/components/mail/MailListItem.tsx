@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Chip, ND, type NDRace } from '@/components/handoff'
 import type { Mail } from './types'
 import { MailTypeIcon, getMailTypeConfig } from './MailTypeIcon'
 
@@ -9,6 +10,7 @@ interface MailListItemProps {
   isActive: boolean
   isSelected: boolean
   selectMode: boolean
+  race: NDRace
   onClick: () => void
   onToggleSelect: () => void
 }
@@ -30,14 +32,13 @@ export function MailListItem({
   isActive,
   isSelected,
   selectMode,
+  race,
   onClick,
   onToggleSelect,
 }: MailListItemProps) {
   const [hovered, setHovered] = useState(false)
-  const config = getMailTypeConfig(mail.type)
+  const config = getMailTypeConfig(mail.type, race)
   const hasRewards = Boolean(mail.rewards?.length)
-
-  const accentColor = mail.isRead ? 'transparent' : config.color
 
   return (
     <div
@@ -64,11 +65,10 @@ export function MailListItem({
       <div
         style={{
           width: 3,
-          borderRadius: '0 2px 2px 0',
-          background: accentColor,
+          background: mail.isRead ? 'transparent' : config.color,
           flexShrink: 0,
           transition: 'background 0.3s ease, box-shadow 0.3s ease',
-          boxShadow: mail.isRead ? 'none' : `0 0 8px ${config.glow ?? config.color}88`,
+          boxShadow: mail.isRead ? 'none' : `0 0 8px ${config.glow}88`,
         }}
       />
 
@@ -78,13 +78,13 @@ export function MailListItem({
           flex: 1,
           padding: '12px 14px 12px 10px',
           background: isActive
-            ? `linear-gradient(90deg, ${config.color}18 0%, var(--color-bg-elevated) 100%)`
+            ? `linear-gradient(90deg, ${race.primary}22 0%, ${ND.surface} 80%)`
             : hovered
-            ? 'var(--color-bg-elevated)'
-            : mail.isRead
-            ? 'transparent'
-            : 'var(--color-bg-surface)',
-          borderBottom: '1px solid var(--color-border)',
+              ? ND.surfaceHi
+              : mail.isRead
+                ? 'transparent'
+                : ND.surface,
+          borderBottom: `1px solid ${ND.border}`,
           display: 'flex',
           gap: 10,
           alignItems: 'flex-start',
@@ -98,14 +98,15 @@ export function MailListItem({
               style={{
                 width: 20,
                 height: 20,
-                borderRadius: 4,
-                border: `2px solid ${isSelected ? config.color : 'var(--color-border-hover)'}`,
-                background: isSelected ? `${config.color}22` : 'transparent',
+                borderRadius: 3,
+                border: `1.5px solid ${isSelected ? race.primary : ND.borderHi}`,
+                background: isSelected ? `${race.primary}22` : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.2s cubic-bezier(0.32,0.72,0,1)',
                 flexShrink: 0,
+                boxShadow: isSelected ? `0 0 6px ${race.glow}55` : 'none',
               }}
               aria-hidden
             >
@@ -113,7 +114,7 @@ export function MailListItem({
                 <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
                   <path
                     d="M1 4.5L4.5 8L11 1"
-                    stroke={config.color}
+                    stroke={race.primary}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -122,7 +123,7 @@ export function MailListItem({
               )}
             </div>
           ) : (
-            <MailTypeIcon type={mail.type} size="sm" animated={!mail.isRead} />
+            <MailTypeIcon type={mail.type} size="sm" animated={!mail.isRead} race={race} />
           )}
         </div>
 
@@ -140,14 +141,15 @@ export function MailListItem({
             <span
               style={{
                 fontSize: 13,
-                fontWeight: mail.isRead ? 400 : 700,
-                color: mail.isRead ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-                letterSpacing: mail.isRead ? 'normal' : '0.01em',
+                fontWeight: mail.isRead ? 500 : 700,
+                color: mail.isRead ? ND.textDim : ND.text,
+                letterSpacing: mail.isRead ? '0.01em' : '0.03em',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 flex: 1,
-                fontFamily: mail.isRead ? 'var(--font-body)' : 'var(--font-display)',
+                fontFamily: mail.isRead ? ND.body : ND.display,
+                textTransform: mail.isRead ? 'none' : 'uppercase',
               }}
             >
               {mail.title}
@@ -156,21 +158,22 @@ export function MailListItem({
               {!mail.isRead && (
                 <div
                   style={{
-                    width: 7,
-                    height: 7,
+                    width: 6,
+                    height: 6,
                     borderRadius: '50%',
                     background: config.color,
-                    boxShadow: `0 0 6px ${config.color}`,
-                    animation: 'glow-pulse 2s ease-in-out infinite',
+                    boxShadow: `0 0 6px ${config.glow}`,
                   }}
                   aria-hidden
                 />
               )}
               <span
                 style={{
-                  fontSize: 11,
-                  color: 'var(--color-text-muted)',
-                  letterSpacing: '0.02em',
+                  fontSize: 10,
+                  color: ND.textMute,
+                  letterSpacing: '0.06em',
+                  fontFamily: ND.mono,
+                  textTransform: 'uppercase',
                 }}
               >
                 {formatRelativeTime(mail.sentAt)}
@@ -181,12 +184,13 @@ export function MailListItem({
           <p
             style={{
               fontSize: 12,
-              color: 'var(--color-text-muted)',
+              color: ND.textDim,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               marginBottom: hasRewards ? 6 : 0,
-              lineHeight: 1.4,
+              lineHeight: 1.45,
+              fontFamily: ND.body,
             }}
           >
             {mail.preview}
@@ -196,21 +200,9 @@ export function MailListItem({
           {hasRewards && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {mail.rewards!.map((r, i) => (
-                <span
-                  key={i}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 7px',
-                    borderRadius: 20,
-                    background: 'var(--color-energy-dim)',
-                    color: 'var(--color-energy)',
-                    border: '1px solid rgba(255,200,50,0.2)',
-                    letterSpacing: '0.02em',
-                    fontWeight: 600,
-                  }}
-                >
-                  {r.icon} {r.amount.toLocaleString()}
-                </span>
+                <Chip key={i} color={ND.warn}>
+                  {r.icon} {r.amount.toLocaleString('tr-TR')}
+                </Chip>
               ))}
             </div>
           )}

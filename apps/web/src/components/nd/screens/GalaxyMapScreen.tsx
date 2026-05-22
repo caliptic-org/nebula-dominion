@@ -163,7 +163,7 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Sigil race={race} size={26} glow />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Eyebrow>Screen 11 · Galaktik Harita</Eyebrow>
+            <Eyebrow>{race.allianceTag} · GALAKTİK HARİTA</Eyebrow>
             <H3 style={{ color: race.primary }}>SEKTÖR-9 / KIYI YOLU</H3>
           </div>
         </div>

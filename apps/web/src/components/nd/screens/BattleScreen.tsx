@@ -335,7 +335,7 @@ export function BattleScreen({ forcedRace }: Props) {
         </button>
         <Sigil race={race} size={24} glow />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <Eyebrow>Screen 14 · Savaş</Eyebrow>
+          <Eyebrow>{race.allianceTag} · CEPHE HATTI</Eyebrow>
           <H3 style={{ color: race.primary }}>{race.short} vs {enemy.short}</H3>
         </div>
         <div style={{ flex: 1 }} />

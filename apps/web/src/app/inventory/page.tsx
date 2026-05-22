@@ -20,6 +20,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 
 const ROSTER_NAMES: Record<string, string> = {
   insan:   'Birim Envanteri',
@@ -36,9 +37,6 @@ const MERGE_VERB: Record<string, string> = {
   canavar: 'Yut',
   seytan:  'Bağla',
 };
-
-const POP_USED = 180;
-const POP_MAX = 240;
 
 type UnitState = 'ready' | 'fleet' | 'wounded';
 type SortKey = 'tier' | 'count' | 'level';
@@ -219,42 +217,93 @@ export default function RosterPage() {
           <Code style={{ color: ND.textMute }}>{visible.length} birim</Code>
         </div>
 
-        {/* Roster grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            {visible.map((u) => (
-              <RosterCard
-                key={u.id}
+        {/* Roster grid (scroll) + sticky detail drawer */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+          }}
+        >
+          <div style={{ padding: '12px 14px', flex: 1 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {visible.map((u) => (
+                <RosterCard
+                  key={u.id}
+                  race={race}
+                  unit={u}
+                  selected={u.id === selectedId}
+                  onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
+                />
+              ))}
+            </div>
+
+            {visible.length === 0 && (
+              <div
+                role="status"
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '48px 0 56px',
+                  minHeight: 220,
+                }}
+              >
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0.15,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <Sigil race={race} size={180} />
+                </div>
+                <div style={{ position: 'relative', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      fontFamily: ND.display,
+                      fontSize: 14,
+                      letterSpacing: '0.10em',
+                      textTransform: 'uppercase',
+                      color: ND.text,
+                    }}
+                  >
+                    Henüz birim yok
+                  </div>
+                  <Caption style={{ marginTop: 6 }}>
+                    Bu tier ile uyumlu birim bulunamadı.
+                  </Caption>
+                </div>
+              </div>
+            )}
+
+            <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
+              <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
+              <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
+            </div>
+          </div>
+
+          {/* Sticky detail drawer — floats above the list, scrolls do not push it */}
+          {selectedUnit && (
+            <div style={{ position: 'sticky', bottom: 0, zIndex: 2 }}>
+              <UnitDetailDrawer
                 race={race}
-                unit={u}
-                selected={u.id === selectedId}
-                onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
+                unit={selectedUnit}
+                onClose={() => setSelectedId(null)}
               />
-            ))}
-          </div>
-
-          {visible.length === 0 && (
-            <Caption style={{ textAlign: 'center', padding: '40px 0' }}>
-              Bu tier ile uyumlu birim yok.
-            </Caption>
+            </div>
           )}
-
-          <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
-            <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
-            <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
-          </div>
         </div>
-
-        {/* Detail drawer (visible when a unit is selected) */}
-        {selectedUnit && (
-          <UnitDetailDrawer
-            race={race}
-            unit={selectedUnit}
-            onClose={() => setSelectedId(null)}
-          />
-        )}
 
         {/* Bottom action bar */}
         {!selectedUnit && (

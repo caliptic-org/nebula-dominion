@@ -114,6 +114,22 @@
   );
 }
 
+/* NDButton interactive states — brightness on hover, gentle press scale */
+.nd-btn {
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.nd-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.nd-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nd-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* Typography helpers */
 .nd-font-display { font-family: var(--font-nd-display), 'Chakra Petch', system-ui, sans-serif; }
 .nd-font-body    { font-family: var(--font-nd-body), 'Inter', system-ui, sans-serif; }

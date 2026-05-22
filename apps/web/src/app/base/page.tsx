@@ -22,6 +22,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 
 const SCREEN_NAMES: Record<string, string> = {
   insan:   'Komuta Üssü',
@@ -38,9 +39,6 @@ const PRODUCTION_HEADLINE: Record<string, string> = {
   canavar: 'Av Çukuru',
   seytan:  'Çağırım Sembolü',
 };
-
-const POP_USED = 180;
-const POP_MAX = 240;
 
 export default function BaseHomePage() {
   const race = useNDRace();

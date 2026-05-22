@@ -126,6 +126,7 @@ export function NDButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      className="nd-btn"
       style={{
         height: heights[size],
         padding: padding[size],

@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { FormationScreen } from '@/components/formation/FormationScreen';
+import { FormationScreenND } from '@/components/formation/FormationScreenND';
 
 export const metadata: Metadata = {
   title: 'Formasyon Kurma — Nebula Dominion',
@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 const DEMO_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
 
 export default function FormationPage() {
-  return <FormationScreen playerId={DEMO_PLAYER_ID} />;
+  return <FormationScreenND playerId={DEMO_PLAYER_ID} />;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -131,8 +132,17 @@ function useCountdown(secs: number) {
   };
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function ShopPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('genel');
   const [currency, setCurrency] = useState<Currency>('gem');
   const promoTimer = useCountdown(2 * 86_400 + 4 * 3_600);
@@ -237,7 +247,11 @@ export default function ShopPage() {
         )}
       </div>
 
-      <BottomNav race={race} active="more" />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

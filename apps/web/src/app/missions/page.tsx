@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -98,8 +99,17 @@ function useDailyCountdown(): string {
   return `${String(t.h).padStart(2, '0')}:${String(t.m).padStart(2, '0')}:${String(t.s).padStart(2, '0')}`;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function MissionsPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('story');
   const resetCountdown = useDailyCountdown();
 
@@ -186,7 +196,11 @@ export default function MissionsPage() {
         )}
       </div>
 
-      <BottomNav race={race} active="story" />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

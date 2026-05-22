@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -90,8 +91,17 @@ function fmtDuration(sec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function ProfilePage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('stats');
 
   const profile = useMemo(
@@ -339,7 +349,11 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <BottomNav race={race} active="more" />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

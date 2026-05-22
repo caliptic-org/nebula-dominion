@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   RACES,
   ND,
@@ -110,8 +111,17 @@ function fmt(n: number) {
   return new Intl.NumberFormat('tr-TR').format(n);
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function AlliancePage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('genel');
 
   const summary = {
@@ -300,7 +310,11 @@ export default function AlliancePage() {
         )}
       </div>
 
-      <BottomNav race={race} active="cmd" />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

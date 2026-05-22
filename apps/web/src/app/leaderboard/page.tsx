@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   RACES,
   ND,
@@ -121,8 +122,17 @@ function useResetCountdown(targetMs: number) {
   return t;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function LeaderboardPage() {
   const playerRace = useNDRace();
+  const router = useRouter();
   const [category, setCategory] = useState<Category>('power');
   const [period, setPeriod] = useState<'weekly' | 'seasonal'>('weekly');
 
@@ -235,7 +245,11 @@ export default function LeaderboardPage() {
         </Panel>
       </div>
 
-      <BottomNav race={playerRace} active="more" />
+      <BottomNav
+        race={playerRace}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

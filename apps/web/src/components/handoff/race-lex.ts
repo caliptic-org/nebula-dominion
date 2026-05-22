@@ -14,7 +14,8 @@ export type NDQuickActionIcon =
   | 'egg' | 'helix' | 'spiral'
   | 'gear' | 'cpu' | 'fuse'
   | 'claw' | 'fang' | 'jaw'
-  | 'sigil' | 'flame' | 'rune';
+  | 'sigil' | 'flame' | 'rune'
+  | 'roster';
 
 export interface NDQuickAction {
   key: string;
@@ -54,9 +55,10 @@ export const RACE_LEX: Record<NDRaceKey, NDRaceLex> = {
     buildTabs: ['Tümü', 'Ekonomi', 'Askeri', 'Bilim', 'Subspace'],
     productionTabs: ['Tümü', 'Piyade', 'Mecha', 'Komutan', 'Filo'],
     quickActions: [
-      { key: 'build', label: 'İNŞA',  icon: 'hammer' },
-      { key: 'prod',  label: 'EĞİT',  icon: 'helmet' },
-      { key: 'merge', label: 'TERFI', icon: 'star'   },
+      { key: 'build',  label: 'İNŞA',     icon: 'hammer' },
+      { key: 'prod',   label: 'EĞİT',     icon: 'helmet' },
+      { key: 'merge',  label: 'TERFI',    icon: 'star'   },
+      { key: 'roster', label: 'TUGAY',    icon: 'roster' },
     ],
     morphHint: 'BLUEPRINT', verticalFlow: 'Sıralı dağıtım',
   },
@@ -73,6 +75,7 @@ export const RACE_LEX: Record<NDRaceKey, NDRaceLex> = {
       { key: 'spawn',  label: 'DOĞUR',    icon: 'egg'    },
       { key: 'mutate', label: 'MUTASYON', icon: 'helix'  },
       { key: 'merge',  label: 'EVRİMLE',  icon: 'spiral' },
+      { key: 'roster', label: 'SÜRÜ',     icon: 'roster' },
     ],
     morphHint: 'GENOM', verticalFlow: 'Damar akışı',
   },
@@ -86,9 +89,10 @@ export const RACE_LEX: Record<NDRaceKey, NDRaceLex> = {
     buildTabs: ['Tümü', 'Veri', 'Montaj', 'Mantık', 'Subspace'],
     productionTabs: ['Tümü', 'Sentinel', 'Catapult', 'Phoenix', 'Demiurge'],
     quickActions: [
-      { key: 'assemble', label: 'MONTAJ',    icon: 'gear' },
-      { key: 'compile',  label: 'DERLE',     icon: 'cpu'  },
-      { key: 'merge',    label: 'BİRLEŞTİR', icon: 'fuse' },
+      { key: 'assemble', label: 'MONTAJ',    icon: 'gear'   },
+      { key: 'compile',  label: 'DERLE',     icon: 'cpu'    },
+      { key: 'merge',    label: 'BİRLEŞTİR', icon: 'fuse'   },
+      { key: 'roster',   label: 'REGİSTRİ',  icon: 'roster' },
     ],
     morphHint: 'BLUEPRINT v', verticalFlow: 'Data akışı',
   },
@@ -102,9 +106,10 @@ export const RACE_LEX: Record<NDRaceKey, NDRaceLex> = {
     buildTabs: ['Tümü', 'Av', 'İn', 'Atalar', 'Yarık'],
     productionTabs: ['Tümü', 'Avcı', 'Sürü', 'Atalar', 'Tanrı'],
     quickActions: [
-      { key: 'dig',  label: 'KAZ', icon: 'claw' },
-      { key: 'hunt', label: 'AV',  icon: 'fang' },
-      { key: 'eat',  label: 'YE',  icon: 'jaw'  },
+      { key: 'dig',    label: 'KAZ',  icon: 'claw'   },
+      { key: 'hunt',   label: 'AV',   icon: 'fang'   },
+      { key: 'eat',    label: 'YE',   icon: 'jaw'    },
+      { key: 'roster', label: 'SÜRÜ', icon: 'roster' },
     ],
     morphHint: 'BEDEN', verticalFlow: 'Kan akışı',
   },
@@ -118,9 +123,10 @@ export const RACE_LEX: Record<NDRaceKey, NDRaceLex> = {
     buildTabs: ['Tümü', 'Ruh', 'Tapınak', 'Pakt', 'Yarık'],
     productionTabs: ['Tümü', 'Imp', 'Cadı', 'Lord', 'Demon'],
     quickActions: [
-      { key: 'pact',   label: 'PAKT',    icon: 'sigil' },
-      { key: 'summon', label: 'ÇAĞIR',   icon: 'flame' },
-      { key: 'seal',   label: 'MÜHÜRLE', icon: 'rune'  },
+      { key: 'pact',   label: 'PAKT',    icon: 'sigil'  },
+      { key: 'summon', label: 'ÇAĞIR',   icon: 'flame'  },
+      { key: 'seal',   label: 'MÜHÜRLE', icon: 'rune'   },
+      { key: 'roster', label: 'MAHKEME', icon: 'roster' },
     ],
     morphHint: 'SİGİL', verticalFlow: 'Ruh akışı',
   },

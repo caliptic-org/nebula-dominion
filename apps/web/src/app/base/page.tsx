@@ -36,6 +36,23 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
   more: '/settings',
 };
 
+const QUICK_ACTION_ROUTES: Record<string, string> = {
+  build:    '/base/build',
+  prod:     '/base/production',
+  spawn:    '/base/production',
+  compile:  '/base/production',
+  hunt:     '/base/production',
+  summon:   '/base/production',
+  merge:    '/merge',
+  mutate:   '/merge',
+  eat:      '/merge',
+  seal:     '/merge',
+  assemble: '/base/build',
+  dig:      '/base/build',
+  pact:     '/base/build',
+  roster:   '/inventory',
+};
+
 export default function BaseHomePage() {
   const race = useNDRace();
   const router = useRouter();
@@ -102,8 +119,14 @@ export default function BaseHomePage() {
           </Panel>
 
           {/* quick actions mid-right */}
-          <div style={{ position: 'absolute', right: 10, top: '36%' }}>
-            <RaceQuickActions race={race} />
+          <div style={{ position: 'absolute', right: 10, top: '32%' }}>
+            <RaceQuickActions
+              race={race}
+              onAction={(key) => {
+                const route = QUICK_ACTION_ROUTES[key];
+                if (route) router.push(route);
+              }}
+            />
           </div>
 
           {/* selected building card bottom */}

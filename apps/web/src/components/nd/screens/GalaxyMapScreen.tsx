@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ND,
@@ -30,6 +30,22 @@ const NODE_KIND_LABEL: Record<GalaxyNode['kind'], string> = {
   mine: 'KAYNAK',
   relay: 'RÖLE',
 };
+
+type FilterKey = 'all' | 'ally' | 'enemy' | 'neutral';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'TÜM' },
+  { key: 'ally', label: 'DOST' },
+  { key: 'enemy', label: 'DÜŞMAN' },
+  { key: 'neutral', label: 'NÖTR' },
+];
+
+function matchesFilter(owner: NodeOwner, filter: FilterKey): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'ally') return owner === 'player';
+  if (filter === 'enemy') return owner === 'enemy' || owner === 'contested';
+  return owner === 'neutral';
+}
 
 function ownerColor(owner: NodeOwner, race: NDRace, enemy: NDRace): string {
   if (owner === 'player') return race.primary;
@@ -94,6 +110,10 @@ interface Props {
   race?: NDRaceKey;
 }
 
+const ZOOM_MIN = 0.75;
+const ZOOM_MAX = 2.25;
+const ZOOM_STEP = 0.25;
+
 export function GalaxyMapScreen({ race: forcedRace }: Props) {
   const detectedRace = useNDRace();
   const race = forcedRace ? RACES[forcedRace] : detectedRace;
@@ -101,6 +121,8 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
 
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string>('co2');
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [zoom, setZoom] = useState<number>(1);
 
   const selected = GALAXY_NODES.find((n) => n.id === selectedId) ?? null;
   const selectionInfo: SelectionInfo | null = selected
@@ -111,9 +133,17 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
       }
     : null;
 
+  const visibleIds = useMemo(
+    () => new Set(GALAXY_NODES.filter((n) => matchesFilter(n.owner, filter)).map((n) => n.id)),
+    [filter],
+  );
+
   const handleAttack = (node: GalaxyNode) => {
     router.push(`/target/${node.id}?race=${race.key}`);
   };
+
+  const setZoomClamped = (next: number) =>
+    setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(next.toFixed(2)))));
 
   return (
     <div
@@ -128,6 +158,7 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
       }}
     >
       <BackgroundNebula race={race} />
+      <ScanBeamKeyframes />
 
       {/* Top HUD */}
       <header
@@ -194,10 +225,19 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
           }}
         >
           <GridBackdrop race={race} />
+          <GalaxyScanBeam race={race} />
           <svg
             viewBox="0 0 100 75"
             preserveAspectRatio="none"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              transform: `scale(${zoom})`,
+              transformOrigin: '50% 50%',
+              transition: 'transform 240ms ease-out',
+            }}
             role="img"
             aria-label="Galaktik harita: yıldız sistemi düğüm grafı"
           >
@@ -215,7 +255,9 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
                 : isEnemyLink
                   ? enemy.primary
                   : ND.borderHi;
-              const opacity = isPlayerLink || isEnemyLink ? 0.55 : 0.32;
+              const linked = visibleIds.has(a.id) && visibleIds.has(b.id);
+              const baseOpacity = isPlayerLink || isEnemyLink ? 0.55 : 0.32;
+              const opacity = linked ? baseOpacity : baseOpacity * 0.18;
               return (
                 <line
                   key={i}
@@ -235,12 +277,19 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
               const c = ownerColor(n.owner, race, enemy);
               const g = ownerGlow(n.owner, race, enemy);
               const isSelected = n.id === selectedId;
+              const visible = visibleIds.has(n.id);
               return (
                 <g
                   key={n.id}
                   transform={`translate(${n.x}, ${n.y * 0.75}) scale(0.18)`}
-                  style={{ cursor: 'pointer', filter: `drop-shadow(0 0 1.5px ${g})` }}
-                  onClick={() => setSelectedId(n.id)}
+                  style={{
+                    cursor: visible ? 'pointer' : 'default',
+                    filter: `drop-shadow(0 0 1.5px ${g})`,
+                    opacity: visible ? 1 : 0.18,
+                    pointerEvents: visible ? 'auto' : 'none',
+                    transition: 'opacity 200ms ease-out',
+                  }}
+                  onClick={() => visible && setSelectedId(n.id)}
                 >
                   {isSelected && (
                     <circle r={16} fill="none" stroke={c} strokeWidth={1.5} opacity={0.85} />
@@ -260,6 +309,26 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
               );
             })}
           </svg>
+
+          {/* Filter tabs — top-left overlay */}
+          <FilterTabs race={race} active={filter} onChange={setFilter} />
+
+          {/* Zoom controls — right overlay */}
+          <ZoomControls
+            race={race}
+            zoom={zoom}
+            onIn={() => setZoomClamped(zoom + ZOOM_STEP)}
+            onOut={() => setZoomClamped(zoom - ZOOM_STEP)}
+            onReset={() => setZoomClamped(1)}
+          />
+
+          {/* Compass widget — bottom-left overlay */}
+          <CompassWidget
+            race={race}
+            x={selected?.x ?? 50}
+            y={selected?.y ?? 50}
+            z={selected ? selected.level : 0}
+          />
         </div>
 
         {/* Legend */}
@@ -287,6 +356,386 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
         )}
       </main>
     </div>
+  );
+}
+
+/* ── Filter tabs (top-left) ──────────────────────────────────────────── */
+
+function FilterTabs({
+  race,
+  active,
+  onChange,
+}: {
+  race: NDRace;
+  active: FilterKey;
+  onChange: (k: FilterKey) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Düğüm filtresi"
+      style={{
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        display: 'flex',
+        gap: 4,
+        padding: 4,
+        background: 'rgba(6,8,15,0.78)',
+        border: `1px solid ${race.primary}55`,
+        borderRadius: 4,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        boxShadow: `0 0 14px -6px ${race.glow}`,
+        zIndex: 6,
+      }}
+    >
+      {FILTERS.map((f) => {
+        const on = f.key === active;
+        return (
+          <button
+            key={f.key}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(f.key)}
+            style={{
+              all: 'unset',
+              padding: '5px 10px',
+              fontFamily: ND.display,
+              fontSize: 10,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: on ? '#0A0E1A' : ND.textDim,
+              background: on
+                ? race.primary
+                : 'transparent',
+              border: `1px solid ${on ? race.primary : 'transparent'}`,
+              borderRadius: 2,
+              cursor: 'pointer',
+              transition: 'all 150ms ease-out',
+            }}
+          >
+            {f.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Zoom controls (right) ───────────────────────────────────────────── */
+
+function ZoomControls({
+  race,
+  zoom,
+  onIn,
+  onOut,
+  onReset,
+}: {
+  race: NDRace;
+  zoom: number;
+  onIn: () => void;
+  onOut: () => void;
+  onReset: () => void;
+}) {
+  const c = race.primary;
+  const btn: CSSProperties = {
+    all: 'unset',
+    width: 36,
+    height: 36,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(6,8,15,0.78)',
+    border: `1px solid ${c}55`,
+    color: c,
+    fontFamily: ND.display,
+    fontSize: 18,
+    cursor: 'pointer',
+    boxShadow: `0 0 10px -6px ${race.glow}`,
+    transition: 'all 150ms ease-out',
+  };
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        right: 10,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        zIndex: 6,
+      }}
+    >
+      <button type="button" aria-label="Yakınlaştır" onClick={onIn} disabled={zoom >= ZOOM_MAX} style={{ ...btn, opacity: zoom >= ZOOM_MAX ? 0.4 : 1 }}>+</button>
+      <button type="button" aria-label="Sıfırla" onClick={onReset} style={{ ...btn, fontSize: 14 }}>◎</button>
+      <button type="button" aria-label="Uzaklaştır" onClick={onOut} disabled={zoom <= ZOOM_MIN} style={{ ...btn, opacity: zoom <= ZOOM_MIN ? 0.4 : 1 }}>−</button>
+      <div
+        aria-live="polite"
+        style={{
+          fontFamily: ND.mono,
+          fontSize: 9,
+          color: c,
+          letterSpacing: '0.10em',
+          textAlign: 'center',
+          padding: '2px 0',
+          background: 'rgba(6,8,15,0.78)',
+          border: `1px solid ${c}33`,
+        }}
+      >
+        ×{zoom.toFixed(2)}
+      </div>
+    </div>
+  );
+}
+
+/* ── Compass widget (bottom-left) ────────────────────────────────────── */
+
+function CompassWidget({
+  race,
+  x,
+  y,
+  z,
+}: {
+  race: NDRace;
+  x: number;
+  y: number;
+  z: number;
+}) {
+  const c = race.primary;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 10,
+        bottom: 10,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px 10px 6px 6px',
+        background: 'rgba(6,8,15,0.78)',
+        border: `1px solid ${c}55`,
+        borderRadius: 4,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        boxShadow: `0 0 14px -6px ${race.glow}`,
+        zIndex: 6,
+      }}
+      role="status"
+      aria-label="Pusula ve koordinat"
+    >
+      <svg width={36} height={36} viewBox="-20 -20 40 40" aria-hidden>
+        <circle r={18} fill="none" stroke={`${c}55`} strokeWidth={1} />
+        <circle r={14} fill="none" stroke={`${c}33`} strokeWidth={0.6} strokeDasharray="2 2" />
+        <line x1={0} y1={-18} x2={0} y2={18} stroke={`${c}33`} strokeWidth={0.5} />
+        <line x1={-18} y1={0} x2={18} y2={0} stroke={`${c}33`} strokeWidth={0.5} />
+        <polygon points="0,-14 4,2 0,-2 -4,2" fill={c} />
+        <polygon points="0,14 4,-2 0,2 -4,-2" fill={`${c}55`} />
+        <text x={0} y={-7} textAnchor="middle" fontSize={6} fill={c} fontFamily={ND.mono} style={{ letterSpacing: '0.15em' }}>K</text>
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: ND.mono, fontSize: 10, letterSpacing: '0.10em' }}>
+        <CoordRow label="X" value={x.toFixed(0).padStart(3, '0')} color={c} />
+        <CoordRow label="Y" value={y.toFixed(0).padStart(3, '0')} color={c} />
+        <CoordRow label="Z" value={z.toFixed(0).padStart(3, '0')} color={c} />
+      </div>
+    </div>
+  );
+}
+
+function CoordRow({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+      <span style={{ color: ND.textMute, width: 10 }}>{label}</span>
+      <span style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
+/* ── Race-specific scan beam ─────────────────────────────────────────── */
+
+function GalaxyScanBeam({ race }: { race: NDRace }) {
+  const c = race.primary;
+  const g = race.glow;
+  const common: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    mixBlendMode: 'screen',
+    zIndex: 2,
+  };
+
+  if (race.key === 'insan') {
+    // horizontal scanline sweeps top → bottom
+    return (
+      <div
+        aria-hidden
+        style={{
+          ...common,
+          background: `linear-gradient(180deg,
+            transparent 0%,
+            ${c}1f 46%,
+            ${c}66 50%,
+            ${c}1f 54%,
+            transparent 100%)`,
+          backgroundSize: '100% 28%',
+          backgroundRepeat: 'no-repeat',
+          animation: 'nd-scan-insan 5.2s linear infinite',
+        }}
+      />
+    );
+  }
+
+  if (race.key === 'zerg') {
+    // drifting spore particles
+    const spores = Array.from({ length: 24 }, (_, i) => i);
+    return (
+      <div aria-hidden style={common}>
+        {spores.map((i) => {
+          const left = (i * 41) % 100;
+          const delay = (i * 0.31) % 6;
+          const dur = 5.5 + ((i * 13) % 35) / 10;
+          const size = 1.6 + ((i * 7) % 26) / 10;
+          return (
+            <span
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `${left}%`,
+                bottom: '-6%',
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                background: c,
+                boxShadow: `0 0 6px ${g}`,
+                opacity: 0.55,
+                animation: `nd-scan-zerg ${dur}s linear ${delay}s infinite`,
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (race.key === 'otomat') {
+    // rotating radar sweep
+    return (
+      <div aria-hidden style={common}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: '-20%',
+            background: `conic-gradient(from 0deg,
+              ${c}55 0deg,
+              ${c}11 30deg,
+              transparent 90deg,
+              transparent 360deg)`,
+            transformOrigin: '50% 50%',
+            animation: 'nd-scan-otomat 4.5s linear infinite',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `radial-gradient(circle at 50% 50%, transparent 0, transparent 28%, ${c}22 28.5%, transparent 29%),
+                         radial-gradient(circle at 50% 50%, transparent 0, transparent 56%, ${c}22 56.5%, transparent 57%)`,
+            opacity: 0.6,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (race.key === 'canavar') {
+    // expanding pulse waves
+    return (
+      <div aria-hidden style={common}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: 60,
+              height: 60,
+              marginLeft: -30,
+              marginTop: -30,
+              border: `1.5px solid ${c}`,
+              borderRadius: '50%',
+              boxShadow: `0 0 18px ${g}`,
+              opacity: 0,
+              transformOrigin: '50% 50%',
+              animation: `nd-scan-canavar 3.6s ease-out ${i * 1.2}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // seytan — vertical ripple/wave scan, dual direction
+  return (
+    <div aria-hidden style={common}>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `repeating-linear-gradient(90deg,
+            transparent 0,
+            transparent 18px,
+            ${c}26 19px,
+            transparent 20px)`,
+          maskImage:
+            'linear-gradient(90deg, transparent 0%, #000 30%, #000 70%, transparent 100%)',
+          WebkitMaskImage:
+            'linear-gradient(90deg, transparent 0%, #000 30%, #000 70%, transparent 100%)',
+          animation: 'nd-scan-seytan 6s ease-in-out infinite',
+        }}
+      />
+    </div>
+  );
+}
+
+function ScanBeamKeyframes() {
+  return (
+    <style>{`
+      @keyframes nd-scan-insan {
+        0%   { background-position: 0 -30%; opacity: 0; }
+        10%  { opacity: 1; }
+        90%  { opacity: 1; }
+        100% { background-position: 0 130%; opacity: 0; }
+      }
+      @keyframes nd-scan-zerg {
+        0%   { transform: translateY(0) translateX(0); opacity: 0; }
+        10%  { opacity: 0.7; }
+        90%  { opacity: 0.7; }
+        100% { transform: translateY(-130%) translateX(8px); opacity: 0; }
+      }
+      @keyframes nd-scan-otomat {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes nd-scan-canavar {
+        0%   { transform: scale(0.4); opacity: 0.9; }
+        80%  { opacity: 0.15; }
+        100% { transform: scale(7); opacity: 0; }
+      }
+      @keyframes nd-scan-seytan {
+        0%   { transform: translateX(-12%); opacity: 0.5; }
+        50%  { transform: translateX(12%);  opacity: 0.9; }
+        100% { transform: translateX(-12%); opacity: 0.5; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-race] > div[aria-hidden] *,
+        [data-race] > div[aria-hidden] {
+          animation: none !important;
+        }
+      }
+    `}</style>
   );
 }
 

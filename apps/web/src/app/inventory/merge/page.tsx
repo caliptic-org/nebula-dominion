@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  Bar,
   BottomNav,
   Caption,
   Chip,
@@ -55,6 +56,18 @@ const MERGE_HINT: Record<NDRaceKey, string> = {
 const SLOT_COUNT = 3;
 const COST_B = 200;
 
+const BASE_SUCCESS: Record<number, number> = {
+  2: 92,
+  3: 78,
+  4: 55,
+};
+
+function riskTheme(rate: number) {
+  if (rate >= 80) return { color: ND.ok, label: 'GÜVENLİ' };
+  if (rate >= 60) return { color: ND.warn, label: 'RİSKLİ' };
+  return { color: ND.danger, label: 'KRİTİK' };
+}
+
 export default function MergePage() {
   const race = useNDRace();
   const [selected, setSelected] = useState<number[]>([]);
@@ -64,6 +77,10 @@ export default function MergePage() {
   const canMerge = selected.length === SLOT_COUNT;
   const promotedTier = Math.min(5, sourceTier + 1);
   const promotedName = race.units.find((u) => u.t === promotedTier)?.n ?? race.units[race.units.length - 1].n;
+  const successRate = BASE_SUCCESS[sourceTier] ?? 60;
+  const slotProgress = selected.length / SLOT_COUNT;
+  const projectedRate = Math.round(successRate * slotProgress);
+  const risk = riskTheme(successRate);
 
   function toggle(idx: number) {
     setSelected((prev) => {
@@ -172,6 +189,74 @@ export default function MergePage() {
                 →
               </div>
               <ResultSlot race={race} tier={promotedTier} ready={canMerge} name={promotedName} />
+            </div>
+          </Panel>
+        </div>
+
+        {/* Success rate */}
+        <div style={{ padding: '10px 14px 0' }}>
+          <Panel race={race} style={{ padding: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: 8,
+                gap: 12,
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Eyebrow color={race.primary}>BAŞARI ORANI</Eyebrow>
+                <Code>
+                  T{sourceTier} → T{promotedTier} · {promotedName.toUpperCase()}
+                </Code>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span
+                  aria-label={`Başarı oranı yüzde ${projectedRate}`}
+                  style={{
+                    fontFamily: ND.display,
+                    fontSize: 26,
+                    fontWeight: 700,
+                    color: canMerge ? risk.color : ND.textDim,
+                    letterSpacing: '0.04em',
+                    textShadow: canMerge ? `0 0 12px ${risk.color}66` : undefined,
+                    lineHeight: 1,
+                  }}
+                >
+                  %{projectedRate}
+                </span>
+                <span
+                  style={{
+                    fontFamily: ND.mono,
+                    fontSize: 9,
+                    color: canMerge ? risk.color : ND.textMute,
+                    letterSpacing: '0.12em',
+                  }}
+                >
+                  {canMerge ? risk.label : `${selected.length}/${SLOT_COUNT} SLOT`}
+                </span>
+              </div>
+            </div>
+            <Bar
+              value={projectedRate}
+              max={100}
+              color={canMerge ? risk.color : race.primaryDim}
+              height={8}
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: 6,
+                fontFamily: ND.mono,
+                fontSize: 9,
+                color: ND.textMute,
+                letterSpacing: '0.08em',
+              }}
+            >
+              <span>TABAN %{successRate}</span>
+              <span>%{projectedRate} / %{successRate}</span>
             </div>
           </Panel>
         </div>

@@ -32,16 +32,35 @@
 
 /* ── Resource bar ──────────────────────────────────────────────────────── */
 .base-resource-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 18px;
   padding: 0 16px;
-  background: var(--race-bg-surface, rgba(7,14,26,0.92));
-  border-bottom: 1px solid var(--race-border, rgba(74,158,255,0.25));
-  backdrop-filter: blur(8px);
+  background: rgba(6, 8, 15, 0.92);
+  border-bottom: 1px solid var(--race-border, rgba(74,158,255,0.30));
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  z-index: 20;
+}
+.base-resource-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--race-glow-rgb, 74,158,255), 0.55) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .base-resource-item {
+  position: relative;
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -50,6 +69,25 @@
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--race-border, rgba(74,158,255,0.18));
   min-width: 110px;
+  overflow: hidden;
+}
+/* CD-spec accent gradient — race primary → secondary, lives as a thin hairline
+ * at the bottom of each resource pill so the HUD reads as "energised" without
+ * fighting the numeric values for legibility. */
+.base-resource-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--race-primary, #4a9eff) 0%,
+    var(--race-secondary, #00d4ff) 100%
+  );
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .base-resource-icon {
@@ -151,6 +189,7 @@
 }
 
 .base-building-row {
+  position: relative;
   display: grid;
   grid-template-columns: 48px 1fr auto;
   gap: 10px;
@@ -158,23 +197,49 @@
   padding: 8px;
   border-radius: 6px;
   cursor: pointer;
-  border: 1px solid transparent;
-  background: transparent;
+  /* Double-bezel: outer shell (this border, faint, always on) + inner card
+   * (::before, race-tinted on hover/select). Matches CD spec for the main
+   * grid cards. */
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(8, 12, 22, 0.55);
   color: inherit;
   text-align: left;
   font: inherit;
-  transition: background 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
-              border-color 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition:
+    background 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.base-building-row::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  pointer-events: none;
+  transition: border-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+              box-shadow 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 .base-building-row:hover {
-  background: var(--race-bg-elevated, rgba(255,255,255,0.04));
-  border-color: var(--race-border, rgba(74,158,255,0.18));
+  background: rgba(8, 12, 22, 0.78);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(1px);
+}
+.base-building-row:hover::before {
+  border-color: var(--race-border, rgba(74,158,255,0.28));
 }
 .base-building-row.is-selected {
-  background: var(--race-bg-elevated, rgba(255,255,255,0.05));
+  background: rgba(8, 12, 22, 0.88);
+  border-color: rgba(255, 255, 255, 0.10);
+  /* CD-spec active-card neon glow. */
+  box-shadow:
+    0 0 32px -8px rgba(var(--race-glow-rgb, 74,158,255), 0.60),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.base-building-row.is-selected::before {
   border-color: var(--race-primary, #4a9eff);
-  box-shadow: 0 0 0 1px rgba(var(--race-glow-rgb, 74,158,255), 0.25),
-              0 0 18px rgba(var(--race-glow-rgb, 74,158,255), 0.15);
+  box-shadow: 0 0 0 1px rgba(var(--race-glow-rgb, 74,158,255), 0.18);
 }
 .base-building-row:focus-visible {
   outline: 2px solid var(--race-primary, #4a9eff);
@@ -295,6 +360,17 @@
   isolation: isolate;
 }
 
+/* ── Backdrop layering (bottom → top) ─────────────────────────────────────
+ * The center map area stacks ambient layers behind the iso grid:
+ *
+ *   z:0  .base-ground-layer       — race-tinted gradient floor (always on)
+ *   z:0  .base-capital-backdrop   — CAL-486 cinematic artwork (only when slot is set)
+ *   z:0  .base-ambient-glow       — pulsing race-glow ellipse (CD-spec 20% 80%)
+ *   z:0  .base-sigil-watermark    — faint corner mark in race accent colour
+ *   z:1  .base-iso-grid           — buildings + grid overlay
+ *
+ * Ambient layers share z-index and stack by DOM order. */
+
 .base-ground-layer {
   position: absolute;
   inset: 0;
@@ -302,11 +378,9 @@
   pointer-events: none;
 }
 
-/* Race-tinted CSS-only ground textures.
- * These are the fallback while the CAL-349 ground asset batch
- * (/assets/ground/<race>-base.webp) is still in production. Once those
- * webps land, the BaseScreen will swap to background-image url() and these
- * gradients become the offline fallback automatically. */
+/* Race-tinted gradient floor. Acts as the default backdrop for races whose
+ * CAL-486 artwork slot is still null (otomat / canavar / şeytan), and as a
+ * race-coloured underlay for the races that do have artwork. */
 [data-race='insan'] .base-ground-layer,
 [data-race='human'] .base-ground-layer {
   background:
@@ -351,6 +425,75 @@
     linear-gradient(180deg, #0a000d 0%, #06000a 100%);
 }
 
+/* Full-bleed cinematic artwork (CAL-512..516). Rendered by IsoMap when the
+ * race's slot in CAPITAL_BACKDROPS is non-null. The inset shadow + after
+ * pseudo overlay apply a readability vignette so iso sprites and HUD chrome
+ * remain legible on top of the artwork. */
+.base-capital-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 0 220px 40px rgba(4, 6, 12, 0.72),
+    inset 0 -120px 160px -40px rgba(4, 6, 12, 0.85);
+}
+.base-capital-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 35%, transparent 0%, rgba(4,6,12,0.18) 60%, rgba(4,6,12,0.55) 100%);
+}
+
+/* Ambient race-glow that pulses behind the iso grid even without artwork.
+ * Hooks into --race-glow-rgb so each race inherits its own accent colour. */
+.base-ambient-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 80%,
+      rgba(var(--race-glow-rgb, 74,158,255), 0.10) 0%,
+      transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 25%,
+      rgba(var(--race-glow-rgb, 74,158,255), 0.06) 0%,
+      transparent 60%);
+  animation: base-ambient-pulse 6s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes base-ambient-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
+/* Faint race sigil watermark in the bottom-right corner. Kept generic — race
+ * theme already controls colour via --race-primary. */
+.base-sigil-watermark {
+  position: absolute;
+  right: 18px;
+  bottom: 10px;
+  z-index: 0;
+  width: 96px;
+  height: 96px;
+  opacity: 0.08;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(var(--race-glow-rgb, 74,158,255), 0.9) 0%,
+    transparent 70%
+  );
+  filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .base-ambient-glow { animation: none; }
+}
+
 .base-iso-grid {
   position: absolute;
   inset: 0;
@@ -384,8 +527,9 @@
   border: 0;
   padding: 0;
   filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55));
-  transition: filter 160ms cubic-bezier(0.22, 0.61, 0.36, 1),
-              transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* CD-spec hover curve — cubic-bezier(0.32, 0.72, 0, 1) over 200ms. */
+  transition: filter 200ms cubic-bezier(0.32, 0.72, 0, 1),
+              transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 .base-building-sprite:focus-visible {
   outline: 2px solid var(--race-primary, #4a9eff);
@@ -395,13 +539,15 @@
 .base-building-sprite:hover {
   filter: brightness(1.25)
           drop-shadow(0 6px 18px rgba(0,0,0,0.55))
-          drop-shadow(0 0 14px rgba(var(--race-glow-rgb, 74,158,255), 0.55));
-  transform: translate(-50%, calc(-50% - 2px));
+          drop-shadow(0 0 18px rgba(var(--race-glow-rgb, 74,158,255), 0.70));
+  /* scale(1.04) per CD spec; lift compensates so the bottom of the sprite
+   * stays anchored to its iso tile. */
+  transform: translate(-50%, calc(-50% - 3px)) scale(1.04);
   z-index: 5;
 }
 .base-building-sprite.is-selected {
   filter: brightness(1.18)
-          drop-shadow(0 0 18px rgba(var(--race-glow-rgb, 74,158,255), 0.7));
+          drop-shadow(0 0 24px rgba(var(--race-glow-rgb, 74,158,255), 0.80));
   z-index: 6;
 }
 .base-building-sprite img {
@@ -750,14 +896,36 @@
 
 /* ── Command card ─────────────────────────────────────────────────────── */
 .base-command-card {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(180px, 220px) 1fr minmax(160px, 220px);
   gap: 18px;
   align-items: center;
   padding: 12px 18px;
-  background: var(--race-bg-surface, rgba(7,14,26,0.92));
-  border-top: 1px solid var(--race-border, rgba(74,158,255,0.25));
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+  /* CD-spec glass effect for the bottom quick-action / command bar:
+   * blur(16px) + rgba(6,8,15,0.88) with a hairline race-tinted top border. */
+  background: rgba(6, 8, 15, 0.88);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  border-top: 1px solid var(--race-border, rgba(74,158,255,0.30));
+  box-shadow:
+    0 -4px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.base-command-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--race-glow-rgb, 74,158,255), 0.55) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 .base-command-portrait {
   display: grid;
@@ -1061,6 +1229,7 @@
   .base-queue-progress,
   .base-queue-item-fill,
   .base-resource-value.is-bumped { transition: none; animation: none; }
-  .base-production-ring { animation: none; }
-  .base-rally-marker   { animation: none; }
+  .base-production-ring  { animation: none; }
+  .base-rally-marker     { animation: none; }
+  .base-sigil-watermark  { animation: none; }
 }

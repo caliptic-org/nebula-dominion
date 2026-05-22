@@ -12,6 +12,7 @@ import { useRaceCommitment } from '@/components/race-selection/useRaceCommitment
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { STRUCTURE_ASSETS } from '@/lib/assets';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { GameMenuDrawer } from '@/components/layout/GameMenuDrawer';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { LevelUpModal } from '@/components/progression/LevelUpModal';
 import { UnlockNotification } from '@/components/progression/UnlockNotification';
@@ -64,6 +65,7 @@ export default function HomePage() {
   const [selectedTile, setSelectedTile] = useState<{ col: number; row: number } | null>(null);
   const [avatarImgError, setAvatarImgError] = useState(false);
   const [portraitImgError, setPortraitImgError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const { userId, loading: sessionLoading } = useSession();
   const { committed: committedRace } = useRaceCommitment();
@@ -79,6 +81,15 @@ export default function HomePage() {
   const { progress, loading } = useProgression({
     userId: userId ?? '',
     onLevelUp: (payload) => {
+      const prevAge = Math.min(6, Math.ceil(payload.previousLevel / 9));
+      const nextAge = Math.min(6, Math.ceil(payload.newLevel / 9));
+      if (nextAge > prevAge && nextAge >= 2) {
+        const qs = new URLSearchParams({ toAge: String(nextAge) });
+        if (payload.newUnlocks.length) qs.set('unlocks', payload.newUnlocks.join(','));
+        qs.set('race', RACE_DESCRIPTIONS[race].dataRace);
+        router.push(`/tier-up?${qs.toString()}`);
+        return;
+      }
       setPendingLevelUp(payload);
       if (payload.newUnlocks.length) setPendingUnlocks(payload.newUnlocks);
     },
@@ -105,6 +116,7 @@ export default function HomePage() {
 
   return (
     <>
+      <GameMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
       <UnlockNotification newUnlocks={pendingUnlocks} />
       {pendingLevelUp && (
         <LevelUpModal
@@ -181,16 +193,21 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Commander mini avatar */}
+            {/* Commander mini avatar — opens the secondary menu drawer */}
             <button
-              className="shrink-0 w-9 h-9 rounded-full border-2 overflow-hidden transition-all duration-300 hover:scale-110"
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="shrink-0 w-9 h-9 rounded-full border-2 overflow-hidden transition-all duration-300 hover:scale-110 relative"
               style={{ borderColor: raceColor, boxShadow: `0 0 10px ${raceGlow}` }}
-              title={primaryCommander.name}
+              title="Menü"
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              aria-label="Oyun menüsünü aç"
             >
               {!avatarImgError ? (
                 <Image
                   src={primaryCommander.portrait}
-                  alt={primaryCommander.name}
+                  alt=""
                   width={36}
                   height={36}
                   className="w-full h-full object-cover object-top"
@@ -204,6 +221,17 @@ export default function HomePage() {
                   {raceDesc.icon}
                 </div>
               )}
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold leading-none"
+                style={{
+                  background: 'var(--color-bg)',
+                  color: raceColor,
+                  border: `1px solid ${raceColor}`,
+                }}
+                aria-hidden
+              >
+                ☰
+              </span>
             </button>
           </div>
         </header>

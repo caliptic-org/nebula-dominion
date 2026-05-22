@@ -18,7 +18,7 @@ interface UseTierProgressResult {
   error: string | null;
   xpPercent: number;
   refresh: () => Promise<void>;
-  levelUp: () => Promise<void>;
+  levelUp: () => Promise<TierProgressView>;
 }
 
 /**
@@ -71,6 +71,7 @@ export function useTierProgress(): UseTierProgressResult {
     setProgress(next);
     const reqs = await tierApi.getRequirements().catch(() => null);
     setRequirements(reqs);
+    return next;
   }, []);
 
   return {

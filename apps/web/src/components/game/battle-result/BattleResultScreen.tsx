@@ -16,6 +16,15 @@ export interface BattleReward {
   rarity: RewardRarity;
 }
 
+export interface BattleMVP {
+  name: string;
+  className: string;
+  icon: string;
+  kills: number;
+  damageDealt: number;
+  contributionPct: number;
+}
+
 export interface BattleResultData {
   outcome: BattleOutcome;
   stats: {
@@ -40,6 +49,7 @@ export interface BattleResultData {
     levelUp: boolean;
     newLevel?: number;
   };
+  mvp?: BattleMVP;
   rewards: BattleReward[];
   opponentName?: string;
 }
@@ -69,7 +79,7 @@ const PARTICLES = Array.from({ length: 16 }, (_, i) => ({
 
 export function BattleResultScreen({ data }: { data: BattleResultData }) {
   const { raceColor, meta } = useRaceTheme();
-  const { outcome, stats, resources, xp, rewards } = data;
+  const { outcome, stats, resources, xp, mvp, rewards } = data;
   const isVictory = outcome === 'victory';
 
   /* XP bar fill (animated after mount) */
@@ -214,6 +224,43 @@ export function BattleResultScreen({ data }: { data: BattleResultData }) {
             </div>
           </div>
         </div>
+
+        {/* ── MVP Unit ── */}
+        {mvp && (
+          <div className="br-panel-shell" style={{ '--stagger-delay': '320ms' } as React.CSSProperties}>
+            <div className="br-panel br-mvp-panel">
+              <div className="br-panel-title">
+                {isVictory ? 'MVP Birim' : 'En İyi Performans'}
+              </div>
+              <div className="br-mvp">
+                <div className="br-mvp-portrait" aria-hidden>
+                  <span className="br-mvp-icon">{mvp.icon}</span>
+                  <span className="br-mvp-badge">★</span>
+                </div>
+                <div className="br-mvp-info">
+                  <div className="br-mvp-name">{mvp.name}</div>
+                  <div className="br-mvp-class">{mvp.className}</div>
+                  <div className="br-mvp-stats">
+                    <span className="br-mvp-stat">
+                      <span className="br-mvp-stat-val">{mvp.kills}</span>
+                      <span className="br-mvp-stat-label">öldürme</span>
+                    </span>
+                    <span className="br-mvp-stat-sep" aria-hidden>·</span>
+                    <span className="br-mvp-stat">
+                      <span className="br-mvp-stat-val">{formatNumber(mvp.damageDealt)}</span>
+                      <span className="br-mvp-stat-label">hasar</span>
+                    </span>
+                    <span className="br-mvp-stat-sep" aria-hidden>·</span>
+                    <span className="br-mvp-stat">
+                      <span className="br-mvp-stat-val">%{mvp.contributionPct}</span>
+                      <span className="br-mvp-stat-label">katkı</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── XP Bar ── */}
         <div className="br-panel-shell" style={{ '--stagger-delay': '360ms' } as React.CSSProperties}>

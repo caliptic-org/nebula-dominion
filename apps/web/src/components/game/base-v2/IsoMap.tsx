@@ -3,17 +3,10 @@
 import Image from 'next/image';
 import clsx from 'clsx';
 import { Race } from '@/types/units';
-import { GROUND_TEXTURES } from './asset-manifest';
+import { CAPITAL_BACKDROPS, type GroundRaceKey } from './asset-manifest';
 import type { BaseBuilding, RaceBaseSnapshot } from './types';
 
-interface Props {
-  snapshot: RaceBaseSnapshot;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}
-
-/** Map a Race enum value to the matching ground-manifest key. */
-function groundKey(race: Race): keyof typeof GROUND_TEXTURES {
+function groundKey(race: Race): GroundRaceKey {
   switch (race) {
     case Race.INSAN:   return 'human';
     case Race.ZERG:    return 'zerg';
@@ -24,6 +17,12 @@ function groundKey(race: Race): keyof typeof GROUND_TEXTURES {
   }
 }
 
+interface Props {
+  snapshot: RaceBaseSnapshot;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}
+
 const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
   idle: 'Hazır',
   producing: 'Üretim sürüyor',
@@ -32,17 +31,25 @@ const STATUS_LABEL: Record<BaseBuilding['status'], string> = {
 };
 
 export function IsoMap({ snapshot, selectedId, onSelect }: Props) {
+  const backdrop = CAPITAL_BACKDROPS[groundKey(snapshot.race)];
   return (
     <main className="base-center" role="region" aria-label="İzometrik üs haritası">
-      <div
-        className="base-ground-layer"
-        aria-hidden
-        style={{
-          backgroundImage: `url(${GROUND_TEXTURES[groundKey(snapshot.race)]})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+      {/* Backdrop stack (bottom → top, DOM order = paint order):
+       *   1. .base-ground-layer       race-tinted gradient floor (always on; CSS-driven)
+       *   2. .base-capital-backdrop   CAL-486 cinematic artwork (when slot non-null)
+       *   3. .base-ambient-glow       CD-spec pulsing race-glow ellipse
+       *   4. .base-sigil-watermark    faint race sigil in bottom-right
+       * Iso grid + sprites paint above on z-index 1. */}
+      <div className="base-ground-layer" aria-hidden />
+      {backdrop && (
+        <div
+          className="base-capital-backdrop"
+          aria-hidden
+          style={{ backgroundImage: `url(${backdrop})` }}
+        />
+      )}
+      <div className="base-ambient-glow" aria-hidden />
+      <div className="base-sigil-watermark" aria-hidden />
       <div className="base-iso-grid">
         <div className="base-grid-overlay" aria-hidden />
         {snapshot.buildings.map((b) => {

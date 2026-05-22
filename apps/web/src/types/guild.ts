@@ -57,6 +57,34 @@ export interface GuildMember {
   avatarColor?: string;
 }
 
+export type AllianceWarStatus = 'preparing' | 'active' | 'won' | 'lost';
+
+export interface AllianceWar {
+  id: string;
+  opponentName: string;
+  opponentTag: string;
+  opponentRace: Race;
+  ourScore: number;
+  theirScore: number;
+  endsAt: string;
+  status: AllianceWarStatus;
+  participantCount: number;
+  totalSlots: number;
+}
+
+export interface SharedObjective {
+  id: string;
+  title: string;
+  description: string;
+  currentValue: number;
+  targetValue: number;
+  unit: string;
+  rewardLabel: string;
+  contributorCount: number;
+  expiresAt: string;
+  icon: string;
+}
+
 export interface GuildProfile extends GuildSummary {
   leaderId: string;
   ageUnlockedAt: number;
@@ -67,6 +95,8 @@ export interface GuildProfile extends GuildSummary {
   researchProgressPct: number;
   controlledSectors?: number;
   totalSectors?: number;
+  wars?: AllianceWar[];
+  objectives?: SharedObjective[];
 }
 
 export interface TutorialState {

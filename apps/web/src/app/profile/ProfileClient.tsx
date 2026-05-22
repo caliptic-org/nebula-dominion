@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import './profile.css';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { GlassPanel } from '@/components/ui/GlassPanel';
+import { MangaPanel } from '@/components/ui/MangaPanel';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { BottomNav } from '@/components/ui/BottomNav';
 
@@ -11,6 +12,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 
 type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 type ProfileTab = 'stats' | 'achievements' | 'history';
+type BattleMode = 'pvp' | 'pve' | 'siege';
+type BattleResult = 'win' | 'loss';
 
 interface Achievement {
   id: string;
@@ -20,37 +23,68 @@ interface Achievement {
   earned: boolean;
 }
 
-// ── Design tokens for achievement rarities ────────────────────────────────────
+interface BattleEntry {
+  id: string;
+  mode: BattleMode;
+  result: BattleResult;
+  opponentName: string;
+  opponentRace: keyof typeof RACE_META;
+  delta: number;
+  scoreLabel: string;
+  whenLabel: string;
+}
+
+// ── Race lookup (matches leaderboard) ─────────────────────────────────────────
+
+const RACE_META = {
+  'İnsan':   { icon: '⚔️', color: '#4a9eff' },
+  'Zerg':    { icon: '🦟', color: '#44ff44' },
+  'Otomat':  { icon: '⚙️', color: '#00cfff' },
+  'Canavar': { icon: '🐉', color: '#ff6600' },
+  'Şeytan':  { icon: '👁️', color: '#cc00ff' },
+} as const;
+
+// ── Achievement rarity palette ────────────────────────────────────────────────
 
 const RARITY_COLOR: Record<Rarity, string> = {
   common:    'rgba(160,168,192,0.85)',
-  uncommon:  'rgba(68,255,136,0.85)',
+  uncommon:  'rgba(68,255,136,0.90)',
   rare:      'rgba(74,158,255,0.90)',
-  epic:      'rgba(204,0,255,0.90)',
+  epic:      'rgba(204,0,255,0.92)',
   legendary: 'rgba(255,200,50,1)',
 };
 
 const RARITY_BG: Record<Rarity, string> = {
-  common:    'rgba(160,168,192,0.08)',
-  uncommon:  'rgba(68,255,136,0.10)',
-  rare:      'rgba(74,158,255,0.12)',
-  epic:      'rgba(204,0,255,0.14)',
-  legendary: 'rgba(255,200,50,0.18)',
+  common:    'rgba(160,168,192,0.06)',
+  uncommon:  'rgba(68,255,136,0.08)',
+  rare:      'rgba(74,158,255,0.10)',
+  epic:      'rgba(204,0,255,0.12)',
+  legendary: 'rgba(255,200,50,0.14)',
 };
 
-// ── Mock profile data ─────────────────────────────────────────────────────────
-// Replace with API call: getProfile(userId)
+// ── Mode label ────────────────────────────────────────────────────────────────
+
+const MODE_LABEL: Record<BattleMode, string> = {
+  pvp:   'PvP',
+  pve:   'PvE',
+  siege: 'Kuşatma',
+};
+
+// ── Mock profile data (replace with API: getProfile(userId)) ──────────────────
 
 const PROFILE = {
   username:    'nova_star',
   displayName: 'Nova★',
-  race:        'İnsan',
-  raceDataAttr: 'insan',
+  race:        'İnsan' as keyof typeof RACE_META,
   level:       47,
   title:       'Yıldız Komutanı',
   avatarUrl:   null as string | null,
   power:       142_800,
   globalRank:  1247,
+  pvpScore:    4_287,
+  pvpRank:     338,
+  bestStreak:  17,
+  guildContrib:18_420,
   wins:        384,
   losses:      97,
   battles:     481,
@@ -61,14 +95,28 @@ const PROFILE = {
   seasonPass:  68,
   achievements: [
     { id: 'a1', icon: '⚔️', label: 'İlk Zafer',      rarity: 'common'    as Rarity, earned: true  },
-    { id: 'a2', icon: '🏆', label: 'Şampiyon',        rarity: 'rare'      as Rarity, earned: true  },
-    { id: 'a3', icon: '💎', label: 'Elmas Sezon',     rarity: 'epic'      as Rarity, earned: true  },
-    { id: 'a4', icon: '🌌', label: 'Nebula Kaşifi',   rarity: 'epic'      as Rarity, earned: true  },
-    { id: 'a5', icon: '👑', label: 'Efsane',          rarity: 'legendary' as Rarity, earned: false },
-    { id: 'a6', icon: '🔥', label: 'Ateş Ustası',     rarity: 'rare'      as Rarity, earned: true  },
+    { id: 'a2', icon: '🏆', label: 'Şampiyon',       rarity: 'rare'      as Rarity, earned: true  },
+    { id: 'a3', icon: '💎', label: 'Elmas Sezon',    rarity: 'epic'      as Rarity, earned: true  },
+    { id: 'a4', icon: '🌌', label: 'Nebula Kaşifi',  rarity: 'epic'      as Rarity, earned: true  },
+    { id: 'a5', icon: '👑', label: 'Efsane',         rarity: 'legendary' as Rarity, earned: false },
+    { id: 'a6', icon: '🔥', label: 'Ateş Ustası',    rarity: 'rare'      as Rarity, earned: true  },
     { id: 'a7', icon: '⚡', label: 'Hız Tanrısı',    rarity: 'uncommon'  as Rarity, earned: true  },
-    { id: 'a8', icon: '🛡️', label: 'Kalkan Efendisi', rarity: 'uncommon'  as Rarity, earned: false },
+    { id: 'a8', icon: '🛡️', label: 'Kalkan Efendisi',rarity: 'uncommon'  as Rarity, earned: false },
+    { id: 'a9', icon: '🌠', label: 'Sezon Sonu',     rarity: 'epic'      as Rarity, earned: false },
+    { id: 'a10', icon: '🎯', label: 'Sniper',        rarity: 'rare'      as Rarity, earned: true  },
+    { id: 'a11', icon: '💠', label: 'Lonca Kahramanı',rarity: 'rare'    as Rarity, earned: true  },
+    { id: 'a12', icon: '🦾', label: 'Demir Zafer',   rarity: 'common'    as Rarity, earned: false },
   ] as Achievement[],
+  history: [
+    { id: 'h1', mode: 'pvp',   result: 'win',  opponentName: 'Khorvash',       opponentRace: 'Canavar', delta:  42, scoreLabel: '+42 PvP', whenLabel: '12 dk önce' },
+    { id: 'h2', mode: 'siege', result: 'win',  opponentName: 'Iron Grid',      opponentRace: 'Otomat',  delta: 188, scoreLabel: '+188 Güç', whenLabel: '1 sa önce'  },
+    { id: 'h3', mode: 'pvp',   result: 'loss', opponentName: 'Malphas',        opponentRace: 'Şeytan',  delta: -28, scoreLabel: '-28 PvP',  whenLabel: '3 sa önce'  },
+    { id: 'h4', mode: 'pve',   result: 'win',  opponentName: 'Yıldız Yıkıcı',  opponentRace: 'Canavar', delta: 320, scoreLabel: '+320 XP', whenLabel: '6 sa önce'  },
+    { id: 'h5', mode: 'pvp',   result: 'win',  opponentName: 'Vex Thara',      opponentRace: 'Zerg',    delta:  35, scoreLabel: '+35 PvP', whenLabel: 'Dün'        },
+    { id: 'h6', mode: 'siege', result: 'loss', opponentName: 'Void Council',   opponentRace: 'Şeytan',  delta: -94, scoreLabel: '-94 Güç', whenLabel: 'Dün'        },
+    { id: 'h7', mode: 'pvp',   result: 'win',  opponentName: 'Chen',           opponentRace: 'İnsan',   delta:  47, scoreLabel: '+47 PvP', whenLabel: '2 gün önce' },
+    { id: 'h8', mode: 'pve',   result: 'win',  opponentName: 'Asteroit Yuva',  opponentRace: 'Zerg',    delta: 145, scoreLabel: '+145 XP', whenLabel: '2 gün önce' },
+  ] as BattleEntry[],
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -84,522 +132,382 @@ export function ProfileClient() {
   const { raceColor, raceGlow, raceDim } = useRaceTheme();
   const [tab, setTab] = useState<ProfileTab>('stats');
 
-  const profile  = PROFILE;
-  const winRate  = Math.round((profile.wins  / profile.battles) * 100);
-  const xpPct    = Math.round((profile.xp    / profile.xpNext)  * 100);
-  const earnedCount = profile.achievements.filter((a) => a.earned).length;
+  const profile = PROFILE;
+  const winRate = Math.round((profile.wins / profile.battles) * 100);
+  const xpPct   = Math.round((profile.xp   / profile.xpNext)  * 100);
+
+  const { earnedCount, totalCount } = useMemo(() => ({
+    earnedCount: profile.achievements.filter((a) => a.earned).length,
+    totalCount:  profile.achievements.length,
+  }), [profile.achievements]);
+
+  // Drive race-glow CSS vars from the active race theme. CSS uses --race / --race-glow / --race-dim.
+  const pageStyle = {
+    '--race':      raceColor,
+    '--race-glow': raceGlow,
+    '--race-dim':  raceDim,
+  } as React.CSSProperties;
 
   return (
-    <div className="min-h-[100dvh] pb-24" style={{ background: 'var(--color-bg)' }}>
+    <div className="pf-page" style={pageStyle}>
+      {/* ── Speed-line background ── */}
+      <div className="pf-speed-bg" aria-hidden>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="pf-speed-line" style={{ '--line-i': i } as React.CSSProperties} />
+        ))}
+      </div>
 
-      {/* ── HERO SECTION ── */}
-      <section className="relative overflow-hidden" style={{ height: 260 }}>
-
-        {/* Race radial gradient sky */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `
-              radial-gradient(ellipse 160% 90% at 50% -10%,
-                ${raceGlow} 0%,
-                rgba(8,10,16,0.92) 65%
-              )
-            `,
-          }}
-        />
-
-        {/* Speed-line diagonal texture */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            opacity: 0.055,
-            backgroundImage: `repeating-linear-gradient(
-              -58deg,
-              transparent 0px,
-              transparent 6px,
-              ${raceColor} 6px,
-              ${raceColor} 7px
-            )`,
-          }}
-        />
-
-        {/* Back button */}
+      {/* ── Header ── */}
+      <header className="pf-header">
         <button
+          type="button"
+          className="pf-back-btn"
           onClick={() => router.back()}
-          className="absolute top-4 left-4 flex items-center gap-1.5 transition-opacity duration-200"
-          style={{
-            opacity: 0.65,
-            color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 14,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.65')}
           aria-label="Geri"
         >
-          <span style={{ fontSize: 18 }}>←</span>
-          <span className="hidden sm:inline">Geri</span>
+          <span aria-hidden>‹</span>
         </button>
-
-        {/* Settings shortcut (own profile) */}
+        <div className="pf-title-group">
+          <h1 className="pf-title">PROFİL</h1>
+          <p className="pf-subtitle">Komutan Dosyası</p>
+        </div>
         <button
+          type="button"
+          className="pf-settings-btn"
           onClick={() => router.push('/settings')}
-          className="absolute top-4 right-4 flex items-center justify-center rounded-full transition-all duration-200"
-          style={{
-            width: 36,
-            height: 36,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 16,
-          }}
           aria-label="Ayarlar"
         >
-          ⚙
+          <span aria-hidden>⚙</span>
         </button>
+      </header>
 
-        {/* Avatar — HUD concentric ring rig */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{ bottom: -52, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-        >
-          {/* Outer spinning dashed ring */}
-          <div
-            style={{
-              position: 'relative',
-              width: 132,
-              height: 132,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                border: `2px dashed ${raceColor}`,
-                opacity: 0.38,
-                animation: 'spin 24s linear infinite',
-              }}
-            />
-            {/* Inner static accent ring */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 10,
-                borderRadius: '50%',
-                border: `1px solid ${raceColor}50`,
-                boxShadow: `0 0 14px ${raceGlow}, inset 0 0 10px ${raceGlow}`,
-              }}
-            />
-            {/* Avatar circle */}
-            <div
-              style={{
-                position: 'relative',
-                width: 98,
-                height: 98,
-                borderRadius: '50%',
-                overflow: 'hidden',
-                background: `radial-gradient(circle at 38% 36%, ${raceDim}, rgba(8,10,16,0.92))`,
-                border: `2px solid ${raceColor}`,
-                boxShadow: `0 0 22px ${raceGlow}, 0 0 44px ${raceGlow}40`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'var(--font-display)',
-                fontWeight: 900,
-                fontSize: 38,
-                color: raceColor,
-                textShadow: `0 0 16px ${raceGlow}`,
-              }}
-            >
+      {/* ── Hero — identity panel ── */}
+      <section className="pf-hero-section">
+        <MangaPanel className="pf-hero-panel" halftone>
+          {/* Avatar rig — double-bezel concentric ring */}
+          <div className="pf-avatar-rig">
+            <div className="pf-avatar-ring-outer" aria-hidden />
+            <div className="pf-avatar-ring-inner" aria-hidden />
+            <div className="pf-avatar" aria-hidden>
               {profile.avatarUrl ? (
-                <img
-                  src={profile.avatarUrl}
-                  alt={profile.username}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+                <img src={profile.avatarUrl} alt="" />
               ) : (
                 profile.displayName[0]
               )}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── PLAYER IDENTITY ── */}
-      <section
-        className="flex flex-col items-center text-center px-4"
-        style={{ paddingTop: 68, paddingBottom: 20 }}
-      >
-        {/* Title eyebrow badge */}
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '3px 12px',
-            borderRadius: 999,
-            fontSize: 10,
-            textTransform: 'uppercase',
-            letterSpacing: '0.22em',
-            fontWeight: 600,
-            fontFamily: 'var(--font-body)',
-            background: `${raceColor}18`,
-            border: `1px solid ${raceColor}40`,
-            color: raceColor,
-            marginBottom: 8,
-          }}
-        >
-          {profile.title}
-        </span>
+          <span className="pf-title-chip">{profile.title}</span>
 
-        {/* Display name */}
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 900,
-            fontSize: 'clamp(1.6rem, 6vw, 2.4rem)',
-            letterSpacing: '-0.01em',
-            color: 'var(--color-text)',
-            textShadow: `0 0 22px ${raceGlow}`,
-            margin: '0 0 6px',
-          }}
-        >
-          {profile.displayName}
-        </h1>
+          <h2 className="pf-display-name">{profile.displayName}</h2>
 
-        {/* Username · Level · Race badge row */}
-        <div
-          className="flex items-center gap-2 flex-wrap justify-center"
-          style={{ marginBottom: 6 }}
-        >
-          <span style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)', fontSize: 13 }}>
-            @{profile.username}
-          </span>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>·</span>
-          {/* Level */}
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              background: 'rgba(255,200,50,0.14)',
-              border: '1px solid rgba(255,200,50,0.40)',
-              color: '#ffc832',
-            }}
-          >
-            Sv.{profile.level}
-          </span>
-          {/* Race badge */}
-          <span
-            style={{
-              padding: '2px 10px',
-              borderRadius: 999,
-              fontSize: 11,
-              fontFamily: 'var(--font-body)',
-              fontWeight: 700,
-              background: `${raceColor}1c`,
-              border: `1px solid ${raceColor}55`,
-              color: raceColor,
-            }}
-          >
-            {profile.race}
-          </span>
-        </div>
-
-        {/* Alliance */}
-        <p
-          style={{
-            fontSize: 12,
-            color: 'var(--color-text-muted)',
-            fontFamily: 'var(--font-body)',
-            marginBottom: 16,
-          }}
-        >
-          🤝 {profile.alliance} · {profile.allianceRole}
-        </p>
-
-        {/* XP bar */}
-        <div style={{ width: '100%', maxWidth: 300 }}>
-          <div
-            className="flex justify-between"
-            style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-body)', marginBottom: 6 }}
-          >
-            <span>Deneyim Puanı</span>
-            <span style={{ color: 'var(--color-text-secondary)' }}>
-              {fmt(profile.xp)} / {fmt(profile.xpNext)} XP
+          <div className="pf-meta-row">
+            <span className="pf-handle">@{profile.username}</span>
+            <span className="pf-meta-dot">·</span>
+            <span className="pf-chip pf-chip--level">Sv.{profile.level}</span>
+            <span className="pf-chip pf-chip--race">
+              <span aria-hidden>{RACE_META[profile.race].icon}</span>
+              <span>{profile.race}</span>
+            </span>
+            <span className="pf-chip pf-chip--alliance">
+              <span aria-hidden>🤝</span>
+              <span>{profile.alliance}</span>
             </span>
           </div>
-          <ProgressBar value={xpPct} variant="xp" size="sm" glow animated />
-        </div>
-      </section>
 
-      {/* ── QUICK STATS ROW ── */}
-      <div className="grid grid-cols-3 gap-2 px-4 mb-4">
-        {[
-          { label: 'Güç',        value: fmt(profile.power),      icon: '⚡', color: '#ffc832'  },
-          { label: 'Küresel #',  value: `#${fmt(profile.globalRank)}`, icon: '🏆', color: raceColor },
-          { label: 'Kazanma %',  value: `%${winRate}`,           icon: '⚔️', color: '#44ff88'  },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="flex flex-col items-center gap-1 text-center rounded-xl py-3 px-1"
-            style={{
-              background: 'rgba(255,255,255,0.025)',
-              border: '1px solid rgba(255,255,255,0.055)',
-            }}
-          >
-            <span style={{ fontSize: 18 }}>{stat.icon}</span>
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 900,
-                fontSize: 'clamp(0.85rem, 3.5vw, 1.1rem)',
-                color: stat.color,
-                textShadow: `0 0 10px ${stat.color}55`,
-              }}
-            >
-              {stat.value}
-            </span>
-            <span
-              style={{
-                fontSize: 9,
-                textTransform: 'uppercase',
-                letterSpacing: '0.14em',
-                color: 'var(--color-text-muted)',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              {stat.label}
-            </span>
-          </div>
-        ))}
-      </div>
+          <p className="pf-rank-line">
+            <strong>{profile.allianceRole}</strong>
+            <span> · Küresel Sıra </span>
+            <strong>#{fmt(profile.globalRank)}</strong>
+          </p>
 
-      {/* ── TAB BAR ── */}
-      <div className="flex px-4 gap-1.5 mb-4">
-        {([
-          ['stats',        'İstatistik'],
-          ['achievements', `Başarımlar (${earnedCount})`],
-          ['history',      'Geçmiş'],
-        ] as [ProfileTab, string][]).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              borderRadius: 10,
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.10em',
-              fontFamily: 'var(--font-body)',
-              transition: 'all 0.25s cubic-bezier(0.32,0.72,0,1)',
-              background:   tab === id ? `${raceColor}1e` : 'rgba(255,255,255,0.025)',
-              border:       tab === id ? `1px solid ${raceColor}50` : '1px solid rgba(255,255,255,0.055)',
-              color:        tab === id ? raceColor : 'var(--color-text-muted)',
-              boxShadow:    tab === id ? `0 0 10px ${raceGlow}` : 'none',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── TAB CONTENT ── */}
-      <div className="px-4 space-y-3">
-
-        {/* STATS TAB */}
-        {tab === 'stats' && (
-          <>
-            {/* Battle record */}
-            <GlassPanel padding="md">
-              <p
-                style={{
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.18em',
-                  color: 'var(--color-text-muted)',
-                  fontFamily: 'var(--font-body)',
-                  marginBottom: 14,
-                }}
-              >
-                Savaş Kaydı
-              </p>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                {[
-                  { label: 'Toplam',   value: profile.battles, color: 'var(--color-text)'    },
-                  { label: 'Kazandı', value: profile.wins,    color: '#44ff88'              },
-                  { label: 'Kaybetti',value: profile.losses,  color: '#ff3355'              },
-                ].map((s) => (
-                  <div key={s.label}>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontWeight: 900,
-                        fontSize: 'clamp(1.2rem, 5vw, 1.75rem)',
-                        color: s.color,
-                      }}
-                    >
-                      {fmt(s.value)}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.14em',
-                        color: 'var(--color-text-muted)',
-                        fontFamily: 'var(--font-body)',
-                        marginTop: 2,
-                      }}
-                    >
-                      {s.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Win-rate bar */}
-              <div style={{ marginTop: 16 }}>
-                <div
-                  className="flex justify-between"
-                  style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-body)', marginBottom: 6 }}
-                >
-                  <span>Kazanma Oranı</span>
-                  <span style={{ color: '#44ff88', fontWeight: 700 }}>%{winRate}</span>
-                </div>
-                <ProgressBar value={winRate} variant="health" size="xs" glow animated />
-              </div>
-            </GlassPanel>
-
-            {/* Season pass */}
-            <GlassPanel padding="md">
-              <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
-                <p
-                  style={{
-                    fontSize: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.18em',
-                    color: 'var(--color-text-muted)',
-                    fontFamily: 'var(--font-body)',
-                  }}
-                >
-                  Sezon Geçişi
-                </p>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 900,
-                    fontSize: 15,
-                    color: raceColor,
-                    textShadow: `0 0 8px ${raceGlow}`,
-                  }}
-                >
-                  {profile.seasonPass}/100
-                </span>
-              </div>
-              <ProgressBar value={profile.seasonPass} variant="brand" size="sm" glow animated />
-              <p
-                style={{
-                  fontSize: 11,
-                  color: 'var(--color-text-muted)',
-                  fontFamily: 'var(--font-body)',
-                  marginTop: 10,
-                }}
-              >
-                Bir sonraki ödüle {100 - profile.seasonPass} seviye kaldı
-              </p>
-            </GlassPanel>
-          </>
-        )}
-
-        {/* ACHIEVEMENTS TAB */}
-        {tab === 'achievements' && (
-          <div className="grid grid-cols-4 gap-2">
-            {profile.achievements.map((ach) => (
-              <div
-                key={ach.id}
-                className="relative flex flex-col items-center gap-1.5 rounded-xl text-center"
-                style={{
-                  padding: '10px 4px',
-                  background: ach.earned ? RARITY_BG[ach.rarity] : 'rgba(255,255,255,0.015)',
-                  border: `1px solid ${ach.earned ? RARITY_COLOR[ach.rarity] : 'rgba(255,255,255,0.055)'}`,
-                  opacity: ach.earned ? 1 : 0.38,
-                  transition: 'transform 0.2s cubic-bezier(0.32,0.72,0,1)',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 22,
-                    filter: ach.earned ? 'none' : 'grayscale(1) brightness(0.5)',
-                  }}
-                >
-                  {ach.icon}
-                </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    lineHeight: 1.2,
-                    fontFamily: 'var(--font-body)',
-                    fontWeight: 600,
-                    color: ach.earned ? RARITY_COLOR[ach.rarity] : 'var(--color-text-muted)',
-                  }}
-                >
-                  {ach.label}
-                </span>
-                {!ach.earned && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      fontSize: 8,
-                      opacity: 0.6,
-                    }}
-                  >
-                    🔒
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* HISTORY TAB */}
-        {tab === 'history' && (
-          <GlassPanel padding="lg">
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <span style={{ fontSize: 36 }}>⚔️</span>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: 'var(--color-text-secondary)',
-                  fontFamily: 'var(--font-body)',
-                }}
-              >
-                Savaş geçmişi yakında geliyor
-              </p>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-muted)',
-                  fontFamily: 'var(--font-body)',
-                }}
-              >
-                Son savaşların, PvP performansın ve strateji özetlerin burada görünecek.
-              </p>
+          {/* XP progress */}
+          <div className="pf-xp-block">
+            <div className="pf-xp-row">
+              <span>Deneyim Puanı</span>
+              <span>{fmt(profile.xp)} / {fmt(profile.xpNext)} XP</span>
             </div>
-          </GlassPanel>
+            <ProgressBar value={xpPct} variant="xp" size="sm" glow animated />
+          </div>
+        </MangaPanel>
+      </section>
+
+      {/* ── Quick stats row ── */}
+      <div className="pf-quick-stats">
+        <QuickStat icon="⚡" label="Güç"        value={fmt(profile.power)}       color="var(--color-energy)" />
+        <QuickStat icon="⚔️" label="PvP"        value={fmt(profile.pvpScore)}    color={raceColor} />
+        <QuickStat icon="🏆" label="Kazanma %"  value={`%${winRate}`}            color="var(--color-success)" />
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="pf-tabs" role="tablist" aria-label="Profil bölümleri">
+        {([
+          ['stats',        'İstatistik',                       '📊'],
+          ['achievements', `Başarımlar`,                       '🏅'],
+          ['history',      'Geçmiş',                           '⚔️'],
+        ] as [ProfileTab, string, string][]).map(([id, label, icon]) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`pf-tab${active ? ' active' : ''}`}
+              onClick={() => setTab(id)}
+            >
+              <span aria-hidden>{icon}</span>
+              <span>{label}</span>
+              {active && <span className="pf-tab-indicator" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Tab content ── */}
+      <div className="pf-tab-content">
+        {tab === 'stats' && <StatsTab profile={profile} winRate={winRate} raceColor={raceColor} raceGlow={raceGlow} />}
+        {tab === 'achievements' && (
+          <AchievementsTab
+            achievements={profile.achievements}
+            earnedCount={earnedCount}
+            totalCount={totalCount}
+          />
         )}
+        {tab === 'history' && <HistoryTab entries={profile.history} />}
       </div>
 
       <BottomNav />
+    </div>
+  );
+}
+
+// ── Quick stat card ──────────────────────────────────────────────────────────
+
+interface QuickStatProps {
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+}
+
+function QuickStat({ icon, label, value, color }: QuickStatProps) {
+  return (
+    <div
+      className="pf-stat-card"
+      style={{ '--stat-color': color } as React.CSSProperties}
+    >
+      <span className="pf-stat-icon" aria-hidden>{icon}</span>
+      <span className="pf-stat-value">{value}</span>
+      <span className="pf-stat-label">{label}</span>
+    </div>
+  );
+}
+
+// ── Stats tab ────────────────────────────────────────────────────────────────
+
+interface StatsTabProps {
+  profile: typeof PROFILE;
+  winRate: number;
+  raceColor: string;
+  raceGlow: string;
+}
+
+function StatsTab({ profile, winRate, raceColor, raceGlow }: StatsTabProps) {
+  return (
+    <>
+      {/* Battle record */}
+      <MangaPanel className="pf-panel" halftone>
+        <div className="pf-panel-title">
+          <span>Savaş Kaydı</span>
+          <span className="pf-panel-title-accent">{fmt(profile.battles)}</span>
+        </div>
+
+        <div className="pf-record-grid">
+          <RecordCell label="Toplam"   value={profile.battles} color="var(--color-text-primary)" />
+          <RecordCell label="Kazandı"  value={profile.wins}    color="var(--color-success)" />
+          <RecordCell label="Kaybetti" value={profile.losses}  color="var(--color-danger)" />
+        </div>
+
+        <div className="pf-winrate-block">
+          <div className="pf-winrate-row">
+            <span>Kazanma Oranı</span>
+            <strong>%{winRate}</strong>
+          </div>
+          <ProgressBar value={winRate} variant="health" size="xs" glow animated />
+        </div>
+      </MangaPanel>
+
+      {/* Detail stats */}
+      <MangaPanel className="pf-panel" halftone>
+        <div className="pf-panel-title">
+          <span>Komutan Dosyası</span>
+        </div>
+        <div className="pf-detail-grid">
+          <DetailCell label="PvP Sıralaması" value={`#${fmt(profile.pvpRank)}`} sub={`${fmt(profile.pvpScore)} puan`} color={raceColor} />
+          <DetailCell label="En İyi Seri"    value={`${profile.bestStreak} zafer`} sub="Üst üste"             color="var(--color-warning)" />
+          <DetailCell label="Lonca Katkısı"  value={fmt(profile.guildContrib)}    sub="Sezon toplamı"        color="var(--color-accent)" />
+          <DetailCell label="Toplam Güç"     value={fmt(profile.power)}           sub="Komuta gücü"          color="var(--color-energy)" />
+        </div>
+      </MangaPanel>
+
+      {/* Season pass */}
+      <MangaPanel className="pf-panel" halftone>
+        <div className="pf-season-row">
+          <div className="pf-panel-title" style={{ marginBottom: 0 }}>
+            <span>Sezon Geçişi</span>
+          </div>
+          <span
+            className="pf-season-value"
+            style={{ color: raceColor, textShadow: `0 0 8px ${raceGlow}` }}
+          >
+            {profile.seasonPass}/100
+          </span>
+        </div>
+        <ProgressBar value={profile.seasonPass} variant="brand" size="sm" glow animated />
+        <p className="pf-season-hint">
+          Bir sonraki ödüle <strong>{100 - profile.seasonPass}</strong> seviye kaldı
+        </p>
+      </MangaPanel>
+    </>
+  );
+}
+
+interface RecordCellProps { label: string; value: number; color: string; }
+function RecordCell({ label, value, color }: RecordCellProps) {
+  return (
+    <div className="pf-record-cell" style={{ '--cell-color': color } as React.CSSProperties}>
+      <span className="pf-record-value">{fmt(value)}</span>
+      <span className="pf-record-label">{label}</span>
+    </div>
+  );
+}
+
+interface DetailCellProps { label: string; value: string; sub: string; color: string; }
+function DetailCell({ label, value, sub, color }: DetailCellProps) {
+  return (
+    <div className="pf-detail-cell" style={{ '--cell-color': color } as React.CSSProperties}>
+      <span className="pf-detail-label">{label}</span>
+      <span className="pf-detail-value">{value}</span>
+      <span className="pf-detail-sub">{sub}</span>
+    </div>
+  );
+}
+
+// ── Achievements tab ─────────────────────────────────────────────────────────
+
+interface AchievementsTabProps {
+  achievements: Achievement[];
+  earnedCount: number;
+  totalCount: number;
+}
+
+function AchievementsTab({ achievements, earnedCount, totalCount }: AchievementsTabProps) {
+  const pct = Math.round((earnedCount / totalCount) * 100);
+  return (
+    <MangaPanel className="pf-panel" halftone>
+      <div className="pf-panel-title">
+        <span>Başarımlar</span>
+        <span className="pf-panel-title-accent">{earnedCount}/{totalCount}</span>
+      </div>
+
+      <div className="pf-achievements-progress">
+        <span>Tamamlanma</span>
+        <strong>%{pct}</strong>
+      </div>
+      <ProgressBar value={pct} variant="brand" size="xs" glow animated />
+
+      <div className="pf-achievements-grid" style={{ marginTop: 14 }}>
+        {achievements.map((ach) => {
+          const color = ach.earned ? RARITY_COLOR[ach.rarity] : 'rgba(255,255,255,0.10)';
+          const bg    = ach.earned ? RARITY_BG[ach.rarity]    : 'rgba(255,255,255,0.015)';
+          return (
+            <div
+              key={ach.id}
+              className={`pf-ach-card ${ach.earned ? 'earned' : 'locked'}`}
+              style={{
+                '--ach-color': color,
+                '--ach-bg':    bg,
+              } as React.CSSProperties}
+              tabIndex={0}
+              role="button"
+              aria-label={`${ach.label} ${ach.earned ? '— kazanıldı' : '— kilitli'}`}
+            >
+              <span className="pf-ach-icon">{ach.icon}</span>
+              <span className="pf-ach-label">{ach.label}</span>
+              {!ach.earned && <span className="pf-ach-lock" aria-hidden>🔒</span>}
+            </div>
+          );
+        })}
+      </div>
+    </MangaPanel>
+  );
+}
+
+// ── History tab ──────────────────────────────────────────────────────────────
+
+interface HistoryTabProps { entries: BattleEntry[]; }
+
+function HistoryTab({ entries }: HistoryTabProps) {
+  return (
+    <MangaPanel className="pf-panel" halftone>
+      <div className="pf-panel-title">
+        <span>Son Savaşlar</span>
+        <span className="pf-panel-title-accent">{entries.length}</span>
+      </div>
+      <div className="pf-history-list" role="list">
+        {entries.map((entry, idx) => (
+          <HistoryRow key={entry.id} entry={entry} rowIndex={idx} />
+        ))}
+      </div>
+    </MangaPanel>
+  );
+}
+
+interface HistoryRowProps { entry: BattleEntry; rowIndex: number; }
+function HistoryRow({ entry, rowIndex }: HistoryRowProps) {
+  const resultColor = entry.result === 'win' ? 'var(--color-success)' : 'var(--color-danger)';
+  const resultLabel = entry.result === 'win' ? 'Zafer' : 'Yenilgi';
+  const race = RACE_META[entry.opponentRace];
+  const deltaSign = entry.delta > 0 ? '+' : '';
+
+  return (
+    <div
+      className="pf-history-row"
+      role="listitem"
+      style={{
+        '--result-color': resultColor,
+        '--row-index': rowIndex,
+      } as React.CSSProperties}
+    >
+      <div className="pf-history-result">
+        <span className="pf-history-result-chip">{resultLabel}</span>
+        <span className="pf-history-mode">{MODE_LABEL[entry.mode]}</span>
+      </div>
+
+      <div className="pf-history-mid">
+        <div className="pf-history-line1">
+          <span className="pf-history-vs">vs</span>
+          <span>{entry.opponentName}</span>
+          <span
+            className="pf-history-race-badge"
+            style={{ color: race.color, borderColor: `${race.color}55` }}
+          >
+            <span aria-hidden>{race.icon}</span>
+            <span>{entry.opponentRace}</span>
+          </span>
+        </div>
+        <div className="pf-history-line2">
+          <span>{entry.whenLabel}</span>
+          <span className="dot">•</span>
+          <span>{entry.scoreLabel}</span>
+        </div>
+      </div>
+
+      <div className="pf-history-right">
+        <span className="pf-history-delta">{deltaSign}{fmt(entry.delta)}</span>
+        <span className="pf-history-delta-unit">{entry.mode === 'pve' ? 'XP' : entry.mode === 'siege' ? 'Güç' : 'PvP'}</span>
+      </div>
     </div>
   );
 }

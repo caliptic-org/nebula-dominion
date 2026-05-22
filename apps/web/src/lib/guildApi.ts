@@ -1,11 +1,13 @@
 import { Race } from '@/types/units';
 import {
+  AllianceWar,
   GuildCreateInput,
   GuildMember,
   GuildProfile,
   GuildSearchFilters,
   GuildSummary,
   GuildTier,
+  SharedObjective,
   TIER_CAPACITY,
   TutorialStep,
 } from '@/types/guild';
@@ -282,6 +284,86 @@ export interface TutorialStateView {
   completedAt: string | null;
 }
 
+const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+
+const seedWars = (guildTag: string): AllianceWar[] => [
+  {
+    id: `${guildTag}-war-active`,
+    opponentName: 'Karanlık Yeminliler',
+    opponentTag: 'KYM',
+    opponentRace: Race.SEYTAN,
+    ourScore: 1840,
+    theirScore: 1610,
+    endsAt: hoursFromNow(6),
+    status: 'active',
+    participantCount: 22,
+    totalSlots: 25,
+  },
+  {
+    id: `${guildTag}-war-preparing`,
+    opponentName: 'Çelik Kabile',
+    opponentTag: 'ÇLK',
+    opponentRace: Race.OTOMAT,
+    ourScore: 0,
+    theirScore: 0,
+    endsAt: hoursFromNow(38),
+    status: 'preparing',
+    participantCount: 14,
+    totalSlots: 25,
+  },
+  {
+    id: `${guildTag}-war-won`,
+    opponentName: 'Yeşil Sürü',
+    opponentTag: 'YŞL',
+    opponentRace: Race.ZERG,
+    ourScore: 2380,
+    theirScore: 2150,
+    endsAt: hoursFromNow(-12),
+    status: 'won',
+    participantCount: 25,
+    totalSlots: 25,
+  },
+];
+
+const seedObjectives = (): SharedObjective[] => [
+  {
+    id: 'obj-raid',
+    title: 'Galaktik Müdafaa',
+    description: 'Bu hafta birlikte 30 raid tamamlayın.',
+    currentValue: 21,
+    targetValue: 30,
+    unit: 'raid',
+    rewardLabel: '500 Mutasyon Özü · lonca kasası',
+    contributorCount: 18,
+    expiresAt: hoursFromNow(96),
+    icon: '🛡️',
+  },
+  {
+    id: 'obj-mineral',
+    title: 'Tedarik Hattı',
+    description: '150K mineral bağışla kasayı doldurun.',
+    currentValue: 92_400,
+    targetValue: 150_000,
+    unit: 'mineral',
+    rewardLabel: '+%5 üretim buff · 24 saat',
+    contributorCount: 24,
+    expiresAt: hoursFromNow(60),
+    icon: '⛏️',
+  },
+  {
+    id: 'obj-sector',
+    title: 'Sektör Genişleme',
+    description: 'Yeni sektör için 8 keşif görevi tamamlayın.',
+    currentValue: 5,
+    targetValue: 8,
+    unit: 'keşif',
+    rewardLabel: 'Yeni sektör kilidi açılır',
+    contributorCount: 9,
+    expiresAt: hoursFromNow(120),
+    icon: '🛰️',
+  },
+];
+
 export const guildApi = {
   // Search: real backend has no filters — fetch a page and filter client-side.
   search: async (filters: Partial<GuildSearchFilters>): Promise<GuildSummary[]> => {
@@ -345,6 +427,8 @@ export const guildApi = {
       weeklyRaidAttendance: 0.78,
       researchProjectName: 'Mutasyon Özü Çıkarma III',
       researchProgressPct: 64,
+      wars: seedWars(summary.tag),
+      objectives: seedObjectives(),
     });
   },
 

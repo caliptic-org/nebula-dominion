@@ -1,0 +1,71 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Production Queue (CAL-494) — animations & swipe states
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* GPU-safe progress fill: scaleX from transform-origin left. */
+.pq-fill {
+  transform-origin: left center;
+  transform: scaleX(var(--pq-progress, 0));
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Subtle shimmer sweep over the fill while ticking. */
+.pq-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: pq-shimmer 1.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes pq-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Soft pulse on the countdown when item is near completion (<10s). */
+.pq-eta-soon {
+  animation: pq-eta-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes pq-eta-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* Swipe row transition. */
+.pq-row {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.pq-row-dragging {
+  transition: none;
+}
+
+/* Completion flash overlay (briefly shown when item finishes). */
+.pq-complete-flash {
+  animation: pq-flash 600ms ease-out;
+}
+
+@keyframes pq-flash {
+  0%   { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pq-fill              { transition: none; }
+  .pq-fill::after       { animation: none; opacity: 0; }
+  .pq-eta-soon          { animation: none; }
+  .pq-row               { transition: none; }
+  .pq-complete-flash    { animation: none; }
+}

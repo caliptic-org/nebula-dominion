@@ -94,6 +94,11 @@ export interface WorldMapProps {
   enemies?: WorldEnemy[];
   /** Backend-supplied territory zones. Falls back to seed data when omitted. */
   territories?: TerritoryZone[];
+  /**
+   * Currently-selected map cell (col,row) used to draw an attack/movement
+   * preview route from the player's base. Pass null/undefined to hide it.
+   */
+  selectedTarget?: { col: number; row: number } | null;
 }
 
 // ── Internal types ─────────────────────────────────────────────────────────
@@ -212,7 +217,9 @@ function normalizeEnemy(input: EnemyInput, idx: number): WorldEnemy {
 
 // ── Component ──────────────────────────────────────────────────────────────
 const WorldMap = forwardRef<WorldMapHandle, WorldMapProps>(function WorldMap(
-  { playerRace, onSelect, className, bases, resources, enemies, territories },
+  // selectedTarget is consumed by SphericalMap (the production renderer); the 2D
+  // iso fallback ignores it but accepts the prop so the prop type stays shared.
+  { playerRace, onSelect, className, bases, resources, enemies, territories, selectedTarget: _selectedTarget },
   ref,
 ) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);

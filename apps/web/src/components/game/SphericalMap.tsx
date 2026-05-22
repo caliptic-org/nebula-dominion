@@ -426,9 +426,130 @@ function createEnemyObject(e: WorldEnemy): MapObject {
   };
 }
 
+// ── Route rendering ────────────────────────────────────────────────────────
+// Routes are great-circle arcs lofted slightly above the play sphere so they
+// read cleanly over the surface. Trade routes connect player-owned + same-race
+// bases (faction supply lines); the attack-preview route is the live line from
+// the player base to whatever (col,row) the user currently has selected.
+
+const ROUTE_ARC_RADIUS = SPHERE_RADIUS * 1.04;
+const ROUTE_SEGMENTS   = 64;
+
+interface RouteSpec {
+  id:    string;
+  from:  THREE.Vector3;
+  to:    THREE.Vector3;
+  kind:  'trade' | 'attack-preview';
+  color: string;
+}
+
+/** Sample a great-circle arc between `a` and `b` and project each sample onto a sphere. */
+function buildArcGeometry(a: THREE.Vector3, b: THREE.Vector3, radius: number, segments: number) {
+  const positions = new Float32Array((segments + 1) * 3);
+  const aN = a.clone().normalize();
+  const bN = b.clone().normalize();
+  const dot = THREE.MathUtils.clamp(aN.dot(bN), -1, 1);
+  const omega = Math.acos(dot);
+  const sinOmega = Math.sin(omega);
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    let x, y, z;
+    if (sinOmega < 1e-6) {
+      // Degenerate (parallel): straight interpolation, then project.
+      x = aN.x + (bN.x - aN.x) * t;
+      y = aN.y + (bN.y - aN.y) * t;
+      z = aN.z + (bN.z - aN.z) * t;
+    } else {
+      const w1 = Math.sin((1 - t) * omega) / sinOmega;
+      const w2 = Math.sin(t * omega)       / sinOmega;
+      x = aN.x * w1 + bN.x * w2;
+      y = aN.y * w1 + bN.y * w2;
+      z = aN.z * w1 + bN.z * w2;
+    }
+    // Project back onto sphere of radius `radius` so the arc lofts above the play surface.
+    const len = Math.hypot(x, y, z) || 1;
+    positions[i * 3 + 0] = (x / len) * radius;
+    positions[i * 3 + 1] = (y / len) * radius;
+    positions[i * 3 + 2] = (z / len) * radius;
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return geom;
+}
+
+interface RouteObject {
+  spec:     RouteSpec;
+  line:     THREE.Line;
+  material: THREE.LineDashedMaterial;
+  /** Comet sprite that travels along the route to suggest flow direction. */
+  comet?:   THREE.Sprite;
+  /** Pre-sampled positions used to position the comet along the arc each frame. */
+  samples:  Float32Array;
+}
+
+function createRouteObject(spec: RouteSpec): RouteObject {
+  const geom = buildArcGeometry(spec.from, spec.to, ROUTE_ARC_RADIUS, ROUTE_SEGMENTS);
+  const samples = geom.getAttribute('position').array as Float32Array;
+
+  const isAttack = spec.kind === 'attack-preview';
+  const material = new THREE.LineDashedMaterial({
+    color:        spec.color,
+    transparent:  true,
+    opacity:      isAttack ? 0.95 : 0.55,
+    dashSize:     isAttack ? 1.6  : 1.0,
+    gapSize:      isAttack ? 0.9  : 1.2,
+    depthWrite:   false,
+    blending:     THREE.AdditiveBlending,
+  });
+  const line = new THREE.Line(geom, material);
+  line.computeLineDistances();
+  line.renderOrder = 5;
+
+  // Flow comet — only on trade routes; attack preview reads as a beam instead.
+  let comet: THREE.Sprite | undefined;
+  if (!isAttack) {
+    comet = makeGlowSprite(spec.color, 2.6);
+    comet.renderOrder = 6;
+  }
+
+  return { spec, line, material, comet, samples };
+}
+
+function disposeRouteObject(r: RouteObject) {
+  r.line.geometry.dispose();
+  r.material.dispose();
+  if (r.comet) {
+    (r.comet.material as THREE.SpriteMaterial).map?.dispose();
+    (r.comet.material as THREE.SpriteMaterial).dispose();
+  }
+}
+
+/** Compute the trade-route specs from the current base layout. */
+function computeTradeRoutes(bases: WorldBase[], playerRace: Race): RouteSpec[] {
+  const player = bases.find(b => b.isPlayer);
+  if (!player) return [];
+  const color = RACE_COL[playerRace];
+  // The player mesh sits at the scene origin, but for route rendering we want a
+  // point on the play sphere — otherwise the great-circle projection would have
+  // to normalize a zero vector. Use the player's grid coords for the arc endpoint.
+  const playerPos = gridToSphere(player.col, player.row);
+
+  return bases
+    .filter(b => !b.isPlayer && b.race === playerRace)
+    .map<RouteSpec>(b => ({
+      id:    `trade-${player.id}-${b.id}`,
+      from:  playerPos,
+      to:    gridToSphere(b.col, b.row),
+      kind:  'trade',
+      color,
+    }));
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function SphericalMap(
-  { playerRace, onSelect, className, bases, resources, enemies, territories: _territories },
+  { playerRace, onSelect, className, bases, resources, enemies, territories: _territories, selectedTarget },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -449,6 +570,13 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
   const resRef       = useRef<WorldResource[]>(resources ?? makeResources());
   const enemiesRef   = useRef<WorldEnemy[]>(enemies ?? makeEnemies());
   const playerRaceRef = useRef<Race>(playerRace);
+
+  // Routes (trade + attack preview) — owned by an internal group so we can
+  // rebuild on bases/race/target change without touching the rest of the scene.
+  const routesGroupRef    = useRef<THREE.Group | null>(null);
+  const tradeRoutesRef    = useRef<RouteObject[]>([]);
+  const attackPreviewRef  = useRef<RouteObject | null>(null);
+  const selectedTargetRef = useRef<{ col: number; row: number } | null>(selectedTarget ?? null);
 
   // Keep the latest onSelect callback without re-binding the canvas listeners
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
@@ -534,6 +662,19 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
       });
     }
 
+    // Routes group — trade lines + attack preview line live here.
+    const routesGroup = new THREE.Group();
+    routesGroup.renderOrder = 4;
+    scene.add(routesGroup);
+
+    // Seed initial trade routes from the current base list.
+    const initialTrade = computeTradeRoutes(basesRef.current, playerRaceRef.current).map(createRouteObject);
+    initialTrade.forEach(r => {
+      routesGroup.add(r.line);
+      if (r.comet) routesGroup.add(r.comet);
+    });
+    tradeRoutesRef.current = initialTrade;
+
     sceneRef.current    = scene;
     cameraRef.current   = camera;
     rendererRef.current = renderer;
@@ -541,6 +682,7 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
     starsRef.current    = stars;
     nebulaRef.current   = nebula;
     objectsRef.current  = objects;
+    routesGroupRef.current = routesGroup;
     clockRef.current    = new THREE.Clock();
 
     // ── Resize handling ─────────────────────────────────────────────────────
@@ -665,6 +807,34 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
         }
       });
 
+      // ── Route animation ────────────────────────────────────────────────
+      // Trade routes: subtle dash drift + travelling comet → faction supply flow.
+      // Attack preview: stronger pulse + thicker dash → reads as a live targeting beam.
+      const trade = tradeRoutesRef.current;
+      for (let i = 0; i < trade.length; i++) {
+        const r = trade[i];
+        // Drift dash offset (LineDashedMaterial doesn't accept a uniform offset, but
+        // animating the line itself by sliding the geometry would be expensive — instead
+        // we modulate opacity to read as flow and slide the comet sprite.)
+        const flow = 0.4 + 0.25 * Math.sin(elapsed * 0.9 + i * 0.5);
+        r.material.opacity = flow;
+
+        if (r.comet) {
+          // Phase the comet 0..1 along the arc so each route reads differently.
+          const phase = ((elapsed * 0.18) + i * 0.137) % 1;
+          const idx = Math.min(ROUTE_SEGMENTS, Math.floor(phase * ROUTE_SEGMENTS));
+          const o = idx * 3;
+          r.comet.position.set(r.samples[o], r.samples[o + 1], r.samples[o + 2]);
+          const sizePulse = 1 + 0.25 * Math.sin(elapsed * 3 + i);
+          r.comet.scale.setScalar(2.6 * sizePulse);
+        }
+      }
+      const preview = attackPreviewRef.current;
+      if (preview) {
+        const pulse = 0.55 + 0.45 * Math.sin(elapsed * 4.2);
+        preview.material.opacity = pulse;
+      }
+
       controls.update();
       renderer.render(scene, camera);
       rafRef.current = requestAnimationFrame(tick);
@@ -682,6 +852,14 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
       // Race bases own internal geometry/material/texture caches — let them dispose first.
       objectsRef.current.forEach(o => o.raceBase?.dispose());
       instancedField?.dispose();
+
+      // Routes (trade + attack preview) own their own line geometries.
+      tradeRoutesRef.current.forEach(disposeRouteObject);
+      tradeRoutesRef.current = [];
+      if (attackPreviewRef.current) {
+        disposeRouteObject(attackPreviewRef.current);
+        attackPreviewRef.current = null;
+      }
 
       // Dispose Three.js resources to avoid GPU leaks on route change
       scene.traverse(o => {
@@ -715,6 +893,55 @@ const SphericalMap = forwardRef<WorldMapHandle, WorldMapProps>(function Spherica
   useEffect(() => { if (bases) basesRef.current = bases; }, [bases]);
   useEffect(() => { if (resources) resRef.current = resources; }, [resources]);
   useEffect(() => { if (enemies) enemiesRef.current = enemies; }, [enemies]);
+
+  // Rebuild trade routes whenever the base layout or player race changes.
+  useEffect(() => {
+    const group = routesGroupRef.current;
+    if (!group) return;
+    tradeRoutesRef.current.forEach(r => {
+      group.remove(r.line);
+      if (r.comet) group.remove(r.comet);
+      disposeRouteObject(r);
+    });
+    const next = computeTradeRoutes(bases ?? basesRef.current, playerRace).map(createRouteObject);
+    next.forEach(r => {
+      group.add(r.line);
+      if (r.comet) group.add(r.comet);
+    });
+    tradeRoutesRef.current = next;
+  }, [bases, playerRace]);
+
+  // Build / refresh the attack-preview route when the selection changes.
+  useEffect(() => {
+    selectedTargetRef.current = selectedTarget ?? null;
+    const group = routesGroupRef.current;
+    if (!group) return;
+
+    // Tear down the old preview line (if any).
+    if (attackPreviewRef.current) {
+      group.remove(attackPreviewRef.current.line);
+      disposeRouteObject(attackPreviewRef.current);
+      attackPreviewRef.current = null;
+    }
+
+    if (!selectedTarget) return;
+
+    // The player base sits at the origin in scene space; the target projects onto
+    // the sphere via the same grid mapping the bases use.
+    const player = basesRef.current.find(b => b.isPlayer);
+    if (!player) return;
+
+    const spec: RouteSpec = {
+      id:    `attack-preview-${selectedTarget.col}-${selectedTarget.row}`,
+      from:  gridToSphere(player.col, player.row),
+      to:    gridToSphere(selectedTarget.col, selectedTarget.row),
+      kind:  'attack-preview',
+      color: '#ff5566',
+    };
+    const obj = createRouteObject(spec);
+    group.add(obj.line);
+    attackPreviewRef.current = obj;
+  }, [selectedTarget]);
 
   // Rebuild map objects when datasets change identity. Cheap because counts are small.
   useEffect(() => {

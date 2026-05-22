@@ -151,10 +151,11 @@ export function SettingsClient() {
             style={{
               position: 'absolute',
               top: 0,
-              left: '-100%',
+              left: 0,
               width: '60%',
               height: '100%',
               background: `linear-gradient(90deg, transparent 0%, ${raceColor}08 50%, transparent 100%)`,
+              transform: 'translateX(-170%)',
               animation: 'settings-scan 5s ease-in-out infinite',
             }}
           />
@@ -523,19 +524,19 @@ export function SettingsClient() {
       {/* Global animation keyframes */}
       <style>{`
         @keyframes settings-scan {
-          0%   { left: -100%; opacity: 0; }
+          0%   { transform: translateX(-170%); opacity: 0; }
           10%  { opacity: 1; }
           90%  { opacity: 1; }
-          100% { left: 200%; opacity: 0; }
+          100% { transform: translateX(280%); opacity: 0; }
         }
-        @keyframes settings-bar-1 { 0%,100%{height:30%} 50%{height:90%} }
-        @keyframes settings-bar-2 { 0%,100%{height:60%} 33%{height:20%} 66%{height:100%} }
-        @keyframes settings-bar-3 { 0%,100%{height:80%} 40%{height:30%} }
-        @keyframes settings-bar-4 { 0%,100%{height:40%} 60%{height:85%} }
-        @keyframes settings-bar-5 { 0%,100%{height:70%} 25%{height:100%} 75%{height:20%} }
-        @keyframes settings-bar-6 { 0%,100%{height:50%} 50%{height:75%} }
-        @keyframes settings-bar-7 { 0%,100%{height:35%} 45%{height:95%} }
-        @keyframes settings-bar-8 { 0%,100%{height:65%} 30%{height:25%} 70%{height:90%} }
+        @keyframes settings-bar-1 { 0%,100%{transform:scaleY(0.30)} 50%{transform:scaleY(0.90)} }
+        @keyframes settings-bar-2 { 0%,100%{transform:scaleY(0.60)} 33%{transform:scaleY(0.20)} 66%{transform:scaleY(1.0)} }
+        @keyframes settings-bar-3 { 0%,100%{transform:scaleY(0.80)} 40%{transform:scaleY(0.30)} }
+        @keyframes settings-bar-4 { 0%,100%{transform:scaleY(0.40)} 60%{transform:scaleY(0.85)} }
+        @keyframes settings-bar-5 { 0%,100%{transform:scaleY(0.70)} 25%{transform:scaleY(1.0)} 75%{transform:scaleY(0.20)} }
+        @keyframes settings-bar-6 { 0%,100%{transform:scaleY(0.50)} 50%{transform:scaleY(0.75)} }
+        @keyframes settings-bar-7 { 0%,100%{transform:scaleY(0.35)} 45%{transform:scaleY(0.95)} }
+        @keyframes settings-bar-8 { 0%,100%{transform:scaleY(0.65)} 30%{transform:scaleY(0.25)} 70%{transform:scaleY(0.90)} }
         @keyframes settings-slide-in {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -675,14 +676,14 @@ function ScanDivider({ raceColor }: { raceColor: string }) {
 
 function AudioVisualizer({ active, raceColor, raceGlow }: { active: boolean; raceColor: string; raceGlow: string }) {
   const bars = [
-    { anim: 'settings-bar-1', delay: '0ms',   height: '30%' },
-    { anim: 'settings-bar-2', delay: '150ms',  height: '60%' },
-    { anim: 'settings-bar-3', delay: '80ms',   height: '80%' },
-    { anim: 'settings-bar-4', delay: '220ms',  height: '40%' },
-    { anim: 'settings-bar-5', delay: '50ms',   height: '70%' },
-    { anim: 'settings-bar-6', delay: '310ms',  height: '50%' },
-    { anim: 'settings-bar-7', delay: '130ms',  height: '35%' },
-    { anim: 'settings-bar-8', delay: '260ms',  height: '65%' },
+    { anim: 'settings-bar-1', delay: '0ms' },
+    { anim: 'settings-bar-2', delay: '150ms' },
+    { anim: 'settings-bar-3', delay: '80ms' },
+    { anim: 'settings-bar-4', delay: '220ms' },
+    { anim: 'settings-bar-5', delay: '50ms' },
+    { anim: 'settings-bar-6', delay: '310ms' },
+    { anim: 'settings-bar-7', delay: '130ms' },
+    { anim: 'settings-bar-8', delay: '260ms' },
   ];
 
   return (
@@ -701,9 +702,11 @@ function AudioVisualizer({ active, raceColor, raceGlow }: { active: boolean; rac
           className="rounded-sm"
           style={{
             width: 3,
-            height: b.height,
+            height: '100%',
             background: raceColor,
             boxShadow: active ? `0 0 4px ${raceGlow}` : 'none',
+            transformOrigin: 'bottom',
+            transform: 'scaleY(0.5)',
             animation: active ? `${b.anim} ${1.2 + i * 0.15}s ease-in-out ${b.delay} infinite` : 'none',
             transition: 'opacity 0.3s ease',
           }}

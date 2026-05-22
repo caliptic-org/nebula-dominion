@@ -446,6 +446,13 @@ export default function WorldMapPage() {
     return `Sektör-${sectorRow * 6 + sectorCol + 1}`;
   })();
 
+  // Player power = the strongest of the player's own bases (used by TargetDetailSheet)
+  const playerPower = (() => {
+    const own = mapState?.bases?.filter(b => b.isPlayer) ?? [];
+    if (own.length === 0) return undefined;
+    return own.reduce((max, b) => Math.max(max, b.power ?? 0), 0);
+  })();
+
   const actions: Action[] = (() => {
     if (!selected) return [];
     // Enemy bases are handled by TargetDetailSheet — don't show duplicate ActionPanel
@@ -457,6 +464,16 @@ export default function WorldMapPage() {
 
   const toastBorder = feedback?.tone === 'error' ? 'rgba(255,80,80,0.55)' : `${raceColor}45`;
   const toastColor  = feedback?.tone === 'error' ? '#ff8a8a' : raceColor;
+
+  // Drive the attack-preview route on the map. We hide it for selections on the
+  // player's own base (no self-routing) and for empty-cell taps where there is
+  // nothing to "target". Resources, enemies, and enemy bases all qualify.
+  const previewTarget = (() => {
+    if (!selected) return null;
+    if (selected.kind === 'empty') return null;
+    if (selected.kind === 'base' && selected.base?.isPlayer) return null;
+    return { col: selected.col, row: selected.row };
+  })();
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background:'#04060c' }}>
@@ -471,6 +488,7 @@ export default function WorldMapPage() {
           resources={mapState?.resources}
           enemies={mapState?.enemies}
           territories={mapState?.territories}
+          selectedTarget={previewTarget}
         />
       </div>
 
@@ -590,6 +608,7 @@ export default function WorldMapPage() {
         visible={targetSheetVisible}
         base={targetSheetBase}
         playerRace={race}
+        playerPower={playerPower}
         onAttack={handleTargetAttack}
         onScout={handleTargetScout}
         onClose={() => { setTargetSheetVisible(false); setSelected(null); }}

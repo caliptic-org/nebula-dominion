@@ -652,18 +652,20 @@
 
 .age-scan-line {
   position: absolute;
+  top: 0;
   left: 0;
   right: 0;
   height: 120px;
   pointer-events: none;
+  transform: translateY(-120px);
   animation: age-scan 2.4s cubic-bezier(0.32, 0.72, 0, 1) 0.4s both;
 }
 
 @keyframes age-scan {
-  0%   { top: -120px; opacity: 0; }
+  0%   { transform: translateY(-120px); opacity: 0; }
   15%  { opacity: 1; }
   85%  { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+  100% { transform: translateY(100vh); opacity: 0; }
 }
 
 /* ── Shockwave ring ───────────────────────────────────────────────────────── */
@@ -1258,4 +1260,18 @@
   .age-number-stamp {
     font-size: clamp(90px, 35vw, 140px);
   }
+}
+
+/* ── Accessibility: reduce motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .age-current,
+  .age-card,
+  .age-tier-icon,
+  .age-scene-star,
+  .age-scan-line,
+  .age-shockwave,
+  .age-speed-line,
+  .age-ring,
+  .age-transition-icon { animation: none; transition: none; }
 }

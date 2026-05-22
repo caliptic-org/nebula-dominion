@@ -690,3 +690,14 @@
     bottom: 200px;
   }
 }
+
+/* ── Accessibility: reduce motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-bg-art-ring,
+  .ss-bg-art-glyph,
+  .ss-scanline,
+  .ss-scanline::after,
+  .ss-counter-dot,
+  .ss-continue--visible { animation: none; transition: none; }
+}

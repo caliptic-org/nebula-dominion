@@ -8,6 +8,7 @@ import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { GlowButton } from '@/components/ui/GlowButton';
 import clsx from 'clsx';
+import './shop.css';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type ShopTab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
@@ -664,13 +665,7 @@ function PurchaseModal({
       style={{ background: 'rgba(8,10,16,0.85)', backdropFilter: 'blur(8px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        className="w-full max-w-sm"
-        style={{
-          animation: 'slideUp 0.4s cubic-bezier(0.32,0.72,0,1) forwards',
-        }}
-      >
-        <style>{`@keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+      <div className="w-full max-w-sm shop-modal-slide">
 
         {/* Outer shell */}
         <div
@@ -975,7 +970,7 @@ function BattlePassSection({
                   style={{ background: isCompleted ? raceColor : 'rgba(255,255,255,0.06)', boxShadow: isCompleted ? `0 0 4px ${raceGlow}` : 'none' }}
                 />
                 <div
-                  className={clsx('w-2.5 h-2.5 rounded-full border shrink-0 transition-all duration-500', isCurrent && 'animate-pulse')}
+                  className={clsx('w-2.5 h-2.5 rounded-full border shrink-0 transition-all duration-500', isCurrent && 'animate-pulse shop-pulse')}
                   style={{
                     background: isCompleted ? raceColor : isCurrent ? `${raceColor}44` : 'rgba(255,255,255,0.06)',
                     borderColor: isCompleted ? raceColor : isCurrent ? raceColor : 'rgba(255,255,255,0.12)',
@@ -1354,7 +1349,7 @@ export default function ShopPage() {
                   <span className="badge badge-race">⏱ Sınırlı Teklifler</span>
                   <div className="flex-1 h-px" style={{ background: `${raceColor}20` }} />
                   <div className="flex items-center gap-1 text-text-muted font-display text-[10px]">
-                    <span className="animate-pulse" style={{ color: '#ff3355' }}>●</span>
+                    <span className="animate-pulse shop-pulse" style={{ color: '#ff3355' }}>●</span>
                     <span>{String(countdown.d).padStart(2,'0')}:{String(countdown.h).padStart(2,'0')}:{String(countdown.m).padStart(2,'0')}</span>
                   </div>
                 </div>

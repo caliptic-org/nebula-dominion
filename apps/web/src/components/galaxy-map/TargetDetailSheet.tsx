@@ -5,11 +5,12 @@
  *
  * Galaksi haritasında bir düşman üssüne tıklanınca aşağıdan yükselen tam ekran
  * detail sheet. İçerir:
- *   • Hedef kimlik başlığı (isim, ırk rozeti, koordinatlar)
+ *   • Hedef kimlik başlığı (isim, ırk rozeti, koordinatlar, "Riskli" badge)
  *   • Gezegen görsel önizlemesi (ırk rengi ile animasyonlu plasma orb)
- *   • Savunma gücü bölümü (güç barı + tehdit seviyesi)
- *   • Kaynak ödülü bölümü (mineral/gaz/enerji)
+ *   • Güç karşılaştırma — Sen vs Düşman iki bar yan yana (playerPower verildiyse)
+ *   • Garnizon (tahmini birim) + Defans Sistemi intel chip'leri
  *   • Irka özgü tehdit göstergesi
+ *   • Kaynak ödülü kartları (mineral/gaz/enerji)
  *   • Saldırı hazırlık CTA + keşfet ikincil aksiyon
  */
 
@@ -25,6 +26,8 @@ export interface TargetDetailSheetProps {
   base: WorldBase | null;
   /** Player's own race, used for threat-level context */
   playerRace?: string;
+  /** Player's strongest base power — used for side-by-side comparison */
+  playerPower?: number;
   /** Called when the user confirms the attack (navigates to battle-prep) */
   onAttack: (base: WorldBase) => void;
   /** Called when the user requests a scout mission */
@@ -44,6 +47,10 @@ interface RaceMeta {
   threatTag: string;
   threatDesc: string;
   icon: string;
+  /** Race-specific defence system shown as intel chip */
+  defenceSystem: string;
+  /** Race-specific garrison unit-density multiplier (units per 100 power) */
+  garrisonDensity: number;
 }
 
 const RACE_META: Record<string, RaceMeta> = {
@@ -54,6 +61,8 @@ const RACE_META: Record<string, RaceMeta> = {
     threatTag: 'BİYO-TEHDİT',
     threatDesc: 'Organik ordu — hızlı üreme, yoğun swarm saldırısı. Uzak mesafe savunması zayıf.',
     icon: '🦠',
+    defenceSystem: 'Organik Kaplama',
+    garrisonDensity: 4.2,
   },
   otomat: {
     label: 'Otomat',
@@ -62,6 +71,8 @@ const RACE_META: Record<string, RaceMeta> = {
     threatTag: 'MEKANİK-TEHDİT',
     threatDesc: 'Zırhlı mekanik ünite — yüksek dayanıklılık, kesin ateş hassasiyeti. Sayısal baskı ile etkisiz.',
     icon: '🤖',
+    defenceSystem: 'Plazma Kalkanı',
+    garrisonDensity: 2.1,
   },
   canavar: {
     label: 'Canavar',
@@ -70,6 +81,8 @@ const RACE_META: Record<string, RaceMeta> = {
     threatTag: 'KABA-GÜÇ-TEHDİT',
     threatDesc: 'Devasa bireysel güç — düşük sayı, yüksek hasar. Çoklu küçük birim tacizine karşı savunmasız.',
     icon: '👹',
+    defenceSystem: 'Kemik Surları',
+    garrisonDensity: 1.4,
   },
   insan: {
     label: 'İnsan',
@@ -78,6 +91,8 @@ const RACE_META: Record<string, RaceMeta> = {
     threatTag: 'STRATEJİK-TEHDİT',
     threatDesc: 'Dengeli ordu — güçlü taktiksel esneklik. Uzun kuşatmada dikkatli ol.',
     icon: '🧑‍🚀',
+    defenceSystem: 'Otomatik Top Hattı',
+    garrisonDensity: 3.0,
   },
   seytan: {
     label: 'Şeytan',
@@ -86,6 +101,8 @@ const RACE_META: Record<string, RaceMeta> = {
     threatTag: 'PSİONİK-TEHDİT',
     threatDesc: 'Psiyonik manipülasyon — moral bozucu efektler, gizli hamleler. Keşif kritik.',
     icon: '👿',
+    defenceSystem: 'Psiyonik Bariyer',
+    garrisonDensity: 2.6,
   },
 };
 
@@ -96,6 +113,8 @@ const FALLBACK_RACE: RaceMeta = {
   threatTag: 'TANIMLANMAMIŞ',
   threatDesc: 'Düşman ırkı tespit edilemedi. Keşif önce tamamlanmalı.',
   icon: '❓',
+  defenceSystem: 'Bilinmeyen',
+  garrisonDensity: 2.5,
 };
 
 // ── Threat level calc ──────────────────────────────────────────────────────
@@ -118,6 +137,25 @@ function estimateRewards(power: number, level: number) {
     gas:     Math.floor(base * 0.6),
     energy:  Math.floor(base * 0.4),
   };
+}
+
+// ── Garrison estimate ──────────────────────────────────────────────────────
+// Units per 100 power scaled by race density; level adds a small flat bonus.
+// Real garrison count will replace this once the backend exposes it.
+function estimateGarrison(power: number, level: number, density: number): number {
+  return Math.max(1, Math.round((power / 100) * density + level * 1.5));
+}
+
+// ── Power comparison classification ────────────────────────────────────────
+// Returns the relative advantage in [-1, 1] (positive = player stronger).
+// Risk = enemy meaningfully stronger than the player (>15% gap).
+function comparePower(playerPower: number, enemyPower: number) {
+  const max = Math.max(playerPower, enemyPower, 1);
+  const playerPct = Math.max(6, Math.round((playerPower / max) * 100));
+  const enemyPct  = Math.max(6, Math.round((enemyPower  / max) * 100));
+  const gap = enemyPower > 0 ? (enemyPower - playerPower) / Math.max(playerPower, 1) : -1;
+  const risky = gap > 0.15;
+  return { playerPct, enemyPct, risky };
 }
 
 // ── Plasma orb canvas ──────────────────────────────────────────────────────
@@ -238,6 +276,137 @@ function StatBar({ label, pct, color, value }: { label: string; pct: number; col
   );
 }
 
+// ── Power compare (player vs enemy) ───────────────────────────────────────
+
+interface PowerCompareBarsProps {
+  playerPower: number;
+  enemyPower:  number;
+  playerColor: string;
+  enemyColor:  string;
+  risky:       boolean;
+}
+
+function PowerCompareBars({
+  playerPower, enemyPower, playerColor, enemyColor, risky,
+}: PowerCompareBarsProps) {
+  const { playerPct, enemyPct } = comparePower(playerPower, enemyPower);
+  const playerBar = useRef<HTMLDivElement>(null);
+  const enemyBar  = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bars: Array<[HTMLDivElement | null, number]> = [
+      [playerBar.current, playerPct],
+      [enemyBar.current,  enemyPct],
+    ];
+    bars.forEach(([el]) => { if (el) el.style.width = '0%'; });
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        bars.forEach(([el, pct]) => { if (el) el.style.width = `${pct}%`; });
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [playerPct, enemyPct]);
+
+  // When the player is stronger, the enemy bar fades and the player bar shines.
+  // When the enemy is stronger (risky), the enemy bar shines amber-red and the player bar fades.
+  const playerOpacity = risky ? 0.55 : 1;
+  const enemyOpacity  = risky ? 1    : 0.55;
+  const enemyTint     = risky ? '#ffb020' : enemyColor; // amber when threatening
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {/* Player row */}
+      <div className="flex flex-col gap-1" style={{ opacity: playerOpacity, transition: 'opacity 400ms ease' }}>
+        <div className="flex items-center justify-between">
+          <span className="font-display text-[9px] uppercase tracking-[0.18em]" style={{ color: 'var(--color-text-muted)' }}>
+            Sen
+          </span>
+          <span className="font-display text-[11px] font-bold" style={{ color: playerColor }}>
+            {playerPower.toLocaleString('tr-TR')}
+          </span>
+        </div>
+        <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <div
+            ref={playerBar}
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: '0%',
+              background: `linear-gradient(90deg, ${playerColor}aa, ${playerColor})`,
+              boxShadow: `0 0 8px ${playerColor}55`,
+              transition: 'width 700ms cubic-bezier(0.32,0.72,0,1)',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Enemy row */}
+      <div className="flex flex-col gap-1" style={{ opacity: enemyOpacity, transition: 'opacity 400ms ease' }}>
+        <div className="flex items-center justify-between">
+          <span className="font-display text-[9px] uppercase tracking-[0.18em]" style={{ color: 'var(--color-text-muted)' }}>
+            Düşman
+          </span>
+          <span className="font-display text-[11px] font-bold" style={{ color: enemyTint }}>
+            {enemyPower.toLocaleString('tr-TR')}
+          </span>
+        </div>
+        <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <div
+            ref={enemyBar}
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: '0%',
+              background: `linear-gradient(90deg, ${enemyTint}aa, ${enemyTint})`,
+              boxShadow: `0 0 8px ${enemyTint}55`,
+              transition: 'width 700ms cubic-bezier(0.32,0.72,0,1) 80ms',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Intel Chip (rectangular intel data card) ──────────────────────────────
+
+function IntelChip({
+  icon, label, value, color,
+}: { icon: string; label: string; value: string | number; color: string }) {
+  const v = typeof value === 'number' ? value.toLocaleString('tr-TR') : value;
+  return (
+    <div
+      className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-2"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '0.625rem',
+      }}
+    >
+      <span
+        className="shrink-0 text-base leading-none"
+        style={{ filter: `drop-shadow(0 0 6px ${color}55)` }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <div className="flex flex-col min-w-0">
+        <span
+          className="font-display text-[8px] uppercase tracking-[0.14em] leading-tight truncate"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          {label}
+        </span>
+        <span
+          className="font-display text-[12px] font-bold leading-tight truncate"
+          style={{ color, textShadow: `0 0 8px ${color}40` }}
+          title={String(value)}
+        >
+          {v}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── Resource Reward Card ──────────────────────────────────────────────────
 
 function RewardCard({ icon, label, value, color }: { icon: string; label: string; value: number; color: string }) {
@@ -287,6 +456,7 @@ export function TargetDetailSheet({
   visible,
   base,
   playerRace,
+  playerPower,
   onAttack,
   onScout,
   onClose,
@@ -301,12 +471,21 @@ export function TargetDetailSheet({
 
   if (!rendered && !visible) return null;
 
-  const race    = base?.race?.toLowerCase() ?? '';
-  const raceMeta = RACE_META[race] ?? FALLBACK_RACE;
-  const power   = base?.power ?? 0;
-  const level   = base?.level ?? 1;
-  const threat  = getThreatLevel(power);
-  const rewards = estimateRewards(power, level);
+  const race      = base?.race?.toLowerCase() ?? '';
+  const raceMeta  = RACE_META[race] ?? FALLBACK_RACE;
+  const power     = base?.power ?? 0;
+  const level     = base?.level ?? 1;
+  const threat    = getThreatLevel(power);
+  const rewards   = estimateRewards(power, level);
+  const garrison  = estimateGarrison(power, level, raceMeta.garrisonDensity);
+
+  // Player race tint — used as the comparison-bar colour for the player row.
+  const playerRaceMeta = playerRace ? RACE_META[playerRace.toLowerCase()] : undefined;
+  const playerColor    = playerRaceMeta?.color ?? '#4a9eff';
+  const hasComparison  = typeof playerPower === 'number' && playerPower > 0;
+  const cmp = hasComparison
+    ? comparePower(playerPower!, power)
+    : { playerPct: 0, enemyPct: 0, risky: false };
 
   const isAttackPending = pendingActionId === 'attack';
   const isScoutPending  = pendingActionId === 'scout';
@@ -440,6 +619,21 @@ export function TargetDetailSheet({
                   >
                     ⚠ {threat.level}
                   </span>
+                  {hasComparison && cmp.risky && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-display text-[8px] uppercase tracking-[0.14em] font-bold"
+                      style={{
+                        background: 'rgba(255,176,32,0.14)',
+                        border:     '1px solid rgba(255,176,32,0.40)',
+                        color:      '#ffb020',
+                        textShadow: '0 0 8px rgba(255,176,32,0.45)',
+                      }}
+                      aria-label="Riskli hedef — düşman daha güçlü"
+                    >
+                      <span aria-hidden>⚠</span>
+                      Riskli
+                    </span>
+                  )}
                 </div>
 
                 {/* Base name */}
@@ -521,12 +715,38 @@ export function TargetDetailSheet({
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <StatBar
-                    label="Savunma Gücü"
-                    pct={threat.pct}
-                    color={threat.color}
-                    value={power.toLocaleString('tr-TR')}
-                  />
+                  {hasComparison ? (
+                    <PowerCompareBars
+                      playerPower={playerPower!}
+                      enemyPower={power}
+                      playerColor={playerColor}
+                      enemyColor={threat.color}
+                      risky={cmp.risky}
+                    />
+                  ) : (
+                    <StatBar
+                      label="Savunma Gücü"
+                      pct={threat.pct}
+                      color={threat.color}
+                      value={power.toLocaleString('tr-TR')}
+                    />
+                  )}
+
+                  {/* Intel chips: Garnizon + Defans Sistemi */}
+                  <div className="flex gap-2">
+                    <IntelChip
+                      icon="👥"
+                      label="Garnizon"
+                      value={`~${garrison.toLocaleString('tr-TR')} birim`}
+                      color="#e8e8f0"
+                    />
+                    <IntelChip
+                      icon="🛡"
+                      label="Defans Sistemi"
+                      value={raceMeta.defenceSystem}
+                      color={raceMeta.color}
+                    />
+                  </div>
 
                   {/* Threat indicator text */}
                   <div

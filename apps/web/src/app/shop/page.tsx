@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -150,10 +150,28 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
   more: '/settings',
 };
 
+// /vip route redirects here with ?tab=vip. Honour the param so the player
+// actually lands on the VIP section instead of the default "genel" tab.
+// Wrap useSearchParams in a Suspense boundary per Next 14 App Router.
 export default function ShopPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShopPageInner />
+    </Suspense>
+  );
+}
+
+const TAB_KEYS: Tab[] = ['genel', 'vip', 'lonca', 'etkinlik', 'gecis'];
+
+function ShopPageInner() {
   const race = useNDRace();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('genel');
+  const searchParams = useSearchParams();
+  const initialTab = (() => {
+    const t = searchParams.get('tab');
+    return t && (TAB_KEYS as string[]).includes(t) ? (t as Tab) : 'genel';
+  })();
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [currency, setCurrency] = useState<Currency>('gem');
   const promoTimer = useCountdown(2 * 86_400 + 4 * 3_600);
 

@@ -849,6 +849,29 @@ export default function EventsPage() {
           </Caption>
         </div>
 
+        {/* Demo-data warning — the EVENTS array below is a fixed
+         *  catalog from page-design time, not a live /api/events feed.
+         *  Mark this prominently so players don't think a "Zerg
+         *  Hâkimiyet · Sezon I" tournament is actually running today. */}
+        <div
+          role="note"
+          style={{
+            padding: '8px 12px',
+            border: `1px dashed ${ND.warn}66`,
+            borderRadius: 4,
+            background: `${ND.warn}11`,
+            fontFamily: ND.mono,
+            fontSize: 10,
+            letterSpacing: '0.04em',
+            color: ND.textDim,
+          }}
+        >
+          <strong style={{ color: ND.warn }}>ÖRNEK İÇERİK ·</strong>{' '}
+          Etkinlik kataloğu henüz arka uça bağlı değil — bu listede
+          gördüğün turnuva, sezon ve takvim örnek görünümdür. Canlı
+          etkinlik akışı yakında.
+        </div>
+
         {/* Featured banner */}
         {showFeatured && featured && (
           <section aria-labelledby="featured-heading">

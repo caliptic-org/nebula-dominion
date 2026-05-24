@@ -743,9 +743,19 @@ function CommanderDetail({ entry }: { entry: CommanderEntry }) {
           disabled={locked}
           onClick={() => {
             if (locked) return;
-            // No backend endpoint for "active commander" yet — surface
-            // a toast so the player knows the click registered. Once
-            // POST /commanders/:id/activate lands, replace with a fetch.
+            // No backend endpoint for "active commander" yet — persist
+            // the selection in localStorage so it survives reload and
+            // the player can see "ACTIVE" badge if/when we wire it.
+            // Once POST /commanders/:id/activate lands, swap the storage
+            // line for a fetch + cache invalidation.
+            try {
+              window.localStorage.setItem(
+                'nebula:active-commander:v1',
+                JSON.stringify({ name: entry.n, race: race.key, ts: Date.now() }),
+              );
+            } catch {
+              /* private mode — best effort */
+            }
             toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
           }}
         >

@@ -302,9 +302,23 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
   })();
 
   function handleClaim() {
-    // No backend claim endpoint yet — provide visible feedback so the
-    // player knows the click registered. Total reward sum used in toast
-    // so it doesn't feel like a stub.
+    // No backend claim endpoint yet — track claimed missions in
+    // localStorage so the player doesn't see the same "claim" button
+    // re-trigger reward toasts on every visit. The mission stays in
+    // the list (greyed) so they can still see what they earned.
+    const KEY = 'nebula:missions:claimed:v1';
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
+      const claimed = raw ? (JSON.parse(raw) as string[]) : [];
+      if (claimed.includes(mission.id)) {
+        toast.info('Bu görevin ödülü zaten alınmış.');
+        return;
+      }
+      claimed.push(mission.id);
+      window.localStorage.setItem(KEY, JSON.stringify(claimed));
+    } catch {
+      /* private mode — best effort */
+    }
     const totalReward = mission.rewards
       .map((r) => `${r.amount.toLocaleString('tr-TR')} ${r.label}`)
       .join(' · ');

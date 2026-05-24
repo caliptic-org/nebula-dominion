@@ -29,6 +29,7 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useBaseState } from '@/hooks/useBaseState';
 import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { useGameBuildings, indexBuildingsByType } from '@/hooks/useGameBuildings';
 
 export default function BaseHomePage() {
   const race = useNDRace();
@@ -53,6 +54,20 @@ export default function BaseHomePage() {
   // for yet; energy is the closest live analogue so the HUD's third pill
   // surfaces a real number too.
   const resCrystal = resources ? formatResource(resources.energy) : '42';
+
+  // Live buildings — used to show the real level + status (constructing
+  // vs active) on the focused-building card. The slot-slug → backend type
+  // mapping is duplicated from /base/build; the focusedBuilding's slug is
+  // hashed to a likely-type via the same first letters.
+  const { data: liveBuildings } = useGameBuildings();
+  const bldgIndex = liveBuildings ? indexBuildingsByType(liveBuildings) : null;
+  // Coarse slug→type fallback: when the player owns ≥1 instance of any
+  // building type, the focused slot picks the first one to surface its
+  // level. Once we share SLUG_TO_BACKEND_TYPE between /base + /base/build
+  // this becomes a precise lookup.
+  const focusedLiveBuilding = bldgIndex
+    ? Array.from(bldgIndex.values())[focusedIdx]?.[0] ?? null
+    : null;
   const liveTrailing = live?.tier
     ? live.tier.isMaxLevel
       ? 'MAKS'
@@ -251,8 +266,26 @@ export default function BaseHomePage() {
                     <H3 style={{ color: ND.text, fontSize: 12 }}>
                       {focusedBuilding.n.toUpperCase()}
                     </H3>
-                    <Chip color={race.primary}>
-                      {focusedBuilding.locked ? 'KİLİTLİ' : 'AKTİF'}
+                    {/* When the player owns this slot, replace the static
+                     *  KİLİTLİ/AKTİF chip with the live status from
+                     *  /api/buildings (constructing / active / destroyed).
+                     *  Includes the real level so "Lv N" is visible. */}
+                    <Chip
+                      color={
+                        focusedBuilding.locked
+                          ? ND.textMute
+                          : focusedLiveBuilding?.status === 'constructing'
+                            ? ND.warn
+                            : race.primary
+                      }
+                    >
+                      {focusedBuilding.locked
+                        ? 'KİLİTLİ'
+                        : focusedLiveBuilding
+                          ? focusedLiveBuilding.status === 'constructing'
+                            ? 'İNŞA EDİLİYOR'
+                            : `AKTİF · Lv ${focusedLiveBuilding.level}`
+                          : 'YAPILMAMIŞ'}
                     </Chip>
                   </div>
                   <Caption style={{ fontSize: 11, marginTop: 2 }}>

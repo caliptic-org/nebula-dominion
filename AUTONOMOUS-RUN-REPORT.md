@@ -214,9 +214,9 @@ After the initial run, kept going on these:
   `href="#"` that refreshed the page.
 
 **Crawler final state**
-- 39/40 routes: 100% clean (0 console errors, 0 4xx, 0 JS exceptions).
-- /formation: 3 silent 404s (backend formation endpoints don't exist)
-  but renders empty-state without crashing.
+- **🎉 40/40 routes 100% clean** (0 console errors, 0 4xx, 0 JS exceptions).
+- /formation 404s closed via new FormationsModule stub + JWT header
+  on formation-api `call()`.
 
 ## Round 6 follow-ups (last extension)
 

@@ -100,7 +100,7 @@ export async function fetchCosmetics(): Promise<CosmeticItem[]> {
     await delay(350);
     return getMockInventory().map((c) => ({ ...c }));
   }
-  const data = await call<CosmeticDTO[]>('/api/cosmetics');
+  const data = await call<CosmeticDTO[]>('/api/v1/cosmetics');
   return data.map(dtoToItem);
 }
 
@@ -109,7 +109,7 @@ export async function fetchBalance(): Promise<number> {
     await delay(250);
     return mockBalance;
   }
-  const data = await call<BalanceDTO>('/api/user/balance');
+  const data = await call<BalanceDTO>('/api/v1/user/balance');
   return data.gems;
 }
 

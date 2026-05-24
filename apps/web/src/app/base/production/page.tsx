@@ -19,6 +19,9 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
+import { useBaseState } from '@/hooks/useBaseState';
+import { formatResource, useGameResources } from '@/hooks/useGameResources';
 import '@/styles/production-queue.css';
 
 const PRODUCTION_NAMES: Record<string, string> = {
@@ -72,11 +75,39 @@ export default function ProductionPage() {
   const [tab, setTab] = useState(0);
   const [selected, setSelected] = useState(0);
   const [count, setCount] = useState(1);
+  // Live HUD pipes (same as /base and /base/build). resA/resB/crystal
+  // mirror server values when logged in; fall back to mock balances so the
+  // production queue is still testable while unauthenticated.
+  const { data: live } = useBaseState();
+  const liveLevel = live?.tier?.currentLevel;
+  const liveTierName = live?.tier?.raceSpecificTierName ?? live?.tier?.currentTierName;
+  const { data: resources } = useGameResources();
+
+  // Local resource state still tracks "what the player WOULD spend" — we
+  // reconcile against live data on the HUD. Real spend lands when the
+  // train POST is wired (TODO: replace handleAdd with /units/train).
   const [crystal, setCrystal] = useState(42);
   const [resA, setResA] = useState(12_480);
   const [resB, setResB] = useState(3_210);
+  // When live resources land, replace the local fallback once.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    if (!resources) return;
+    setResA(resources.mineral);
+    setResB(resources.gas);
+    setCrystal(resources.energy);
+    hydrated.current = true;
+  }, [resources]);
 
-  const units: UnitDef[] = useMemo(() => buildUnits(race), [race]);
+  // Live backend unit configs (race-specific). Overlay onto the first 5
+  // race-flavoured slots when available; mock numbers fill in if the fetch
+  // fails or the player isn't logged in (endpoint is public anyway).
+  const { configs: backendUnits } = useUnitConfigs(race.key);
+  const units: UnitDef[] = useMemo(
+    () => buildUnits(race, backendUnits),
+    [race, backendUnits],
+  );
   const [queue, setQueue] = useState<QueueItem[]>(() => buildInitialQueue(race));
   const [flashId, setFlashId] = useState<string | null>(null);
 
@@ -233,11 +264,11 @@ export default function ProductionPage() {
 
         <HUD
           race={race}
-          level={9}
-          levelName="Metropol"
-          resA={formatNumber(resA)}
-          resB={formatNumber(resB)}
-          crystal={String(crystal)}
+          level={liveLevel ?? 9}
+          levelName={liveTierName ?? 'Metropol'}
+          resA={resources ? formatResource(resources.mineral) : formatNumber(resA)}
+          resB={resources ? formatResource(resources.gas) : formatNumber(resB)}
+          crystal={resources ? formatResource(resources.energy) : String(crystal)}
         />
 
         {/* Production flow */}
@@ -810,7 +841,8 @@ function EmptySlot({ race, index }: { race: NDRace; index: number }) {
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
-function buildUnits(race: NDRace): UnitDef[] {
+function buildUnits(race: NDRace, backend: UnitConfigDto[]): UnitDef[] {
+  const fmt = (n: number) => n.toLocaleString('tr-TR');
   return race.units.slice(0, 5).map((u, i) => {
     const rows: [string, string, number][] = [
       ['80',    '20',   24],
@@ -820,12 +852,13 @@ function buildUnits(race: NDRace): UnitDef[] {
       ['2,800', '1,000', 1800],
     ];
     const row = rows[i] ?? rows[rows.length - 1];
+    const live = backend[i];
     return {
       name: u.n,
-      tier: u.t,
-      costA: row[0],
-      costB: row[1],
-      durationSec: row[2],
+      tier: live?.tier ?? u.t,
+      costA: live?.cost ? fmt(live.cost.mineral) : row[0],
+      costB: live?.cost ? fmt(live.cost.gas) : row[1],
+      durationSec: live?.trainTimeSeconds ?? row[2],
     };
   });
 }

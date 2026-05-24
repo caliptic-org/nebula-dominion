@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { COMMANDERS, RACE_THEMES, Commander, RaceTheme } from '../data';
 import { SLOT_META, SLOT_ORDER } from '@/types/equipment';
+import { toast } from '@/components/handoff/Toaster';
 
 /* ── Skill tree configuration ─────────────────────────────────────────────── */
 const SKILL_LEVEL_GATES = [1, 3, 5, 7] as const;
@@ -636,6 +637,13 @@ function EquipmentPanel({
                 key={slot}
                 type="button"
                 disabled={locked}
+                onClick={() => {
+                  if (locked) return;
+                  // Equipment picker doesn't exist yet — surface a toast so
+                  // the tap is at least felt. Once /equipment/inventory lands
+                  // we open a drawer with available items for this slot.
+                  toast.info(`${meta.label} slotu — envanter yakında açılacak`);
+                }}
                 className="relative flex flex-col items-center justify-center gap-1.5 rounded-xl border transition-all duration-200 group"
                 style={{
                   height: 84,

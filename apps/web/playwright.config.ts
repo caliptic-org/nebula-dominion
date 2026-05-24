@@ -38,6 +38,15 @@ export default defineConfig({
       testMatch: /map\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: WEB_BASE },
     },
+    {
+      // Autonomous QA crawler — visits every route and reports per-route
+      // failures (console errors, 4xx/5xx, JS exceptions). Run via:
+      //   pnpm exec playwright test --project=crawl
+      name: 'crawl',
+      testMatch: /route-crawl\.spec\.ts/,
+      timeout: 15 * 60 * 1000,
+      use: { ...devices['Desktop Chrome'], baseURL: WEB_BASE },
+    },
   ],
 
   webServer: {

@@ -452,57 +452,56 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
 /* Slot-slug → backend BuildingType enum string mapping.
  *
  * The race tokens carry race-flavoured names ("Komuta Üssü", "Kovan
- * Çekirdeği") that the design needs; the game-server backend has 16
- * generic StarCraft-style types (COMMAND_CENTER, BARRACKS, NANO_FORGE…)
- * with the actual cost/time/cap rules. Each race's 6 slots map onto a
- * sensible backend type so the POST /buildings call can succeed.
+ * Çekirdeği") that the design needs; the game-server's DB enum
+ * `buildings_type_enum` currently exposes 8 generic types (command_center,
+ * mine, refinery, barracks, hangar, research_lab, shield_generator, turret).
+ * Each race's 6 slots map onto the closest generic equivalent so POST
+ * /buildings doesn't reject on enum validation.
  *
- * Capital slot (index 0 for every race) → COMMAND_CENTER, the only
- * universal mapping. The remaining 5 are race-flavoured to the closest
- * generic equivalent. New backend types can be added without touching
- * this table — slugs without a mapping fall through to `undefined` and
- * the BAŞLAT handler reports "arka uç eşlemesi yok" instead of firing
- * a guaranteed 400. */
+ * The TS BuildingType enum in apps/game-server/src/buildings/entities has
+ * additional names (academy, factory, spawning_pool, nano_forge…) but
+ * those aren't in the live DB schema yet — a future migration will reconcile
+ * the two and this table can expand without touching the BAŞLAT handler. */
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // Insan — sleek military sci-fi
   komuta_ussu:        'command_center',
-  reaktor_modulu:     'solar_plant',
+  reaktor_modulu:     'refinery',
   kisla:              'barracks',
-  bilim_akademisi:    'academy',
+  bilim_akademisi:    'research_lab',
   subspace_anteni:    'shield_generator',
-  genetik_lab:        'factory',
+  genetik_lab:        'hangar',
 
   // Zerg — organic hive
   kovan_cekirdegi:    'command_center',
-  biyokutle_havuzu:   'mineral_extractor',
-  mutasyon_cukuru:    'spawning_pool',
-  genom_tumsegi:      'hatchery',
+  biyokutle_havuzu:   'mine',
+  mutasyon_cukuru:    'barracks',
+  genom_tumsegi:      'research_lab',
   yutucu_tumsek:      'shield_generator',
-  subspace_damari:    'factory',
+  subspace_damari:    'hangar',
 
   // Otomat — cybernetic
   sonsuzluk_cekirdegi:'command_center',
-  veri_kaynagi:       'solar_plant',
-  montaj_hatti:       'nano_forge',
-  mantik_matrisi:     'cyber_core',
-  cihaz_hazinesi:     'quantum_reactor',
-  subspace_cozucu:    'defense_matrix',
+  veri_kaynagi:       'refinery',
+  montaj_hatti:       'hangar',
+  mantik_matrisi:     'research_lab',
+  cihaz_hazinesi:     'shield_generator',
+  subspace_cozucu:    'turret',
 
   // Canavar — primal tribal
   alfa_tahti:         'command_center',
-  av_kampi:           'mineral_extractor',
+  av_kampi:           'mine',
   vahsi_cukur:        'barracks',
-  atalar_sunagi:      'gas_refinery',
+  atalar_sunagi:      'refinery',
   atalar_magarasi:    'shield_generator',
-  boyut_yarigi:       'factory',
+  boyut_yarigi:       'hangar',
 
   // Seytan — dark occult
   karanlik_taht:      'command_center',
-  ruh_toplayici:      'gas_refinery',
+  ruh_toplayici:      'refinery',
   lanet_tapinagi:     'barracks',
-  pakt_sembolu:       'academy',
+  pakt_sembolu:       'research_lab',
   yasak_grimoire:     'shield_generator',
-  yarik_kapisi:       'factory',
+  yarik_kapisi:       'turret',
 };
 
 /* Build the displayed catalog. We always show 6 race-flavoured slots from

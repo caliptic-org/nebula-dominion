@@ -18,6 +18,7 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { formatResource, useGameResources } from '@/hooks/useGameResources';
 import {
   GALAXY_EDGES,
   GALAXY_NODES,
@@ -111,6 +112,10 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string>('co2');
 
+  // Live wallet pipe — keeps the top resource pills accurate as the player
+  // fights / builds in other tabs. Falls back to mock when unauthenticated.
+  const { data: liveResources } = useGameResources();
+
   const selected = GALAXY_NODES.find((n) => n.id === selectedId) ?? null;
   const selectionInfo: SelectionInfo | null = selected
     ? {
@@ -152,7 +157,7 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
         }}
       >
         <a
-          href="/"
+          href="/base"
           aria-label="Geri"
           style={{
             display: 'inline-flex',
@@ -199,8 +204,16 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <ResPill kind={race.resourceA.icon} value="12,480" accent={race.primary} />
-          <ResPill kind={race.resourceB.icon} value="3,210" accent={race.primary} />
+          <ResPill
+            kind={race.resourceA.icon}
+            value={liveResources ? formatResource(liveResources.mineral) : '12,480'}
+            accent={race.primary}
+          />
+          <ResPill
+            kind={race.resourceB.icon}
+            value={liveResources ? formatResource(liveResources.gas) : '3,210'}
+            accent={race.primary}
+          />
         </div>
       </header>
 

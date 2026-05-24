@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { MangaPanel } from '@/components/ui/MangaPanel';
 import { GlowButton } from '@/components/ui/GlowButton';
+import { formatResource, useGameResources } from '@/hooks/useGameResources';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -1062,6 +1063,7 @@ export default function ResearchPage() {
   const [activeCategory, setActiveCategory] = useState<CategoryId>('ekonomi');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryData[]>(INITIAL_CATEGORIES);
+  const { data: liveResources } = useGameResources();
 
   const activeCategoryData = useMemo(
     () => categories.find((c) => c.id === activeCategory)!,
@@ -1178,11 +1180,21 @@ export default function ResearchPage() {
             </div>
           </div>
 
-          {/* Resource mini-bar */}
+          {/* Resource mini-bar — wired to live game-server wallet, mock fallback. */}
           <div className="hidden sm:flex items-center gap-4">
             {[
-              { icon: '💠', label: 'Mineral', value: '12,450', color: 'var(--color-race-insan)' },
-              { icon: '🟢', label: 'Gaz', value: '3,820', color: 'var(--color-success)' },
+              {
+                icon: '💠',
+                label: 'Mineral',
+                value: liveResources ? formatResource(liveResources.mineral) : '12,450',
+                color: 'var(--color-race-insan)',
+              },
+              {
+                icon: '🟢',
+                label: 'Gaz',
+                value: liveResources ? formatResource(liveResources.gas) : '3,820',
+                color: 'var(--color-success)',
+              },
             ].map((r) => (
               <div key={r.label} className="flex items-center gap-1.5">
                 <span className="text-sm">{r.icon}</span>

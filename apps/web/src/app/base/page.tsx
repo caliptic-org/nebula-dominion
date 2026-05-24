@@ -230,9 +230,43 @@ export default function BaseHomePage() {
             </div>
           </Panel>
 
-          {/* quick actions mid-right */}
+          {/* quick actions mid-right — each race's keys route to the
+            * appropriate screen. Unknown keys fall through to a toast
+            * so unwired race actions at least give visual feedback. */}
           <div style={{ position: 'absolute', right: 10, top: '36%' }}>
-            <RaceQuickActions race={race} />
+            <RaceQuickActions
+              race={race}
+              onAction={(key) => {
+                switch (key) {
+                  // İnşa / Doğur / Montaj / Kaz / Pakt → /base/build
+                  case 'build':
+                  case 'spawn':
+                  case 'assemble':
+                  case 'dig':
+                  case 'pact':
+                    router.push('/base/build');
+                    break;
+                  // Eğit / Mutate / Derle / Av / Çağır → /base/production
+                  case 'prod':
+                  case 'mutate':
+                  case 'compile':
+                  case 'hunt':
+                  case 'summon':
+                    router.push('/base/production');
+                    break;
+                  // Terfi / Evrimle / Birleştir / Ye / Mühürle → /merge
+                  case 'merge':
+                  case 'eat':
+                  case 'seal':
+                    router.push('/merge');
+                    break;
+                  default:
+                    // Defensive fallback for any future action key.
+                    // eslint-disable-next-line no-console
+                    console.warn(`[base] unhandled quick action: ${key}`);
+                }
+              }}
+            />
           </div>
 
           {/* selected building card bottom */}
@@ -292,6 +326,7 @@ export default function BaseHomePage() {
                     {focusedBuilding.locked ? focusedBuilding.t : race.capitalDescription}
                   </Caption>
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {/* İnşa Et → catalog (full build list, pre-focused). */}
                     <Link
                       href={`/base/build${
                         focusedBuilding.slug ? `?focus=${focusedBuilding.slug}` : ''
@@ -302,13 +337,15 @@ export default function BaseHomePage() {
                         {lex.actionVerb}
                       </NDButton>
                     </Link>
-                    {/* DETAY routes to the same build catalog but pre-focuses
-                     *  the selected slot, so the player lands on this exact
-                     *  building's costs/upgrade row instead of the first one. */}
+                    {/* DETAY → single-building detail page (image, stats,
+                     *  tabs, upgrade actions). Falls back to /base/build
+                     *  when the slot has no slug (locked / placeholder). */}
                     <Link
-                      href={`/base/build${
-                        focusedBuilding.slug ? `?focus=${focusedBuilding.slug}` : ''
-                      }`}
+                      href={
+                        focusedBuilding.slug
+                          ? `/base/building/${focusedBuilding.slug}`
+                          : '/base/build'
+                      }
                       style={{ textDecoration: 'none' }}
                     >
                       <NDButton race={race} variant="ghost" size="sm">

@@ -1,0 +1,260 @@
+name: Deploy to Production
+
+# Tag-bazlı deploy:
+#   main üstündeki bir commit'e semver tag (v*) push edildiğinde
+#   tetiklenir. Örnek:
+#     git tag v0.1.0 origin/main
+#     git push origin v0.1.0
+#   -> Bu workflow başlar, image tag = pushlanan tag adı.
+#
+# Image versioning: git describe --tags (push edilen tag adı).
+#
+# Acil durumda: workflow_dispatch ile UI'dan manuel çalıştırılabilir.
+# Tag input ZORUNLU — tag-bazlı deploy modelinden sapılmaz.
+#
+# Pattern source: github.com/<caliptic>/.github/workflows/deploy-prod.yml
+#   — aynı self-hosted bastion runner, aynı oc-login + docker push + rollout
+#     akışı. Caliptic backend/web/daemon yerine bizde web/api/game-server.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Semver tag to deploy (e.g. v0.1.0). Required."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # External route — used to push images FROM bastion to OpenShift registry
+  REGISTRY: ${{ secrets.OPENSHIFT_REGISTRY }}
+  # Internal registry — used by OCP pods to pull (cluster-internal DNS)
+  INTERNAL_REGISTRY: image-registry.openshift-image-registry.svc:5000
+  NAMESPACE: ${{ secrets.OPENSHIFT_NAMESPACE }}
+  WEB_IMAGE: nebula-web
+  API_IMAGE: nebula-api
+  GAME_IMAGE: nebula-game-server
+
+jobs:
+  deploy:
+    name: Build & Deploy to OpenShift
+    runs-on: [self-hosted, bastion]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Tag push: github.ref = refs/tags/v* (auto). workflow_dispatch:
+          # use the required `tag` input. Either way, deploy is tag-scoped.
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set image tag
+        id: meta
+        run: |
+          echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" >> $GITHUB_OUTPUT
+
+      # ── OpenShift login ────────────────────────────────────────────────────
+      # redhat-actions/oc-login@v1 still ships with `using: node20` (no v2 or
+      # Node 24 release as of 2026-05). Force the GitHub Actions runner to
+      # execute it under Node 24 anyway — this opts in to the runtime that
+      # becomes the default on 2026-06-02 and removes the deprecation warning.
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@v1
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          namespace: ${{ env.NAMESPACE }}
+          insecure_skip_tls_verify: false
+
+      - name: Login to OpenShift internal registry
+        run: |
+          OC_TOKEN=$(oc whoami --show-token)
+          echo "$OC_TOKEN" | docker login \
+            -u "unused" \
+            --password-stdin \
+            "${{ env.REGISTRY }}"
+
+      # ── Build api ──────────────────────────────────────────────────────────
+      # Same Dockerfile as docker-compose uses, with BuildKit cache mounts
+      # (added in apps/api/Dockerfile) so subsequent pushes reuse pnpm store.
+      - name: Build api image
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --file apps/api/Dockerfile \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:latest" \
+            .
+
+      - name: Push api image
+        run: |
+          push_with_retry() {
+            local image="$1"
+            for attempt in 1 2 3; do
+              echo "Push attempt $attempt: $image"
+              docker push "$image" && return 0
+              echo "Attempt $attempt failed — waiting 15s before retry…"
+              sleep 15
+            done
+            echo "All 3 push attempts failed for $image"
+            return 1
+          }
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}"
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:latest"
+
+      # ── Build game-server ──────────────────────────────────────────────────
+      - name: Build game-server image
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --file apps/game-server/Dockerfile \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:latest" \
+            .
+
+      - name: Push game-server image
+        run: |
+          push_with_retry() {
+            local image="$1"
+            for attempt in 1 2 3; do
+              echo "Push attempt $attempt: $image"
+              docker push "$image" && return 0
+              echo "Attempt $attempt failed — waiting 15s before retry…"
+              sleep 15
+            done
+            echo "All 3 push attempts failed for $image"
+            return 1
+          }
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}"
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:latest"
+
+      # ── Build web ──────────────────────────────────────────────────────────
+      # NEXT_PUBLIC_* must be passed as build args because Next.js inlines
+      # them into the client bundle at `next build` — runtime env vars in the
+      # standalone runner stage are too late. Empty values fall through and
+      # leave the corresponding integration silent.
+      - name: Build web image
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --file apps/web/Dockerfile \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:latest" \
+            --build-arg NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
+            --build-arg NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
+            --build-arg NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \
+            --build-arg NEXT_PUBLIC_FB_PIXEL_ID="${{ secrets.NEXT_PUBLIC_FB_PIXEL_ID }}" \
+            --build-arg NEXT_PUBLIC_SENTRY_DSN="${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
+            --build-arg NEXT_PUBLIC_SENTRY_ENV="production" \
+            --build-arg NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}" \
+            .
+
+      - name: Push web image
+        run: |
+          push_with_retry() {
+            local image="$1"
+            for attempt in 1 2 3; do
+              echo "Push attempt $attempt: $image"
+              docker push "$image" && return 0
+              echo "Attempt $attempt failed — waiting 15s before retry…"
+              sleep 15
+            done
+            echo "All 3 push attempts failed for $image"
+            return 1
+          }
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}"
+          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:latest"
+
+      # ── Sync runtime config ────────────────────────────────────────────────
+      # TypeORM migrations run on api boot (DB_RUN_MIGRATIONS=true in the
+      # nebula-shared ConfigMap) so no separate migration step is required.
+      # If a destructive migration ever ships we'd add a one-off pod step
+      # here, mirroring Caliptic's `migrate up` pattern.
+
+      - name: Sync api/game-server env
+        run: |
+          # Patch live env vars on each deploy — these are CONFIG, not
+          # secrets, and we want them to drift to current values without
+          # waiting for a Terraform apply.
+          oc set env deployment/nebula-api \
+            CORS_ORIGINS="https://nebula.caliptic.com" \
+            NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
+            NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
+            APP_VERSION="${{ steps.meta.outputs.version }}" \
+            -n "$NAMESPACE" || true
+
+          oc set env deployment/nebula-game-server \
+            APP_VERSION="${{ steps.meta.outputs.version }}" \
+            -n "$NAMESPACE" || true
+
+      # ── Deploy api ─────────────────────────────────────────────────────────
+      - name: Deploy api
+        run: |
+          if oc get deployment nebula-api -n "$NAMESPACE" &>/dev/null; then
+            oc set image deployment/nebula-api \
+              api="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+              -n "$NAMESPACE"
+            oc rollout status deployment/nebula-api -n "$NAMESPACE" --timeout=300s
+          else
+            echo "Deployment nebula-api not found — run terraform apply first (initial install)"
+            exit 1
+          fi
+
+      # ── Deploy game-server ─────────────────────────────────────────────────
+      - name: Deploy game-server
+        run: |
+          if oc get deployment nebula-game-server -n "$NAMESPACE" &>/dev/null; then
+            oc set image deployment/nebula-game-server \
+              game-server="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+              -n "$NAMESPACE"
+            oc rollout status deployment/nebula-game-server -n "$NAMESPACE" --timeout=300s
+          else
+            echo "Deployment nebula-game-server not found — run terraform apply first (initial install)"
+            exit 1
+          fi
+
+      # ── Deploy web ─────────────────────────────────────────────────────────
+      - name: Deploy web
+        run: |
+          if oc get deployment nebula-web -n "$NAMESPACE" &>/dev/null; then
+            oc set image deployment/nebula-web \
+              web="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}" \
+              -n "$NAMESPACE"
+            oc rollout status deployment/nebula-web -n "$NAMESPACE" --timeout=300s
+          else
+            echo "Deployment nebula-web not found — run terraform apply first (initial install)"
+            exit 1
+          fi
+
+      # ── Smoke test ─────────────────────────────────────────────────────────
+      - name: Smoke test
+        run: |
+          sleep 5
+          for host in nebula.caliptic.com api-nebula.caliptic.com game-nebula.caliptic.com; do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${host}/" || echo "000")
+            echo "https://${host} → HTTP ${STATUS}"
+            # 2xx, 3xx (redirects), and 401 (api endpoints requiring auth)
+            # are all acceptable post-deploy. 404/5xx fail the smoke test.
+            case "$STATUS" in
+              2*|3*|401|405) echo "✅ ${host} reachable" ;;
+              *) echo "❌ ${host} returned ${STATUS}" ; exit 1 ;;
+            esac
+          done
+
+      # ── Summary ────────────────────────────────────────────────────────────
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "### Deployment successful :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web:** \`${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **API:** \`${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://api-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Game:** \`${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://game-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY

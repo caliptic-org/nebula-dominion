@@ -17,6 +17,49 @@
  * beats touching dozens of service files.
  */
 
+import { RACES, type NDRaceKey } from './nd-tokens';
+
+/* ── Race-flavoured resource labels ───────────────────────────────────── */
+
+/* The backend speaks raw column names (mineral / gas / energy). The HUD
+ * speaks race lore (insan = Kredi / Bilim / Enerji, zerg = Biyokütle /
+ * Genetik / Gen, …). "60 mineral" in an error toast is confusing when
+ * the player's wallet pill says "KREDİ". Resolve the active race from
+ * localStorage (same key the race-confirm flow writes) and map the three
+ * resource slots to the matching lex names. Falls back to neutral
+ * defaults when localStorage is empty or pre-race. */
+const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
+
+function currentRaceKey(): NDRaceKey | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(RACE_COMMITMENT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { race?: string };
+    const r = parsed?.race;
+    if (r && r in RACES) return r as NDRaceKey;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function resourceLabels(): { mineral: string; gas: string; energy: string } {
+  const key = currentRaceKey();
+  if (!key) return { mineral: 'mineral', gas: 'gaz', energy: 'enerji' };
+  const r = RACES[key];
+  // Backend slot → race lex name. Mirrors useHudState's mapping:
+  //   mineral → race.resourceA (Kredi / Biyokütle / Mineral / Vahşi Et / Ruh Özü)
+  //   gas     → race.resourceB (Bilim / Genetik / Hesap / Kan Özü / Karanlık Md.)
+  //   energy  → universal "Enerji" / "Kristal" — keep generic so it doesn't
+  //             conflict with resourceB labels like "Genetik".
+  return {
+    mineral: r.resourceA.name,
+    gas: r.resourceB.name,
+    energy: 'Enerji',
+  };
+}
+
 /* ── Building type code → human-readable Turkish ─────────────────────── */
 
 const BUILDING_TYPE_TR: Record<string, string> = {
@@ -63,7 +106,16 @@ const RULES: Rule[] = [
   },
   {
     re: /^Insufficient resources\. Required: (\d+)M (\d+)G (\d+)E$/,
-    tr: (m) => `Yetersiz kaynak. Gerekli: ${m[1]} mineral, ${m[2]} gaz, ${m[3]} enerji.`,
+    tr: (m) => {
+      const labels = resourceLabels();
+      // Only mention non-zero costs — "0 X" lines just add noise.
+      const parts: string[] = [];
+      if (Number(m[1]) > 0) parts.push(`${m[1]} ${labels.mineral}`);
+      if (Number(m[2]) > 0) parts.push(`${m[2]} ${labels.gas}`);
+      if (Number(m[3]) > 0) parts.push(`${m[3]} ${labels.energy}`);
+      const need = parts.length > 0 ? parts.join(', ') : `${m[1]} ${labels.mineral}`;
+      return `Yetersiz kaynak. Gerekli: ${need}.`;
+    },
   },
   {
     re: /^Building ([\w-]+) not found for player ([\w-]+)\.?$/,

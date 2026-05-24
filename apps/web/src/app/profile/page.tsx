@@ -19,6 +19,7 @@ import {
   type NDRace,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 type Tab = 'stats' | 'achievements' | 'history';
 
@@ -93,16 +94,21 @@ function fmtDuration(sec: number) {
 export default function ProfilePage() {
   const race = useNDRace();
   const [tab, setTab] = useState<Tab>('stats');
+  // Backend profile. When signed-in: handle/level/xp/alliance come from the API;
+  // race-derived placeholders fill in cosmetic fields (title/avatar/capitalBase)
+  // that the backend profile DTO doesn't currently expose. Guests see the full
+  // race-derived placeholder as before.
+  const { profile: live } = useUserProfile();
 
   const profile = useMemo(
     () => ({
-      handle: race.handle,
+      handle: live?.username ?? race.handle,
       title: race.title,
       avatar: race.avatar,
-      allianceTag: race.allianceTag,
+      allianceTag: live?.allianceTag ?? race.allianceTag,
       allianceName: race.allianceName,
       capitalBase: race.capitalBase,
-      level: 47,
+      level: live?.level ?? 47,
       power: 142_800,
       globalRank: 1_247,
       pvpScore: 4_287,
@@ -112,11 +118,11 @@ export default function ProfilePage() {
       battles: 481,
       bestStreak: 17,
       guildContrib: 18_420,
-      xp: 74_200,
+      xp: live?.xp ?? 74_200,
       xpNext: 100_000,
       seasonPass: 68,
     }),
-    [race],
+    [race, live],
   );
 
   const winRate = Math.round((profile.wins / profile.battles) * 100);
@@ -137,7 +143,7 @@ export default function ProfilePage() {
           borderBottom: `1px solid ${race.primary}33`,
         }}
       >
-        <Link href="/dashboard" aria-label="Geri" style={iconBtn()}>
+        <Link href="/base" aria-label="Geri" style={iconBtn()}>
           ‹
         </Link>
         <Sigil race={race} size={28} glow />

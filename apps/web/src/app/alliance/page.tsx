@@ -17,6 +17,7 @@ import {
   Chip,
   Code,
   NDButton,
+  toast,
   useNDRace,
   type NDRace,
   type NDRaceKey,
@@ -142,13 +143,13 @@ export default function AlliancePage() {
           borderBottom: `1px solid ${race.primary}33`,
         }}
       >
-        <Link href="/dashboard" aria-label="Geri" style={iconBtn()}>‹</Link>
+        <Link href="/base" aria-label="Geri" style={iconBtn()}>‹</Link>
         <Sigil race={race} size={28} glow />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Eyebrow color={race.primary}>{race.allianceTag} · İTTİFAK</Eyebrow>
           <H2 style={{ marginTop: 2 }}>{race.allianceName}</H2>
         </div>
-        <Link href="/dashboard/guild" aria-label="Lonca Salonu" style={iconBtn()}>💬</Link>
+        <Link href="/chat?tab=guild" aria-label="Lonca Salonu" style={iconBtn()}>💬</Link>
       </header>
 
       <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '12px 16px 0' }}>
@@ -256,7 +257,13 @@ export default function AlliancePage() {
             {WARS.map(w => (
               <WarCard key={w.id} war={w} myRace={race} />
             ))}
-            <NDButton race={race} full>İttifak Savaşı Bildir</NDButton>
+            <NDButton
+              race={race}
+              full
+              onClick={() => toast.info('Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil')}
+            >
+              İttifak Savaşı Bildir
+            </NDButton>
           </>
         )}
 
@@ -433,8 +440,21 @@ function WarCard({ war, myRace }: { war: WarEntry; myRace: NDRace }) {
           {war.status === 'preparing' && ' · Henüz başlamadı'}
         </Caption>
         <div style={{ display: 'flex', gap: 8 }}>
-          <NDButton race={myRace} variant="primary" full>Katıl</NDButton>
-          <NDButton race={myRace} variant="outline">Strateji</NDButton>
+          <NDButton
+            race={myRace}
+            variant="primary"
+            full
+            onClick={() => toast.success(`${war.opponentTag} savaşına katıldın — slot ${war.slots.filled + 1}/${war.slots.total}`)}
+          >
+            Katıl
+          </NDButton>
+          <NDButton
+            race={myRace}
+            variant="outline"
+            onClick={() => toast.info(`${war.opponentTag} strateji odası yakında`)}
+          >
+            Strateji
+          </NDButton>
         </div>
       </div>
     </Panel>

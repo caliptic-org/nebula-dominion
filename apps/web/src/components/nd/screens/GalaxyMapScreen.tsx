@@ -13,6 +13,7 @@ import {
   Panel,
   ResPill,
   NDButton,
+  toast,
   useNDRace,
   type NDRace,
   type NDRaceKey,
@@ -92,9 +93,17 @@ interface SelectionInfo {
 
 interface Props {
   race?: NDRaceKey;
+  /** Optional live player base summary from `/api/v1/map/state`. When passed,
+   * the top-right HUD shows real level/power numbers instead of decorative
+   * placeholders. */
+  liveBase?: {
+    name: string;
+    level: number;
+    power: number;
+  };
 }
 
-export function GalaxyMapScreen({ race: forcedRace }: Props) {
+export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
   const detectedRace = useNDRace();
   const race = forcedRace ? RACES[forcedRace] : detectedRace;
   const enemy = RACES[race.enemyRace];
@@ -168,6 +177,27 @@ export function GalaxyMapScreen({ race: forcedRace }: Props) {
           </div>
         </div>
         <div style={{ flex: 1 }} />
+        {liveBase && (
+          /* Live player-base pill — real level + power from /api/v1/map/state.
+           * Sits to the left of the resource pills as a confirmation that the
+           * backend reflection of the map is reachable. */
+          <div
+            style={{
+              padding: '4px 10px',
+              border: `1px solid ${race.primary}77`,
+              background: 'rgba(6,8,15,0.8)',
+              fontFamily: ND.mono,
+              fontSize: 10,
+              letterSpacing: '0.10em',
+              color: race.primary,
+              textTransform: 'uppercase',
+              clipPath: 'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
+            }}
+            aria-label="Üs durumu (canlı)"
+          >
+            ◆ {liveBase.name} · Sv.{liveBase.level} · {liveBase.power.toLocaleString('tr-TR')} GÜÇ
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <ResPill kind={race.resourceA.icon} value="12,480" accent={race.primary} />
           <ResPill kind={race.resourceB.icon} value="3,210" accent={race.primary} />
@@ -334,6 +364,7 @@ function NodeDetailPanel({
   enemy: NDRace;
   onAttack: () => void;
 }) {
+  const router = useRouter();
   const { node, ownerColor: c, isEnemy } = info;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -394,7 +425,12 @@ function NodeDetailPanel({
             <NDButton race={enemy} onClick={onAttack} variant="primary" size="md" full>
               SALDIR ⚔
             </NDButton>
-            <NDButton race={race} variant="ghost" size="md">
+            <NDButton
+              race={race}
+              variant="ghost"
+              size="md"
+              onClick={() => toast.info(`${node.label} keşfediliyor — yakında detay paneli açılacak`)}
+            >
               KEŞFET
             </NDButton>
           </>
@@ -403,16 +439,34 @@ function NodeDetailPanel({
             <NDButton race={race} variant="primary" size="md" full onClick={onAttack}>
               FETHET
             </NDButton>
-            <NDButton race={race} variant="ghost" size="md">
+            <NDButton
+              race={race}
+              variant="ghost"
+              size="md"
+              onClick={() => toast.info(`${node.label} taranıyor — yakında detay paneli açılacak`)}
+            >
               KEŞFET
             </NDButton>
           </>
         ) : (
           <>
-            <NDButton race={race} variant="primary" size="md" full>
+            <NDButton
+              race={race}
+              variant="primary"
+              size="md"
+              full
+              onClick={() => {
+                toast.success(`${node.label} savunma kuvvetleri pekiştirildi`);
+              }}
+            >
               SAVUN
             </NDButton>
-            <NDButton race={race} variant="ghost" size="md">
+            <NDButton
+              race={race}
+              variant="ghost"
+              size="md"
+              onClick={() => router.push('/base/build')}
+            >
               GELİŞTİR
             </NDButton>
           </>

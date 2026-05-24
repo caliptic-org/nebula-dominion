@@ -15,6 +15,7 @@ import {
   Panel,
   RACES,
   Sigil,
+  toast,
   type NDRace,
   type NDRaceCmdr,
   type NDRaceKey,
@@ -26,6 +27,20 @@ type Filter = NDRaceKey | 'all';
 
 interface ScrCommandersProps {
   playerRaceKey: NDRaceKey;
+  /** Optional override — when supplied (e.g. from /api/v1/commanders), the
+   * roster is built from these entries instead of RACES tokens. Shape mirrors
+   * the backend stub: `{ id, name, title, race, level, tier, skill, unlocked }`.
+   * The fallback path (no live data) keeps the screen working offline. */
+  liveCommanders?: Array<{
+    id: string;
+    name: string;
+    title: string;
+    race: NDRaceKey;
+    level: number;
+    tier: string;
+    skill: string;
+    unlocked: boolean;
+  }>;
 }
 
 interface CommanderEntry extends NDRaceCmdr {
@@ -88,7 +103,26 @@ function buildRoster(): CommanderEntry[] {
   });
 }
 
-export function ScrCommanders({ playerRaceKey }: ScrCommandersProps) {
+function rosterFromLive(
+  live: NonNullable<ScrCommandersProps['liveCommanders']>,
+): CommanderEntry[] {
+  return live.map<CommanderEntry>((c) => {
+    const race = RACES[c.race];
+    const mappedId = NAME_TO_DATA_ID[c.name];
+    return {
+      n: c.name,
+      t: c.title,
+      lv: c.level,
+      tier: c.tier as NDRaceCmdr['tier'],
+      skill: c.skill,
+      race,
+      id: mappedId ?? c.id,
+      locked: !c.unlocked || c.level === 0,
+    };
+  });
+}
+
+export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersProps) {
   const playerRace = RACES[playerRaceKey];
   const [filter, setFilter] = useState<Filter>('all');
   const [showLockedOnly, setShowLockedOnly] = useState(false);
@@ -100,7 +134,13 @@ export function ScrCommanders({ playerRaceKey }: ScrCommandersProps) {
     }
   }, [playerRaceKey]);
 
-  const roster = useMemo(buildRoster, []);
+  // Prefer the live roster when the page hands it in (sourced from
+  // /api/v1/commanders); otherwise fall back to RACES tokens so the screen
+  // still works for guests and during the initial fetch.
+  const roster = useMemo(
+    () => (liveCommanders && liveCommanders.length > 0 ? rosterFromLive(liveCommanders) : buildRoster()),
+    [liveCommanders],
+  );
   const visible = useMemo(
     () =>
       roster.filter((c) => {
@@ -696,7 +736,19 @@ function CommanderDetail({ entry }: { entry: CommanderEntry }) {
             →
           </span>
         </Link>
-        <NDButton race={race} variant={locked ? 'outline' : 'primary'} full disabled={locked}>
+        <NDButton
+          race={race}
+          variant={locked ? 'outline' : 'primary'}
+          full
+          disabled={locked}
+          onClick={() => {
+            if (locked) return;
+            // No backend endpoint for "active commander" yet — surface
+            // a toast so the player knows the click registered. Once
+            // POST /commanders/:id/activate lands, replace with a fetch.
+            toast.success(`${entry.name} aktif komutan olarak ayarlandı`);
+          }}
+        >
           {locked ? '🔒 Kilidi Aç' : '⚔ Komutan Seç'}
         </NDButton>
       </div>

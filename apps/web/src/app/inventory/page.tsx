@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bar,
   BottomNav,
@@ -17,9 +18,11 @@ import {
   Panel,
   ResIcon,
   Sigil,
+  toast,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 
 const ROSTER_NAMES: Record<string, string> = {
@@ -71,7 +74,15 @@ export default function RosterPage() {
   const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const units: RosterUnit[] = useMemo(() => buildRoster(race), [race]);
+  // Backend stats overlay: ATK / DEF / SPD numbers come from the game-server
+  // unit catalog (race-spesifik). Count / level / state stay synthesized
+  // until the JWT-protected per-player roster (GET /api/units) is wired
+  // (needs cross-service JWT — bkz. Adım 7 sınırlamaları).
+  const { configs: backendUnits } = useUnitConfigs(race.key);
+  const units: RosterUnit[] = useMemo(
+    () => buildRoster(race, backendUnits),
+    [race, backendUnits],
+  );
 
   const visible = useMemo(() => {
     const filtered = tierFilter === 'all' ? units : units.filter((u) => u.tier === tierFilter);
@@ -284,7 +295,9 @@ export default function RosterPage() {
                 {MERGE_VERB[race.key] ?? 'Birleştir'}
               </NDButton>
             </Link>
-            <NDButton race={race} size="md" style={{ flex: 1 }}>FİLO YAP</NDButton>
+            <Link href="/formation" style={{ flex: 1, textDecoration: 'none' }}>
+              <NDButton race={race} size="md" full>FİLO YAP</NDButton>
+            </Link>
           </div>
         )}
 
@@ -308,22 +321,34 @@ function clamp(n: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildRoster(race: NDRace): RosterUnit[] {
+function buildRoster(race: NDRace, backend: UnitConfigDto[]): RosterUnit[] {
   const states: UnitState[] = ['ready', 'fleet', 'wounded'];
   return race.units.map((u, i) => {
     const id = `${race.key}-${u.n}-${i}`;
     const seed = hash(id);
     const baseCount = [86, 42, 26, 14, 6, 2][i] ?? 1;
+    const live = backend[i];
+    // Backend stats are absolute (hp/attack/defense/speed); scale to the
+    // 0-100 display the roster card uses so the bars stay legible.
+    const atk = live?.attack != null
+      ? clamp(Math.round((live.attack as number) * 2))
+      : clamp(u.t * 14 + (seed % 9) + 8);
+    const def = live?.defense != null
+      ? clamp(Math.round((live.defense as number) * 2.5))
+      : clamp(u.t * 11 + ((seed >> 3) % 8) + 6);
+    const spd = live?.speed != null
+      ? clamp(Math.round((live.speed as number) * 14))
+      : clamp(94 - u.t * 12 + ((seed >> 6) % 10));
     return {
       id,
       name: u.n,
-      tier: u.t,
+      tier: live?.tier ?? u.t,
       level: Math.max(1, 10 - i * 2),
       count: baseCount,
       state: states[i % states.length],
-      atk: clamp(u.t * 14 + (seed % 9) + 8),
-      def: clamp(u.t * 11 + ((seed >> 3) % 8) + 6),
-      spd: clamp(94 - u.t * 12 + ((seed >> 6) % 10)),
+      atk,
+      def,
+      spd,
     };
   });
 }
@@ -534,7 +559,17 @@ function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <NDButton race={race} variant="outline" size="md" style={{ flex: 1 }}>
+        <NDButton
+          race={race}
+          variant="outline"
+          size="md"
+          style={{ flex: 1 }}
+          onClick={() => {
+            // No per-unit upgrade endpoint yet; provide visible feedback so
+            // the cost preview at least reads as actionable.
+            toast.success(`${unit.name} Lv ${unit.level + 1}'e yükseltiliyor (-${cost})`);
+          }}
+        >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             Yükselt
             <span style={{ opacity: 0.8 }}>Lv {unit.level} → {unit.level + 1}</span>
@@ -545,9 +580,11 @@ function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
             </span>
           </span>
         </NDButton>
-        <NDButton race={race} size="md" style={{ flex: 1 }}>
-          Savaşa Gönder
-        </NDButton>
+        <Link href={`/battle-prep?unit=${encodeURIComponent(unit.id)}`} style={{ flex: 1, textDecoration: 'none' }}>
+          <NDButton race={race} size="md" full>
+            Savaşa Gönder
+          </NDButton>
+        </Link>
       </div>
     </section>
   );

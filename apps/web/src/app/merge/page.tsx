@@ -17,10 +17,14 @@ import {
   Panel,
   ResIcon,
   Sigil,
+  toast,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
 import { useMergePreview } from '@/hooks/useMergePreview';
+import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
+import { gameServerApi } from '@/lib/game-server-api';
+import { FetchError } from '@/lib/api';
 
 const MERGE_NAMES: Record<NDRaceKey, string> = {
   insan:   'Promosyon Töreni',
@@ -75,7 +79,24 @@ export default function MergePage() {
     selectedCount: selected.length,
     slotCount: SLOT_COUNT,
   });
-  const { promotedTier, promotedName, successRate, projectedRate, canMerge, riskLabel } = preview;
+  // Backend validation layer: once 3 slots are filled, POST the recipe to
+  // /api/v1/units/merge-preview. The server returns canMerge / resultUnitId /
+  // costs / consumed / reasons. We fall back to the deterministic client-side
+  // `preview` when the backend hasn't responded yet so the UI never stalls.
+  const slotUnitIds = useMemo<(string | null)[]>(
+    () => Array.from({ length: SLOT_COUNT }, (_, i) => pool[selected[i]]?.id ?? null),
+    [pool, selected],
+  );
+  const { preview: liveMerge } = useMergePreviewBackend(race.key, slotUnitIds);
+  const promotedTier = liveMerge?.resultTier ?? preview.promotedTier;
+  const promotedName =
+    (liveMerge?.resultUnitId &&
+      race.units.find((u) => u.n.toLowerCase().includes(liveMerge.resultUnitId!.toLowerCase()))?.n) ||
+    preview.promotedName;
+  const { successRate, projectedRate, riskLabel } = preview;
+  // Authoritative `canMerge` comes from backend when present; client estimate
+  // is used only while waiting on the network round-trip.
+  const canMerge = liveMerge ? liveMerge.canMerge : preview.canMerge;
   const risk = { color: riskColor(riskLabel), label: riskLabel };
 
   function toggle(idx: number) {
@@ -86,9 +107,23 @@ export default function MergePage() {
     });
   }
 
-  function performMerge() {
+  async function performMerge() {
     if (!canMerge) return;
+    // Optimistic: clear local selection immediately for snappy feel, then
+    // attempt the real merge POST. Falls back to a toast if the backend
+    // rejects (e.g. resource cost not met).
+    const snapshot = [...selected];
     setSelected([]);
+    try {
+      const ids = snapshot.map((idx) => pool[idx]?.id).filter(Boolean);
+      await gameServerApi.post('/units/merge', { unitIds: ids, targetTier: tier + 1 });
+      toast.success(`Birleştirme başarılı: ${ids.length} birim Tier ${tier + 1}'e yükseltildi`);
+    } catch (err) {
+      // Restore selection so the player can retry without re-picking.
+      setSelected(snapshot);
+      const msg = err instanceof FetchError ? err.message : 'Birleştirme reddedildi';
+      toast.error(msg);
+    }
   }
 
   return (

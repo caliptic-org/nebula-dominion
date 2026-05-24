@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   BaseField,
   BottomNav,
@@ -19,8 +20,16 @@ import {
   Sigil,
   raceLex,
 } from '@/components/handoff';
+import Image from 'next/image';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
+import { useBaseState } from '@/hooks/useBaseState';
+import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { gameServerApi } from '@/lib/game-server-api';
+import { FetchError } from '@/lib/api';
+import { toast } from '@/components/handoff/Toaster';
+import { hasSession } from '@/lib/session';
 
 interface BuildEntry {
   name: string;
@@ -30,28 +39,116 @@ interface BuildEntry {
   costB: number;
   durationSec: number;
   level: number;
+  /** Backend type code (COMMAND_CENTER, MINERAL_EXTRACTOR…) when matched. */
+  backendType?: string;
+  /** Path to the 512×512 building art generated via scripts/comfy-gen.js.
+   * Empty when the slug from RACES tokens doesn't have a rendered asset. */
+  assetPath?: string;
 }
 
 export default function BuildMenuPage() {
+  // Suspense wrapper required because useSearchParams suspends during SSR
+  // pre-render. Without it, Next 14 errors at build time on this route.
+  return (
+    <Suspense fallback={null}>
+      <BuildMenuInner />
+    </Suspense>
+  );
+}
+
+function BuildMenuInner() {
   const race = useNDRace();
   const lex = raceLex(race.key);
+  const params = useSearchParams();
+  const focusSlug = params.get('focus');
   const [activeTab, setActiveTab] = useState(0);
   const [selectedName, setSelectedName] = useState<string | null>(null);
 
-  const catalog = useMemo<BuildEntry[]>(() => buildCatalog(race), [race]);
+  // Live tier progress — same pipe /base uses. Drives the HUD's level and
+  // tier name; falls back to mock when there's no JWT or the API errors.
+  const { data: live } = useBaseState();
+  const liveLevel = live?.tier?.currentLevel;
+  const liveTierName = live?.tier?.raceSpecificTierName ?? live?.tier?.currentTierName;
+
+  // Same live wallet pipe as /base — keeps the resources pill consistent
+  // across the two screens (no flicker when the player navigates).
+  const { data: resources } = useGameResources();
+  const resA = resources ? formatResource(resources.mineral) : '12,480';
+  const resB = resources ? formatResource(resources.gas) : '3,210';
+  const resCrystal = resources ? formatResource(resources.energy) : '42';
+
+  // Live backend config: cost / build time / max-per-player numbers from
+  // game-server's BUILDING_CONFIGS. Used to overlay real values on the
+  // race-flavoured slots; if the fetch fails we keep the mock numbers.
+  const { types: backendTypes } = useBuildingTypes();
+  const catalog = useMemo<BuildEntry[]>(
+    () => buildCatalog(race, backendTypes, liveLevel ?? null),
+    [race, backendTypes, liveLevel],
+  );
   const lockedCount = catalog.filter((c) => c.locked).length;
+
+  // Preselect the building the player tapped on /base (?focus=<slug>).
+  // Falls through to the local state once the user clicks another card.
+  useEffect(() => {
+    if (!focusSlug) return;
+    const match = race.buildings.find((b) => b.slug === focusSlug);
+    if (match) setSelectedName(match.n);
+  }, [focusSlug, race]);
+
   const selected = catalog.find((c) => c.name === selectedName) ?? catalog[0];
+
+  const [busy, setBusy] = useState(false);
+  async function handleStartBuild() {
+    if (!selected || busy) return;
+    if (selected.locked) {
+      toast.error('Bu yapı henüz kilitli');
+      return;
+    }
+    if (!hasSession()) {
+      toast.error('Giriş yapmadan inşaat başlatılamaz');
+      return;
+    }
+    const type = selected.backendType;
+    if (!type) {
+      // The race-flavoured catalog has 6 slots but the backend type table
+      // exposes 16 generic types; if the matched slot lacks a backendType,
+      // we can't safely fire POST /buildings. Fall back to a clear toast
+      // until the slug↔type mapping is added (gap #75).
+      toast.info(`${selected.name} için arka uç eşlemesi yok — yakında`);
+      return;
+    }
+    setBusy(true);
+    try {
+      // Pick a random unoccupied-ish tile. Without the live `buildings`
+      // roster we can't truly check occupation, but the 8×8 grid the
+      // backend uses gives plenty of room for the first few placements.
+      const positionX = Math.floor(Math.random() * 8);
+      const positionY = Math.floor(Math.random() * 8);
+      await gameServerApi.post('/buildings', { type, positionX, positionY });
+      toast.success(`${selected.name} inşaatı başlatıldı (${selected.durationSec}s)`);
+    } catch (err) {
+      const message =
+        err instanceof FetchError
+          ? `İnşaat reddedildi: ${err.message}`
+          : err instanceof Error
+          ? err.message
+          : 'Bilinmeyen hata';
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div data-race={race.key} style={{ position: 'relative', minHeight: '100dvh' }}>
       <Screen race={race} dim={0.55} style={{ minHeight: '100dvh' }}>
         <HUD
           race={race}
-          level={9}
-          levelName="Metropol"
-          resA="12,480"
-          resB="3,210"
-          crystal="42"
+          level={liveLevel ?? 9}
+          levelName={liveTierName ?? 'Metropol'}
+          resA={resA}
+          resB={resB}
+          crystal={resCrystal}
         />
 
         <div
@@ -166,16 +263,27 @@ export default function BuildMenuPage() {
 
             {/* CTAs */}
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <NDButton race={race} variant="ghost" size="md" style={{ flex: 1 }}>
+              <NDButton
+                race={race}
+                variant="ghost"
+                size="md"
+                style={{ flex: 1 }}
+                onClick={() => toast.info('Filtre yakında — şu anda tüm yapılar listede')}
+              >
                 FİLTRE
               </NDButton>
               <NDButton
                 race={race}
                 size="md"
                 style={{ flex: 2 }}
-                disabled={selected?.locked ?? false}
+                disabled={(selected?.locked ?? false) || busy}
+                onClick={handleStartBuild}
               >
-                {selected ? `${lex.actionVerb} BAŞLAT · ${selected.name}` : `${lex.actionVerb} BAŞLAT`}
+                {busy
+                  ? 'GÖNDERİLİYOR…'
+                  : selected
+                    ? `${lex.actionVerb} BAŞLAT · ${selected.name}`
+                    : `${lex.actionVerb} BAŞLAT`}
               </NDButton>
             </div>
           </div>
@@ -197,6 +305,15 @@ interface BuildingCardProps {
 }
 
 function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
+  // Asset placeholder: many of the 30 ComfyUI building renders take ~5 min
+  // each, so during a fresh sweep some PNGs won't exist yet on disk. Track
+  // image-load failures locally and fall back to the original SVG silhouette
+  // so the card never shows a broken placeholder. Resets when the slug
+  // (asset path) changes — useful when sweep finishes and user reloads.
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [entry.assetPath]);
+  const showImage = !!entry.assetPath && !imgFailed;
+
   return (
     <button
       type="button"
@@ -220,8 +337,14 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
         <div
           aria-hidden
           style={{
-            height: 64,
+            // Image area boosted from 64 -> 140 so the full iso building is
+            // visible without cropping. objectFit: 'contain' (vs 'cover')
+            // shows the whole 512×512 ComfyUI render scaled down to fit,
+            // never overlapping the text rows below. Cards can stretch
+            // downward freely — the grid uses auto rows.
+            aspectRatio: '1 / 1',
             position: 'relative',
+            overflow: 'hidden',
             background: `linear-gradient(180deg, ${race.primary}11, transparent)`,
             border: `1px dashed ${race.primary}44`,
             display: 'flex',
@@ -229,26 +352,50 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
             justifyContent: 'center',
           }}
         >
-          <svg width="48" height="40" viewBox="0 0 48 40" aria-hidden="true">
-            <path
-              d="M 4 28 L 24 14 L 44 28 L 24 36 Z"
-              fill="rgba(40,52,76,0.85)"
-              stroke={race.primary}
-              strokeWidth="0.8"
+          {showImage && entry.assetPath ? (
+            // ComfyUI-generated iso building art (512×512). After strip-bg.py
+            // the assets are transparent — `contain` keeps the whole silhouette
+            // visible with race-tinted bg gradient peeking through behind it.
+            // The bottom-fade mask still helps blend the small base platform
+            // on unstripped assets but is a soft no-op on transparent ones.
+            <Image
+              src={entry.assetPath}
+              alt={entry.name}
+              fill
+              sizes="(max-width: 480px) 30vw, 180px"
+              style={{
+                objectFit: 'contain',
+                filter: entry.locked ? 'grayscale(0.7)' : undefined,
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, black 0%, black 80%, transparent 100%)',
+                maskImage:
+                  'linear-gradient(to bottom, black 0%, black 80%, transparent 100%)',
+              }}
+              priority={false}
+              onError={() => setImgFailed(true)}
             />
-            <path
-              d="M 4 28 L 4 32 L 24 40 L 24 36 Z"
-              fill="#0C1224"
-              stroke={`${race.primary}aa`}
-              strokeWidth="0.5"
-            />
-            <path
-              d="M 44 28 L 44 32 L 24 40 L 24 36 Z"
-              fill="#070B17"
-              stroke={`${race.primary}88`}
-              strokeWidth="0.5"
-            />
-          </svg>
+          ) : (
+            <svg width="48" height="40" viewBox="0 0 48 40" aria-hidden="true">
+              <path
+                d="M 4 28 L 24 14 L 44 28 L 24 36 Z"
+                fill="rgba(40,52,76,0.85)"
+                stroke={race.primary}
+                strokeWidth="0.8"
+              />
+              <path
+                d="M 4 28 L 4 32 L 24 40 L 24 36 Z"
+                fill="#0C1224"
+                stroke={`${race.primary}aa`}
+                strokeWidth="0.5"
+              />
+              <path
+                d="M 44 28 L 44 32 L 24 40 L 24 36 Z"
+                fill="#070B17"
+                stroke={`${race.primary}88`}
+                strokeWidth="0.5"
+              />
+            </svg>
+          )}
         </div>
 
         <div
@@ -261,7 +408,15 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
           }}
         >
           <H3 style={{ color: ND.text, fontSize: 10 }}>{entry.name}</H3>
-          {entry.locked ? <Chip>KİLİT</Chip> : <Chip color={race.primary}>Lv {entry.level}</Chip>}
+          {entry.locked ? (
+            <Chip>KİLİT</Chip>
+          ) : entry.level > 0 ? (
+            <Chip color={race.primary}>Lv {entry.level}</Chip>
+          ) : (
+            // No backend-known level for this slot yet → don't lie with "Lv 0".
+            // Player can build/upgrade from here; the chip says so plainly.
+            <Chip>YENİ</Chip>
+          )}
         </div>
 
         <Caption style={{ fontSize: 10, marginTop: 2 }}>{entry.desc}</Caption>
@@ -294,17 +449,93 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
 
 /* ─── Catalog builder ──────────────────────────────────────────────────── */
 
-function buildCatalog(race: NDRace): BuildEntry[] {
+/* Slot-slug → backend BuildingType enum string mapping.
+ *
+ * The race tokens carry race-flavoured names ("Komuta Üssü", "Kovan
+ * Çekirdeği") that the design needs; the game-server backend has 16
+ * generic StarCraft-style types (COMMAND_CENTER, BARRACKS, NANO_FORGE…)
+ * with the actual cost/time/cap rules. Each race's 6 slots map onto a
+ * sensible backend type so the POST /buildings call can succeed.
+ *
+ * Capital slot (index 0 for every race) → COMMAND_CENTER, the only
+ * universal mapping. The remaining 5 are race-flavoured to the closest
+ * generic equivalent. New backend types can be added without touching
+ * this table — slugs without a mapping fall through to `undefined` and
+ * the BAŞLAT handler reports "arka uç eşlemesi yok" instead of firing
+ * a guaranteed 400. */
+const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
+  // Insan — sleek military sci-fi
+  komuta_ussu:        'command_center',
+  reaktor_modulu:     'solar_plant',
+  kisla:              'barracks',
+  bilim_akademisi:    'academy',
+  subspace_anteni:    'shield_generator',
+  genetik_lab:        'factory',
+
+  // Zerg — organic hive
+  kovan_cekirdegi:    'command_center',
+  biyokutle_havuzu:   'mineral_extractor',
+  mutasyon_cukuru:    'spawning_pool',
+  genom_tumsegi:      'hatchery',
+  yutucu_tumsek:      'shield_generator',
+  subspace_damari:    'factory',
+
+  // Otomat — cybernetic
+  sonsuzluk_cekirdegi:'command_center',
+  veri_kaynagi:       'solar_plant',
+  montaj_hatti:       'nano_forge',
+  mantik_matrisi:     'cyber_core',
+  cihaz_hazinesi:     'quantum_reactor',
+  subspace_cozucu:    'defense_matrix',
+
+  // Canavar — primal tribal
+  alfa_tahti:         'command_center',
+  av_kampi:           'mineral_extractor',
+  vahsi_cukur:        'barracks',
+  atalar_sunagi:      'gas_refinery',
+  atalar_magarasi:    'shield_generator',
+  boyut_yarigi:       'factory',
+
+  // Seytan — dark occult
+  karanlik_taht:      'command_center',
+  ruh_toplayici:      'gas_refinery',
+  lanet_tapinagi:     'barracks',
+  pakt_sembolu:       'academy',
+  yasak_grimoire:     'shield_generator',
+  yarik_kapisi:       'factory',
+};
+
+/* Build the displayed catalog. We always show 6 race-flavoured slots from
+ * `RACES[race].buildings` (the design is race-specific). When the backend
+ * BUILDING_CONFIGS list is available we replace the synthesised cost/time
+ * numbers with real data for the slot's mapped type. */
+function buildCatalog(
+  race: NDRace,
+  backendTypes: BuildingTypeDto[],
+  liveTierLevel: number | null,
+): BuildEntry[] {
+  // Index the backend table by type code so we can look up by mapped slug.
+  const byType = new Map<string, BuildingTypeDto>();
+  backendTypes.forEach((t) => byType.set(t.type, t));
+
   return race.buildings.map((b, i) => {
+    const mappedType = b.slug ? SLUG_TO_BACKEND_TYPE[b.slug] : undefined;
+    const backend = mappedType ? byType.get(mappedType) : undefined;
     const base = (i + 1) * 220;
     return {
       name: b.n,
       desc: b.t,
       locked: b.locked,
-      costA: base,
-      costB: Math.round(base * 0.35),
-      durationSec: 90 + i * 60,
-      level: b.locked ? 0 : Math.max(1, 5 - i),
+      costA: backend?.cost.mineral ?? base,
+      costB: backend?.cost.gas ?? Math.round(base * 0.35),
+      durationSec: backend?.buildTimeSeconds ?? 90 + i * 60,
+      // i === 0 is the race's capital (headquarters). Tying its visible
+      // level to the player's tier level matches what /base's HUD shows
+      // and gives the screen one trustworthy number until per-building
+      // levels land server-side.
+      level: b.locked ? 0 : i === 0 ? liveTierLevel ?? 1 : 0,
+      backendType: mappedType ?? backend?.type,
+      assetPath: b.slug ? `/assets/buildings/${race.key}/${b.slug}.png` : undefined,
     };
   });
 }

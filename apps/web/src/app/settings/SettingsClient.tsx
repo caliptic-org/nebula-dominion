@@ -21,8 +21,10 @@ import {
   type NDRace,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
-import { clearTokens } from '@/lib/session';
+import { clearTokens, hasSession } from '@/lib/session';
 import { useNDTweaks, type NDDensity, type NDOnOff } from '@/hooks/useNDTweaks';
+import { raceApi } from '@/lib/race-api';
+import { FetchError } from '@/lib/api';
 
 type GraphicsQuality = 'low' | 'mid' | 'high';
 type Language = 'tr' | 'en';
@@ -137,7 +139,7 @@ export function SettingsClient() {
           borderBottom: `1px solid ${race.primary}33`,
         }}
       >
-        <Link href="/dashboard" aria-label="Geri" style={iconBtn()}>‹</Link>
+        <Link href="/base" aria-label="Geri" style={iconBtn()}>‹</Link>
         <Sigil race={race} size={28} glow />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Eyebrow color={race.primary}>SİSTEM</Eyebrow>
@@ -471,18 +473,42 @@ function AccountSection({ race }: { race: NDRace }) {
     return null;
   }, [pw]);
 
-  function submitProfile(e: FormEvent<HTMLFormElement>) {
+  async function submitProfile(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setProfileMsg(null);
     if (!profile.displayName.trim()) {
       setProfileMsg({ kind: 'err', text: 'Görünen ad boş olamaz.' });
       return;
     }
+
+    // Persist to localStorage first so the optimistic update is instant.
     try {
       window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-      setProfileMsg({ kind: 'ok', text: 'Profil güncellendi.' });
     } catch {
       setProfileMsg({ kind: 'err', text: 'Profil kaydedilemedi.' });
+      return;
+    }
+
+    // If signed in, also send to the backend (PATCH /api/v1/users/profile).
+    // Guests stay local-only. Conflict (username taken) bubbles up as 409.
+    if (!hasSession()) {
+      setProfileMsg({ kind: 'ok', text: 'Profil yerel olarak kaydedildi.' });
+      return;
+    }
+    try {
+      await raceApi.updateProfile({ username: profile.displayName.trim() });
+      setProfileMsg({ kind: 'ok', text: 'Profil güncellendi (sunucu + yerel).' });
+    } catch (err) {
+      if (err instanceof FetchError && err.status === 409) {
+        setProfileMsg({ kind: 'err', text: 'Bu kullanıcı adı kullanılıyor.' });
+        return;
+      }
+      // Network/server errors: keep the local save and surface a hint.
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      setProfileMsg({
+        kind: 'err',
+        text: `Sunucuya yazılamadı: ${msg}. Yerel kayıt yapıldı.`,
+      });
     }
   }
 

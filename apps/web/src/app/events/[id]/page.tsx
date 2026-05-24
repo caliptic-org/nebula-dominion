@@ -8,6 +8,7 @@ import { EventBadge, type EventType } from '@/components/events/EventBadge';
 import { RewardTable, type Reward } from '@/components/events/RewardTable';
 import { sanitizeColor, sanitizeGradient, isValidEventSlug } from '@/lib/colorSanitizer';
 import { joinEventAction } from '../actions';
+import { toast } from '@/components/handoff/Toaster';
 
 /* ── Types & data ──────────────────────────────────────────────── */
 
@@ -443,9 +444,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
 
             <MangaPanel color={c} title="CANLI SIRALAMA">
               <Leaderboard entries={event.leaderboard} accentColor={c} />
-              <p className="text-center text-text-muted text-[10px] mt-4">
+              <a
+                href={`/leaderboard?event=${event.id}`}
+                className="block text-center text-text-muted text-[10px] mt-4 underline-offset-2 hover:underline"
+              >
                 Tüm sıralamayı gör →
-              </p>
+              </a>
             </MangaPanel>
           </div>
 
@@ -476,8 +480,21 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             >
               <p className="text-[10px] text-text-muted mb-2">Bu etkinliği arkadaşlarınla paylaş</p>
               <button
+                type="button"
                 className="text-xs font-bold px-4 py-2 rounded-full transition-all duration-300"
                 style={{ color: c, border: `1px solid ${c}30`, background: `${c}10`, transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
+                onClick={() => {
+                  if (typeof window === 'undefined') return;
+                  const url = window.location.href;
+                  if (navigator.clipboard?.writeText) {
+                    navigator.clipboard
+                      .writeText(url)
+                      .then(() => toast.success('Etkinlik linki panoya kopyalandı'))
+                      .catch(() => toast.error('Pano erişimi reddedildi'));
+                  } else {
+                    toast.info(url);
+                  }
+                }}
               >
                 Linki Kopyala
               </button>

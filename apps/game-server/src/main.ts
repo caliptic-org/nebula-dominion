@@ -1,3 +1,7 @@
+// Sentry must load before anything else — patches Node http/ws before any
+// other module wires its own listeners.
+import './instrument';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -57,6 +61,17 @@ async function bootstrap() {
 
   const redisUrl = config.get<string>('redisUrl', 'redis://localhost:6379');
   const corsOrigins = config.get<string[]>('cors.origins', ['http://localhost:3000']);
+
+  // CORS for the HTTP REST surface (e.g. /api/buildings/types). Previously
+  // only the Socket.io adapter below got CORS, so any browser fetch from
+  // the Next dev server (:3000) failed with "No 'Access-Control-Allow-Origin'
+  // header" — which is exactly what blocked /base/build's catalog hydration.
+  app.enableCors({
+    origin: corsOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
 
   const redisAdapter = new RedisIoAdapter(app);
   redisAdapter.setAllowedOrigins(corsOrigins);

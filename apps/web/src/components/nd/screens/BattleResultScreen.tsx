@@ -19,6 +19,7 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { Analytics, track } from '@/lib/analytics';
 
 export type BattleOutcome = 'victory' | 'defeat';
 
@@ -93,6 +94,24 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
     }, 80);
     return () => window.clearTimeout(t);
   }, [data.rewards.xpAfter, data.rewards.xpMax]);
+
+  // Battle outcome + reward telemetry. Fires once per result-screen mount.
+  // Level-ups are critical retention metric, so they get their own event.
+  useEffect(() => {
+    Analytics.battleComplete(data.outcome, '');
+    if (data.rewards.levelUp && data.rewards.newLevel) {
+      Analytics.levelUp(data.rewards.newLevel, race.key);
+    }
+    if (data.rewards.xpGained) {
+      track('xp_gained', {
+        amount: data.rewards.xpGained,
+        source: 'battle',
+        outcome: data.outcome,
+      });
+    }
+  // We want one fire per result — outcome+level identify a unique battle.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const xpBeforePct = (data.rewards.xpBefore / data.rewards.xpMax) * 100;
 
@@ -397,7 +416,7 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
           <NDButton race={race} variant="primary" size="lg" full onClick={() => router.push(`/battle?race=${race.key}`)}>
             TEKRAR ⚔
           </NDButton>
-          <NDButton race={race} variant="ghost" size="lg" onClick={() => router.push('/')}>
+          <NDButton race={race} variant="ghost" size="lg" onClick={() => router.push('/base')}>
             ANA ÜS
           </NDButton>
         </div>

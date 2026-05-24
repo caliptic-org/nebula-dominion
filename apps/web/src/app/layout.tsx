@@ -1,46 +1,25 @@
 import type { Metadata, Viewport } from 'next';
-import { Orbitron, Rajdhani, Chakra_Petch, Inter, JetBrains_Mono } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { RaceThemeProvider } from '@/hooks/useRaceTheme';
 import { GuildTutorialProvider } from '@/hooks/useGuildTutorial';
 import { NDTweaksProvider } from '@/hooks/useNDTweaks';
+import { GAScript } from '@/components/analytics/GAScript';
+import { FBPixel } from '@/components/analytics/FBPixel';
+import { PageViewTracker } from '@/components/analytics/PageViewTracker';
+import { Toaster } from '@/components/handoff/Toaster';
+import { htmlLangMap, type Locale } from '@/i18n/config';
 import '@/styles/globals.css';
 import '@/styles/nd-handoff.css';
 import '@/styles/nd-globals.css';
 
-const orbitron = Orbitron({
-  subsets: ['latin'],
-  variable: '--font-display',
-  display: 'swap',
-  weight: ['400', '500', '600', '700', '800', '900'],
-});
-
-const rajdhani = Rajdhani({
-  subsets: ['latin'],
-  variable: '--font-body',
-  display: 'swap',
-  weight: ['300', '400', '500', '600', '700'],
-});
-
-const chakraPetch = Chakra_Petch({
-  subsets: ['latin'],
-  variable: '--font-nd-display',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-});
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-nd-body',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-nd-mono',
-  display: 'swap',
-  weight: ['400', '500'],
-});
+/* Fonts are self-hosted via @fontsource and imported at the top of
+ * globals.css — see `Fonts strategy` comment there. We used to populate the
+ * `--font-*` CSS variables via next/font/google's per-font className, but
+ * that pulled woff2 files from fonts.gstatic.com during `next build` and
+ * blocked Docker builds for 5+ minutes when the network to Google was
+ * intermittent. CSS variables are now declared directly in globals.css's
+ * :root block so removing the className composition below is harmless. */
 
 export const metadata: Metadata = {
   title: {
@@ -56,18 +35,34 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Locale + messages are resolved by next-intl from the request (cookie set
+  // by middleware based on Accept-Language). Server-rendered components get
+  // useTranslations() from the message bundle below; client components get
+  // it via NextIntlClientProvider.
+  const locale = (await getLocale()) as Locale;
+  const messages = await getMessages();
+
   return (
-    <html lang="tr" data-race="insan" className={`${orbitron.variable} ${rajdhani.variable} ${chakraPetch.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang={htmlLangMap[locale] ?? 'en'} data-race="insan">
       <body>
+        {/* Analytics — both scripts no-op when their env id is missing,
+            so local dev / PR previews stay silent. SPA navigation page_view
+            is fired by <PageViewTracker /> (App Router doesn't auto-emit). */}
+        <GAScript />
+        <FBPixel />
+        <PageViewTracker />
+        <Toaster />
         <div className="hud-scan-beam" aria-hidden="true" />
-        <NDTweaksProvider>
-          <RaceThemeProvider>
-            <GuildTutorialProvider>
-              {children}
-            </GuildTutorialProvider>
-          </RaceThemeProvider>
-        </NDTweaksProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <NDTweaksProvider>
+            <RaceThemeProvider>
+              <GuildTutorialProvider>
+                {children}
+              </GuildTutorialProvider>
+            </RaceThemeProvider>
+          </NDTweaksProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

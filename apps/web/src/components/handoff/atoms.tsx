@@ -4,6 +4,116 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ND, type NDRace, type NDResIconKind } from './nd-tokens';
 import { NebulaBg } from './Sigil';
 
+/* ── NotchSurface ─────────────────────────────────────────────────────────
+ * clip-path + border + glow safely. Clip-path on a single element clips
+ * both border AND box-shadow, so the design's 1px stroke and outer glow
+ * disappear under inline `border: 1px solid ...`/`boxShadow: ...`.
+ *
+ * Pattern: an outer wrapper applies `filter: drop-shadow(…)` for the glow
+ * (drop-shadow respects clipped silhouettes). A middle clipped div uses the
+ * border colour as its background and a `padding` equal to border width so a
+ * 1px stroke shows around the inner div. The inner div is clipped 1px tighter
+ * and carries the actual content background.
+ *
+ * Use this any time you'd write `clipPath` + `border` together. */
+
+const notchClip = (n: number) =>
+  `polygon(${n}px 0, 100% 0, 100% calc(100% - ${n}px), calc(100% - ${n}px) 100%, 0 100%, 0 ${n}px)`;
+
+interface NotchSurfaceProps {
+  children?: ReactNode;
+  /** Corner-cut size in px. Default 12 (matches NotchPanel). */
+  notch?: number;
+  /** 1px outer stroke colour. Omit to skip the stroke layer. */
+  borderColor?: string;
+  /** Inner content background. Defaults to `ND.surface`. */
+  background?: string;
+  /** Outer glow colour. Renders via `filter: drop-shadow` so the clipped
+   * silhouette is preserved. Omit for no glow. */
+  glow?: string;
+  /** Glow blur radius. Default 12px. */
+  glowSize?: number;
+  /** Padding applied to the inner content surface. */
+  padding?: number | string;
+  /** Extra styles applied to the outermost (glow) wrapper. */
+  style?: CSSProperties;
+  /** Extra styles applied to the inner content surface. */
+  innerStyle?: CSSProperties;
+  /** Tag to use for the outermost element. Default 'div'. */
+  as?: 'div' | 'span';
+}
+
+export function NotchSurface({
+  children,
+  notch = 12,
+  borderColor,
+  background,
+  glow,
+  glowSize = 12,
+  padding = 12,
+  style,
+  innerStyle,
+  as = 'div',
+}: NotchSurfaceProps) {
+  const outerClip = notchClip(notch);
+  const innerNotch = Math.max(0, notch - 1);
+  const innerClip = notchClip(innerNotch);
+  const Tag = as as 'div';
+  const innerBg = background ?? ND.surface;
+
+  if (!borderColor) {
+    return (
+      <Tag
+        style={{
+          display: 'inline-block',
+          filter: glow ? `drop-shadow(0 0 ${glowSize}px ${glow})` : undefined,
+          ...style,
+        }}
+      >
+        <div
+          style={{
+            clipPath: outerClip,
+            background: innerBg,
+            padding,
+            ...innerStyle,
+          }}
+        >
+          {children}
+        </div>
+      </Tag>
+    );
+  }
+
+  return (
+    <Tag
+      style={{
+        display: 'inline-block',
+        filter: glow ? `drop-shadow(0 0 ${glowSize}px ${glow})` : undefined,
+        ...style,
+      }}
+    >
+      <div
+        style={{
+          clipPath: outerClip,
+          background: borderColor,
+          padding: 1,
+        }}
+      >
+        <div
+          style={{
+            clipPath: innerClip,
+            background: innerBg,
+            padding,
+            ...innerStyle,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </Tag>
+  );
+}
+
 /* ── Panel ────────────────────────────────────────────────────────────── */
 
 interface PanelProps {
@@ -46,18 +156,15 @@ interface NotchPanelProps {
 
 export function NotchPanel({ children, style, race, fill, notch = 12 }: NotchPanelProps) {
   return (
-    <div
-      style={{
-        position: 'relative',
-        background: fill || ND.surface,
-        border: `1px solid ${race ? race.primary + '55' : ND.border}`,
-        clipPath: `polygon(${notch}px 0, 100% 0, 100% calc(100% - ${notch}px), calc(100% - ${notch}px) 100%, 0 100%, 0 ${notch}px)`,
-        padding: 12,
-        ...style,
-      }}
+    <NotchSurface
+      notch={notch}
+      borderColor={race ? race.primary + '55' : ND.border}
+      background={fill || ND.surface}
+      padding={12}
+      style={{ display: 'block', position: 'relative', ...style }}
     >
       {children}
-    </div>
+    </NotchSurface>
   );
 }
 
@@ -94,63 +201,95 @@ export function NDButton({
   const heights: Record<NDButtonSize, number> = { sm: 32, md: 40, lg: 48 };
   const padding: Record<NDButtonSize, string> = { sm: '0 12px', md: '0 16px', lg: '0 22px' };
   const fontSize: Record<NDButtonSize, number> = { sm: 12, md: 13, lg: 14 };
-  const variants: Record<NDButtonVariant, CSSProperties> = {
+
+  type Variant = {
+    background: string;
+    color: string;
+    borderColor?: string;
+    glow?: string;
+    fontWeight: number;
+  };
+  const primaryColor = race?.primary || 'oklch(0.78 0.16 220)';
+  const primaryDim = race?.primaryDim || 'oklch(0.55 0.13 220)';
+  const primaryGlow = race?.glow || 'oklch(0.85 0.18 220)';
+  const variants: Record<NDButtonVariant, Variant> = {
     primary: {
-      background: `linear-gradient(180deg, ${race?.primary || 'oklch(0.78 0.16 220)'} 0%, ${race?.primaryDim || 'oklch(0.55 0.13 220)'} 100%)`,
+      background: `linear-gradient(180deg, ${primaryColor} 0%, ${primaryDim} 100%)`,
       color: '#0A0E1A',
-      border: 'none',
-      boxShadow: `0 0 0 1px ${race?.glow || 'oklch(0.85 0.18 220)'}55, 0 4px 16px -4px ${race?.glow || 'oklch(0.85 0.18 220)'}66`,
+      borderColor: `${primaryGlow}55`,
+      glow: `${primaryGlow}66`,
       fontWeight: 700,
     },
     ghost: {
       background: 'rgba(120, 200, 255, 0.06)',
       color: ND.text,
-      border: `1px solid ${ND.border}`,
+      borderColor: ND.border,
       fontWeight: 600,
     },
     outline: {
-      background: 'transparent',
+      // Inner surface needs an opaque dark fill so the race-tinted outer
+      // stripe of NotchSurface (`borderColor: race.primary`) doesn't bleed
+      // through and end up matching the text colour. Using `ND.bg` keeps
+      // the legible "race outline on dark face" silhouette the design wants.
+      background: ND.bg,
       color: race?.primary || ND.text,
-      border: `1px solid ${race?.primary || ND.borderHi}`,
+      borderColor: race?.primary || ND.borderHi,
       fontWeight: 600,
     },
     danger: {
-      background: 'transparent',
+      // Same reason as outline: opaque face so the red border doesn't
+      // collide with the red text.
+      background: ND.bg,
       color: ND.danger,
-      border: `1px solid ${ND.danger}77`,
+      borderColor: `${ND.danger}77`,
       fontWeight: 600,
     },
   };
+  const v = variants[variant];
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className="nd-btn"
+    <NotchSurface
+      notch={8}
+      borderColor={v.borderColor}
+      background={v.background}
+      glow={v.glow}
+      glowSize={16}
+      padding={0}
       style={{
-        height: heights[size],
-        padding: padding[size],
-        fontSize: fontSize[size],
-        fontFamily: ND.display,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        borderRadius: 4,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+        display: full ? 'block' : 'inline-block',
         width: full ? '100%' : undefined,
-        clipPath:
-          'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
-        ...variants[variant],
+        opacity: disabled ? 0.5 : 1,
         ...style,
       }}
+      innerStyle={{ padding: 0 }}
     >
-      {icon}
-      <span>{children}</span>
-    </button>
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        className="nd-btn"
+        style={{
+          all: 'unset',
+          boxSizing: 'border-box',
+          height: heights[size],
+          padding: padding[size],
+          fontSize: fontSize[size],
+          fontFamily: ND.display,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: v.color,
+          fontWeight: v.fontWeight,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          width: '100%',
+        }}
+      >
+        {icon}
+        <span>{children}</span>
+      </button>
+    </NotchSurface>
   );
 }
 
@@ -360,16 +499,16 @@ export function HUD({
         borderBottom: `1px solid ${ND.border}`,
       }}
     >
-      <div
-        style={{
+      <NotchSurface
+        notch={6}
+        borderColor={`${race.primary}66`}
+        background={`linear-gradient(180deg, ${race.primary}28, transparent)`}
+        padding={0}
+        innerStyle={{
           display: 'flex',
           alignItems: 'center',
           gap: 6,
           padding: '4px 6px 4px 4px',
-          background: `linear-gradient(180deg, ${race.primary}28, transparent)`,
-          border: `1px solid ${race.primary}66`,
-          borderRadius: 3,
-          clipPath: 'polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px)',
         }}
       >
         <div
@@ -394,7 +533,7 @@ export function HUD({
         >
           {levelName}
         </div>
-      </div>
+      </NotchSurface>
       <div style={{ flex: 1 }} />
       <ResPill kind={race.resourceA.icon} value={resA} accent={race.primary}/>
       <ResPill kind={race.resourceB.icon} value={resB} accent={race.primary}/>
@@ -491,9 +630,14 @@ interface ScreenProps {
   dim?: number;
   intensity?: number;
   style?: CSSProperties;
+  /** Optional per-screen backdrop image (e.g. /assets/bases/<race>/age-<n>.png).
+   *  Forwarded into NebulaBg so the SVG nebula layers tint the photo instead
+   *  of an opaque #06080F fill. Without this, screens like /base were hiding
+   *  their per-age ComfyUI art under the default deep-space background. */
+  bgImage?: string | null;
 }
 
-export function Screen({ children, race, dim = 1, intensity = 1, style }: ScreenProps) {
+export function Screen({ children, race, dim = 1, intensity = 1, style, bgImage }: ScreenProps) {
   return (
     <div
       style={{
@@ -506,7 +650,7 @@ export function Screen({ children, race, dim = 1, intensity = 1, style }: Screen
         ...style,
       }}
     >
-      <NebulaBg race={race} intensity={intensity} dim={dim} />
+      <NebulaBg race={race} intensity={intensity} dim={dim} bgImage={bgImage} />
       <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
         {children}
       </div>

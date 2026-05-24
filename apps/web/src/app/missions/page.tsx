@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ND,
@@ -20,6 +20,10 @@ import {
   type NDRace,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { useMissions, type Quest } from '@/hooks/useMissions';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { toast } from '@/components/handoff/Toaster';
+import { useRouter } from 'next/navigation';
 
 type Tab = 'story' | 'daily' | 'weekly' | 'achievement';
 type State = 'active' | 'completed' | 'locked';
@@ -98,14 +102,59 @@ function useDailyCountdown(): string {
   return `${String(t.h).padStart(2, '0')}:${String(t.m).padStart(2, '0')}:${String(t.s).padStart(2, '0')}`;
 }
 
+/* Map a backend Quest (from /daily/quests) onto the Mission shape that the
+ * existing UI was already wired to render. The backend doesn't carry
+ * difficulty / chapter / timeLeft, so we synthesise reasonable defaults so
+ * the visual grammar stays consistent with the mock-driven tabs. */
+function questToMission(q: Quest): Mission {
+  const pct = q.target > 0 ? Math.min(100, Math.round((q.progress / q.target) * 100)) : 0;
+  const state: State = q.claimed
+    ? 'completed'
+    : q.progress >= q.target
+      ? 'completed'
+      : q.progress > 0
+        ? 'active'
+        : 'active';
+  const rewards: Reward[] = [];
+  if (q.reward.gold) rewards.push({ label: 'Kaynak', amount: q.reward.gold });
+  if (q.reward.gems) rewards.push({ label: 'Kristal', amount: q.reward.gems });
+  if (q.reward.xp) rewards.push({ label: 'XP', amount: q.reward.xp });
+  return {
+    id: `daily-${q.id}`,
+    title: q.title,
+    description: q.description,
+    state,
+    progress: pct,
+    progressLabel: `${q.progress}/${q.target}`,
+    timeLeft: '24s',
+    rewards,
+    category: 'daily',
+    difficulty: q.kind === 'pvp' ? 'zor' : q.kind === 'pve' ? 'orta' : 'kolay',
+  };
+}
+
 export default function MissionsPage() {
   const race = useNDRace();
   const [tab, setTab] = useState<Tab>('story');
   const resetCountdown = useDailyCountdown();
 
-  const visible = MISSIONS.filter(m => m.category === tab);
+  // Live daily quests from the backend stub. Falls back to the local mock
+  // 'daily-*' entries when the player isn't signed in or the fetch fails.
+  const { profile } = useUserProfile();
+  const { data: liveDaily } = useMissions(profile?.id ?? null);
+  const dailyMissions: Mission[] =
+    liveDaily && liveDaily.quests.length > 0
+      ? liveDaily.quests.map(questToMission)
+      : MISSIONS.filter((m) => m.category === 'daily');
+
+  const allMissions: Mission[] = useMemo(
+    () => [...MISSIONS.filter((m) => m.category !== 'daily'), ...dailyMissions],
+    [dailyMissions],
+  );
+
+  const visible = allMissions.filter(m => m.category === tab);
   const completed = visible.filter(m => m.state === 'completed').length;
-  const claimable = MISSIONS.filter(m => m.state === 'completed').length;
+  const claimable = allMissions.filter(m => m.state === 'completed').length;
   const unlockedAch = ACHIEVEMENTS.filter(a => a.unlocked).length;
 
   return (
@@ -227,6 +276,27 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
   const locked = mission.state === 'locked';
   const completed = mission.state === 'completed';
   const diffColor = mission.difficulty ? DIFFICULTY_COLOR[mission.difficulty] : ND.textDim;
+  const router = useRouter();
+
+  // "Devam" button routes to the screen the player needs to use to progress
+  // this mission. We pick a sensible destination by mission category since
+  // backend mission targeting isn't wired yet.
+  const continueTarget = (() => {
+    if (mission.category === 'story') return '/story';
+    if (mission.category === 'daily') return '/base/build';
+    if (mission.category === 'weekly') return '/missions';
+    return '/base';
+  })();
+
+  function handleClaim() {
+    // No backend claim endpoint yet — provide visible feedback so the
+    // player knows the click registered. Total reward sum used in toast
+    // so it doesn't feel like a stub.
+    const totalReward = mission.rewards
+      .map((r) => `${r.amount.toLocaleString('tr-TR')} ${r.label}`)
+      .join(' · ');
+    toast.success(`Ödül alındı: ${totalReward}`);
+  }
   return (
     <Panel
       race={race}
@@ -274,12 +344,17 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
               ))}
             </div>
             {completed && (
-              <NDButton race={race} size="sm">
+              <NDButton race={race} size="sm" onClick={handleClaim}>
                 Ödülü Al
               </NDButton>
             )}
             {mission.state === 'active' && (
-              <NDButton race={race} variant="outline" size="sm">
+              <NDButton
+                race={race}
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(continueTarget)}
+              >
                 Devam
               </NDButton>
             )}

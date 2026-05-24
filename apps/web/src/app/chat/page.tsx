@@ -485,7 +485,17 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
-  const messages = activeTab === 'global' ? GLOBAL_MESSAGES : GUILD_MESSAGES;
+  /* Local optimistic messages per tab, layered on top of the static mock arrays.
+   * Until `POST /api/v1/chat/{tab}` exists this lets the player at least see
+   * their typed messages appear in the stream. Keyed by tab so global drafts
+   * don't bleed into guild and vice versa. */
+  const [draftsByTab, setDraftsByTab] = useState<Record<ChatTab, ChatMessage[]>>({
+    global: [],
+    guild: [],
+    dm: [],
+  });
+  const baseMessages = activeTab === 'global' ? GLOBAL_MESSAGES : GUILD_MESSAGES;
+  const messages = [...baseMessages, ...(draftsByTab[activeTab] ?? [])];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -501,7 +511,27 @@ export default function ChatPage() {
   }, [activeTab]);
 
   function handleSend() {
-    if (!input.trim()) return;
+    const text = input.trim();
+    if (!text) return;
+    // Optimistic local append: the chat backend doesn't exist yet, but the
+    // player should see their own message land in the stream. A unique id is
+    // generated client-side; the message is tagged `isOwn` so MessageBubble
+    // styles it with the player's race color.
+    const optimistic: ChatMessage = {
+      id: `local-${Date.now()}`,
+      author: 'Sen',
+      content: text,
+      timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+      // ChatMessage.type accepts 'player'|'system'|'battle'|'guild'. Tab
+      // splitting happens via the draftsByTab map above, not the type.
+      type: activeTab === 'guild' ? 'guild' : 'player',
+      race: undefined,
+      isOwn: true,
+    };
+    setDraftsByTab((cur) => ({
+      ...cur,
+      [activeTab]: [...(cur[activeTab] ?? []), optimistic],
+    }));
     setInput('');
     setShowEmoji(false);
     setShowQuickReplies(false);

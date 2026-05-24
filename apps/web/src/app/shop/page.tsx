@@ -17,10 +17,13 @@ import {
   Code,
   NDButton,
   ResPill,
+  toast,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { api, FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
@@ -155,7 +158,7 @@ export default function ShopPage() {
           borderBottom: `1px solid ${race.primary}33`,
         }}
       >
-        <Link href="/dashboard" aria-label="Geri" style={iconBtn()}>‹</Link>
+        <Link href="/base" aria-label="Geri" style={iconBtn()}>‹</Link>
         <Sigil race={race} size={28} glow />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Eyebrow color={race.primary}>MAĞAZA</Eyebrow>
@@ -338,7 +341,31 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
             <Caption style={{ fontSize: 9 }}>Kalan: {product.stock}</Caption>
           )}
         </div>
-        <NDButton race={race} size="sm">Satın Al</NDButton>
+        <NDButton
+          race={race}
+          size="sm"
+          onClick={async () => {
+            if (!hasSession()) {
+              toast.error('Satın alma için giriş yapmalısın');
+              return;
+            }
+            try {
+              // POST /api/v1/shop/purchase exists; we send the product id
+              // and the chosen currency. Backend validates balance + fires
+              // ledger entry. Success = inventory refresh on next nav.
+              await api.post('/shop/purchase', {
+                sku: product.id,
+                currency: product.priceGem !== undefined ? 'gem' : 'gold',
+              });
+              toast.success(`${product.name} alındı`);
+            } catch (err) {
+              const msg = err instanceof FetchError ? err.message : 'Satın alma başarısız';
+              toast.error(msg);
+            }
+          }}
+        >
+          Satın Al
+        </NDButton>
       </div>
     </Panel>
   );
@@ -396,7 +423,24 @@ function VipSection({ race }: { race: NDRace }) {
           <Caption>
             Her gün <strong style={{ color: race.primary }}>+50 Kristal</strong> ve <strong style={{ color: ND.warn }}>+200 XP</strong>.
           </Caption>
-          <NDButton race={race}>Bugün Al</NDButton>
+          <NDButton
+            race={race}
+            onClick={async () => {
+              if (!hasSession()) {
+                toast.error('Giriş yapmalısın');
+                return;
+              }
+              try {
+                await api.post('/vip/claim-daily', {});
+                toast.success('Günlük VIP ödülü alındı: +50 Kristal, +200 XP');
+              } catch (err) {
+                const msg = err instanceof FetchError ? err.message : 'Ödül alma başarısız';
+                toast.error(msg);
+              }
+            }}
+          >
+            Bugün Al
+          </NDButton>
         </div>
       </Panel>
 
@@ -417,7 +461,25 @@ function VipSection({ race }: { race: NDRace }) {
             <Caption style={{ fontSize: 10 }}>+{p.bonusGems.toLocaleString('tr-TR')} bonus kristal</Caption>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
               <div style={{ fontFamily: ND.display, fontSize: 18, color: race.primary }}>💎 {p.gemPrice.toLocaleString('tr-TR')}</div>
-              <NDButton race={race} size="sm">Yükselt</NDButton>
+              <NDButton
+                race={race}
+                size="sm"
+                onClick={async () => {
+                  if (!hasSession()) {
+                    toast.error('Giriş yapmalısın');
+                    return;
+                  }
+                  try {
+                    await api.post('/shop/purchase', { sku: `vip_${p.id}`, currency: 'gem' });
+                    toast.success(`VIP ${p.label} satın alındı`);
+                  } catch (err) {
+                    const msg = err instanceof FetchError ? err.message : 'Yükseltme başarısız';
+                    toast.error(msg);
+                  }
+                }}
+              >
+                Yükselt
+              </NDButton>
             </div>
           </Panel>
         ))}
@@ -548,7 +610,25 @@ function BattlePassSection({ race }: { race: NDRace }) {
         </div>
       </Panel>
 
-      <NDButton race={race} full>Premium Geçiş Satın Al · 💎 800</NDButton>
+      <NDButton
+        race={race}
+        full
+        onClick={async () => {
+          if (!hasSession()) {
+            toast.error('Giriş yapmalısın');
+            return;
+          }
+          try {
+            await api.post('/shop/purchase', { sku: 'battle_pass_premium', currency: 'gem' });
+            toast.success('Premium Geçiş aktif edildi');
+          } catch (err) {
+            const msg = err instanceof FetchError ? err.message : 'Premium satın alımı başarısız';
+            toast.error(msg);
+          }
+        }}
+      >
+        Premium Geçiş Satın Al · 💎 800
+      </NDButton>
     </>
   );
 }

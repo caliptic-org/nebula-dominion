@@ -73,11 +73,17 @@ interface NebulaBgProps {
   className?: string;
   style?: React.CSSProperties;
   children?: React.ReactNode;
+  /** Optional landscape backdrop (race+age PNG). When set, the SVG nebula
+   *  layers paint on top of it as a tinted overlay instead of hiding it
+   *  behind an opaque #06080F fill — that's how the per-age ComfyUI
+   *  art at /assets/bases/<race>/age-<n>.png becomes visible on /base. */
+  bgImage?: string | null;
 }
 
-export function NebulaBg({ race, intensity = 1, dim = 1, className, style, children }: NebulaBgProps) {
+export function NebulaBg({ race, intensity = 1, dim = 1, className, style, children, bgImage }: NebulaBgProps) {
   const rawId = useId();
   const id = rawId.replace(/:/g, '');
+  const hasBg = Boolean(bgImage);
   return (
     <div
       className={className}
@@ -85,10 +91,40 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
         position: 'absolute',
         inset: 0,
         overflow: 'hidden',
-        background: '#06080F',
+        // Without a backdrop image we keep the original opaque deep-space
+        // fill so every screen looks identical to the design handoff.
+        // When a bgImage is supplied we drop to transparent so the image
+        // shows through — the SVG nebula layers still paint over it.
+        background: hasBg ? 'transparent' : '#06080F',
         ...style,
       }}
     >
+      {bgImage && (
+        // Landscape sits beneath the SVG so the race-tinted gradient still
+        // paints on top. cover + center matches the previous /base layout
+        // exactly; mask fades the bottom 30% so the iso-tilemap's own
+        // ground gradient doesn't double up against the photo horizon.
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${bgImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.85,
+            // Horizon mask: show the ComfyUI landscape only in the top ~45%
+            // of the screen, then fade hard to transparent by 60%. /base
+            // renders an iso tilemap below this band — the photo acts as
+            // a distant sky/skyline above the player's playable ground.
+            WebkitMaskImage:
+              'linear-gradient(to bottom, black 0%, black 45%, transparent 60%)',
+            maskImage:
+              'linear-gradient(to bottom, black 0%, black 45%, transparent 60%)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <svg
         width="100%"
         height="100%"
@@ -121,7 +157,8 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
             <circle cx="74" cy="72" r="0.45" fill="#fff" opacity="0.55" />
           </pattern>
         </defs>
-        <rect width="400" height="800" fill="#03050B" />
+        {/* When bg image is set, skip the opaque base rect so the photo shows. */}
+        {!hasBg && <rect width="400" height="800" fill="#03050B" />}
         <rect width="400" height="800" fill={`url(#stars-${id})`} />
         <rect width="400" height="800" fill={`url(#neb-${id}-a)`} />
         <rect width="400" height="800" fill={`url(#neb-${id}-b)`} />

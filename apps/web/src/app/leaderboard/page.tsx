@@ -20,6 +20,7 @@ import {
   type NDRaceKey,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { useLeaderboard, type LeaderboardCategory, type LeaderboardEntry } from '@/hooks/useLeaderboard';
 
 type Category = 'power' | 'pvp' | 'alliance';
 
@@ -51,18 +52,18 @@ function makeEntry(
 
 const POWER: Entry[] = [
   makeEntry(1, 'p1', 'A. Voss', 'insan', 4_872_000, '4.87M', 'YZH', false, 3),
-  makeEntry(2, 'p2', 'Demiurge Prime', 'otomat', 4_581_300, '4.58M', 'AĞ', false, 0),
+  makeEntry(2, 'p2', 'Demiurge Prime', 'otomat', 4_581_300, '4.58M', 'OTM', false, 0),
   makeEntry(3, 'p3', 'Mor’gath', 'zerg', 4_210_800, '4.21M', 'KVN', false, -1),
   makeEntry(4, 'p4', 'Malphas', 'seytan', 3_987_400, '3.99M', 'MHK', false, 5),
   makeEntry(5, 'p5', 'Khorvash', 'canavar', 3_742_100, '3.74M', 'SRÜ', false, 2),
-  makeEntry(6, 'p6', 'Aurelius', 'otomat', 3_611_200, '3.61M', 'AĞ', false, -2),
+  makeEntry(6, 'p6', 'Aurelius', 'otomat', 3_611_200, '3.61M', 'OTM', false, -2),
   makeEntry(7, 'p7', 'Ravenna', 'canavar', 3_498_700, '3.50M', 'SRÜ', false, 1),
   makeEntry(8, 'p8', 'Lilithra', 'seytan', 3_344_500, '3.34M', 'MHK', false, -3),
   makeEntry(9, 'p9', 'Chen', 'insan', 3_201_800, '3.20M', 'YZH', false, 0),
   makeEntry(10, 'p10', 'Vex’thara', 'zerg', 3_104_200, '3.10M', 'KVN', false, 4),
   makeEntry(11, 'p11', 'Reyes', 'insan', 2_977_500, '2.98M', 'YZH', false, 0),
   makeEntry(12, 'p12', 'Threnix', 'zerg', 2_845_000, '2.85M', 'KVN', false, -1),
-  makeEntry(13, 'p13', 'Crucible', 'otomat', 2_712_300, '2.71M', 'AĞ', false, 2),
+  makeEntry(13, 'p13', 'Crucible', 'otomat', 2_712_300, '2.71M', 'OTM', false, 2),
   makeEntry(14, 'p14', 'Vorhaal', 'seytan', 2_601_700, '2.60M', 'MHK', false, 0),
 ];
 
@@ -73,12 +74,12 @@ const PVP: Entry[] = [
   makeEntry(4, 'v4', 'Mor’gath', 'zerg', 15_877, '15.877 Puan', 'KVN', false, 3),
   makeEntry(5, 'v5', 'Ravenna', 'canavar', 14_441, '14.441 Puan', 'SRÜ', false, 0),
   makeEntry(6, 'v6', 'Lilithra', 'seytan', 13_984, '13.984 Puan', 'MHK', false, -2),
-  makeEntry(7, 'v7', 'Demiurge Prime', 'otomat', 13_211, '13.211 Puan', 'AĞ', false, 4),
+  makeEntry(7, 'v7', 'Demiurge Prime', 'otomat', 13_211, '13.211 Puan', 'OTM', false, 4),
   makeEntry(8, 'v8', 'Vex’thara', 'zerg', 12_650, '12.650 Puan', 'KVN', false, 0),
-  makeEntry(9, 'v9', 'Aurelius', 'otomat', 11_988, '11.988 Puan', 'AĞ', false, -1),
+  makeEntry(9, 'v9', 'Aurelius', 'otomat', 11_988, '11.988 Puan', 'OTM', false, -1),
   makeEntry(10, 'v10', 'Chen', 'insan', 11_401, '11.401 Puan', 'YZH', false, 2),
   makeEntry(11, 'v11', 'Reyes', 'insan', 10_822, '10.822 Puan', 'YZH', false, 0),
-  makeEntry(12, 'v12', 'Crucible', 'otomat', 10_199, '10.199 Puan', 'AĞ', false, 1),
+  makeEntry(12, 'v12', 'Crucible', 'otomat', 10_199, '10.199 Puan', 'OTM', false, 1),
 ];
 
 const ALLIANCE: Entry[] = [
@@ -136,7 +137,28 @@ export default function LeaderboardPage() {
   const seasonalReset = useMemo(() => Date.now() + 60 * 86_400_000, []);
   const timer = useResetCountdown(period === 'weekly' ? weeklyReset : seasonalReset);
 
-  const baseEntries = DATA[category];
+  // Live leaderboard from /api/v1/leaderboard. Falls back to the local mock
+  // when the fetch hasn't resolved yet so we never flash an empty list.
+  const liveCategory: LeaderboardCategory = category === 'alliance' ? 'guild' : category;
+  const { data: live } = useLeaderboard(liveCategory, 20);
+  const fmtScore = (n: number, cat: Category) =>
+    cat === 'pvp'
+      ? `${n.toLocaleString('tr-TR')} Puan`
+      : n >= 1_000_000
+        ? `${(n / 1_000_000).toFixed(2)}M`
+        : n.toLocaleString('tr-TR');
+  const liveAsEntries: Entry[] | null = live
+    ? live.entries.map((e: LeaderboardEntry) => ({
+        rank: e.rank,
+        id: e.id,
+        name: e.name,
+        race: e.race,
+        score: e.score,
+        scoreLabel: fmtScore(e.score, category),
+        allianceTag: e.allianceTag,
+      }))
+    : null;
+  const baseEntries = liveAsEntries ?? DATA[category];
   // Inject "me" row using player race
   const me: Entry = {
     rank: 42,
@@ -255,7 +277,7 @@ function PageHeader({ title, subtitle, race }: { title: string; subtitle: string
       }}
     >
       <Link
-        href="/dashboard"
+        href="/base"
         aria-label="Geri"
         style={{
           width: 32,

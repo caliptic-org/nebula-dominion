@@ -386,12 +386,24 @@ export default function ProductionPage() {
           {units.map((u, i) => {
             const on = i === selected;
             return (
-              <button
+              <div
                 key={u.name}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelected(i)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelected(i);
+                  }
+                }}
                 aria-pressed={on}
-                style={{ all: 'unset', cursor: 'pointer', display: 'block' }}
+                // Was a real <button>, but the inner Panel contains NDButton
+                // (+ / − count steppers) when selected. <button> inside
+                // <button> is invalid HTML and trips a hydration warning in
+                // Next 14 dev. Promoting this to a div with role="button"
+                // keeps a11y semantics without nesting buttons.
+                style={{ cursor: 'pointer', display: 'block' }}
               >
                 <Panel
                   race={race}
@@ -458,7 +470,7 @@ export default function ProductionPage() {
                     )}
                   </div>
                 </Panel>
-              </button>
+              </div>
             );
           })}
         </div>

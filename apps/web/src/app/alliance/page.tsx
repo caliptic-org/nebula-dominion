@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import {
   RACES,
   ND,
@@ -124,21 +125,29 @@ export default function AlliancePage() {
   const race = useNDRace();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('genel');
+  // Live profile — drives the "henüz bir ittifaka katılmadın" empty state
+  // when the player has no allianceTag, and pulls the player's actual
+  // guild tag/name into the header when they do. Member roster, wars,
+  // and ortak objectives are still demo data — backend guild endpoints
+  // for those are next, but at minimum the page should stop pretending
+  // every player is in a 7-member alliance from day 1.
+  const { profile } = useUserProfile();
+  const hasAlliance = Boolean(profile?.allianceTag);
 
   const summary = {
-    name: race.allianceName,
-    tag: race.allianceTag,
-    tier: 'BÜYÜK İTTİFAK',
-    tierScore: 24_120,
-    memberCount: MEMBERS.length,
+    name: profile?.allianceTag ? race.allianceName : 'İttifak Yok',
+    tag: profile?.allianceTag ?? '—',
+    tier: hasAlliance ? 'BÜYÜK İTTİFAK' : '—',
+    tierScore: hasAlliance ? 24_120 : 0,
+    memberCount: hasAlliance ? MEMBERS.length : 0,
     capacity: 50,
-    weeklyRank: 5,
-    weeklyDonations: 184_000,
-    raidAttendance: 14,
-    controlledSectors: 9,
+    weeklyRank: hasAlliance ? 5 : 0,
+    weeklyDonations: hasAlliance ? 184_000 : 0,
+    raidAttendance: hasAlliance ? 14 : 0,
+    controlledSectors: hasAlliance ? 9 : 0,
     totalSectors: 12,
-    researchName: 'Genom Optimizasyonu',
-    researchPct: 62,
+    researchName: hasAlliance ? 'Genom Optimizasyonu' : '—',
+    researchPct: hasAlliance ? 62 : 0,
   };
 
   return (
@@ -181,6 +190,30 @@ export default function AlliancePage() {
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* No-alliance empty state — shown above tab content so the
+         *  player understands the numbers below are placeholder until
+         *  they actually join a guild. Honest > "fake 7 members" */}
+        {!hasAlliance && (
+          <NotchPanel race={race}>
+            <Eyebrow color={race.primary}>İTTİFAK YOK</Eyebrow>
+            <H3 style={{ marginTop: 6, color: ND.text }}>Henüz bir ittifaka katılmadın</H3>
+            <Caption style={{ marginTop: 6 }}>
+              İttifak haftalık raid, ortak araştırma ve savaş katılımı
+              sağlar. Aşağıdaki sayfa içeriği <strong>örnek görünüm</strong>
+              — gerçek üye, savaş ve hedef verileri ittifaka katılınca
+              gelir.
+            </Caption>
+            <div style={{ marginTop: 10 }}>
+              <NDButton
+                race={race}
+                full
+                onClick={() => toast.info('İttifak keşfi yakında — şimdilik sadece görünüm')}
+              >
+                İttifak Bul
+              </NDButton>
+            </div>
+          </NotchPanel>
+        )}
         {tab === 'genel' && (
           <>
             <NotchPanel race={race}>

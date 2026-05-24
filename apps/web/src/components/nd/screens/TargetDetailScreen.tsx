@@ -19,6 +19,7 @@ import {
   type NDRaceKey,
 } from '@/components/handoff';
 import { GALAXY_NODES } from './galaxy-data';
+import { useGameUnits } from '@/hooks/useGameUnits';
 
 interface DefenderUnit {
   name: string;
@@ -29,6 +30,18 @@ interface DefenderUnit {
 interface Props {
   nodeId: string;
   forcedRace?: NDRaceKey;
+  /** Optional live target data sourced from /api/v1/target/:id. When present,
+   * overrides the static GALAXY_NODES lookup so the screen reflects real
+   * backend info (owner race, level, power, garrison, rewards). */
+  liveTarget?: {
+    name?: string;
+    ownerRace?: NDRaceKey | null;
+    level?: number;
+    power?: number;
+    defence?: number;
+    rewards?: { gold: number; gems: number; xp: number };
+    status?: string;
+  };
 }
 
 function defenderRoster(enemy: NDRace, level: number): DefenderUnit[] {
@@ -43,20 +56,55 @@ function totalPower(units: DefenderUnit[]): number {
   return units.reduce((sum, u) => sum + u.count * (40 + u.tier * 18), 0);
 }
 
-export function TargetDetailScreen({ nodeId, forcedRace }: Props) {
+export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
   const detected = useNDRace();
   const race = forcedRace ? RACES[forcedRace] : detected;
-  const enemy = RACES[race.enemyRace];
+  // Owner race for combat math: prefer the live backend value (which reflects
+  // the actual sector ownership in the world), then fall back to the static
+  // node's enemy/player marker. `race.enemyRace` remains the ultimate default.
+  const liveOwnerRace = liveTarget?.ownerRace ?? null;
+  const enemyRaceKey = liveOwnerRace && liveOwnerRace !== race.key ? liveOwnerRace : race.enemyRace;
+  const enemy = RACES[enemyRaceKey];
   const router = useRouter();
 
-  const node = useMemo(
+  const staticNode = useMemo(
     () => GALAXY_NODES.find((n) => n.id === nodeId) ?? GALAXY_NODES[0],
     [nodeId],
   );
 
+  // Merge live data on top of the static node so the visual layout stays
+  // intact when /target/:id arrives mid-render. The galaxy node graph uses
+  // `label` for the display name; mapping live `name` → `label` lets the
+  // existing UI read one field across both sources.
+  const node = useMemo(
+    () => ({
+      ...staticNode,
+      label: liveTarget?.name ?? staticNode.label,
+      level: liveTarget?.level ?? staticNode.level,
+    }),
+    [staticNode, liveTarget],
+  );
+
   const defenders = useMemo(() => defenderRoster(enemy, node.level), [enemy, node.level]);
-  const defendingPower = useMemo(() => totalPower(defenders), [defenders]);
-  const playerPower = 4180;
+  // If the backend supplied a power number, use it directly — it already
+  // factors in real garrison + level scaling. Otherwise derive from the
+  // synthesised defender roster like before.
+  const defendingPower = useMemo(
+    () => liveTarget?.power ?? totalPower(defenders),
+    [defenders, liveTarget],
+  );
+  // Player power: prefer live derivation from owned units when authed.
+  // Each unit's stats give a per-unit power, summed → total. Falls back
+  // to the previous 4180 literal when the user isn't logged in so the
+  // win-probability dial still renders for guests.
+  const { data: liveUnits } = useGameUnits();
+  const playerPower = useMemo(() => {
+    if (!liveUnits || liveUnits.length === 0) return 4180;
+    return liveUnits.reduce((sum, u) => {
+      if (!u.isAlive) return sum;
+      return sum + Math.floor(u.attack * 2 + u.defense * 1.5 + u.hp * 0.1 + u.speed * 0.5);
+    }, 0);
+  }, [liveUnits]);
   const advantage = playerPower - defendingPower;
   const winProbability = Math.max(
     8,

@@ -743,9 +743,12 @@ function GalaxyScanBeam({ race }: { race: NDRace }) {
   );
 }
 
-function ScanBeamKeyframes() {
-  return (
-    <style>{`
+// Use dangerouslySetInnerHTML so React doesn't try to re-encode the `>`
+// combinator in our prefers-reduced-motion selector — without this the
+// server emits `&gt;` (HTML entity) while the client sees raw `>` after
+// hydration, tripping React's "Text content did not match" warning and
+// switching the Suspense boundary to client rendering.
+const SCAN_BEAM_KEYFRAMES = `
       @keyframes nd-scan-insan {
         0%   { background-position: 0 -30%; opacity: 0; }
         10%  { opacity: 1; }
@@ -778,8 +781,10 @@ function ScanBeamKeyframes() {
           animation: none !important;
         }
       }
-    `}</style>
-  );
+    `;
+
+function ScanBeamKeyframes() {
+  return <style dangerouslySetInnerHTML={{ __html: SCAN_BEAM_KEYFRAMES }} />;
 }
 
 function LegendChip({ color, label }: { color: string; label: string }) {

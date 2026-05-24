@@ -39,17 +39,24 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
   more: '/settings',
 };
 
-/* Race → existing illustrated base sprite, used as the /base backdrop
- * until we regenerate the 30-image age-aware ComfyUI sweep that should
- * live under /assets/bases/<race>/age-<n>.png. These sprites are also
- * referenced by battle-result / map screens, so we don't move or rename
- * the underlying files — just point /base at them. */
+/* Race → /base backdrop, using each race's CAPITAL building (slot 0 of
+ * race.buildings — the player's main keep). These PNGs are Nebula's own
+ * ComfyUI-generated assets with the iso-platform background cleaned up,
+ * living under /assets/buildings/<race>/<slug>.png at runtime. The full
+ * 30-building-with-platform versions live in the sibling /_orig/ folder
+ * but are reserved for future use; runtime + /base both prefer the
+ * cleaned versions.
+ *
+ * Previously this map pointed at /sprites/base-*.png, but those are
+ * Caliptic project assets (commit ddc7137, ticket CAL-341) that shouldn't
+ * be shipped with Nebula — swapping to Nebula's own renders keeps the
+ * project visually self-contained. */
 const BASE_BG_FALLBACK: Record<string, string> = {
-  insan:   '/sprites/base-insan.png',
-  zerg:    '/sprites/base-bocek.png',
-  otomat:  '/sprites/enemy-otomat.png',
-  canavar: '/sprites/enemy-canavar.png',
-  seytan:  '/sprites/base-seytan.png',
+  insan:   '/assets/buildings/insan/komuta_ussu.png',
+  zerg:    '/assets/buildings/zerg/kovan_cekirdegi.png',
+  otomat:  '/assets/buildings/otomat/sonsuzluk_cekirdegi.png',
+  canavar: '/assets/buildings/canavar/alfa_tahti.png',
+  seytan:  '/assets/buildings/seytan/karanlik_taht.png',
 };
 
 const QUICK_ACTION_ROUTES: Record<string, string> = {

@@ -255,6 +255,27 @@ async function generateBase(race, age) {
 
 const BASES_OUTPUT_DIR = path.resolve(__dirname, '..', 'apps/web/public/assets/bases');
 const TILES_OUTPUT_DIR = path.resolve(__dirname, '..', 'apps/web/public/assets/tiles');
+const CHARACTERS_OUTPUT_DIR = path.resolve(__dirname, '..', 'apps/web/public/assets/characters');
+
+/* ── Commander portrait generation ────────────────────────────────────────
+ * Each commander gets a 1024×1024 manga-style bust shot. Used by /commanders
+ * detail page + /commanders list cards. Naming: <race>/<slug>.png. Backed
+ * by the same dreamshaperXL_lightningDPMSDE workflow, but the prompt asks
+ * for a portrait composition instead of an iso building. */
+
+async function generateCommander(race, slug, subject) {
+  const style = STYLE_BY_RACE[race];
+  const positive = [
+    'character portrait, bust shot from chest up, looking at camera',
+    `subject: ${subject}`,
+    'manga / anime cinematic style, dramatic lighting, sharp focus',
+    'dark background with subtle race-themed atmospheric haze',
+    `nebula dominion: dark sci-fi manga aesthetic, ${style}`,
+    'highly detailed character design, expressive eyes, race-appropriate armor or attire',
+    'centered composition, no text or watermark, single figure only',
+  ].join(', ');
+  return runAndSave(positive, CHARACTERS_OUTPUT_DIR, race, slug);
+}
 
 /* ── Per-race iso ground tile sprites ─────────────────────────────────────
  * One pre-projected diamond tile per race used as the BaseField ground.
@@ -402,6 +423,9 @@ async function main() {
     // node scripts/comfy-gen.js --tile insan          → ground (default)
     // node scripts/comfy-gen.js --tile insan ground   → explicit type
     await generateTile(args[1], args[2] || 'ground');
+  } else if (args[0] === '--commander' && args[1] && args[2]) {
+    // node scripts/comfy-gen.js --commander zerg kthala "Brood-Anne hive matron"
+    await generateCommander(args[1], args[2], args[3] || `${args[2]} commander portrait`);
   } else if (args[0] === '--base' && args[1] && args[2]) {
     await generateBase(args[1], Number(args[2]));
   } else if (args[0] && args[1]) {

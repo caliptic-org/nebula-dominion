@@ -57,35 +57,40 @@ import { hasSession } from '@/lib/session';
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
 // shared lib once a third consumer appears.
+// Intersection of TS BuildingType enum + Postgres buildings_type_enum:
+// only command_center, barracks, shield_generator, turret are accepted by
+// BOTH layers. Anything else 400s (DTO) or 500s (DB). Mirror /base/build's
+// SLUG_TO_BACKEND_TYPE for the same reason — extract to a shared lib once
+// a 3rd consumer appears.
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   komuta_ussu:        'command_center',
-  reaktor_modulu:     'refinery',
+  reaktor_modulu:     'shield_generator',
   kisla:              'barracks',
-  bilim_akademisi:    'research_lab',
-  subspace_anteni:    'shield_generator',
-  genetik_lab:        'hangar',
+  bilim_akademisi:    'shield_generator',
+  subspace_anteni:    'turret',
+  genetik_lab:        'barracks',
   kovan_cekirdegi:    'command_center',
-  biyokutle_havuzu:   'mine',
+  biyokutle_havuzu:   'barracks',
   mutasyon_cukuru:    'barracks',
-  genom_tumsegi:      'research_lab',
+  genom_tumsegi:      'shield_generator',
   yutucu_tumsek:      'shield_generator',
-  subspace_damari:    'hangar',
+  subspace_damari:    'turret',
   sonsuzluk_cekirdegi:'command_center',
-  veri_kaynagi:       'refinery',
-  montaj_hatti:       'hangar',
-  mantik_matrisi:     'research_lab',
+  veri_kaynagi:       'shield_generator',
+  montaj_hatti:       'barracks',
+  mantik_matrisi:     'shield_generator',
   cihaz_hazinesi:     'shield_generator',
   subspace_cozucu:    'turret',
   alfa_tahti:         'command_center',
-  av_kampi:           'mine',
+  av_kampi:           'barracks',
   vahsi_cukur:        'barracks',
-  atalar_sunagi:      'refinery',
+  atalar_sunagi:      'shield_generator',
   atalar_magarasi:    'shield_generator',
-  boyut_yarigi:       'hangar',
+  boyut_yarigi:       'turret',
   karanlik_taht:      'command_center',
-  ruh_toplayici:      'refinery',
+  ruh_toplayici:      'shield_generator',
   lanet_tapinagi:     'barracks',
-  pakt_sembolu:       'research_lab',
+  pakt_sembolu:       'shield_generator',
   yasak_grimoire:     'shield_generator',
   yarik_kapisi:       'turret',
 };

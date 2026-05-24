@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   BaseField,
   BottomNav,
@@ -59,6 +59,7 @@ export default function BuildMenuPage() {
 function BuildMenuInner() {
   const race = useNDRace();
   const lex = raceLex(race.key);
+  const router = useRouter();
   const params = useSearchParams();
   const focusSlug = params.get('focus');
   const [activeTab, setActiveTab] = useState(0);
@@ -86,6 +87,20 @@ function BuildMenuInner() {
     [race, backendTypes, liveLevel],
   );
   const lockedCount = catalog.filter((c) => c.locked).length;
+
+  // Filter pills (`lex.buildTabs`) split the 6-slot catalog into themed
+  // categories. Tab 0 = "Tümü" → show all. Each subsequent tab maps to
+  // a slot index range based on the race's themed grouping (capital +
+  // resource + military + science + frontier ≈ 6 slots / 5 tabs).
+  // The mapping is approximate (each race lex defines its own 5 tabs);
+  // we slice the catalog evenly so every tab has at least 1-2 entries.
+  const visibleCatalog = useMemo(() => {
+    if (activeTab === 0) return catalog; // "Tümü"
+    // Tab N (1..4) gets the slot at index (N-1)*2 and (N-1)*2 + 1 if any.
+    const start = (activeTab - 1) * 2;
+    const slice = catalog.slice(start, start + 2);
+    return slice.length > 0 ? slice : catalog;
+  }, [catalog, activeTab]);
 
   // Preselect the building the player tapped on /base (?focus=<slug>).
   // Falls through to the local state once the user clicks another card.
@@ -250,16 +265,27 @@ function BuildMenuInner() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {catalog.map((entry) => (
+              {visibleCatalog.map((entry) => (
                 <BuildingCard
                   key={entry.name}
                   race={race}
                   entry={entry}
                   selected={selected?.name === entry.name}
-                  onSelect={() => setSelectedName(entry.name)}
+                  onSelect={() => {
+                    setSelectedName(entry.name);
+                    // Card tap routes to the detail page — quicker than
+                    // selecting and then hitting "İnşa Et" again.
+                    const slug = race.buildings.find((b) => b.n === entry.name)?.slug;
+                    if (slug) router.push(`/base/building/${slug}`);
+                  }}
                 />
               ))}
             </div>
+            {visibleCatalog.length === 0 && (
+              <Caption style={{ textAlign: 'center', padding: 16 }}>
+                Bu filtrede kayıt yok.
+              </Caption>
+            )}
 
             {/* CTAs */}
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
@@ -451,55 +477,62 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
 
 /* Slot-slug → backend BuildingType enum string mapping.
  *
- * The race tokens carry race-flavoured names ("Komuta Üssü", "Kovan
- * Çekirdeği") that the design needs; the game-server's DB enum
- * `buildings_type_enum` currently exposes 8 generic types (command_center,
- * mine, refinery, barracks, hangar, research_lab, shield_generator, turret).
- * Each race's 6 slots map onto the closest generic equivalent so POST
- * /buildings doesn't reject on enum validation.
+ * Schema drift gotcha: the TypeScript BuildingType enum exposes 16 values
+ * (mineral_extractor, gas_refinery, solar_plant, academy, factory, …) but
+ * the live Postgres `buildings_type_enum` only has 8 (command_center,
+ * mine, refinery, barracks, hangar, research_lab, shield_generator,
+ * turret). The two sets only share **4 values**:
  *
- * The TS BuildingType enum in apps/game-server/src/buildings/entities has
- * additional names (academy, factory, spawning_pool, nano_forge…) but
- * those aren't in the live DB schema yet — a future migration will reconcile
- * the two and this table can expand without touching the BAŞLAT handler. */
+ *     command_center · barracks · shield_generator · turret
+ *
+ * Sending anything else triggers either:
+ *   - 400 "type must be one of ..." (DB-only values blocked by TS DTO)
+ *   - 500 invalid enum (TS-only values rejected by Postgres at INSERT)
+ *
+ * Until a migration aligns the two enums (TODO: `ALTER TYPE
+ * buildings_type_enum ADD VALUE` for the missing TS values), every slug
+ * here MUST resolve to one of the 4 valid intersection values. Capital
+ * slot (index 0) is `command_center` (max 1 per player); the remaining
+ * 5 slots round-robin between `barracks`, `shield_generator`, `turret`
+ * so a race's build menu produces a mix when fully constructed. */
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // Insan — sleek military sci-fi
   komuta_ussu:        'command_center',
-  reaktor_modulu:     'refinery',
+  reaktor_modulu:     'shield_generator',
   kisla:              'barracks',
-  bilim_akademisi:    'research_lab',
-  subspace_anteni:    'shield_generator',
-  genetik_lab:        'hangar',
+  bilim_akademisi:    'shield_generator',
+  subspace_anteni:    'turret',
+  genetik_lab:        'barracks',
 
   // Zerg — organic hive
   kovan_cekirdegi:    'command_center',
-  biyokutle_havuzu:   'mine',
+  biyokutle_havuzu:   'barracks',
   mutasyon_cukuru:    'barracks',
-  genom_tumsegi:      'research_lab',
+  genom_tumsegi:      'shield_generator',
   yutucu_tumsek:      'shield_generator',
-  subspace_damari:    'hangar',
+  subspace_damari:    'turret',
 
   // Otomat — cybernetic
   sonsuzluk_cekirdegi:'command_center',
-  veri_kaynagi:       'refinery',
-  montaj_hatti:       'hangar',
-  mantik_matrisi:     'research_lab',
+  veri_kaynagi:       'shield_generator',
+  montaj_hatti:       'barracks',
+  mantik_matrisi:     'shield_generator',
   cihaz_hazinesi:     'shield_generator',
   subspace_cozucu:    'turret',
 
   // Canavar — primal tribal
   alfa_tahti:         'command_center',
-  av_kampi:           'mine',
+  av_kampi:           'barracks',
   vahsi_cukur:        'barracks',
-  atalar_sunagi:      'refinery',
+  atalar_sunagi:      'shield_generator',
   atalar_magarasi:    'shield_generator',
-  boyut_yarigi:       'hangar',
+  boyut_yarigi:       'turret',
 
   // Seytan — dark occult
   karanlik_taht:      'command_center',
-  ruh_toplayici:      'refinery',
+  ruh_toplayici:      'shield_generator',
   lanet_tapinagi:     'barracks',
-  pakt_sembolu:       'research_lab',
+  pakt_sembolu:       'shield_generator',
   yasak_grimoire:     'shield_generator',
   yarik_kapisi:       'turret',
 };

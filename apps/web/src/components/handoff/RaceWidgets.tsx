@@ -724,15 +724,17 @@ export function DraggableBaseField({
         />
       </div>
 
-      {/* Zoom controls — bottom-left, opposite the BottomNav, tucked under
-        * the selected-building card. Small footprint, no labels, race-tinted
-        * border. Hidden visually on very narrow viewports (no media query —
-        * the rest of the HUD already crowds those pixels). */}
+      {/* Zoom controls — top-left, tucked directly under the
+        * BaseFieldStatusChip (which sits at top:12, ~28px tall).
+        * Moved from the bottom-left so it doesn't compete with the
+        * floating REAKTÖR-MODÜLÜ detail panel that anchors the
+        * lower-left corner. Small footprint, no labels, race-tinted
+        * border. */}
       <div
         style={{
           position: 'absolute',
           left: 12,
-          bottom: 12,
+          top: 48,
           display: 'flex',
           flexDirection: 'column',
           gap: 4,

@@ -1,20 +1,31 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { useRaceTheme } from '@/hooks/useRaceTheme';
+import {
+  RACES,
+  ND,
+  Screen,
+  Panel,
+  Eyebrow,
+  Caption,
+  Code,
+  NDButton,
+  useNDRace,
+  type NDRace,
+  type NDRaceKey,
+} from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
 type ChatTab = 'global' | 'guild' | 'dm';
-type Race = 'insan' | 'zerg' | 'otomat' | 'canavar' | 'seytan';
 
 interface ChatMessage {
   id: string;
   type: 'player' | 'system' | 'battle' | 'guild';
   author?: string;
-  race?: Race;
+  race?: NDRaceKey;
   level?: number;
   content: string;
   timestamp: string;
@@ -24,7 +35,7 @@ interface ChatMessage {
 interface DMConversation {
   id: string;
   author: string;
-  race: Race;
+  race: NDRaceKey;
   level: number;
   lastMessage: string;
   timestamp: string;
@@ -34,23 +45,7 @@ interface DMConversation {
 
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
-const RACE_COLORS: Record<Race, string> = {
-  insan:   'var(--color-race-insan)',
-  zerg:    'var(--color-race-zerg)',
-  otomat:  'var(--color-race-otomat)',
-  canavar: 'var(--color-race-canavar)',
-  seytan:  'var(--color-race-seytan)',
-};
-
-const RACE_LABELS: Record<Race, string> = {
-  insan:   'İNSAN',
-  zerg:    'ZERG',
-  otomat:  'OTOMAT',
-  canavar: 'CANAVAR',
-  seytan:  'ŞEYTAN',
-};
-
-const RACE_ICONS: Record<Race, string> = {
+const RACE_ICONS: Record<NDRaceKey, string> = {
   insan:   '⚡',
   zerg:    '🦠',
   otomat:  '🤖',
@@ -226,39 +221,60 @@ const DM_CONVERSATIONS: DMConversation[] = [
 
 /* ── Sub-components ────────────────────────────────────────────────────── */
 
-function RaceBadge({ race, size = 'sm' }: { race: Race; size?: 'xs' | 'sm' }) {
-  const color = RACE_COLORS[race];
-  const label = RACE_LABELS[race];
-  const icon = RACE_ICONS[race];
+function RaceBadge({ raceKey, size = 'sm' }: { raceKey: NDRaceKey; size?: 'xs' | 'sm' }) {
+  const r = RACES[raceKey];
   return (
     <span
-      className="inline-flex items-center gap-0.5 rounded font-display font-black uppercase tracking-widest"
       style={{
-        fontSize: size === 'xs' ? '7px' : '8px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 2,
+        fontFamily: ND.display,
+        fontWeight: 800,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        fontSize: size === 'xs' ? 7 : 8,
         padding: size === 'xs' ? '1px 4px' : '2px 5px',
-        background: `${color}18`,
-        color,
-        border: `1px solid ${color}35`,
+        background: `${r.primary}18`,
+        color: r.primary,
+        border: `1px solid ${r.primary}35`,
+        borderRadius: 2,
       }}
     >
-      {icon} {label}
+      {RACE_ICONS[raceKey]} {r.short}
     </span>
   );
 }
 
-function MessageAvatar({ author, race, isOwn }: { author: string; race: Race; isOwn?: boolean }) {
-  const color = RACE_COLORS[race];
+function MessageAvatar({
+  author,
+  raceKey,
+  isOwn,
+}: {
+  author: string;
+  raceKey: NDRaceKey;
+  isOwn?: boolean;
+}) {
+  const r = RACES[raceKey];
   const initials = author.slice(0, 2).toUpperCase();
   return (
     <div
-      className="flex-shrink-0 flex items-center justify-center rounded font-display font-black text-[10px] select-none"
       style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         width: 32,
         height: 32,
-        background: `${color}18`,
-        border: `2px solid ${color}55`,
-        color,
-        boxShadow: isOwn ? `0 0 8px ${color}40` : undefined,
+        background: `${r.primary}18`,
+        border: `2px solid ${r.primary}55`,
+        color: r.primary,
+        fontFamily: ND.display,
+        fontWeight: 800,
+        fontSize: 10,
+        userSelect: 'none',
+        borderRadius: 3,
+        boxShadow: isOwn ? `0 0 8px ${r.glow}40` : undefined,
       }}
     >
       {initials}
@@ -266,203 +282,289 @@ function MessageAvatar({ author, race, isOwn }: { author: string; race: Race; is
   );
 }
 
-/* Manga-style speech bubble */
 function MessageBubble({
   message,
-  raceColor,
+  myRace,
 }: {
   message: ChatMessage;
-  raceColor: string;
+  myRace: NDRace;
 }) {
   const isOwn = message.isOwn;
-  const bubbleColor = isOwn ? raceColor : (message.race ? RACE_COLORS[message.race] : 'var(--color-text-secondary)');
 
   if (message.type === 'system') {
     return (
-      <div
-        className="flex items-center gap-2 mx-2 my-1 px-3 py-1.5 rounded font-body text-[11px]"
-        style={{
-          background: 'rgba(0,207,255,0.06)',
-          border: '1px solid rgba(0,207,255,0.15)',
-          color: 'var(--color-race-otomat)',
-          borderLeft: '3px solid var(--color-race-otomat)',
-        }}
-      >
-        <span style={{ opacity: 0.7 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          {message.timestamp}
-        </span>
-      </div>
+      <SystemLine
+        content={message.content}
+        timestamp={message.timestamp}
+        color={RACES.otomat.primary}
+        tint="rgba(120, 200, 255, 0.06)"
+      />
     );
   }
 
   if (message.type === 'battle') {
     return (
-      <div
-        className="flex items-center gap-2 mx-2 my-1 px-3 py-1.5 rounded font-body text-[11px]"
-        style={{
-          background: 'rgba(255,51,85,0.06)',
-          border: '1px solid rgba(255,51,85,0.18)',
-          color: 'var(--color-danger)',
-          borderLeft: '3px solid var(--color-danger)',
-        }}
-      >
-        <span style={{ opacity: 0.85 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          {message.timestamp}
-        </span>
-      </div>
+      <SystemLine
+        content={message.content}
+        timestamp={message.timestamp}
+        color={ND.danger}
+        tint="rgba(255, 80, 80, 0.08)"
+      />
     );
   }
 
   if (message.type === 'guild') {
     return (
-      <div
-        className="flex items-center gap-2 mx-2 my-1 px-3 py-1.5 rounded font-body text-[11px]"
-        style={{
-          background: 'rgba(255,200,50,0.06)',
-          border: '1px solid rgba(255,200,50,0.15)',
-          color: 'var(--color-energy)',
-          borderLeft: '3px solid var(--color-energy)',
-        }}
-      >
-        <span style={{ opacity: 0.85 }}>{message.content}</span>
-        <span className="ml-auto text-[9px] font-display" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          {message.timestamp}
-        </span>
-      </div>
+      <SystemLine
+        content={message.content}
+        timestamp={message.timestamp}
+        color={ND.warn}
+        tint="rgba(220, 180, 60, 0.07)"
+      />
     );
   }
 
-  return (
-    <div className={`flex items-end gap-2 px-3 py-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-      {!isOwn && <MessageAvatar author={message.author!} race={message.race!} />}
+  const bubbleRace = isOwn ? myRace : (message.race ? RACES[message.race] : myRace);
+  const bubbleColor = bubbleRace.primary;
 
-      <div className={`flex flex-col gap-0.5 max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
-        {/* Author line */}
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        gap: 8,
+        padding: '4px 12px',
+        flexDirection: isOwn ? 'row-reverse' : 'row',
+      }}
+    >
+      {!isOwn && <MessageAvatar author={message.author!} raceKey={message.race!} />}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          maxWidth: '70%',
+          alignItems: isOwn ? 'flex-end' : 'flex-start',
+        }}
+      >
         {!isOwn && (
-          <div className="flex items-center gap-1.5 px-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px' }}>
             <span
-              className="font-display text-[10px] font-bold tracking-wide"
-              style={{ color: bubbleColor }}
+              style={{
+                fontFamily: ND.display,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                color: bubbleColor,
+              }}
             >
               {message.author}
             </span>
-            {message.race && <RaceBadge race={message.race} size="xs" />}
+            {message.race && <RaceBadge raceKey={message.race} size="xs" />}
             {message.level && (
-              <span className="font-display text-[8px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span style={{ fontFamily: ND.mono, fontSize: 9, color: ND.textMute }}>
                 Lv.{message.level}
               </span>
             )}
           </div>
         )}
 
-        {/* Speech balloon — manga style */}
         <div
-          className="relative px-3 py-2 font-body text-[12px] leading-relaxed"
           style={{
+            position: 'relative',
+            padding: '8px 12px',
+            fontFamily: ND.body,
+            fontSize: 12,
+            lineHeight: 1.45,
+            color: ND.text,
             background: isOwn
               ? `linear-gradient(135deg, ${bubbleColor}22 0%, ${bubbleColor}10 100%)`
-              : 'rgba(20, 24, 44, 0.85)',
+              : ND.surface,
             border: `1.5px solid ${bubbleColor}${isOwn ? '60' : '30'}`,
-            borderRadius: isOwn
-              ? '12px 12px 2px 12px'
-              : '12px 12px 12px 2px',
-            color: 'var(--color-text-primary)',
+            borderRadius: isOwn ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
             boxShadow: isOwn
               ? `0 0 12px ${bubbleColor}20, inset 0 0 0 1px ${bubbleColor}10`
               : '0 2px 8px rgba(0,0,0,0.4)',
           }}
         >
-          {/* Manga corner accent */}
           <div
-            className="absolute top-0 pointer-events-none"
+            aria-hidden
             style={{
+              position: 'absolute',
+              top: 0,
               [isOwn ? 'right' : 'left']: 0,
               width: 6,
               height: 6,
               background: bubbleColor,
               opacity: 0.5,
               borderRadius: isOwn ? '0 0 0 6px' : '0 0 6px 0',
+              pointerEvents: 'none',
             }}
           />
           {message.content}
         </div>
 
         <span
-          className="font-display text-[8px] px-1"
-          style={{ color: 'var(--color-text-muted)' }}
+          style={{
+            fontFamily: ND.mono,
+            fontSize: 9,
+            color: ND.textMute,
+            padding: '0 4px',
+          }}
         >
           {message.timestamp}
         </span>
       </div>
 
-      {isOwn && <MessageAvatar author="Sen" race="insan" isOwn />}
+      {isOwn && <MessageAvatar author="Sen" raceKey={myRace.key} isOwn />}
+    </div>
+  );
+}
+
+function SystemLine({
+  content,
+  timestamp,
+  color,
+  tint,
+}: {
+  content: string;
+  timestamp: string;
+  color: string;
+  tint: string;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        margin: '4px 8px',
+        padding: '6px 12px',
+        fontFamily: ND.body,
+        fontSize: 11,
+        background: tint,
+        border: `1px solid ${color}30`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 3,
+        color,
+      }}
+    >
+      <span style={{ opacity: 0.85 }}>{content}</span>
+      <span
+        style={{
+          marginLeft: 'auto',
+          fontFamily: ND.mono,
+          fontSize: 9,
+          color: ND.textMute,
+          flexShrink: 0,
+        }}
+      >
+        {timestamp}
+      </span>
     </div>
   );
 }
 
 function DMListItem({ conv, onClick }: { conv: DMConversation; onClick: () => void }) {
-  const color = RACE_COLORS[conv.race];
+  const r = RACES[conv.race];
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200"
       style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '12px 16px',
+        textAlign: 'left',
         background: 'transparent',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        border: 'none',
+        borderBottom: `1px solid ${ND.border}`,
+        cursor: 'pointer',
+        transition: 'background 0.2s',
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)';
+        (e.currentTarget as HTMLElement).style.background = 'rgba(120,160,220,0.06)';
       }}
       onMouseLeave={e => {
         (e.currentTarget as HTMLElement).style.background = 'transparent';
       }}
     >
-      {/* Avatar */}
-      <div className="relative flex-shrink-0">
+      <div style={{ position: 'relative', flexShrink: 0 }}>
         <div
-          className="flex items-center justify-center rounded font-display font-black text-[10px]"
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             width: 36,
             height: 36,
-            background: `${color}18`,
-            border: `2px solid ${color}55`,
-            color,
+            background: `${r.primary}18`,
+            border: `2px solid ${r.primary}55`,
+            color: r.primary,
+            fontFamily: ND.display,
+            fontWeight: 800,
+            fontSize: 10,
+            borderRadius: 3,
           }}
         >
           {conv.author.slice(0, 2).toUpperCase()}
         </div>
-        {/* Online indicator */}
         <div
-          className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
           style={{
-            background: conv.online ? 'var(--color-success)' : 'var(--color-text-muted)',
-            borderColor: 'var(--color-bg-base)',
+            position: 'absolute',
+            bottom: -2,
+            right: -2,
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: conv.online ? ND.ok : ND.textMute,
+            border: `2px solid ${ND.bg}`,
           }}
         />
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="font-display text-[11px] font-bold text-text-primary truncate">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <span
+            style={{
+              fontFamily: ND.display,
+              fontSize: 11,
+              fontWeight: 700,
+              color: ND.text,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {conv.author}
           </span>
-          <RaceBadge race={conv.race} size="xs" />
+          <RaceBadge raceKey={conv.race} size="xs" />
         </div>
-        <p className="font-body text-[11px] text-text-muted truncate">{conv.lastMessage}</p>
+        <Caption style={{ fontSize: 11, color: ND.textMute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {conv.lastMessage}
+        </Caption>
       </div>
 
-      {/* Meta */}
-      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
-          {conv.timestamp}
-        </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+        <Code style={{ fontSize: 9 }}>{conv.timestamp}</Code>
         {conv.unread > 0 && (
           <span
-            className="flex items-center justify-center rounded-full font-display font-black text-[9px] min-w-[16px] h-4 px-1"
-            style={{ background: 'var(--color-danger)', color: 'var(--color-on-race)' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 999,
+              fontFamily: ND.display,
+              fontWeight: 800,
+              fontSize: 9,
+              minWidth: 16,
+              height: 16,
+              padding: '0 4px',
+              background: ND.danger,
+              color: '#0A0E1A',
+            }}
           >
             {conv.unread}
           </span>
@@ -475,7 +577,7 @@ function DMListItem({ conv, onClick }: { conv: DMConversation; onClick: () => vo
 /* ── Main Component ────────────────────────────────────────────────────── */
 
 export default function ChatPage() {
-  const { raceColor, raceGlow } = useRaceTheme();
+  const race = useNDRace();
   const [activeTab, setActiveTab] = useState<ChatTab>('global');
   const [input, setInput] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
@@ -511,7 +613,6 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeTab, activeDM]);
 
-  /* Simulate incoming message */
   useEffect(() => {
     if (activeTab !== 'global') return;
     const timer = setTimeout(() => {
@@ -554,78 +655,48 @@ export default function ChatPage() {
   ];
 
   return (
-    <div
-      className="h-dvh flex flex-col relative overflow-hidden"
-      style={{ background: 'var(--color-bg)' }}
-    >
-      {/* Nebula bg */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
-        aria-hidden
-      />
-      <div className="fixed inset-0 halftone-bg pointer-events-none opacity-10" aria-hidden />
-
-      {/* Speed lines */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute h-px"
-            style={{
-              top: `${12 + i * 18}%`,
-              left: 0,
-              right: 0,
-              background: `linear-gradient(90deg, transparent 0%, ${raceColor}07 50%, transparent 100%)`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* ── Header ────────────────────────────────────────────── */}
+    <Screen race={race} style={{ minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
       <header
-        className="relative z-40 sticky top-0 flex items-center justify-between px-4 py-2"
         style={{
-          background: 'rgba(8,10,16,0.95)',
-          borderBottom: `1px solid ${raceColor}20`,
-          backdropFilter: 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px',
+          background: 'linear-gradient(180deg, rgba(6,8,15,0.95), rgba(6,8,15,0.55))',
+          borderBottom: `1px solid ${race.primary}33`,
+          flexShrink: 0,
         }}
       >
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="font-display text-text-muted text-[10px] hover:text-text-primary transition-colors"
-          >
-            ← Ana Üs
-          </Link>
-          <div className="h-3 w-px" style={{ background: 'rgba(255,255,255,0.10)' }} />
-          <span
-            className="font-display text-[11px] font-black uppercase tracking-widest"
-            style={{ color: raceColor }}
-          >
-            💬 SOHBET
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link href="/" aria-label="Geri" style={iconBtn()}>‹</Link>
+          <div style={{ height: 12, width: 1, background: ND.border }} />
+          <Eyebrow color={race.primary}>💬 Sohbet</Eyebrow>
         </div>
 
-        {/* Online count */}
-        <div className="flex items-center gap-1.5">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
-            className="w-1.5 h-1.5 rounded-full animate-pulse"
-            style={{ background: 'var(--color-success)' }}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: ND.ok,
+              animation: 'pulse 2s ease-in-out infinite',
+            }}
           />
-          <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
-            1,247 çevrimiçi
-          </span>
+          <Code style={{ fontSize: 9, color: ND.textDim }}>1,247 çevrimiçi</Code>
         </div>
       </header>
 
-      {/* ── Tab Bar ───────────────────────────────────────────── */}
+      {/* Tab Bar */}
       <div
-        className="relative z-30 flex"
+        role="tablist"
         style={{
-          background: 'rgba(13,17,23,0.9)',
-          borderBottom: `1px solid rgba(255,255,255,0.05)`,
-          backdropFilter: 'blur(12px)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 6,
+          padding: '12px 16px 0',
+          flexShrink: 0,
         }}
       >
         {tabs.map((tab) => {
@@ -633,205 +704,307 @@ export default function ChatPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setActiveDM(null); setNewMessageAlert(false); }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 relative transition-all duration-200 font-display text-[10px] font-bold uppercase tracking-widest"
+              role="tab"
+              aria-selected={isActive}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.id);
+                setActiveDM(null);
+                setNewMessageAlert(false);
+              }}
               style={{
-                color: isActive ? raceColor : 'var(--color-text-muted)',
-                borderBottom: isActive ? `2px solid ${raceColor}` : '2px solid transparent',
-                background: isActive ? `${raceColor}08` : 'transparent',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '10px 6px',
+                fontFamily: ND.display,
+                fontSize: 10,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+                background: isActive
+                  ? `linear-gradient(180deg, ${race.primary}28, ${race.primary}10)`
+                  : 'transparent',
+                border: `1px solid ${isActive ? race.primary : ND.border}`,
+                color: isActive ? race.primary : ND.textDim,
+                borderRadius: 3,
+                cursor: 'pointer',
+                position: 'relative',
               }}
             >
               <span aria-hidden>{tab.icon}</span>
               {tab.label}
               {tab.badge ? (
                 <span
-                  className="flex items-center justify-center rounded-full min-w-[14px] h-3.5 px-0.5 font-black text-[8px]"
-                  style={{ background: 'var(--color-danger)', color: 'var(--color-on-race)' }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 999,
+                    minWidth: 14,
+                    height: 14,
+                    padding: '0 3px',
+                    fontWeight: 800,
+                    fontSize: 8,
+                    background: ND.danger,
+                    color: '#0A0E1A',
+                  }}
                 >
                   {tab.badge}
                 </span>
               ) : null}
-              {isActive && (
-                <div
-                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-px"
-                  style={{
-                    background: raceColor,
-                    boxShadow: `0 0 8px ${raceColor}`,
-                  }}
-                />
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* ── Content ───────────────────────────────────────────── */}
-      <main className="relative z-10 flex-1 flex flex-col overflow-hidden">
-
-        {/* DM List */}
-        {activeTab === 'dm' && !activeDM && (
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-4 py-2">
-              <span className="font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                Özel Mesajlar
-              </span>
+      {/* Content */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '12px 16px 0', minHeight: 0 }}>
+        <Panel race={race} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+          {/* DM List */}
+          {activeTab === 'dm' && !activeDM && (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <div style={{ padding: '12px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Eyebrow color={race.primary}>Özel Mesajlar</Eyebrow>
+                <Code>{DM_CONVERSATIONS.length}</Code>
+              </div>
+              {DM_CONVERSATIONS.map((conv) => (
+                <DMListItem
+                  key={conv.id}
+                  conv={conv}
+                  onClick={() => setActiveDM(conv)}
+                />
+              ))}
             </div>
-            {DM_CONVERSATIONS.map((conv) => (
-              <DMListItem
-                key={conv.id}
-                conv={conv}
-                onClick={() => setActiveDM(conv)}
-              />
-            ))}
-          </div>
-        )}
+          )}
 
-        {/* DM Conversation View */}
-        {activeTab === 'dm' && activeDM && (
-          <>
-            {/* DM Header */}
+          {/* DM Conversation View */}
+          {activeTab === 'dm' && activeDM && (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderBottom: `1px solid ${ND.border}`,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveDM(null)}
+                  style={{
+                    ...iconBtn(),
+                    width: 28,
+                    height: 28,
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Geri"
+                >
+                  ‹
+                </button>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 28,
+                    height: 28,
+                    background: `${RACES[activeDM.race].primary}18`,
+                    border: `2px solid ${RACES[activeDM.race].primary}55`,
+                    color: RACES[activeDM.race].primary,
+                    fontFamily: ND.display,
+                    fontWeight: 800,
+                    fontSize: 10,
+                    borderRadius: 3,
+                  }}
+                >
+                  {activeDM.author.slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: ND.display, fontSize: 11, fontWeight: 700, color: ND.text }}>
+                      {activeDM.author}
+                    </span>
+                    <RaceBadge raceKey={activeDM.race} size="xs" />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: activeDM.online ? ND.ok : ND.textMute,
+                      }}
+                    />
+                    <Code style={{ fontSize: 9 }}>
+                      {activeDM.online ? 'Çevrimiçi' : 'Çevrimdışı'} · Lv.{activeDM.level}
+                    </Code>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                ref={messageContainerRef}
+                style={{
+                  flex: 1,
+                  overflow: 'auto',
+                  padding: '8px 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <div
+                  style={{
+                    margin: '8px 12px',
+                    padding: 8,
+                    textAlign: 'center',
+                    fontFamily: ND.mono,
+                    fontSize: 10,
+                    color: ND.textMute,
+                    background: 'rgba(120,160,220,0.05)',
+                    border: `1px dashed ${ND.border}`,
+                    borderRadius: 3,
+                  }}
+                >
+                  Konuşma başladı
+                </div>
+                <MessageBubble
+                  myRace={race}
+                  message={{
+                    id: 'dm-msg-1',
+                    type: 'player',
+                    author: activeDM.author,
+                    race: activeDM.race,
+                    level: activeDM.level,
+                    content: activeDM.lastMessage,
+                    timestamp: activeDM.timestamp,
+                  }}
+                />
+                <div ref={messagesEndRef} />
+              </div>
+            </>
+          )}
+
+          {/* Global / Guild Message List */}
+          {activeTab !== 'dm' && (
             <div
-              className="flex items-center gap-3 px-4 py-2"
+              ref={messageContainerRef}
               style={{
-                background: 'rgba(13,17,23,0.8)',
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                flex: 1,
+                overflow: 'auto',
+                padding: '8px 0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
               }}
             >
-              <button
-                onClick={() => setActiveDM(null)}
-                className="font-display text-[10px] text-text-muted hover:text-text-primary transition-colors"
-              >
-                ←
-              </button>
-              <div
-                className="flex items-center justify-center rounded font-display font-black text-[10px]"
-                style={{
-                  width: 28,
-                  height: 28,
-                  background: `${RACE_COLORS[activeDM.race]}18`,
-                  border: `2px solid ${RACE_COLORS[activeDM.race]}55`,
-                  color: RACE_COLORS[activeDM.race],
-                }}
-              >
-                {activeDM.author.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-display text-[11px] font-bold text-text-primary">
-                    {activeDM.author}
-                  </span>
-                  <RaceBadge race={activeDM.race} size="xs" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: activeDM.online ? 'var(--color-success)' : 'var(--color-text-muted)' }}
-                  />
-                  <span className="font-display text-[8px]" style={{ color: 'var(--color-text-muted)' }}>
-                    {activeDM.online ? 'Çevrimiçi' : 'Çevrimdışı'} · Lv.{activeDM.level}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* DM Messages */}
-            <div ref={messageContainerRef} className="flex-1 overflow-y-auto py-2 flex flex-col gap-1">
-              <div
-                className="mx-3 my-2 p-2 text-center font-body text-[10px] rounded"
-                style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)' }}
-              >
-                Konuşma başladı
-              </div>
-              <MessageBubble
-                raceColor={raceColor}
-                message={{
-                  id: 'dm-msg-1',
-                  type: 'player',
-                  author: activeDM.author,
-                  race: activeDM.race,
-                  level: activeDM.level,
-                  content: activeDM.lastMessage,
-                  timestamp: activeDM.timestamp,
-                }}
-              />
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} myRace={race} />
+              ))}
               <div ref={messagesEndRef} />
             </div>
-          </>
-        )}
+          )}
 
-        {/* Global / Guild Message List */}
-        {activeTab !== 'dm' && (
-          <div ref={messageContainerRef} className="flex-1 overflow-y-auto py-2 flex flex-col gap-0.5">
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} raceColor={raceColor} />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-
-        {/* New message notification bar */}
-        {newMessageAlert && activeTab === 'global' && (
-          <div
-            className="absolute left-3 right-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer"
-            style={{
-              bottom: 72,
-              background: `${raceColor}18`,
-              border: `1px solid ${raceColor}40`,
-              backdropFilter: 'blur(12px)',
-              zIndex: 20,
-            }}
-            onClick={() => {
-              setNewMessageAlert(false);
-              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full animate-pulse flex-shrink-0"
-                style={{ background: raceColor }}
-              />
-              <span className="font-display text-[10px] font-bold" style={{ color: raceColor }}>
-                Yeni mesaj
-              </span>
+          {/* New message alert */}
+          {newMessageAlert && activeTab === 'global' && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setNewMessageAlert(false);
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                position: 'absolute',
+                left: 12,
+                right: 12,
+                bottom: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '8px 12px',
+                background: `${race.primary}18`,
+                border: `1px solid ${race.primary}40`,
+                backdropFilter: 'blur(12px)',
+                borderRadius: 4,
+                cursor: 'pointer',
+                zIndex: 5,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: race.primary,
+                    flexShrink: 0,
+                    animation: 'pulse 1.4s ease-in-out infinite',
+                  }}
+                />
+                <span style={{ fontFamily: ND.display, fontSize: 10, fontWeight: 700, color: race.primary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Yeni mesaj
+                </span>
+              </div>
+              <Code style={{ color: ND.textDim }}>Alta git ↓</Code>
             </div>
-            <span className="font-display text-[9px]" style={{ color: 'var(--color-text-muted)' }}>
-              Alta git ↓
-            </span>
-          </div>
-        )}
+          )}
+        </Panel>
       </main>
 
-      {/* ── Input Bar ─────────────────────────────────────────── */}
+      {/* Input Bar */}
       {(activeTab !== 'dm' || activeDM) && (
         <div
-          className="relative z-30"
           style={{
-            background: 'rgba(8,10,16,0.97)',
-            borderTop: `1px solid ${raceColor}18`,
+            position: 'relative',
+            margin: '8px 16px 0',
+            background: ND.surface,
+            border: `1px solid ${race.primary}33`,
+            borderRadius: 4,
             backdropFilter: 'blur(20px)',
+            flexShrink: 0,
           }}
         >
           {/* Quick Reply Popover */}
           {showQuickReplies && (
             <div
-              className="absolute bottom-full left-0 right-0 flex flex-wrap gap-1.5 p-3"
               style={{
-                background: 'rgba(13,17,23,0.98)',
-                borderTop: `1px solid rgba(255,255,255,0.06)`,
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: 4,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                padding: 12,
+                background: ND.surfaceHi,
+                border: `1px solid ${ND.border}`,
+                borderRadius: 4,
+                backdropFilter: 'blur(12px)',
               }}
             >
-              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                Hızlı yanıtlar
-              </span>
+              <div style={{ width: '100%' }}>
+                <Eyebrow color={race.primary}>Hızlı yanıtlar</Eyebrow>
+              </div>
               {QUICK_REPLIES.map((reply) => (
                 <button
                   key={reply}
+                  type="button"
                   onClick={() => { setInput(reply); setShowQuickReplies(false); }}
-                  className="px-2.5 py-1 rounded-full font-body text-[11px] transition-all duration-150"
                   style={{
-                    background: `${raceColor}12`,
-                    border: `1px solid ${raceColor}30`,
-                    color: raceColor,
+                    padding: '4px 10px',
+                    fontFamily: ND.body,
+                    fontSize: 11,
+                    background: `${race.primary}12`,
+                    border: `1px solid ${race.primary}30`,
+                    color: race.primary,
+                    borderRadius: 999,
+                    cursor: 'pointer',
                   }}
                 >
                   {reply}
@@ -843,21 +1016,42 @@ export default function ChatPage() {
           {/* Emoji Picker */}
           {showEmoji && (
             <div
-              className="absolute bottom-full left-0 right-0 flex flex-wrap gap-2 p-3"
               style={{
-                background: 'rgba(13,17,23,0.98)',
-                borderTop: `1px solid rgba(255,255,255,0.06)`,
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: 4,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                padding: 12,
+                background: ND.surfaceHi,
+                border: `1px solid ${ND.border}`,
+                borderRadius: 4,
+                backdropFilter: 'blur(12px)',
               }}
             >
-              <span className="w-full font-display text-[9px] uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                Emoji
-              </span>
+              <div style={{ width: '100%' }}>
+                <Eyebrow color={race.primary}>Emoji</Eyebrow>
+              </div>
               {EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
+                  type="button"
                   onClick={() => { setInput((v) => v + emoji); }}
-                  className="text-lg w-9 h-9 flex items-center justify-center rounded transition-all duration-150 hover:scale-110"
-                  style={{ background: 'rgba(255,255,255,0.04)' }}
+                  style={{
+                    fontSize: 18,
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(120,160,220,0.08)',
+                    border: `1px solid ${ND.border}`,
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                  }}
                 >
                   {emoji}
                 </button>
@@ -866,77 +1060,110 @@ export default function ChatPage() {
           )}
 
           {/* Input Row */}
-          <div className="flex items-center gap-2 px-3 py-2.5">
-            {/* Emoji toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
             <button
+              type="button"
               onClick={() => { setShowEmoji((v) => !v); setShowQuickReplies(false); }}
-              className="flex items-center justify-center w-8 h-8 rounded transition-all duration-150"
+              aria-label="Emoji"
               style={{
-                background: showEmoji ? `${raceColor}20` : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${showEmoji ? raceColor + '50' : 'rgba(255,255,255,0.08)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
                 fontSize: 16,
+                background: showEmoji ? `${race.primary}20` : 'rgba(120,160,220,0.06)',
+                border: `1px solid ${showEmoji ? race.primary + '60' : ND.border}`,
+                borderRadius: 3,
+                cursor: 'pointer',
               }}
-              title="Emoji"
             >
               😊
             </button>
 
-            {/* Quick replies toggle */}
             <button
+              type="button"
               onClick={() => { setShowQuickReplies((v) => !v); setShowEmoji(false); }}
-              className="flex items-center justify-center w-8 h-8 rounded transition-all duration-150"
+              aria-label="Hızlı yanıtlar"
               style={{
-                background: showQuickReplies ? `${raceColor}20` : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${showQuickReplies ? raceColor + '50' : 'rgba(255,255,255,0.08)'}`,
-                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 32,
+                height: 32,
+                fontSize: 14,
+                background: showQuickReplies ? `${race.primary}20` : 'rgba(120,160,220,0.06)',
+                border: `1px solid ${showQuickReplies ? race.primary + '60' : ND.border}`,
+                borderRadius: 3,
+                cursor: 'pointer',
               }}
-              title="Hızlı yanıtlar"
             >
               ⚡
             </button>
 
-            {/* Text input */}
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
               placeholder="Mesaj yaz..."
-              className="flex-1 bg-transparent font-body text-[13px] text-text-primary placeholder:text-text-muted outline-none px-3 py-1.5 rounded"
               style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${raceColor}20`,
+                flex: 1,
+                fontFamily: ND.body,
+                fontSize: 13,
+                color: ND.text,
+                background: 'rgba(120,160,220,0.06)',
+                border: `1px solid ${race.primary}30`,
+                outline: 'none',
+                padding: '8px 12px',
+                borderRadius: 3,
                 transition: 'border-color 0.2s',
+                minWidth: 0,
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = `${raceColor}60`;
+                e.currentTarget.style.borderColor = `${race.primary}80`;
                 setShowEmoji(false);
                 setShowQuickReplies(false);
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = `${raceColor}20`;
+                e.currentTarget.style.borderColor = `${race.primary}30`;
               }}
             />
 
-            {/* Send button */}
-            <button
+            <NDButton
+              race={race}
+              size="sm"
               onClick={handleSend}
               disabled={!input.trim()}
-              className="flex items-center justify-center w-9 h-9 rounded font-display font-black text-[12px] transition-all duration-200 disabled:opacity-40"
-              style={{
-                background: input.trim() ? raceColor : 'rgba(255,255,255,0.06)',
-                color: input.trim() ? 'var(--color-bg-base)' : 'var(--color-text-muted)',
-                boxShadow: input.trim() ? `0 0 12px ${raceGlow}` : undefined,
-              }}
-              title="Gönder"
+              style={{ minWidth: 56 }}
             >
-              ▶
-            </button>
+              Gönder
+            </NDButton>
           </div>
         </div>
       )}
 
-      <BottomNav />
-    </div>
+      <div style={{ paddingTop: 8, flexShrink: 0 }}>
+        <BottomNav />
+      </div>
+    </Screen>
   );
+}
+
+/* ── pieces ───────────────────────────────────────────────────────────── */
+
+function iconBtn(): CSSProperties {
+  return {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    border: `1px solid ${ND.border}`,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: ND.text,
+    fontFamily: ND.display,
+    textDecoration: 'none',
+    background: 'transparent',
+  };
 }

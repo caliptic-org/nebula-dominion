@@ -1,0 +1,23 @@
+# Nebula Dominion — Terraform deploy secrets.
+#
+# Copy this file to terraform.tfvars (gitignored) and fill the real values:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Required:
+postgres_password   = "CHANGE_ME_strong_32+_random"
+jwt_secret          = "CHANGE_ME_jwt_secret_32+_random"
+jwt_refresh_secret  = "CHANGE_ME_refresh_secret_32+_random"
+minio_root_password = "CHANGE_ME_minio_secret"
+
+# Optional — paste from analytics dashboards once Faz 1 / Faz 3 keys exist:
+# next_public_ga_id        = "G-XXXXXXXXXX"
+# next_public_fb_pixel_id  = "000000000000000"
+# next_public_sentry_dsn   = "https://...@...ingest.sentry.io/..."
+# server_sentry_dsn        = "https://...@...ingest.sentry.io/..."
+
+# Optional — override defaults if you split clusters / domains:
+# namespace   = "nebula-prod"
+# host_web    = "nebula.caliptic.com"
+# host_api    = "api-nebula.caliptic.com"
+# host_game   = "game-nebula.caliptic.com"
+# image_tag   = "v0.1.0"

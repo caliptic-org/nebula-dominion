@@ -1,13 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { CountdownTimer } from '@/components/events/CountdownTimer';
-import { EventBadge, type EventType } from '@/components/events/EventBadge';
-import { sanitizeColor, sanitizeGradient } from '@/lib/colorSanitizer';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Caption,
+  Chip,
+  Code,
+  Eyebrow,
+  H2,
+  H3,
+  ND,
+  NDButton,
+  Panel,
+  RACES,
+  Screen,
+  Sigil,
+  useNDRace,
+  type NDRace,
+  type NDRaceKey,
+} from '@/components/handoff';
 
-/* ── Static demo data ─────────────────────────────────────────────── */
+/* ── Domain types ─────────────────────────────────────────────────────── */
 
+type EventType = 'tournament' | 'resource' | 'guild' | 'special';
 type EventStatus = 'active' | 'upcoming' | 'archive';
 
 interface GameEvent {
@@ -16,8 +31,8 @@ interface GameEvent {
   subtitle: string;
   type: EventType;
   status: EventStatus;
-  raceColor: string;
-  raceGradient: string;
+  /** `null` reserves the slot for cross-race or archive events. */
+  raceKey: NDRaceKey | null;
   raceLabel: string;
   endDate: Date;
   startDate: Date;
@@ -27,56 +42,56 @@ interface GameEvent {
   featured?: boolean;
 }
 
+/* ── Static demo data (ND-shaped) ─────────────────────────────────────── */
+
 /* Deterministic "demo now" so SSR + client hydration agree. The events
  * dataset is currently static mock copy — once the backend lands, dates
  * will arrive as ISO strings from the server and this constant goes away.
  * Picking a fixed point in 2026 keeps the "in 2 days" / "in 5 days"
  * relative offsets readable without re-rendering on the clock. */
 const now = new Date('2026-05-24T12:00:00Z').getTime();
+
 const EVENTS: GameEvent[] = [
   {
     id: 'zerg-domination-s1',
-    title: 'ZERG HAKIMIYET',
+    title: 'ZERG HÂKİMİYET',
     subtitle: 'Sezon I · Kovan Savaşları',
     type: 'tournament',
     status: 'active',
-    raceColor: 'var(--color-race-zerg)',
-    raceGradient: 'linear-gradient(135deg, var(--color-race-zerg-deep-1) 0%, var(--color-race-zerg-deep-2) 40%, var(--color-bg) 100%)',
-    raceLabel: 'Zerg',
+    raceKey: 'zerg',
+    raceLabel: RACES.zerg.name,
     endDate: new Date(now + 2 * 86400000 + 14 * 3600000),
     startDate: new Date(now - 3 * 86400000),
     participants: 2847,
-    topPrize: '10,000 Kristal',
+    topPrize: '10.000 Kristal',
     featured: true,
   },
   {
     id: 'automat-grid-race',
     title: 'OTOMATİK IZGARA',
-    subtitle: 'Kaynak Toplanması · Sprint Modu',
+    subtitle: 'Kaynak Sprinti · Çoklu Faz',
     type: 'resource',
     status: 'active',
-    raceColor: 'var(--color-race-otomat)',
-    raceGradient: 'linear-gradient(135deg, var(--color-race-otomat-deep-1) 0%, var(--color-race-otomat-deep-2) 40%, var(--color-bg) 100%)',
-    raceLabel: 'Otomat',
+    raceKey: 'otomat',
+    raceLabel: RACES.otomat.name,
     endDate: new Date(now + 18 * 3600000),
     startDate: new Date(now - 6 * 3600000),
     participants: 1203,
     maxParticipants: 2000,
-    topPrize: '5,000 Enerji',
+    topPrize: '5.000 Enerji',
   },
   {
     id: 'guild-nebula-clash',
     title: 'NEBULA ÇATIŞMASI',
-    subtitle: 'Lonca Ligası · Grup Aşaması',
+    subtitle: 'Lonca Ligi · Grup Aşaması',
     type: 'guild',
     status: 'active',
-    raceColor: 'var(--color-race-seytan)',
-    raceGradient: 'linear-gradient(135deg, var(--color-race-seytan-deep-1) 0%, var(--color-race-seytan-deep-2) 40%, var(--color-bg) 100%)',
-    raceLabel: 'Şeytan',
+    raceKey: 'seytan',
+    raceLabel: RACES.seytan.name,
     endDate: new Date(now + 5 * 86400000),
     startDate: new Date(now - 1 * 86400000),
     participants: 648,
-    topPrize: '25,000 Kristal + Rozet',
+    topPrize: '25.000 Kristal + Rozet',
   },
   {
     id: 'beast-rampage',
@@ -84,13 +99,12 @@ const EVENTS: GameEvent[] = [
     subtitle: 'PvE Özel Etkinlik',
     type: 'special',
     status: 'upcoming',
-    raceColor: 'var(--color-race-canavar)',
-    raceGradient: 'linear-gradient(135deg, var(--color-race-canavar-deep-1) 0%, var(--color-race-canavar-deep-2) 40%, var(--color-bg) 100%)',
-    raceLabel: 'Canavar',
+    raceKey: 'canavar',
+    raceLabel: RACES.canavar.name,
     endDate: new Date(now + 8 * 86400000),
     startDate: new Date(now + 3 * 86400000),
     participants: 0,
-    topPrize: '7,500 Amber',
+    topPrize: '7.500 Amber',
   },
   {
     id: 'human-tech-sprint',
@@ -98,13 +112,12 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Araştırma Yarışması',
     type: 'resource',
     status: 'upcoming',
-    raceColor: 'var(--color-race-insan)',
-    raceGradient: 'linear-gradient(135deg, var(--color-race-insan-deep-1) 0%, var(--color-race-insan-deep-2) 40%, var(--color-bg) 100%)',
-    raceLabel: 'İnsan',
+    raceKey: 'insan',
+    raceLabel: RACES.insan.name,
     endDate: new Date(now + 12 * 86400000),
     startDate: new Date(now + 7 * 86400000),
     participants: 0,
-    topPrize: '8,000 Kristal',
+    topPrize: '8.000 Kristal',
   },
   {
     id: 'ancient-war-s0',
@@ -112,344 +125,782 @@ const EVENTS: GameEvent[] = [
     subtitle: 'Sezon 0 · Tamamlandı',
     type: 'tournament',
     status: 'archive',
-    raceColor: 'var(--color-neutral-700)',
-    raceGradient: 'linear-gradient(135deg, var(--color-bg-deep) 0%, var(--color-bg-base) 100%)',
+    raceKey: null,
     raceLabel: 'Tüm Irklar',
     endDate: new Date(now - 5 * 86400000),
     startDate: new Date(now - 12 * 86400000),
     participants: 5122,
-    topPrize: '50,000 Kristal',
+    topPrize: '50.000 Kristal',
   },
 ];
 
-/* ── Speed-line background SVG ───────────────────────────────────── */
-function SpeedLines({ color }: { color: string }) {
-  return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      {Array.from({ length: 18 }).map((_, i) => {
-        const x = (i / 17) * 100;
-        const angle = -20 + (i % 3) * 5;
-        return (
-          <line
-            key={i}
-            x1={`${x}%`} y1="0%"
-            x2={`${x + 5}%`} y2="100%"
-            stroke={color}
-            strokeWidth={i % 4 === 0 ? '0.8' : '0.3'}
-            strokeOpacity={i % 4 === 0 ? '0.12' : '0.05'}
-            transform={`skewX(${angle})`}
-          />
-        );
-      })}
-    </svg>
-  );
+/* ── Event type configuration (ND palette only) ──────────────────────── */
+
+const EVENT_TYPE: Record<EventType, { label: string; tint: string }> = {
+  tournament: { label: 'TURNUVA', tint: ND.danger },
+  resource:   { label: 'KAYNAK',  tint: ND.ok },
+  guild:      { label: 'LONCA',   tint: 'oklch(0.62 0.22 15)' },
+  special:    { label: 'ÖZEL',    tint: ND.warn },
+};
+
+function eventAccent(event: GameEvent): { primary: string; primaryDim: string; glow: string; race: NDRace | null } {
+  if (!event.raceKey) {
+    return {
+      primary: ND.textDim,
+      primaryDim: ND.textMute,
+      glow: ND.borderHi,
+      race: null,
+    };
+  }
+  const r = RACES[event.raceKey];
+  return { primary: r.primary, primaryDim: r.primaryDim, glow: r.glow, race: r };
 }
 
-const SAFE_BG = 'linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg) 100%)';
+/* ── ND-styled countdown ──────────────────────────────────────────────── */
 
-/* ── Featured banner ─────────────────────────────────────────────── */
-function FeaturedBanner({ event }: { event: GameEvent }) {
-  // FIX: sanitize colors from data before placing in inline styles (CSS injection)
-  const c = sanitizeColor(event.raceColor);
-  const bg = sanitizeGradient(event.raceGradient, SAFE_BG);
+interface TimeLeft { d: number; h: number; m: number; s: number; total: number }
+
+function computeTime(target: Date): TimeLeft {
+  const diff = Math.max(0, target.getTime() - Date.now());
+  return {
+    d: Math.floor(diff / 86400000),
+    h: Math.floor((diff % 86400000) / 3600000),
+    m: Math.floor((diff % 3600000) / 60000),
+    s: Math.floor((diff % 60000) / 1000),
+    total: diff,
+  };
+}
+
+interface NDCountdownProps {
+  targetDate: Date;
+  color: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+function NDCountdown({ targetDate, color, size = 'md' }: NDCountdownProps) {
+  const [t, setT] = useState<TimeLeft>(() => computeTime(targetDate));
+  useEffect(() => {
+    setT(computeTime(targetDate));
+    const id = setInterval(() => setT(computeTime(targetDate)), 1000);
+    return () => clearInterval(id);
+  }, [targetDate]);
+
+  const dims = size === 'lg'
+    ? { digit: 30, label: 10, pad: '6px 10px', sep: 20, gap: 8 }
+    : size === 'sm'
+      ? { digit: 16, label: 8, pad: '3px 6px', sep: 12, gap: 5 }
+      : { digit: 22, label: 9, pad: '5px 8px', sep: 16, gap: 6 };
+
+  const ended = t.total <= 0;
+
+  const units: { v: number; label: string }[] = [
+    { v: t.d, label: 'GÜN' },
+    { v: t.h, label: 'SA' },
+    { v: t.m, label: 'DK' },
+    { v: t.s, label: 'SN' },
+  ];
+
   return (
-    <Link href={`/events/${event.id}`} className="block group" aria-label={`${event.title} etkinliğine git`}>
-      {/* Outer double-bezel shell */}
-      <div
-        className="relative rounded-2xl p-0.5 overflow-hidden transition-all duration-700"
-        style={{
-          background: `linear-gradient(135deg, ${c}40, ${c}10, transparent)`,
-          boxShadow: `0 0 60px ${c}20, 0 0 120px ${c}08`,
-        }}
-      >
-        {/* Inner core */}
-        <div
-          className="relative rounded-[calc(1rem-2px)] overflow-hidden"
-          style={{ background: bg, minHeight: '280px' }}
-        >
-          <SpeedLines color={c} />
-
-          {/* Manga halftone corner */}
-          <div
-            className="absolute bottom-0 right-0 w-48 h-48 pointer-events-none"
-            style={{ background: `radial-gradient(circle at 100% 100%, ${c}18 0%, transparent 70%)` }}
-            aria-hidden
-          />
-
-          {/* Content */}
-          <div className="relative z-10 p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 min-h-[280px]">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4">
-                <EventBadge type={event.type} />
-                <span
-                  className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full"
-                  style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}
-                >
-                  {event.raceLabel}
-                </span>
-                <span
-                  className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,100,100,0.15)', color: 'var(--color-danger-mid)', border: '1px solid rgba(255,100,100,0.3)' }}
-                >
-                  ● AKTİF
-                </span>
-              </div>
-
-              <h2
-                className="font-display font-black text-3xl md:text-5xl leading-none mb-2 tracking-tight"
-                style={{ color: c, textShadow: `0 0 40px ${c}66` }}
-              >
-                {event.title}
-              </h2>
-              <p className="text-text-secondary text-sm mb-6">{event.subtitle}</p>
-
-              <div>
-                <p className="text-[9px] font-bold tracking-widest uppercase text-text-muted mb-2">
-                  KALAN SÜRE
-                </p>
-                <CountdownTimer targetDate={event.endDate} raceColor={c} size="md" />
-              </div>
+    <div
+      role="timer"
+      aria-label="Kalan süre"
+      style={{ display: 'inline-flex', alignItems: 'flex-end', gap: dims.gap }}
+    >
+      {units.map((u, i) => (
+        <div key={u.label} style={{ display: 'inline-flex', alignItems: 'flex-end', gap: dims.gap }}>
+          {i > 0 && (
+            <span
+              aria-hidden
+              style={{
+                fontFamily: ND.display,
+                fontSize: dims.sep,
+                lineHeight: 1,
+                color: `${color}88`,
+                paddingBottom: dims.label + 4,
+                textShadow: `0 0 10px ${color}`,
+              }}
+            >
+              :
+            </span>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div
+              style={{
+                padding: dims.pad,
+                background: ended ? 'rgba(20,8,8,0.7)' : 'rgba(8,12,26,0.78)',
+                border: `1px solid ${ended ? `${ND.danger}55` : `${color}44`}`,
+                clipPath:
+                  'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
+                fontFamily: ND.mono,
+                fontWeight: 700,
+                fontSize: dims.digit,
+                color: ended ? ND.danger : color,
+                textShadow: ended ? 'none' : `0 0 12px ${color}99`,
+                lineHeight: 1,
+                letterSpacing: '0.02em',
+                minWidth: dims.digit * 1.7,
+                textAlign: 'center',
+              }}
+            >
+              {String(u.v).padStart(2, '0')}
             </div>
-
-            <div className="flex flex-col items-start md:items-end gap-4">
-              <div className="text-right">
-                <p className="text-[9px] tracking-widest uppercase text-text-muted">Katılımcı</p>
-                <p className="font-display font-black text-2xl" style={{ color: c }}>
-                  {event.participants.toLocaleString("tr-TR")}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] tracking-widest uppercase text-text-muted">Birinci Ödül</p>
-                <p className="font-display font-bold text-sm text-text-primary">{event.topPrize}</p>
-              </div>
-
-              {/* Join CTA — Button-in-button pattern */}
-              <button
-                className="flex items-center gap-3 rounded-full font-bold text-sm px-5 py-3 transition-all duration-500 group-hover:scale-105 active:scale-95"
-                style={{
-                  background: `linear-gradient(135deg, ${c}, ${c}bb)`,
-                  color: 'var(--color-bg-pure)',
-                  boxShadow: `0 0 30px ${c}55`,
-                  transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-                }}
-                aria-label={`${event.title} etkinliğine katıl`}
-              >
-                KATIL
-                <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                  style={{ background: 'rgba(0,0,0,0.2)' }}
-                  aria-hidden
-                >
-                  ↗
-                </span>
-              </button>
-            </div>
+            <span
+              style={{
+                marginTop: 4,
+                fontFamily: ND.display,
+                fontSize: dims.label,
+                letterSpacing: '0.20em',
+                color: `${color}aa`,
+                textTransform: 'uppercase',
+              }}
+            >
+              {u.label}
+            </span>
           </div>
         </div>
-      </div>
-    </Link>
+      ))}
+    </div>
   );
 }
 
-/* ── Event card (compact list/grid) ─────────────────────────────── */
-function EventCard({ event }: { event: GameEvent }) {
-  const isArchive = event.status === 'archive';
-  const isUpcoming = event.status === 'upcoming';
-  // FIX: sanitize colors from data before placing in inline styles (CSS injection)
-  const c = sanitizeColor(event.raceColor);
-  const bg = sanitizeGradient(event.raceGradient, SAFE_BG);
+/* ── Status pill ──────────────────────────────────────────────────────── */
+
+function StatusChip({ status }: { status: EventStatus }) {
+  if (status === 'active') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '2px 8px',
+          fontFamily: ND.mono,
+          fontSize: 9,
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: ND.danger,
+          background: `${ND.danger}1a`,
+          border: `1px solid ${ND.danger}55`,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: ND.danger,
+            boxShadow: `0 0 8px ${ND.danger}`,
+            animation: 'nd-pulse 1.4s ease-in-out infinite',
+          }}
+        />
+        CANLI
+      </span>
+    );
+  }
+  if (status === 'upcoming') {
+    return <Chip color={ND.warn}>Yakında</Chip>;
+  }
+  return <Chip color={ND.textMute}>Arşiv</Chip>;
+}
+
+/* ── Featured banner ──────────────────────────────────────────────────── */
+
+function FeaturedBanner({ event }: { event: GameEvent }) {
+  const { primary, primaryDim, glow, race } = eventAccent(event);
+  const type = EVENT_TYPE[event.type];
 
   return (
     <Link
       href={`/events/${event.id}`}
-      className="block group"
-      aria-label={`${event.title} etkinliği`}
+      aria-label={`${event.title} etkinliğini aç`}
+      style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
       <div
-        className="relative rounded-xl overflow-hidden transition-all duration-500 hover-glow"
+        className="nd-featured"
         style={{
-          border: `1px solid ${isArchive ? 'var(--color-neutral-900)' : c + '30'}`,
-          background: isArchive ? 'rgba(10,10,18,0.8)' : bg,
-          transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-          opacity: isArchive ? 0.65 : 1,
+          position: 'relative',
+          padding: 1,
+          background: `linear-gradient(135deg, ${primary}, ${primaryDim}66 60%, ${ND.border} 100%)`,
+          clipPath:
+            'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)',
+          boxShadow: `0 0 38px -8px ${glow}, 0 0 80px -32px ${glow}`,
+          transition: 'box-shadow 400ms cubic-bezier(0.32,0.72,0,1)',
         }}
       >
-        {!isArchive && <SpeedLines color={c} />}
-
-        <div className="relative z-10 p-5">
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <EventBadge type={event.type} size="sm" />
-              {isArchive && (
-                <span className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-white/5 text-text-muted border border-white/10">
-                  TAMAMLANDI
-                </span>
-              )}
-              {isUpcoming && (
-                <span className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full text-status-warning border border-status-warning/30 bg-status-warning/10">
-                  YAKINDA
-                </span>
-              )}
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: `linear-gradient(135deg, ${primary}26 0%, rgba(8,12,26,0.85) 55%, ${ND.bgDeep} 100%)`,
+            clipPath:
+              'polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px)',
+            minHeight: 280,
+          }}
+        >
+          {/* Sigil watermark */}
+          {race && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: -40,
+                transform: 'translateY(-50%)',
+                opacity: 0.18,
+                filter: `drop-shadow(0 0 24px ${glow})`,
+                pointerEvents: 'none',
+              }}
+            >
+              <Sigil race={race} size={300} />
             </div>
-            <span className="text-[9px] font-bold shrink-0" style={{ color: c }}>
-              {event.raceLabel}
-            </span>
-          </div>
+          )}
 
-          <h3
-            className="font-display font-black text-lg leading-tight mb-1 tracking-tight"
+          {/* Scanlines */}
+          <div
+            aria-hidden
             style={{
-              color: isArchive ? 'var(--color-text-secondary)' : c,
-              textShadow: isArchive ? 'none' : `0 0 20px ${c}55`,
+              position: 'absolute',
+              inset: 0,
+              background: `repeating-linear-gradient(0deg, transparent 0 2px, ${primary}08 2px 3px)`,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Corner glow */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              bottom: -60,
+              right: -60,
+              width: 240,
+              height: 240,
+              background: `radial-gradient(circle, ${glow}33 0%, transparent 70%)`,
+              pointerEvents: 'none',
+            }}
+          />
+
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              padding: '28px 28px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 18,
+              minHeight: 280,
             }}
           >
-            {event.title}
-          </h3>
-          <p className="text-text-muted text-xs mb-4">{event.subtitle}</p>
-
-          {event.status === 'active' && (
-            <CountdownTimer targetDate={event.endDate} raceColor={c} size="sm" />
-          )}
-          {isUpcoming && (
-            <p className="text-xs text-text-secondary">
-              Başlangıç: {event.startDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
-            </p>
-          )}
-          {isArchive && (
-            <p className="text-xs text-text-muted">
-              {event.participants.toLocaleString("tr-TR")} katılımcı · {event.topPrize}
-            </p>
-          )}
-
-          {/* Bottom bar */}
-          {!isArchive && (
-            <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${c}15` }}>
-              <span className="text-[10px] text-text-muted">
-                {event.participants.toLocaleString("tr-TR")} oyuncu
-              </span>
-              <span
-                className="text-[10px] font-bold transition-transform duration-300 group-hover:translate-x-1"
-                style={{ color: c }}
-              >
-                Detay →
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Chip color={primary}>Öne Çıkan</Chip>
+              <Chip color={type.tint}>{type.label}</Chip>
+              <Chip color={primary}>{event.raceLabel.toUpperCase()}</Chip>
+              <StatusChip status={event.status} />
             </div>
-          )}
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-end', flex: 1 }}>
+              <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+                <Eyebrow color={primary}>Aktif Etkinlik</Eyebrow>
+                <H2
+                  style={{
+                    marginTop: 6,
+                    fontSize: 30,
+                    color: ND.text,
+                    textShadow: `0 0 28px ${glow}, 0 0 6px ${primary}aa`,
+                  }}
+                >
+                  {event.title}
+                </H2>
+                <Caption style={{ marginTop: 4 }}>{event.subtitle}</Caption>
+
+                <div style={{ marginTop: 16 }}>
+                  <Eyebrow>Kalan Süre</Eyebrow>
+                  <div style={{ marginTop: 6 }}>
+                    <NDCountdown targetDate={event.endDate} color={primary} size="lg" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: 14,
+                  minWidth: 200,
+                }}
+              >
+                <div style={{ textAlign: 'right' }}>
+                  <Eyebrow>Katılımcı</Eyebrow>
+                  <div
+                    style={{
+                      fontFamily: ND.display,
+                      fontSize: 26,
+                      fontWeight: 700,
+                      color: primary,
+                      textShadow: `0 0 18px ${glow}`,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    {event.participants.toLocaleString('tr-TR')}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <Eyebrow>Birinci Ödül</Eyebrow>
+                  <div
+                    style={{
+                      fontFamily: ND.display,
+                      fontSize: 14,
+                      color: ND.text,
+                      letterSpacing: '0.04em',
+                      marginTop: 2,
+                    }}
+                  >
+                    {event.topPrize}
+                  </div>
+                </div>
+                <NDButton race={race ?? undefined} variant="primary" size="md">
+                  ◈ Katıl
+                </NDButton>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Link>
   );
 }
 
-/* ── Tab filter ──────────────────────────────────────────────────── */
-type Tab = 'active' | 'upcoming' | 'archive';
+/* ── Compact event card ───────────────────────────────────────────────── */
 
-const TABS: { id: Tab; label: string; count: number }[] = [
-  { id: 'active',   label: 'Aktif',   count: EVENTS.filter(e => e.status === 'active').length },
-  { id: 'upcoming', label: 'Yakında', count: EVENTS.filter(e => e.status === 'upcoming').length },
-  { id: 'archive',  label: 'Arşiv',  count: EVENTS.filter(e => e.status === 'archive').length },
-];
+function EventCard({ event }: { event: GameEvent }) {
+  const { primary, primaryDim, glow, race } = eventAccent(event);
+  const type = EVENT_TYPE[event.type];
+  const isArchive = event.status === 'archive';
+  const isUpcoming = event.status === 'upcoming';
 
-/* ── Page ────────────────────────────────────────────────────────── */
-export default function EventsPage() {
-  const [tab, setTab] = useState<Tab>('active');
-  const featured = EVENTS.find(e => e.featured && e.status === 'active');
-  const filtered = EVENTS.filter(e => e.status === tab && !e.featured);
+  const capacityPct = event.maxParticipants
+    ? Math.min(100, Math.round((event.participants / event.maxParticipants) * 100))
+    : null;
 
   return (
-    <div
-      className="h-dvh overflow-y-auto"
-      style={{ background: 'var(--color-bg)' }}
+    <Link
+      href={`/events/${event.id}`}
+      aria-label={`${event.title} etkinliğini aç`}
+      style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 py-4 border-b border-border"
-        style={{ background: 'rgba(7, 9, 15, 0.85)', backdropFilter: 'blur(16px)' }}
+      <div
+        className="nd-event-card"
+        style={{
+          position: 'relative',
+          padding: 1,
+          background: isArchive
+            ? `linear-gradient(135deg, ${ND.border} 0%, transparent 100%)`
+            : `linear-gradient(135deg, ${primary}aa 0%, ${primaryDim}55 50%, ${ND.border} 100%)`,
+          clipPath:
+            'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
+          boxShadow: isArchive ? 'none' : `0 0 22px -10px ${glow}`,
+          transition: 'box-shadow 400ms cubic-bezier(0.32,0.72,0,1), transform 400ms cubic-bezier(0.32,0.72,0,1)',
+          opacity: isArchive ? 0.7 : 1,
+          height: '100%',
+        }}
       >
-        <div className="flex items-center gap-4">
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            background: isArchive
+              ? 'rgba(10,12,22,0.85)'
+              : `linear-gradient(160deg, ${primary}14 0%, rgba(8,12,26,0.86) 60%, ${ND.bgDeep} 100%)`,
+            clipPath:
+              'polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px)',
+            padding: 16,
+            minHeight: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {/* Sigil watermark */}
+          {race && !isArchive && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: -20,
+                right: -30,
+                opacity: 0.12,
+                filter: `drop-shadow(0 0 16px ${glow})`,
+                pointerEvents: 'none',
+              }}
+            >
+              <Sigil race={race} size={160} />
+            </div>
+          )}
+
+          {/* Scanlines */}
+          {!isArchive && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `repeating-linear-gradient(0deg, transparent 0 2px, ${primary}07 2px 3px)`,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Chip color={type.tint}>{type.label}</Chip>
+            <StatusChip status={event.status} />
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <Eyebrow color={primary}>{event.raceLabel.toUpperCase()}</Eyebrow>
+            <H3
+              style={{
+                marginTop: 4,
+                color: isArchive ? ND.textDim : ND.text,
+                textShadow: isArchive ? 'none' : `0 0 16px ${glow}80`,
+                fontSize: 16,
+                lineHeight: 1.15,
+              }}
+            >
+              {event.title}
+            </H3>
+            <Caption style={{ marginTop: 4 }}>{event.subtitle}</Caption>
+          </div>
+
+          <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 10 }}>
+            {event.status === 'active' && (
+              <NDCountdown targetDate={event.endDate} color={primary} size="sm" />
+            )}
+            {isUpcoming && (
+              <Code style={{ color: primary }}>
+                BAŞLANGIÇ ·{' '}
+                {event.startDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+              </Code>
+            )}
+            {isArchive && (
+              <Caption>
+                {event.participants.toLocaleString('tr-TR')} katılımcı · {event.topPrize}
+              </Caption>
+            )}
+
+            {capacityPct !== null && !isArchive && (
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontFamily: ND.mono,
+                    fontSize: 9,
+                    color: ND.textDim,
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
+                  <span>Kapasite</span>
+                  <span>
+                    {event.participants.toLocaleString('tr-TR')} / {event.maxParticipants?.toLocaleString('tr-TR')}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 4,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${ND.border}`,
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: `${capacityPct}%`,
+                      background: `linear-gradient(90deg, ${primary}99, ${primary})`,
+                      boxShadow: `0 0 8px ${glow}`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isArchive && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: 8,
+                  borderTop: `1px solid ${primary}22`,
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Eyebrow>Ödül</Eyebrow>
+                  <span
+                    style={{
+                      fontFamily: ND.display,
+                      fontSize: 12,
+                      color: ND.text,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {event.topPrize}
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontFamily: ND.display,
+                    fontSize: 10,
+                    color: primary,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Detay →
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ── Tab filter ───────────────────────────────────────────────────────── */
+
+type Tab = EventStatus;
+
+interface TabConfig { id: Tab; label: string }
+
+const TABS: TabConfig[] = [
+  { id: 'active',   label: 'Aktif' },
+  { id: 'upcoming', label: 'Yakında' },
+  { id: 'archive',  label: 'Arşiv' },
+];
+
+function TabButton({
+  active,
+  label,
+  count,
+  color,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        all: 'unset',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 14px',
+        fontFamily: ND.display,
+        fontSize: 12,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        border: `1px solid ${active ? color : ND.border}`,
+        background: active ? `linear-gradient(180deg, ${color}22, ${color}08)` : 'transparent',
+        color: active ? color : ND.textDim,
+        clipPath:
+          'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+        transition: 'all 220ms cubic-bezier(0.32,0.72,0,1)',
+      }}
+    >
+      <span>{label}</span>
+      <span
+        style={{
+          fontFamily: ND.mono,
+          fontSize: 10,
+          padding: '1px 6px',
+          background: active ? `${color}22` : 'rgba(255,255,255,0.06)',
+          color: active ? color : ND.textMute,
+          border: `1px solid ${active ? `${color}44` : ND.border}`,
+        }}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────── */
+
+export default function EventsPage() {
+  const race = useNDRace();
+  const [tab, setTab] = useState<Tab>('active');
+
+  const counts = useMemo(() => ({
+    active:   EVENTS.filter(e => e.status === 'active').length,
+    upcoming: EVENTS.filter(e => e.status === 'upcoming').length,
+    archive:  EVENTS.filter(e => e.status === 'archive').length,
+  }), []);
+
+  const featured = useMemo(
+    () => EVENTS.find(e => e.featured && e.status === 'active') ?? null,
+    [],
+  );
+
+  const filtered = useMemo(
+    () => EVENTS.filter(e => e.status === tab && !e.featured),
+    [tab],
+  );
+
+  const showFeatured = tab === 'active' && featured !== null;
+
+  return (
+    <Screen race={race} style={{ minHeight: '100dvh', height: 'auto', overflow: 'auto' }}>
+      <style jsx global>{`
+        @keyframes nd-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
+        }
+        .nd-event-card:hover,
+        .nd-featured:hover {
+          transform: translateY(-2px);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nd-event-card:hover,
+          .nd-featured:hover { transform: none; }
+        }
+      `}</style>
+
+      {/* Header */}
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '12px 16px',
+          background: 'rgba(6,8,15,0.92)',
+          borderBottom: `1px solid ${ND.border}`,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <Link
             href="/dashboard"
-            className="text-text-muted hover:text-text-primary transition-colors text-sm flex items-center gap-2"
             aria-label="Dashboard'a dön"
+            style={{
+              fontFamily: ND.display,
+              fontSize: 11,
+              letterSpacing: '0.10em',
+              color: ND.textDim,
+              textDecoration: 'none',
+            }}
           >
-            ← Geri
+            ← ANA ÜS
           </Link>
-          <div className="w-px h-5 bg-border" aria-hidden />
-          <h1 className="font-display font-black text-lg tracking-wider text-text-primary">
-            ETKİNLİKLER
-          </h1>
+          <div style={{ width: 1, height: 14, background: ND.border }} aria-hidden />
+          <Sigil race={race} size={22} glow />
+          <Chip color={race.primary}>ETKİNLİKLER</Chip>
         </div>
-        <span
-          className="text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded-full"
-          style={{ background: 'rgba(255,100,100,0.12)', color: 'var(--color-danger-mid)', border: '1px solid rgba(255,100,100,0.25)' }}
-        >
-          ● {EVENTS.filter(e => e.status === 'active').length} AKTİF
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Code style={{ color: ND.danger }}>● {counts.active} CANLI</Code>
+        </div>
       </header>
 
-      <main className="px-4 md:px-8 py-8 max-w-6xl mx-auto space-y-10">
+      <main
+        style={{
+          position: 'relative',
+          flex: 1,
+          maxWidth: 1200,
+          width: '100%',
+          margin: '0 auto',
+          padding: '24px 16px 64px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 28,
+        }}
+      >
+        {/* Page title */}
+        <div>
+          <Eyebrow color={race.primary}>SEZON · GALAKTİK ETKİNLİKLER</Eyebrow>
+          <H2 style={{ marginTop: 6, fontSize: 24 }}>SAVAŞ ÇAĞIRILARI</H2>
+          <Caption style={{ marginTop: 4, maxWidth: 540 }}>
+            Aktif turnuvalara katıl, yaklaşan etkinliklere kayıt ol, geçmiş zaferlere göz at.
+          </Caption>
+        </div>
 
-        {/* ── Featured banner ──────────────────────────────────── */}
-        {tab === 'active' && featured && (
+        {/* Featured banner */}
+        {showFeatured && featured && (
           <section aria-labelledby="featured-heading">
-            <p id="featured-heading" className="text-[9px] font-bold tracking-widest uppercase text-text-muted mb-3">
-              ÖNE ÇIKAN ETKİNLİK
-            </p>
+            <div
+              id="featured-heading"
+              style={{
+                fontFamily: ND.display,
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                color: ND.textDim,
+                marginBottom: 12,
+              }}
+            >
+              ◈ Öne Çıkan
+            </div>
             <FeaturedBanner event={featured} />
           </section>
         )}
 
-        {/* ── Filter tabs ──────────────────────────────────────── */}
-        <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--color-border)' }}>
+        {/* Tabs */}
+        <div role="tablist" aria-label="Etkinlik filtresi" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {TABS.map(t => (
-            <button
+            <TabButton
               key={t.id}
+              active={tab === t.id}
+              label={t.label}
+              count={counts[t.id]}
+              color={race.primary}
               onClick={() => setTab(t.id)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-400"
-              style={{
-                background: tab === t.id ? 'var(--color-bg-elevated)' : 'transparent',
-                color: tab === t.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                boxShadow: tab === t.id ? '0 0 12px rgba(123,140,222,0.15), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
-                transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-              }}
-              aria-pressed={tab === t.id}
-            >
-              {t.label}
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
-                style={{
-                  background: tab === t.id ? 'var(--color-brand-dim)' : 'rgba(255,255,255,0.06)',
-                  color: tab === t.id ? 'var(--color-brand)' : 'var(--color-text-muted)',
-                }}
-              >
-                {t.count}
-              </span>
-            </button>
+            />
           ))}
         </div>
 
-        {/* ── Event grid ───────────────────────────────────────── */}
+        {/* Event grid */}
         <section aria-label={`${tab} etkinlikler`}>
-          {filtered.length === 0 && (
+          {filtered.length === 0 ? (
+            <Panel style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ fontFamily: ND.display, fontSize: 32, color: ND.textMute, marginBottom: 8 }}>
+                ◇
+              </div>
+              <Caption>Bu kategoride etkinlik yok.</Caption>
+            </Panel>
+          ) : (
             <div
-              className="flex flex-col items-center justify-center text-center py-24 rounded-xl"
-              style={{ border: '1px dashed var(--color-border)', background: 'rgba(255,255,255,0.01)' }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: 14,
+              }}
             >
-              <span className="text-5xl mb-4" aria-hidden>🌌</span>
-              <p className="text-text-muted text-sm">Bu kategoride etkinlik yok.</p>
+              {filtered.map(ev => (
+                <EventCard key={ev.id} event={ev} />
+              ))}
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(ev => (
-              <EventCard key={ev.id} event={ev} />
-            ))}
-          </div>
         </section>
       </main>
-    </div>
+    </Screen>
   );
 }

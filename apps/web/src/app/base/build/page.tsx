@@ -25,7 +25,7 @@ import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useBaseState } from '@/hooks/useBaseState';
-import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { useHudState } from '@/hooks/useHudState';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
@@ -46,6 +46,14 @@ interface BuildEntry {
   assetPath?: string;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function BuildMenuPage() {
   // Suspense wrapper required because useSearchParams suspends during SSR
   // pre-render. Without it, Next 14 errors at build time on this route.
@@ -58,25 +66,19 @@ export default function BuildMenuPage() {
 
 function BuildMenuInner() {
   const race = useNDRace();
-  const lex = raceLex(race.key);
   const router = useRouter();
+  const lex = raceLex(race.key);
   const params = useSearchParams();
   const focusSlug = params.get('focus');
+  const hud = useHudState();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedName, setSelectedName] = useState<string | null>(null);
 
-  // Live tier progress — same pipe /base uses. Drives the HUD's level and
-  // tier name; falls back to mock when there's no JWT or the API errors.
+  // Live tier progress — same pipe /base uses. Drives the catalog tier level
+  // (HUD now sources from useHudState above). Falls back to mock when there's
+  // no JWT or the API errors.
   const { data: live } = useBaseState();
   const liveLevel = live?.tier?.currentLevel;
-  const liveTierName = live?.tier?.raceSpecificTierName ?? live?.tier?.currentTierName;
-
-  // Same live wallet pipe as /base — keeps the resources pill consistent
-  // across the two screens (no flicker when the player navigates).
-  const { data: resources } = useGameResources();
-  const resA = resources ? formatResource(resources.mineral) : '12,480';
-  const resB = resources ? formatResource(resources.gas) : '3,210';
-  const resCrystal = resources ? formatResource(resources.energy) : '42';
 
   // Live backend config: cost / build time / max-per-player numbers from
   // game-server's BUILDING_CONFIGS. Used to overlay real values on the
@@ -159,11 +161,11 @@ function BuildMenuInner() {
       <Screen race={race} dim={0.55} style={{ minHeight: '100dvh' }}>
         <HUD
           race={race}
-          level={liveLevel ?? 9}
-          levelName={liveTierName ?? 'Metropol'}
-          resA={resA}
-          resB={resB}
-          crystal={resCrystal}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
         />
 
         <div
@@ -315,7 +317,11 @@ function BuildMenuInner() {
           </div>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </Screen>
     </div>
   );

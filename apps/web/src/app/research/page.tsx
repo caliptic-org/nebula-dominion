@@ -1,12 +1,26 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
-import { useRaceTheme } from '@/hooks/useRaceTheme';
-import { MangaPanel } from '@/components/ui/MangaPanel';
-import { GlowButton } from '@/components/ui/GlowButton';
-import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import {
+  ND,
+  Sigil,
+  Screen,
+  Panel,
+  Bar,
+  Eyebrow,
+  H2,
+  H3,
+  Caption,
+  Chip,
+  Code,
+  NDButton,
+  ResIcon,
+  useNDRace,
+  type NDRace,
+} from '@/components/handoff';
+import { useGameResources } from '@/hooks/useGameResources';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -83,10 +97,10 @@ const INITIAL_CATEGORIES: CategoryData[] = [
   {
     id: 'ekonomi',
     label: 'Ekonomi',
-    icon: '⚙️',
+    icon: '⚙',
     nodes: [
       {
-        id: 'ek-madencilik', name: 'Temel Madencilik', icon: '⛏️',
+        id: 'ek-madencilik', name: 'Temel Madencilik', icon: '⛏',
         description: 'Mineral çıkarma kapasitesini artırır. Tüm madencilik yapıları %20 daha verimli çalışır ve depolama kapasitesi genişler.',
         effect: '+20% Mineral Üretimi',
         tier: 0, row: 0, requires: [],
@@ -102,7 +116,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'completed',
       },
       {
-        id: 'ek-rafine', name: 'Gelişmiş Rafine', icon: '🔩',
+        id: 'ek-rafine', name: 'Gelişmiş Rafine', icon: '◈',
         description: 'Ham minerallerden daha fazla saf kaynak elde edilir. Depolama kapasitesi %40 artar, kayıp oranı minimize edilir.',
         effect: '+40% Mineral Verimliliği',
         tier: 1, row: 0, requires: ['ek-madencilik'],
@@ -111,7 +125,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         progress: 65,
       },
       {
-        id: 'ek-verimlilik', name: 'Enerji Verimliliği', icon: '💎',
+        id: 'ek-verimlilik', name: 'Enerji Verimliliği', icon: '◆',
         description: 'Tüm yapıların enerji tüketimi azalır. Savaş gemilerinde yakıt tasarrufu sağlanır, üretim maliyeti düşer.',
         effect: '-25% Enerji Tüketimi',
         tier: 1, row: 1, requires: ['ek-enerji'],
@@ -119,7 +133,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'available',
       },
       {
-        id: 'ek-mega', name: 'Mega Yapılar', icon: '🏗️',
+        id: 'ek-mega', name: 'Mega Yapılar', icon: '▦',
         description: 'Dev nebula yapıları inşa edilebilir. Her mega yapı bağımsız bir ekonomik merkez işlevi görür ve pasif kaynak üretir.',
         effect: '+3 Mega Yapı Kapasitesi',
         tier: 2, row: 0, requires: ['ek-rafine'],
@@ -127,7 +141,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'ek-kuantum', name: 'Kuantum Yakıt', icon: '🔮',
+        id: 'ek-kuantum', name: 'Kuantum Yakıt', icon: '◉',
         description: 'Kuantum reaktörler sonsuz yakıt döngüsü oluşturur. Birlik hareket maliyetleri sıfıra iner, hızlı yeniden konumlanma aktif.',
         effect: '-100% Hareket Maliyeti',
         tier: 2, row: 1, requires: ['ek-verimlilik'],
@@ -139,10 +153,10 @@ const INITIAL_CATEGORIES: CategoryData[] = [
   {
     id: 'askeri',
     label: 'Askeri',
-    icon: '⚔️',
+    icon: '⚔',
     nodes: [
       {
-        id: 'as-silah', name: 'Temel Silahlar', icon: '🗡️',
+        id: 'as-silah', name: 'Temel Silahlar', icon: '†',
         description: 'Tüm saldırı birimlerinin hasar değeri artırılır. Menzil +1 hex genişler, kritik vuruş şansı yükselir.',
         effect: '+15% Saldırı Hasarı',
         tier: 0, row: 0, requires: [],
@@ -150,7 +164,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'completed',
       },
       {
-        id: 'as-egitim', name: 'Birlik Eğitimi', icon: '🎯',
+        id: 'as-egitim', name: 'Birlik Eğitimi', icon: '◎',
         description: 'Birim eğitim süresi %20 azalır. Eğitim kapasitesi iki katına çıkar ve deneyim kazanma hızı artar.',
         effect: '-20% Eğitim Süresi',
         tier: 0, row: 1, requires: [],
@@ -158,7 +172,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'available',
       },
       {
-        id: 'as-taktik', name: 'Taktik Sistemler', icon: '📡',
+        id: 'as-taktik', name: 'Taktik Sistemler', icon: '◐',
         description: 'Birimler düşman zayıflıklarını otomatik analiz eder. Flanklama bonusları %50 artar, pusu kurma yeteneği kazanılır.',
         effect: '+50% Flanklama Bonusu',
         tier: 1, row: 0, requires: ['as-silah'],
@@ -166,7 +180,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'as-zirh', name: 'Ağır Zırh', icon: '🛡️',
+        id: 'as-zirh', name: 'Ağır Zırh', icon: '◇',
         description: 'Frontline birimler için ağır zırh protokolü aktive edilir. HP %25 artar, hasar direnci %10 yükselir.',
         effect: '+25% HP (Ön Saflar)',
         tier: 1, row: 1, requires: ['as-egitim'],
@@ -174,7 +188,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'as-nukleer', name: 'Nükleer Protokol', icon: '☢️',
+        id: 'as-nukleer', name: 'Nükleer Protokol', icon: '☢',
         description: 'Nebula reaktör silahları kullanılabilir hale gelir. AoE hasar yetenekleri açılır, radyasyon yavaşlatma efekti aktif.',
         effect: 'AoE Nükleer Saldırı',
         tier: 2, row: 0, requires: ['as-taktik'],
@@ -182,7 +196,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'as-titan', name: 'Titan Savaşçı', icon: '🤖',
+        id: 'as-titan', name: 'Titan Savaşçı', icon: '⬢',
         description: 'Her ırka özgü dev titan birimi oluşturulabilir. Savaş alanında dominant güç sağlar, karşı koyulamaz yıkım gücü.',
         effect: 'Titan Birimi Açılır',
         tier: 2, row: 1, requires: ['as-zirh'],
@@ -194,10 +208,10 @@ const INITIAL_CATEGORIES: CategoryData[] = [
   {
     id: 'savunma',
     label: 'Savunma',
-    icon: '🛡️',
+    icon: '◈',
     nodes: [
       {
-        id: 'sv-tahkimat', name: 'Temel Tahkimat', icon: '🏰',
+        id: 'sv-tahkimat', name: 'Temel Tahkimat', icon: '▣',
         description: 'Savunma yapılarının dayanıklılığı artırılır. Kale HP %30 yükselir, hasar emme kapasitesi güçlenir.',
         effect: '+30% Kale HP',
         tier: 0, row: 0, requires: [],
@@ -205,7 +219,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'completed',
       },
       {
-        id: 'sv-duvar', name: 'Duvar İnşaatı', icon: '🧱',
+        id: 'sv-duvar', name: 'Duvar İnşaatı', icon: '▤',
         description: 'Enerji duvarları inşa edilebilir hale gelir. Düşman ilerleme yollarını engeller, çevre savunması güçlenir.',
         effect: 'Enerji Duvarı İnşaatı',
         tier: 0, row: 1, requires: [],
@@ -213,7 +227,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'completed',
       },
       {
-        id: 'sv-kalkan', name: 'Enerji Kalkanı', icon: '🔵',
+        id: 'sv-kalkan', name: 'Enerji Kalkanı', icon: '◯',
         description: 'Tüm savunma yapılarını saran yenilenen enerji kalkanı. Hasar emme kapasitesi +500, her tur 50 HP yenilenir.',
         effect: '+500 Kalkan HP',
         tier: 1, row: 0, requires: ['sv-tahkimat'],
@@ -221,7 +235,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'available',
       },
       {
-        id: 'sv-mayin', name: 'Mayın Tarlası', icon: '💣',
+        id: 'sv-mayin', name: 'Mayın Tarlası', icon: '✦',
         description: 'Otomatik tetiklemeli enerji mayınları düşman geçiş yollarına yerleştirilir. Gizli konumlandırma, hasar +80%.',
         effect: 'Otomatik Mayın Sistemi',
         tier: 1, row: 1, requires: ['sv-duvar'],
@@ -229,7 +243,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'sv-kule', name: 'Yıkılmaz Kule', icon: '⭐',
+        id: 'sv-kule', name: 'Yıkılmaz Kule', icon: '★',
         description: 'Kuantum zırhıyla kaplı süper savunma kulesi. Kale içi otomatik onarım mekanizması etkin, hasarı hafifletir.',
         effect: 'Oto-Onarım Kulesi',
         tier: 2, row: 0, requires: ['sv-kalkan'],
@@ -237,7 +251,7 @@ const INITIAL_CATEGORIES: CategoryData[] = [
         state: 'locked',
       },
       {
-        id: 'sv-nano', name: 'Nano Onarım', icon: '🧬',
+        id: 'sv-nano', name: 'Nano Onarım', icon: '⌬',
         description: 'Nano-bot sürüleri savunma yapılarını savaş sırasında anlık onarır. Yavaş saldırılar tamamen etkisizleşir.',
         effect: '+50 HP/Tur Onarım',
         tier: 2, row: 1, requires: ['sv-mayin'],
@@ -250,69 +264,68 @@ const INITIAL_CATEGORIES: CategoryData[] = [
 
 // ── Node State Styles ─────────────────────────────────────────────────────
 
-function getNodeStyle(state: NodeState, raceColor: string, raceGlow: string) {
+function getNodeStyle(state: NodeState, race: NDRace) {
   switch (state) {
     case 'completed':
       return {
-        border: `2px solid ${raceColor}`,
-        background: `linear-gradient(135deg, ${raceColor}22 0%, ${raceColor}0a 100%)`,
-        boxShadow: `0 0 16px ${raceGlow}, inset 0 1px 1px rgba(255,255,255,0.12)`,
+        border: `2px solid ${race.primary}`,
+        background: `linear-gradient(135deg, ${race.primary}22 0%, ${race.primary}0a 100%)`,
+        boxShadow: `0 0 16px ${race.glow}, inset 0 1px 1px rgba(255,255,255,0.12)`,
         opacity: 1,
-        iconColor: raceColor,
+        iconColor: race.primary,
       };
     case 'researching':
       return {
-        border: '2px solid var(--color-energy)',
-        background: 'linear-gradient(135deg, rgba(255,200,50,0.15) 0%, rgba(255,200,50,0.05) 100%)',
-        boxShadow: '0 0 20px rgba(255,200,50,0.4), inset 0 1px 1px rgba(255,255,255,0.12)',
+        border: `2px solid ${ND.warn}`,
+        background: `linear-gradient(135deg, ${ND.warn}26 0%, ${ND.warn}0d 100%)`,
+        boxShadow: `0 0 20px ${ND.warn}66, inset 0 1px 1px rgba(255,255,255,0.12)`,
         opacity: 1,
-        iconColor: 'var(--color-energy)',
+        iconColor: ND.warn,
       };
     case 'available':
       return {
-        border: `2px solid ${raceColor}88`,
-        background: `linear-gradient(135deg, ${raceColor}18 0%, ${raceColor}08 100%)`,
-        boxShadow: `0 0 12px ${raceGlow}88`,
+        border: `2px solid ${race.primary}88`,
+        background: `linear-gradient(135deg, ${race.primary}18 0%, ${race.primary}08 100%)`,
+        boxShadow: `0 0 12px ${race.glow}88`,
         opacity: 1,
-        iconColor: raceColor,
+        iconColor: race.primary,
       };
     case 'locked':
     default:
       return {
-        border: '2px solid rgba(255,255,255,0.06)',
-        background: 'rgba(8,10,16,0.6)',
+        border: `2px solid ${ND.border}`,
+        background: ND.bgDeep,
         boxShadow: 'none',
         opacity: 0.45,
-        iconColor: 'var(--color-text-muted)',
+        iconColor: ND.textMute,
       };
   }
 }
 
-function getConnectionStyle(fromState: NodeState, toState: NodeState, raceColor: string) {
+function getConnectionStyle(fromState: NodeState, toState: NodeState, race: NDRace) {
   if (fromState === 'completed' && (toState === 'completed' || toState === 'researching' || toState === 'available')) {
-    return { stroke: raceColor, opacity: 0.7, dasharray: 'none', animated: false };
+    return { stroke: race.primary, opacity: 0.7, dasharray: 'none', animated: false };
   }
   if (fromState === 'completed' && toState === 'locked') {
-    return { stroke: raceColor, opacity: 0.25, dasharray: '6 8', animated: false };
+    return { stroke: race.primary, opacity: 0.25, dasharray: '6 8', animated: false };
   }
   if (fromState === 'researching') {
-    return { stroke: 'var(--color-energy)', opacity: 0.5, dasharray: '4 6', animated: true };
+    return { stroke: ND.warn, opacity: 0.5, dasharray: '4 6', animated: true };
   }
-  return { stroke: 'rgba(255,255,255,0.10)', opacity: 1, dasharray: 'none', animated: false };
+  return { stroke: ND.border, opacity: 1, dasharray: 'none', animated: false };
 }
 
 // ── Node Card Component ───────────────────────────────────────────────────
 
 interface NodeCardProps {
   node: TechNodeData;
-  raceColor: string;
-  raceGlow: string;
+  race: NDRace;
   isSelected: boolean;
   onClick: () => void;
 }
 
-function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardProps) {
-  const style = getNodeStyle(node.state, raceColor, raceGlow);
+function NodeCard({ node, race, isSelected, onClick }: NodeCardProps) {
+  const style = getNodeStyle(node.state, race);
   const pos = getNodePos(node.tier, node.row);
 
   return (
@@ -324,35 +337,32 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
       aria-label={node.name}
       aria-pressed={isSelected}
     >
-      {/* Outer glow ring when selected */}
       {isSelected && (
         <rect
           x={-6} y={-6}
           width={NODE_W + 12} height={NODE_H + 12}
-          rx={14} ry={14}
+          rx={6} ry={6}
           fill="none"
-          stroke={raceColor}
+          stroke={race.primary}
           strokeWidth={1.5}
           opacity={0.5}
-          style={{ filter: `drop-shadow(0 0 8px ${raceColor})` }}
+          style={{ filter: `drop-shadow(0 0 8px ${race.primary})` }}
         />
       )}
 
-      {/* Double-bezel outer shell */}
       <rect
         x={-2} y={-2}
         width={NODE_W + 4} height={NODE_H + 4}
-        rx={12} ry={12}
+        rx={4} ry={4}
         fill="rgba(255,255,255,0.03)"
-        stroke="rgba(255,255,255,0.06)"
+        stroke={ND.border}
         strokeWidth={1}
       />
 
-      {/* Inner core */}
       <rect
         x={0} y={0}
         width={NODE_W} height={NODE_H}
-        rx={10} ry={10}
+        rx={3} ry={3}
         fill={style.background as string}
         stroke={style.border.replace('2px solid ', '')}
         strokeWidth={2}
@@ -360,42 +370,22 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
         style={{ filter: style.boxShadow !== 'none' ? `drop-shadow(0 0 8px ${style.iconColor}44)` : 'none' }}
       />
 
-      {/* Halftone dots top-right corner */}
-      <pattern id={`dot-${node.id}`} x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
-        <circle cx="3" cy="3" r="0.8" fill="rgba(255,255,255,0.06)" />
-      </pattern>
-      <rect
-        x={NODE_W - 36} y={0}
-        width={36} height={36}
-        rx={0} ry={0}
-        fill={`url(#dot-${node.id})`}
-        opacity={style.opacity}
-        style={{ clipPath: `inset(0 0 0 0 round 0 10px 0 0)` }}
-      />
-
-      {/* Corner accent lines — manga panel style */}
-      <line x1={0} y1={0} x2={20} y2={0} stroke="rgba(255,255,255,0.18)" strokeWidth={2} opacity={style.opacity} />
-      <line x1={0} y1={0} x2={0} y2={16} stroke="rgba(255,255,255,0.18)" strokeWidth={2} opacity={style.opacity} />
-      <line x1={NODE_W} y1={0} x2={NODE_W - 20} y2={0} stroke="rgba(255,255,255,0.18)" strokeWidth={2} opacity={style.opacity} />
-      <line x1={NODE_W} y1={0} x2={NODE_W} y2={16} stroke="rgba(255,255,255,0.18)" strokeWidth={2} opacity={style.opacity} />
-
-      {/* Icon */}
       <text
         x={NODE_W / 2} y={44}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize={28}
         opacity={style.opacity}
+        fill={style.iconColor}
       >
         {node.icon}
       </text>
 
-      {/* State indicator badge — top right */}
       {node.state !== 'locked' && (
         <>
           <circle
             cx={NODE_W - 12} cy={12} r={10}
-            fill={node.state === 'completed' ? raceColor : node.state === 'researching' ? 'var(--color-energy)' : raceColor}
+            fill={node.state === 'researching' ? ND.warn : race.primary}
             opacity={0.95}
           />
           <text
@@ -403,7 +393,7 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize={node.state === 'completed' ? 10 : 11}
-            fill="var(--color-bg-base)"
+            fill={ND.bg}
             fontWeight="900"
           >
             {node.state === 'completed' ? '✓' : node.state === 'researching' ? '⚗' : '▶'}
@@ -411,7 +401,6 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
         </>
       )}
 
-      {/* Lock icon */}
       {node.state === 'locked' && (
         <text
           x={NODE_W - 14} y={14}
@@ -419,21 +408,21 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
           dominantBaseline="middle"
           fontSize={12}
           opacity={0.35}
+          fill={ND.textMute}
         >
-          🔒
+          ⌧
         </text>
       )}
 
-      {/* Node name — clamped at 2 lines */}
       <foreignObject x={6} y={56} width={NODE_W - 12} height={42}>
         <div
           style={{
-            fontFamily: "'Orbitron', sans-serif",
+            fontFamily: ND.display,
             fontSize: '8.5px',
             fontWeight: 700,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            color: style.opacity < 1 ? 'var(--color-text-muted)' : style.iconColor,
+            color: style.opacity < 1 ? ND.textMute : style.iconColor,
             textAlign: 'center',
             lineHeight: 1.35,
             wordBreak: 'break-word',
@@ -448,30 +437,29 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
         </div>
       </foreignObject>
 
-      {/* Research progress overlay */}
       {node.state === 'researching' && node.progress !== undefined && (
         <>
           <rect
             x={8} y={NODE_H - 14}
             width={NODE_W - 16} height={6}
-            rx={3} ry={3}
-            fill="rgba(255,200,50,0.15)"
+            rx={2} ry={2}
+            fill={`${ND.warn}26`}
           />
           <rect
             x={8} y={NODE_H - 14}
             width={Math.max(4, ((NODE_W - 16) * node.progress) / 100)}
             height={6}
-            rx={3} ry={3}
-            fill="var(--color-energy)"
-            style={{ filter: 'drop-shadow(0 0 4px rgba(255,200,50,0.8))' }}
+            rx={2} ry={2}
+            fill={ND.warn}
+            style={{ filter: `drop-shadow(0 0 4px ${ND.warn}cc)` }}
           />
           <text
             x={NODE_W / 2} y={NODE_H - 18}
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize={7}
-            fill="rgba(255,200,50,0.7)"
-            fontFamily="Orbitron, sans-serif"
+            fill={`${ND.warn}b3`}
+            fontFamily={ND.display}
             fontWeight="700"
           >
             {node.progress}%
@@ -479,14 +467,13 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
         </>
       )}
 
-      {/* Available pulse ring animation */}
       {node.state === 'available' && (
         <rect
           x={-4} y={-4}
           width={NODE_W + 8} height={NODE_H + 8}
-          rx={14} ry={14}
+          rx={6} ry={6}
           fill="none"
-          stroke={raceColor}
+          stroke={race.primary}
           strokeWidth={1}
           opacity={0}
           style={{ animation: 'tech-pulse 2s ease-in-out infinite' }}
@@ -501,15 +488,13 @@ function NodeCard({ node, raceColor, raceGlow, isSelected, onClick }: NodeCardPr
 interface DetailPanelProps {
   node: TechNodeData | null;
   nodes: TechNodeData[];
-  raceColor: string;
-  raceDim: string;
-  raceGlow: string;
+  race: NDRace;
   onClose: () => void;
   onResearch: (id: string) => void;
   onCancel: (id: string) => void;
 }
 
-function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onResearch, onCancel }: DetailPanelProps) {
+function DetailPanel({ node, nodes, race, onClose, onResearch, onCancel }: DetailPanelProps) {
   const visible = node !== null;
 
   const prereqNodes = useMemo(() => {
@@ -522,12 +507,11 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end pointer-events-none"
       aria-hidden={!visible}
     >
-      {/* Backdrop — mobile only */}
       {visible && (
         <div
-          className="absolute inset-0 bg-black/50 sm:hidden pointer-events-auto"
+          className="absolute inset-0 sm:hidden pointer-events-auto"
           onClick={onClose}
-          style={{ backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
         />
       )}
 
@@ -545,215 +529,159 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
           overflow: 'hidden auto',
         }}
       >
-        {/* Double-bezel outer shell */}
-        <div
-          className="p-[2px] rounded-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          {/* Inner core */}
-          <div
-            className="rounded-[calc(1rem-2px)] overflow-hidden"
-            style={{
-              background: 'rgba(13,17,23,0.97)',
-              boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.06)',
-              backdropFilter: 'blur(40px)',
-            }}
-          >
-            {/* Handle — mobile drag indicator */}
-            <div className="flex justify-center pt-3 pb-1 sm:hidden">
-              <div className="w-10 h-1 rounded-full bg-white/20" />
-            </div>
+        <Panel race={race} hi glow style={{ overflow: 'hidden' }}>
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: ND.border }} />
+          </div>
 
-            {node && (
-              <div className="p-5">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+          {node && (
+            <div style={{ padding: 20 }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 24,
+                      flexShrink: 0,
+                      background: `${race.primary}18`,
+                      border: `1.5px solid ${race.primary}66`,
+                      boxShadow: `0 0 12px ${race.glow}66`,
+                      color: race.primary,
+                    }}
+                  >
+                    {node.icon}
+                  </div>
+                  <div>
+                    <Chip color={node.state === 'researching' ? ND.warn : node.state === 'completed' ? race.primary : node.state === 'available' ? race.primary : ND.textMute}>
+                      {node.state === 'completed' ? '✓ Tamamlandı' : node.state === 'researching' ? '⚗ Araştırılıyor' : node.state === 'available' ? '▶ Hazır' : '⌧ Kilitli'}
+                    </Chip>
+                    <H3 style={{ marginTop: 6, color: node.state === 'locked' ? ND.textDim : race.primary }}>
+                      {node.name}
+                    </H3>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  type="button"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 4,
+                    border: `1px solid ${ND.border}`,
+                    background: 'transparent',
+                    color: ND.textDim,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Kapat"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Research progress */}
+              {node.state === 'researching' && node.progress !== undefined && (
+                <div style={{ marginBottom: 16 }}>
+                  <Bar
+                    value={node.progress}
+                    color={ND.warn}
+                    label="ARAŞTIRMA İLERLEMESİ"
+                    trailing={`${node.progress}%`}
+                  />
+                  <div style={{ marginTop: 6 }}>
+                    <Caption style={{ fontSize: 10 }}>
+                      ~{formatTime(Math.round(node.cost.timeSec * (1 - node.progress / 100)))} kaldı
+                    </Caption>
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              <Caption style={{ marginBottom: 16, lineHeight: 1.55 }}>
+                {node.description}
+              </Caption>
+
+              {/* Effect chip */}
+              <div style={{ marginBottom: 16 }}>
+                <Chip color={race.primary} style={{ fontSize: 10, padding: '4px 10px' }}>
+                  ✦ {node.effect}
+                </Chip>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height: 1, background: ND.border, marginBottom: 16 }} />
+
+              {/* Cost grid */}
+              <div style={{ marginBottom: 16 }}>
+                <Eyebrow color={race.primary}>MALİYET</Eyebrow>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 }}>
+                  {[
+                    { label: 'Mineral', value: node.cost.minerals.toLocaleString('tr-TR'), color: race.primary, icon: 'min' as const },
+                    { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString('tr-TR') : '—', color: ND.ok, icon: 'energy' as const },
+                    { label: 'Süre', value: formatTime(node.cost.timeSec), color: ND.warn, icon: 'sci' as const },
+                  ].map((c) => (
                     <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                      key={c.label}
                       style={{
-                        background: `${raceColor}18`,
-                        border: `1.5px solid ${raceColor}40`,
-                        boxShadow: `0 0 12px ${raceGlow}`,
+                        padding: 10,
+                        textAlign: 'center',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${ND.border}`,
+                        borderRadius: 3,
                       }}
                     >
-                      {node.icon}
-                    </div>
-                    <div>
-                      <div className="mb-1">
-                        <span
-                          className="badge text-[9px]"
-                          style={{ background: raceDim, color: raceColor, border: `1px solid ${raceColor}40` }}
-                        >
-                          {node.state === 'completed' ? '✓ Tamamlandı' : node.state === 'researching' ? '⚗ Araştırılıyor' : node.state === 'available' ? '▶ Hazır' : '🔒 Kilitli'}
-                        </span>
+                      <div style={{ marginBottom: 4 }}><ResIcon kind={c.icon} size={14} color={c.color} /></div>
+                      <div style={{ fontFamily: ND.display, fontSize: 12, fontWeight: 700, color: c.color }}>
+                        {c.value}
                       </div>
-                      <h2
-                        className="font-display text-sm font-black leading-tight"
-                        style={{ color: node.state === 'locked' ? 'var(--color-text-secondary)' : raceColor }}
-                      >
-                        {node.name}
-                      </h2>
+                      <Eyebrow style={{ fontSize: 8, marginTop: 2 }}>{c.label}</Eyebrow>
                     </div>
-                  </div>
-                  <button
-                    onClick={onClose}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary transition-colors shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.06)' }}
-                    aria-label="Kapat"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Research progress bar */}
-                {node.state === 'researching' && node.progress !== undefined && (
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-1.5">
-                      <span className="font-display text-[9px] uppercase tracking-widest text-text-muted">Araştırma İlerlemesi</span>
-                      <span className="font-display text-[9px]" style={{ color: 'var(--color-energy)' }}>{node.progress}%</span>
-                    </div>
-                    <div
-                      className="h-2 rounded-full overflow-hidden"
-                      style={{ background: 'rgba(255,200,50,0.10)' }}
-                    >
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${node.progress}%`,
-                          background: 'linear-gradient(90deg, color-mix(in srgb, var(--color-energy) 53%, transparent), var(--color-energy))',
-                          boxShadow: '0 0 8px rgba(255,200,50,0.6)',
-                          transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-1">
-                      <span className="font-display text-[9px] text-text-muted">
-                        ~{formatTime(Math.round(node.cost.timeSec * (1 - node.progress / 100)))} kaldı
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Description */}
-                <p className="text-text-secondary text-xs leading-relaxed mb-4" style={{ fontFamily: 'var(--font-body)' }}>
-                  {node.description}
-                </p>
-
-                {/* Effect chip */}
-                <div
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
-                  style={{
-                    background: `${raceColor}14`,
-                    border: `1px solid ${raceColor}30`,
-                  }}
-                >
-                  <span className="text-base">✦</span>
-                  <span
-                    className="font-display text-[10px] font-black uppercase tracking-wide"
-                    style={{ color: raceColor }}
-                  >
-                    {node.effect}
-                  </span>
-                </div>
-
-                {/* Divider */}
-                <div className="h-px mb-4" style={{ background: 'rgba(255,255,255,0.06)' }} />
-
-                {/* Cost grid */}
-                <div className="mb-4">
-                  <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-2">Maliyet</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: 'Mineral', value: node.cost.minerals.toLocaleString('tr-TR'), color: 'var(--color-race-insan)', icon: '💠' },
-                      { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString('tr-TR') : 'Yok', color: 'var(--color-success)', icon: '🟢' },
-                      { label: 'Süre', value: formatTime(node.cost.timeSec), color: 'var(--color-energy)', icon: '⏱' },
-                    ].map((c) => (
-                      <div
-                        key={c.label}
-                        className="p-2.5 rounded-xl text-center"
-                        style={{
-                          background: 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                        }}
+              {/* Prerequisites */}
+              {prereqNodes.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <Eyebrow color={race.primary}>GEREKSİNİMLER</Eyebrow>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {prereqNodes.map((req) => (
+                      <Chip
+                        key={req.id}
+                        color={req.state === 'completed' ? race.primary : ND.textMute}
                       >
-                        <div className="text-base mb-1">{c.icon}</div>
-                        <div
-                          className="font-display text-xs font-black"
-                          style={{ color: c.color }}
-                        >
-                          {c.value}
-                        </div>
-                        <div className="font-display text-[8px] uppercase tracking-widest text-text-muted mt-0.5">
-                          {c.label}
-                        </div>
-                      </div>
+                        {req.state === 'completed' ? '✓' : '○'} {req.name}
+                      </Chip>
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* Prerequisites */}
-                {prereqNodes.length > 0 && (
-                  <div className="mb-4">
-                    <div className="font-display text-[9px] uppercase tracking-widest text-text-muted mb-2">Gereksinimler</div>
-                    <div className="flex flex-wrap gap-2">
-                      {prereqNodes.map((req) => (
-                        <div
-                          key={req.id}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                          style={{
-                            background: req.state === 'completed'
-                              ? `${raceColor}14`
-                              : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${req.state === 'completed' ? `${raceColor}40` : 'rgba(255,255,255,0.08)'}`,
-                          }}
-                        >
-                          <span className="text-xs">{req.state === 'completed' ? '✓' : '○'}</span>
-                          <span
-                            className="font-display text-[9px] font-bold uppercase tracking-wide"
-                            style={{ color: req.state === 'completed' ? raceColor : 'var(--color-text-muted)' }}
-                          >
-                            {req.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action button */}
-                {node.state === 'available' && (
-                  <GlowButton
-                    variant="primary"
-                    size="md"
-                    className="w-full"
-                    onClick={() => onResearch(node.id)}
-                  >
-                    Araştırmayı Başlat
-                  </GlowButton>
-                )}
-                {node.state === 'researching' && (
-                  <button
-                    className="w-full py-2.5 rounded-full font-display text-xs font-bold uppercase tracking-widest transition-all duration-300"
-                    style={{
-                      background: 'rgba(255,51,85,0.12)',
-                      border: '1px solid rgba(255,51,85,0.3)',
-                      color: 'var(--color-danger)',
-                    }}
-                    onClick={() => onCancel(node.id)}
-                  >
-                    Araştırmayı İptal Et
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+              {/* Action */}
+              {node.state === 'available' && (
+                <NDButton race={race} full size="md" onClick={() => onResearch(node.id)}>
+                  Araştırmayı Başlat
+                </NDButton>
+              )}
+              {node.state === 'researching' && (
+                <NDButton variant="danger" full size="md" onClick={() => onCancel(node.id)}>
+                  Araştırmayı İptal Et
+                </NDButton>
+              )}
+            </div>
+          )}
+        </Panel>
       </div>
     </div>
   );
@@ -763,33 +691,41 @@ function DetailPanel({ node, nodes, raceColor, raceDim, raceGlow, onClose, onRes
 
 interface QueueStripProps {
   researching: TechNodeData | null;
-  raceColor: string;
-  raceGlow: string;
+  race: NDRace;
 }
 
-function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
+function QueueStrip({ researching, race }: QueueStripProps) {
   if (!researching) {
     return (
       <div
-        className="sticky bottom-0 z-40 px-4 py-3"
         style={{
-          background: 'rgba(8,10,16,0.95)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          flexShrink: 0,
+          padding: '12px 16px',
+          background: 'linear-gradient(180deg, rgba(6,8,15,0.55), rgba(6,8,15,0.95))',
+          borderTop: `1px solid ${ND.border}`,
           backdropFilter: 'blur(20px)',
         }}
       >
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <div className="flex items-center gap-2 opacity-40">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <span className="text-sm">⚗</span>
-            </div>
-            <div>
-              <div className="font-display text-[9px] uppercase tracking-widest text-text-muted">Araştırma Kuyruğu</div>
-              <div className="font-display text-xs text-text-muted">Boş — Araştırılacak teknoloji seç</div>
-            </div>
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, opacity: 0.5 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 4,
+              border: `1px solid ${ND.border}`,
+              background: ND.surface,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: ND.display,
+              color: ND.textDim,
+            }}
+          >
+            ⚗
+          </div>
+          <div>
+            <Eyebrow>ARAŞTIRMA KUYRUĞU</Eyebrow>
+            <Caption style={{ fontSize: 11 }}>Boş — Araştırılacak teknoloji seç</Caption>
           </div>
         </div>
       </div>
@@ -798,61 +734,49 @@ function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
 
   return (
     <div
-      className="sticky bottom-0 z-40 px-4 py-3"
       style={{
-        background: 'rgba(8,10,16,0.96)',
-        borderTop: `1px solid ${raceColor}20`,
+        flexShrink: 0,
+        padding: '12px 16px',
+        background: 'linear-gradient(180deg, rgba(6,8,15,0.55), rgba(6,8,15,0.97))',
+        borderTop: `1px solid ${race.primary}33`,
         backdropFilter: 'blur(20px)',
-        boxShadow: `0 -8px 32px rgba(0,0,0,0.5)`,
+        boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
       }}
     >
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-3">
-          {/* Queue icon */}
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-            style={{
-              background: `${raceColor}18`,
-              border: `1.5px solid ${raceColor}40`,
-              boxShadow: `0 0 12px ${raceGlow}`,
-            }}
-          >
-            {researching.icon}
-          </div>
+      <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+            background: `${race.primary}18`,
+            border: `1.5px solid ${race.primary}66`,
+            boxShadow: `0 0 12px ${race.glow}66`,
+            color: race.primary,
+          }}
+        >
+          {researching.icon}
+        </div>
 
-          {/* Name + progress */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-display text-xs font-bold truncate" style={{ color: 'var(--color-energy)' }}>
-                {researching.name}
-              </span>
-              <span className="font-display text-[9px] text-text-muted ml-2 shrink-0">
-                ~{formatTime(Math.round(researching.cost.timeSec * (1 - (researching.progress ?? 0) / 100)))} kaldı
-              </span>
-            </div>
-            <div
-              className="h-1.5 rounded-full overflow-hidden"
-              style={{ background: 'rgba(255,200,50,0.10)' }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-1000"
-                style={{
-                  width: `${researching.progress ?? 0}%`,
-                  background: 'linear-gradient(90deg, color-mix(in srgb, var(--color-energy) 40%, transparent), var(--color-energy))',
-                  boxShadow: '0 0 6px rgba(255,200,50,0.5)',
-                  transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-                }}
-              />
-            </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontFamily: ND.display, fontSize: 12, fontWeight: 700, color: ND.warn, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {researching.name}
+            </span>
+            <Code style={{ flexShrink: 0 }}>
+              ~{formatTime(Math.round(researching.cost.timeSec * (1 - (researching.progress ?? 0) / 100)))} kaldı
+            </Code>
           </div>
+          <Bar value={researching.progress ?? 0} color={ND.warn} height={5} />
+        </div>
 
-          {/* Percent badge */}
-          <div
-            className="shrink-0 font-display text-xs font-black px-2 py-1 rounded-full"
-            style={{ background: 'rgba(255,200,50,0.12)', color: 'var(--color-energy)', border: '1px solid rgba(255,200,50,0.25)' }}
-          >
-            {researching.progress ?? 0}%
-          </div>
+        <div style={{ flexShrink: 0 }}>
+          <Chip color={ND.warn}>{researching.progress ?? 0}%</Chip>
         </div>
       </div>
     </div>
@@ -864,12 +788,11 @@ function QueueStrip({ researching, raceColor, raceGlow }: QueueStripProps) {
 interface TechTreeCanvasProps {
   nodes: TechNodeData[];
   selectedId: string | null;
-  raceColor: string;
-  raceGlow: string;
+  race: NDRace;
   onSelectNode: (id: string) => void;
 }
 
-function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }: TechTreeCanvasProps) {
+function TechTreeCanvas({ nodes, selectedId, race, onSelectNode }: TechTreeCanvasProps) {
   const { w, h } = useMemo(() => getCanvasDims(nodes), [nodes]);
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
@@ -891,8 +814,8 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
     >
       {/* Tier labels */}
       <div
-        className="flex"
         style={{
+          display: 'flex',
           width: w,
           paddingLeft: PAD_X,
           paddingRight: PAD_X,
@@ -903,19 +826,9 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
         {['Seviye I', 'Seviye II', 'Seviye III'].map((label) => (
           <div
             key={label}
-            className="shrink-0 flex justify-center"
-            style={{ width: NODE_W }}
+            style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', width: NODE_W }}
           >
-            <span
-              className="font-display text-[9px] uppercase tracking-widest px-3 py-1 rounded-full"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              {label}
-            </span>
+            <Chip>{label}</Chip>
           </div>
         ))}
       </div>
@@ -928,7 +841,6 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
         aria-label="Teknoloji Ağacı"
       >
         <defs>
-          {/* Neon glow filter */}
           <filter id="neon-glow" x="-40%" y="-40%" width="180%" height="180%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
             <feMerge>
@@ -936,16 +848,6 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="neon-glow-strong" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur1" />
-            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur2" />
-            <feMerge>
-              <feMergeNode in="blur2" />
-              <feMergeNode in="blur1" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          {/* Animated dash for researching connections */}
           <style>{`
             @keyframes dashFlow {
               to { stroke-dashoffset: -20; }
@@ -957,14 +859,13 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
           `}</style>
         </defs>
 
-        {/* Connection lines — drawn beneath nodes */}
+        {/* Connection lines */}
         {connections.map(({ from, to }) => {
-          const connStyle = getConnectionStyle(from.state, to.state, raceColor);
+          const connStyle = getConnectionStyle(from.state, to.state, race);
           const path = connectionPath(from.tier, from.row, to.tier, to.row);
 
           return (
             <g key={`${from.id}-${to.id}`}>
-              {/* Glow layer */}
               {connStyle.opacity > 0.3 && (
                 <path
                   d={path}
@@ -976,7 +877,6 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
                   filter="url(#neon-glow)"
                 />
               )}
-              {/* Primary line */}
               <path
                 d={path}
                 fill="none"
@@ -990,7 +890,6 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
                 } : undefined}
                 strokeLinecap="round"
               />
-              {/* Arrow head at destination */}
               {connStyle.opacity > 0.2 && (() => {
                 const toPos = getNodePos(to.tier, to.row);
                 const arrowX = toPos.x;
@@ -1007,13 +906,12 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
           );
         })}
 
-        {/* Node cards */}
+        {/* Nodes */}
         {nodes.map((node) => (
           <NodeCard
             key={node.id}
             node={node}
-            raceColor={raceColor}
-            raceGlow={raceGlow}
+            race={race}
             isSelected={selectedId === node.id}
             onClick={() => onSelectNode(node.id)}
           />
@@ -1023,32 +921,25 @@ function TechTreeCanvas({ nodes, selectedId, raceColor, raceGlow, onSelectNode }
   );
 }
 
-// ── Tier Column Labels with counters ─────────────────────────────────────
+// ── Tier Progress ─────────────────────────────────────────────────────────
 
-function TierProgress({ nodes, raceColor }: { nodes: TechNodeData[]; raceColor: string }) {
+function TierProgress({ nodes, race }: { nodes: TechNodeData[]; race: NDRace }) {
   const tiers = [0, 1, 2];
   return (
-    <div className="flex gap-3 mb-4">
+    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
       {tiers.map((tier) => {
         const tierNodes = nodes.filter((n) => n.tier === tier);
         const done = tierNodes.filter((n) => n.state === 'completed').length;
         const pct = tierNodes.length > 0 ? (done / tierNodes.length) * 100 : 0;
         return (
-          <div key={tier} className="flex-1">
-            <div className="flex justify-between mb-1">
-              <span className="font-display text-[8px] uppercase tracking-widest text-text-muted">Seviye {tier + 1}</span>
-              <span className="font-display text-[8px]" style={{ color: raceColor }}>{done}/{tierNodes.length}</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${pct}%`,
-                  background: `linear-gradient(90deg, ${raceColor}66, ${raceColor})`,
-                  transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-                }}
-              />
-            </div>
+          <div key={tier} style={{ flex: 1 }}>
+            <Bar
+              value={pct}
+              color={race.primary}
+              height={4}
+              label={`SEVİYE ${tier + 1}`}
+              trailing={`${done}/${tierNodes.length}`}
+            />
           </div>
         );
       })}
@@ -1059,11 +950,14 @@ function TierProgress({ nodes, raceColor }: { nodes: TechNodeData[]; raceColor: 
 // ── Main Page ─────────────────────────────────────────────────────────────
 
 export default function ResearchPage() {
-  const { raceColor, raceDim, raceGlow } = useRaceTheme();
+  const race = useNDRace();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('ekonomi');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryData[]>(INITIAL_CATEGORIES);
-  const { data: liveResources } = useGameResources();
+  /* MERGE: kept the useGameResources poll active so the resource cache stays
+   * warm for downstream screens; the header in this version no longer renders
+   * resources directly (remote moved to a chip count). */
+  useGameResources();
 
   const activeCategoryData = useMemo(
     () => categories.find((c) => c.id === activeCategory)!,
@@ -1117,266 +1011,174 @@ export default function ResearchPage() {
   const totalNodes = useMemo(() => categories.flatMap((c) => c.nodes).length, [categories]);
 
   return (
-    <div
-      className="h-dvh flex flex-col relative overflow-y-auto"
-      style={{ background: 'var(--color-bg)' }}
-    >
-      {/* Nebula background */}
-      <div
-        className="fixed inset-0 pointer-events-none transition-all duration-700"
-        style={{ background: 'var(--gradient-nebula)', zIndex: 0 }}
-        aria-hidden
-      />
-      <div className="manga-halftone-race fixed inset-0 pointer-events-none" style={{ opacity: 0.12 }} aria-hidden />
-
-      {/* Manga horizontal sweep — research-tree atmosphere */}
-      <div className="speed-lines-sweep fixed inset-0 pointer-events-none" style={{ opacity: 0.4 }} aria-hidden />
-
-      {/* Scan line ambient effect */}
-      <div
-        className="fixed inset-x-0 h-px pointer-events-none opacity-10"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${raceColor}, transparent)`,
-          top: '35%',
-          zIndex: 1,
-          filter: `blur(1px)`,
-        }}
-        aria-hidden
-      />
-
-      {/* ── Sticky Header ── */}
+    <Screen race={race} style={{ minHeight: '100dvh' }}>
+      {/* Header */}
       <header
-        className="relative z-40 sticky top-0"
         style={{
-          background: 'rgba(8,10,16,0.92)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(24px)',
+          background: 'linear-gradient(180deg, rgba(6,8,15,0.95), rgba(6,8,15,0.55))',
+          borderBottom: `1px solid ${race.primary}33`,
+          backdropFilter: 'blur(20px)',
+          flexShrink: 0,
         }}
       >
-        {/* Top row */}
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="font-display text-text-muted text-xs hover:text-text-primary transition-colors flex items-center gap-1"
-              style={{ transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)' }}
-            >
-              ← Ana Üs
-            </Link>
-            <div className="h-3.5 w-px" style={{ background: 'rgba(255,255,255,0.10)' }} />
-            <div className="flex items-center gap-2">
-              <span
-                className="badge text-[9px]"
-                style={{ background: raceDim, color: raceColor, border: `1px solid ${raceColor}40` }}
-              >
-                Araştırma
-              </span>
-              <span
-                className="font-display text-[10px] font-black"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                {totalCompleted}/{totalNodes}
-              </span>
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
+          <Link
+            href="/"
+            aria-label="Geri"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 4,
+              border: `1px solid ${ND.border}`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: ND.text,
+              fontFamily: ND.display,
+              textDecoration: 'none',
+            }}
+          >
+            ‹
+          </Link>
+          <Sigil race={race} size={28} glow />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Eyebrow color={race.primary}>ARAŞTIRMA</Eyebrow>
+            <H2 style={{ marginTop: 2 }}>TECH TREE</H2>
           </div>
-
-          {/* Resource mini-bar — wired to live game-server wallet, mock fallback. */}
-          <div className="hidden sm:flex items-center gap-4">
-            {[
-              {
-                icon: '💠',
-                label: 'Mineral',
-                value: liveResources ? formatResource(liveResources.mineral) : '12,450',
-                color: 'var(--color-race-insan)',
-              },
-              {
-                icon: '🟢',
-                label: 'Gaz',
-                value: liveResources ? formatResource(liveResources.gas) : '3,820',
-                color: 'var(--color-success)',
-              },
-            ].map((r) => (
-              <div key={r.label} className="flex items-center gap-1.5">
-                <span className="text-sm">{r.icon}</span>
-                <div>
-                  <div className="font-display text-[8px] uppercase tracking-widest text-text-muted leading-none">{r.label}</div>
-                  <div className="font-display text-xs font-black leading-tight" style={{ color: r.color }}>
-                    {r.value}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Chip color={race.primary}>{totalCompleted}/{totalNodes}</Chip>
         </div>
 
         {/* Category tabs */}
-        <div
-          className="flex border-t px-4 py-0"
-          style={{ borderColor: 'rgba(255,255,255,0.05)' }}
-        >
+        <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '0 16px 12px' }}>
           {categories.map((cat) => {
-            const active = cat.id === activeCategory;
-            const catCompleted = cat.nodes.filter((n) => n.state === 'completed').length;
-            const catTotal = cat.nodes.length;
+            const on = cat.id === activeCategory;
+            const done = cat.nodes.filter((n) => n.state === 'completed').length;
             return (
               <button
                 key={cat.id}
+                role="tab"
+                aria-selected={on}
+                type="button"
                 onClick={() => {
                   setActiveCategory(cat.id);
                   setSelectedNodeId(null);
                 }}
-                className="relative flex items-center gap-2 px-5 py-3 font-display text-xs font-bold uppercase tracking-widest transition-all duration-300"
                 style={{
-                  color: active ? raceColor : 'var(--color-text-muted)',
-                  transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  padding: '10px 6px',
+                  fontFamily: ND.display,
+                  fontSize: 11,
+                  letterSpacing: '0.10em',
+                  textTransform: 'uppercase',
+                  background: on ? `linear-gradient(180deg, ${race.primary}28, ${race.primary}10)` : 'transparent',
+                  border: `1px solid ${on ? race.primary : ND.border}`,
+                  color: on ? race.primary : ND.textDim,
+                  borderRadius: 3,
+                  cursor: 'pointer',
                 }}
-                aria-selected={active}
               >
-                <span className="text-sm">{cat.icon}</span>
+                <span style={{ fontSize: 13 }}>{cat.icon}</span>
                 <span>{cat.label}</span>
-                <span
-                  className="font-display text-[8px] px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: active ? raceDim : 'rgba(255,255,255,0.04)',
-                    color: active ? raceColor : 'var(--color-text-muted)',
-                    border: active ? `1px solid ${raceColor}30` : '1px solid rgba(255,255,255,0.06)',
-                  }}
-                >
-                  {catCompleted}/{catTotal}
+                <span style={{ fontFamily: ND.mono, fontSize: 9, color: on ? race.primary : ND.textMute }}>
+                  {done}/{cat.nodes.length}
                 </span>
-                {/* Active underline */}
-                {active && (
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"
-                    style={{
-                      background: `linear-gradient(90deg, transparent, ${raceColor}, transparent)`,
-                      boxShadow: `0 0 8px ${raceGlow}`,
-                    }}
-                  />
-                )}
               </button>
             );
           })}
         </div>
       </header>
 
-      {/* ── Main Content ── */}
-      <main className="relative z-10 flex-1 p-4 pb-6 max-w-5xl mx-auto w-full">
-
+      {/* Main */}
+      <main
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '16px',
+          paddingBottom: 24,
+          width: '100%',
+        }}
+      >
+       <div style={{ maxWidth: 1024, margin: '0 auto', width: '100%' }}>
         {/* Category title + tier progress */}
-        <div className="mb-5 animate-manga-appear">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl">{activeCategoryData.icon}</span>
-            <h1 className="manga-title" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.6rem)' }}>
-              {activeCategoryData.label} Tech Tree
-            </h1>
-            <div className="flex-1 panel-divider" aria-hidden />
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>{activeCategoryData.icon}</span>
+            <H3 style={{ color: ND.text }}>{activeCategoryData.label.toUpperCase()} TECH TREE</H3>
+            <div style={{ flex: 1, height: 1, background: ND.border }} aria-hidden />
           </div>
-          <TierProgress nodes={activeCategoryData.nodes} raceColor={raceColor} />
+          <TierProgress nodes={activeCategoryData.nodes} race={race} />
         </div>
 
-        {/* Tech Tree Canvas — double-bezel container */}
-        <div
-          className="p-[2px] rounded-2xl mb-5 animate-manga-appear"
-          style={{
-            animationDelay: '80ms',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.07)',
-          }}
-        >
-          <div
-            className="rounded-[calc(1rem-2px)] overflow-hidden"
-            style={{
-              background: 'rgba(8,10,20,0.8)',
-              boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.04)',
-            }}
-          >
-            {/* Manga corner accents */}
-            <div className="relative">
-              <div className="absolute top-0 left-0 w-8 h-8 pointer-events-none z-10" aria-hidden>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M0 0 L16 0" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-                  <path d="M0 0 L0 16" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-                </svg>
-              </div>
-              <div className="absolute top-0 right-0 w-8 h-8 pointer-events-none z-10" aria-hidden>
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M32 0 L16 0" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-                  <path d="M32 0 L32 16" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6">
+        {/* Tech Tree Canvas */}
+        <div style={{ marginBottom: 20 }}>
+          <Panel race={race} hi style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: 16 }}>
               <TechTreeCanvas
                 key={activeCategory}
                 nodes={activeCategoryData.nodes}
                 selectedId={selectedNodeId}
-                raceColor={raceColor}
-                raceGlow={raceGlow}
+                race={race}
                 onSelectNode={handleSelectNode}
               />
             </div>
-          </div>
+          </Panel>
         </div>
 
         {/* Legend */}
-        <div
-          className="flex flex-wrap gap-3 px-4 py-3 rounded-xl animate-manga-appear"
-          style={{
-            animationDelay: '160ms',
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.05)',
-          }}
-        >
-          {[
-            { state: 'completed', label: 'Tamamlandı', color: raceColor },
-            { state: 'researching', label: 'Araştırılıyor', color: 'var(--color-energy)' },
-            { state: 'available', label: 'Araştırılabilir', color: raceColor },
-            { state: 'locked', label: 'Kilitli', color: 'var(--color-text-muted)' },
-          ].map((item) => (
-            <div key={item.state} className="flex items-center gap-1.5">
-              <div
-                className="w-3 h-3 rounded-sm"
-                style={{
-                  background: item.state === 'locked' ? 'rgba(255,255,255,0.06)' : `${item.color}22`,
-                  border: `1.5px solid ${item.state === 'locked' ? 'rgba(255,255,255,0.10)' : item.color}`,
-                  opacity: item.state === 'locked' ? 0.5 : 1,
-                }}
-              />
-              <span
-                className="font-display text-[9px] uppercase tracking-wider"
-                style={{ color: item.state === 'locked' ? 'var(--color-text-muted)' : item.color }}
-              >
-                {item.label}
-              </span>
+        <Panel race={race} style={{ padding: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+            {[
+              { state: 'completed', label: 'Tamamlandı', color: race.primary },
+              { state: 'researching', label: 'Araştırılıyor', color: ND.warn },
+              { state: 'available', label: 'Araştırılabilir', color: race.primary },
+              { state: 'locked', label: 'Kilitli', color: ND.textMute },
+            ].map((item) => (
+              <div key={item.state} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div
+                  style={{
+                    width: 12,
+                    height: 12,
+                    background: item.state === 'locked' ? ND.bgDeep : `${item.color}22`,
+                    border: `1.5px solid ${item.color}`,
+                    opacity: item.state === 'locked' ? 0.5 : 1,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: ND.display,
+                    fontSize: 10,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: item.state === 'locked' ? ND.textMute : item.color,
+                  }}
+                >
+                  {item.label}
+                </span>
+              </div>
+            ))}
+            <div style={{ marginLeft: 'auto' }}>
+              <Caption style={{ fontSize: 10 }}>Düğüme tıkla → Detaylar</Caption>
             </div>
-          ))}
-          <div className="ml-auto font-display text-[9px] text-text-muted">
-            Node&apos;a tıkla → Detaylar
           </div>
-        </div>
+        </Panel>
+       </div>
       </main>
 
-      {/* ── Research Queue ── */}
-      <QueueStrip
-        researching={researchingNode}
-        raceColor={raceColor}
-        raceGlow={raceGlow}
-      />
+      {/* Research Queue */}
+      <QueueStrip researching={researchingNode} race={race} />
 
-      {/* ── Node Detail Side Panel ── */}
+      {/* Node Detail Side Panel */}
       <DetailPanel
         node={selectedNode}
         nodes={activeCategoryData.nodes}
-        raceColor={raceColor}
-        raceDim={raceDim}
-        raceGlow={raceGlow}
+        race={race}
         onClose={() => setSelectedNodeId(null)}
         onResearch={handleResearch}
         onCancel={handleCancel}
       />
-
-    </div>
+    </Screen>
   );
 }

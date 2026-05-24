@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FormationScreen } from '@/components/formation/FormationScreen';
+import { FormationScreenND } from '@/components/formation/FormationScreenND';
 import { getAccessToken } from '@/lib/session';
 
 /* The formation backend wants a UUID. We decode it from the live JWT (sub
@@ -29,14 +29,16 @@ function playerIdFromToken(): string {
 }
 
 export default function FormationPage() {
-  // Hold null until after mount so the FormationScreen's first render (and
+  // Hold null until after mount so the FormationScreenND's first render (and
   // its initial fetches against /units/player/:id) only fires AFTER we've
   // resolved the real user UUID from the JWT. Avoids the double-fetch +
   // 404 the previous version caused (demo id → real id → both fetched).
+  /* MERGE: kept HEAD's JWT-resolved playerId on top of remote's ND
+   * component (FormationScreenND). */
   const [playerId, setPlayerId] = useState<string | null>(null);
   useEffect(() => {
     setPlayerId(playerIdFromToken());
   }, []);
   if (!playerId) return null;
-  return <FormationScreen playerId={playerId} />;
+  return <FormationScreenND playerId={playerId} />;
 }

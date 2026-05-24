@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   BottomNav,
   Caption,
@@ -20,9 +21,9 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
-import { useBaseState } from '@/hooks/useBaseState';
 import { formatResource, useGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings } from '@/hooks/useGameBuildings';
+import { useHudState } from '@/hooks/useHudState';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
@@ -57,6 +58,14 @@ const SLOT_TOTAL = 5;
 const SWIPE_CANCEL_PX = 80;
 const SWIPE_THRESHOLD_PX = 56;
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 interface QueueItem {
   id: string;
   unitName: string;
@@ -77,15 +86,14 @@ interface UnitDef {
 
 export default function ProductionPage() {
   const race = useNDRace();
+  const router = useRouter();
+  const hud = useHudState();
   const [tab, setTab] = useState(0);
   const [selected, setSelected] = useState(0);
   const [count, setCount] = useState(1);
-  // Live HUD pipes (same as /base and /base/build). resA/resB/crystal
-  // mirror server values when logged in; fall back to mock balances so the
-  // production queue is still testable while unauthenticated.
-  const { data: live } = useBaseState();
-  const liveLevel = live?.tier?.currentLevel;
-  const liveTierName = live?.tier?.raceSpecificTierName ?? live?.tier?.currentTierName;
+  // Live wallet pipe — used for HUD pill display when authed. Local resA/B/
+  // crystal still track optimistic deductions for the train flow below.
+  /* MERGE: useBaseState dropped — useHudState above now drives level/tier. */
   const { data: resources } = useGameResources();
 
   // Local resource state still tracks "what the player WOULD spend" — we
@@ -322,8 +330,11 @@ export default function ProductionPage() {
 
         <HUD
           race={race}
-          level={liveLevel ?? 9}
-          levelName={liveTierName ?? 'Metropol'}
+          level={hud.level}
+          levelName={hud.levelName}
+          /* MERGE: kept HEAD's local-state resource fields — they reflect
+           * optimistic deductions from queueing units before the train POST
+           * reconciles. hud.resA/resB/crystal would show stale wallet values. */
           resA={resources ? formatResource(resources.mineral) : formatNumber(resA)}
           resB={resources ? formatResource(resources.gas) : formatNumber(resB)}
           crystal={resources ? formatResource(resources.energy) : String(crystal)}
@@ -558,7 +569,11 @@ export default function ProductionPage() {
           </Caption>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

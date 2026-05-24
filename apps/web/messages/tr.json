@@ -1,0 +1,137 @@
+{
+  "common": {
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu",
+    "retry": "Tekrar dene",
+    "cancel": "İptal",
+    "save": "Kaydet",
+    "continue": "Devam",
+    "back": "Geri",
+    "next": "İleri",
+    "close": "Kapat",
+    "confirm": "Onayla",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "yes": "Evet",
+    "no": "Hayır",
+    "skip": "Atla"
+  },
+  "auth": {
+    "login": {
+      "title": "Giriş",
+      "subtitle": "Fethine devam et",
+      "username": "Kullanıcı adı veya e-posta",
+      "password": "Şifre",
+      "submit": "Giriş Yap",
+      "forgotPassword": "Şifreni mi unuttun?",
+      "noAccount": "Henüz hesabın yok mu?",
+      "registerLink": "Kaydol",
+      "errorInvalid": "Geçersiz bilgiler. Tekrar dene.",
+      "errorGeneric": "Giriş başarısız. Tekrar dene."
+    },
+    "register": {
+      "title": "Kayıt Ol",
+      "subtitle": "Nebula Dominion'a katıl",
+      "username": "Kullanıcı adı",
+      "email": "E-posta",
+      "password": "Şifre",
+      "confirmPassword": "Şifreyi onayla",
+      "submit": "Hesap Oluştur",
+      "haveAccount": "Zaten hesabın var mı?",
+      "loginLink": "Giriş yap",
+      "errorMismatch": "Şifreler eşleşmiyor",
+      "errorTaken": "Bu kullanıcı adı alınmış",
+      "errorGeneric": "Kayıt başarısız. Tekrar dene."
+    },
+    "logout": "Çıkış Yap"
+  },
+  "races": {
+    "selectTitle": "Irkını Seç",
+    "selectSubtitle": "Bu karar kaderini şekillendirir",
+    "confirmTitle": "Uyanış",
+    "confirmContinue": "Devam",
+    "lockedHint": "Bir kez kilitlenince ırkın değiştirilemez"
+  },
+  "hud": {
+    "level": "Seviye",
+    "age": "Çağ",
+    "xp": "TP",
+    "resources": {
+      "primary": "Birincil",
+      "secondary": "İkincil",
+      "crystal": "Kristal"
+    },
+    "tierMax": "MAKS",
+    "tierProgress": "{current} / {max} → ÇAĞ {next}"
+  },
+  "nav": {
+    "base": "Üs",
+    "galaxy": "Galaksi",
+    "commanders": "Komutan",
+    "story": "Hikaye",
+    "more": "Daha",
+    "build": "Yap",
+    "production": "Üret",
+    "inventory": "Envanter",
+    "battle": "Savaş",
+    "missions": "Görevler",
+    "alliance": "İttifak",
+    "shop": "Mağaza",
+    "settings": "Ayarlar",
+    "profile": "Profil"
+  },
+  "base": {
+    "title": "Üs",
+    "buildingActive": "AKTİF",
+    "buildingLocked": "KİLİTLİ",
+    "detailButton": "Detay",
+    "productionDone": "üretim tamam",
+    "statusOk": "Tüm sistemler nominal"
+  },
+  "build": {
+    "title": "Yapı Kataloğu",
+    "morphHint": "Slot değiştirmek için basılı tut",
+    "lockedCount": "{count} kilit",
+    "filterButton": "Filtre",
+    "compareButton": "Kıyasla",
+    "costLabel": "Maliyet",
+    "timeLabel": "Süre",
+    "queueLabel": "Sıra"
+  },
+  "tutorial": {
+    "skip": "Eğitimi Atla",
+    "next": "İleri",
+    "finish": "Bitir",
+    "step": "{total} adımdan {current}."
+  },
+  "battle": {
+    "prepare": "Savaşa Hazırlan",
+    "engage": "Saldır",
+    "retreat": "Geri çekil",
+    "victory": "Zafer",
+    "defeat": "Yenilgi",
+    "ourPower": "Bizim Güç",
+    "enemyPower": "Düşman Güç",
+    "winProbability": "Zafer Olasılığı"
+  },
+  "story": {
+    "newChapter": "✦ YENİ ÇAĞ {age} HİKAYE BÖLÜMÜ AÇILDI · DOKUN ›",
+    "title": "Hikaye Galerisi"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "language": "Dil",
+    "languageHint": "Cihazından otomatik algılandı. Değiştirmek için tarayıcı veya sistem dilini değiştir.",
+    "audio": "Ses",
+    "graphics": "Grafik",
+    "notifications": "Bildirimler",
+    "account": "Hesap",
+    "about": "Hakkında"
+  },
+  "errors": {
+    "networkOffline": "Çevrimdışı görünüyorsun",
+    "sessionExpired": "Oturumun sona erdi. Tekrar giriş yap.",
+    "notFound": "Bilinmeyen Sektör",
+    "notFoundDescription": "Aradığın koordinat galaksinin haritalanmamış bölgesinde."
+  }
+}

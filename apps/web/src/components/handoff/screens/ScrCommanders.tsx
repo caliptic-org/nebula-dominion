@@ -746,7 +746,7 @@ function CommanderDetail({ entry }: { entry: CommanderEntry }) {
             // No backend endpoint for "active commander" yet — surface
             // a toast so the player knows the click registered. Once
             // POST /commanders/:id/activate lands, replace with a fetch.
-            toast.success(`${entry.name} aktif komutan olarak ayarlandı`);
+            toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
           }}
         >
           {locked ? '🔒 Kilidi Aç' : '⚔ Komutan Seç'}

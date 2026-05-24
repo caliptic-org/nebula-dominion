@@ -482,11 +482,11 @@ interface HUDProps {
 
 export function HUD({
   race,
-  level = 9,
-  levelName = 'Metropol',
-  resA = '12,480',
-  resB = '3,210',
-  crystal = '42',
+  level = 1,
+  levelName = '—',
+  resA = '—',
+  resB = '—',
+  crystal = '—',
 }: HUDProps) {
   return (
     <div

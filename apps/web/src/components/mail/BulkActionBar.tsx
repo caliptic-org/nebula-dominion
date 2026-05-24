@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { ND, type NDRace } from '@/components/handoff'
 
 interface BulkActionBarProps {
   selectedCount: number
   hasClaimable: boolean
+  race: NDRace
   onClaimSelected: () => void
   onDeleteSelected: () => void
   onMarkRead: () => void
@@ -14,13 +16,12 @@ interface BulkActionBarProps {
 export function BulkActionBar({
   selectedCount,
   hasClaimable,
+  race,
   onClaimSelected,
   onDeleteSelected,
   onMarkRead,
   onCancel,
 }: BulkActionBarProps) {
-  const [visible] = useState(true)
-
   return (
     <div
       role="toolbar"
@@ -31,15 +32,16 @@ export function BulkActionBar({
         left: 0,
         right: 0,
         zIndex: 20,
-        padding: '14px 16px',
-        background: 'var(--color-bg-surface)',
-        borderTop: '1px solid var(--color-border)',
+        padding: '12px 14px',
+        background: `linear-gradient(180deg, ${ND.surface} 0%, ${ND.surfaceSolid} 100%)`,
+        borderTop: `1px solid ${race.primary}55`,
+        boxShadow: `0 -8px 24px -8px ${race.glow}33`,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        transform: visible ? 'translateY(0)' : 'translateY(100%)',
         transition: 'transform 0.35s cubic-bezier(0.32,0.72,0,1)',
-        backdropFilter: 'none',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       }}
     >
       {/* Count badge */}
@@ -48,30 +50,38 @@ export function BulkActionBar({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          marginRight: 4,
+          marginRight: 2,
           flexShrink: 0,
         }}
       >
         <div
           style={{
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            background: 'var(--color-brand)',
-            color: '#fff',
+            width: 24,
+            height: 24,
+            background: race.primary,
+            color: '#0A0E1A',
             fontSize: 11,
             fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: 'var(--font-display)',
+            fontFamily: ND.display,
+            clipPath: 'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
+            boxShadow: `0 0 8px ${race.glow}66`,
           }}
           aria-hidden
         >
           {selectedCount}
         </div>
         <span
-          style={{ fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}
+          style={{
+            fontSize: 10,
+            color: ND.textDim,
+            whiteSpace: 'nowrap',
+            fontFamily: ND.mono,
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+          }}
         >
           seçildi
         </span>
@@ -80,7 +90,7 @@ export function BulkActionBar({
       {/* Divider */}
       <div
         aria-hidden
-        style={{ width: 1, height: 28, background: 'var(--color-border)', flexShrink: 0 }}
+        style={{ width: 1, height: 24, background: ND.border, flexShrink: 0 }}
       />
 
       {/* Actions */}
@@ -88,28 +98,24 @@ export function BulkActionBar({
         <ActionButton
           icon="📥"
           label="Talep Et"
-          color="var(--color-energy)"
-          glow="rgba(255,200,50,0.4)"
+          color={ND.warn}
           onClick={onClaimSelected}
         />
       )}
       <ActionButton
         icon="👁"
         label="Okundu"
-        color="var(--color-accent)"
-        glow="rgba(68,217,200,0.35)"
+        color={race.primary}
         onClick={onMarkRead}
       />
       <ActionButton
         icon="🗑"
         label="Sil"
-        color="var(--color-danger)"
-        glow="rgba(255,68,68,0.35)"
+        color={ND.danger}
         onClick={onDeleteSelected}
         dangerous
       />
 
-      {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* Cancel */}
@@ -117,17 +123,19 @@ export function BulkActionBar({
         onClick={onCancel}
         aria-label="Seçimi iptal et"
         style={{
-          padding: '7px 14px',
-          borderRadius: 8,
-          border: '1px solid var(--color-border)',
+          padding: '7px 12px',
+          border: `1px solid ${ND.border}`,
           background: 'transparent',
-          color: 'var(--color-text-muted)',
+          color: ND.textDim,
           cursor: 'pointer',
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: 600,
-          letterSpacing: '0.04em',
+          letterSpacing: '0.10em',
+          textTransform: 'uppercase',
+          fontFamily: ND.display,
           transition: 'color 0.2s, border-color 0.2s',
           flexShrink: 0,
+          clipPath: 'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
         }}
       >
         İptal
@@ -140,12 +148,11 @@ interface ActionButtonProps {
   icon: string
   label: string
   color: string
-  glow: string
   onClick: () => void
   dangerous?: boolean
 }
 
-function ActionButton({ icon, label, color, glow, onClick, dangerous = false }: ActionButtonProps) {
+function ActionButton({ icon, label, color, onClick, dangerous = false }: ActionButtonProps) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -159,22 +166,20 @@ function ActionButton({ icon, label, color, glow, onClick, dangerous = false }: 
         alignItems: 'center',
         gap: 5,
         padding: '7px 12px',
-        borderRadius: 8,
-        border: `1px solid ${hovered ? color + '66' : 'var(--color-border)'}`,
-        background: hovered
-          ? dangerous
-            ? `rgba(255,68,68,0.12)`
-            : `${color}14`
-          : 'var(--color-bg-elevated)',
-        color: hovered ? color : 'var(--color-text-secondary)',
+        border: `1px solid ${hovered ? color : ND.border}`,
+        background: hovered ? `${color}1f` : ND.surface,
+        color: hovered ? color : ND.text,
         cursor: 'pointer',
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: '0.03em',
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.10em',
+        textTransform: 'uppercase',
+        fontFamily: ND.display,
         transition: 'all 0.25s cubic-bezier(0.32,0.72,0,1)',
-        boxShadow: hovered ? `0 0 10px ${glow}` : 'none',
+        boxShadow: hovered ? `0 0 12px ${color}55` : 'none',
         transform: hovered ? 'scale(1.02)' : 'scale(1)',
         flexShrink: 0,
+        clipPath: 'polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)',
       }}
     >
       <span style={{ fontSize: 13 }} aria-hidden>{icon}</span>

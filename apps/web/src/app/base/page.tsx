@@ -28,32 +28,48 @@ import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useBaseState } from '@/hooks/useBaseState';
-import { formatResource, useGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings, indexBuildingsByType } from '@/hooks/useGameBuildings';
+import { useHudState } from '@/hooks/useHudState';
+
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
+const QUICK_ACTION_ROUTES: Record<string, string> = {
+  build:    '/base/build',
+  prod:     '/base/production',
+  spawn:    '/base/production',
+  compile:  '/base/production',
+  hunt:     '/base/production',
+  summon:   '/base/production',
+  merge:    '/merge',
+  mutate:   '/merge',
+  eat:      '/merge',
+  seal:     '/merge',
+  assemble: '/base/build',
+  dig:      '/base/build',
+  pact:     '/base/build',
+  roster:   '/inventory',
+};
 
 export default function BaseHomePage() {
   const race = useNDRace();
+  const router = useRouter();
   const lex = raceLex(race.key);
+  const hud = useHudState();
   const [focusedIdx, setFocusedIdx] = useState(1);
   const focusedBuilding = race.buildings[focusedIdx] ?? race.buildings[0];
 
   // Live tier progress (level, age, xp%). Falls back to mock when guest or
   // when the API errors so the HUD never goes blank.
+  /* MERGE: kept useBaseState for liveAge (backdrop selection) and for the
+   * focused-building card status; HUD itself now reads from useHudState. */
   const { data: live } = useBaseState();
-  const liveLevel = live?.tier?.currentLevel;
   const liveAge = live?.tier?.currentAge;
-  const liveTierName = live?.tier?.raceSpecificTierName ?? live?.tier?.currentTierName;
-  const liveXpPct = live?.xpPercent;
-
-  // Live wallet (mineral/gas/energy) polled every 5s from the game-server.
-  // null = guest mode → HUD shows mock 12,480 / 3,210 / 42 placeholders.
-  const { data: resources } = useGameResources();
-  const resA = resources ? formatResource(resources.mineral) : '12,480';
-  const resB = resources ? formatResource(resources.gas) : '3,210';
-  // "crystal" in the design = a prestige currency we don't have a backend
-  // for yet; energy is the closest live analogue so the HUD's third pill
-  // surfaces a real number too.
-  const resCrystal = resources ? formatResource(resources.energy) : '42';
 
   // Live buildings — used to show the real level + status (constructing
   // vs active) on the focused-building card. The slot-slug → backend type
@@ -68,17 +84,11 @@ export default function BaseHomePage() {
   const focusedLiveBuilding = bldgIndex
     ? Array.from(bldgIndex.values())[focusedIdx]?.[0] ?? null
     : null;
-  const liveTrailing = live?.tier
-    ? live.tier.isMaxLevel
-      ? 'MAKS'
-      : `${Number(live.tier.xp).toLocaleString('tr-TR')} / ${Number(live.tier.xpToNextLevel).toLocaleString('tr-TR')} XP`
-    : undefined;
 
   // First-session redirect: brand-new players are routed to the multi-step
   // tutorial (`/tutorial?step=1`). Once the player completes or skips the
   // tutorial, `useOnboarding.hasCompletedTutorial` flips and the redirect
   // becomes a no-op. Tutorial step persistence lives in `nebula:tutorial:v1`.
-  const router = useRouter();
   const { hydrated, isFirstSession } = useOnboarding();
   useEffect(() => {
     if (!hydrated) return;
@@ -134,20 +144,14 @@ export default function BaseHomePage() {
       <Screen race={race} dim={0.3} style={{ height: '100%' }} bgImage={baseBg}>
         <HUD
           race={race}
-          level={liveLevel ?? 9}
-          levelName={liveTierName ?? 'Metropol'}
-          resA={resA}
-          resB={resB}
-          crystal={resCrystal}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
         />
 
-        <TierBanner
-          race={race}
-          level={liveLevel ?? 9}
-          age={liveAge ?? 1}
-          xpPercent={liveXpPct ?? 92}
-          trailing={liveTrailing ?? '9 / 9 → ÇAĞ 2'}
-        />
+        <TierBanner race={race} level={hud.level} age={hud.age} xpPercent={hud.xpPercent} />
 
         {/* New-chapter toast: shown when player.safeAge advances past the
             persisted threshold. Self-dismisses on click and links to
@@ -230,41 +234,15 @@ export default function BaseHomePage() {
             </div>
           </Panel>
 
-          {/* quick actions mid-right — each race's keys route to the
-            * appropriate screen. Unknown keys fall through to a toast
-            * so unwired race actions at least give visual feedback. */}
-          <div style={{ position: 'absolute', right: 10, top: '36%' }}>
+          {/* quick actions mid-right — each race's keys route via the
+            * QUICK_ACTION_ROUTES table at the top of the file. Unknown keys
+            * are no-ops; add them to the table when new actions land. */}
+          <div style={{ position: 'absolute', right: 10, top: '32%' }}>
             <RaceQuickActions
               race={race}
               onAction={(key) => {
-                switch (key) {
-                  // İnşa / Doğur / Montaj / Kaz / Pakt → /base/build
-                  case 'build':
-                  case 'spawn':
-                  case 'assemble':
-                  case 'dig':
-                  case 'pact':
-                    router.push('/base/build');
-                    break;
-                  // Eğit / Mutate / Derle / Av / Çağır → /base/production
-                  case 'prod':
-                  case 'mutate':
-                  case 'compile':
-                  case 'hunt':
-                  case 'summon':
-                    router.push('/base/production');
-                    break;
-                  // Terfi / Evrimle / Birleştir / Ye / Mühürle → /merge
-                  case 'merge':
-                  case 'eat':
-                  case 'seal':
-                    router.push('/merge');
-                    break;
-                  default:
-                    // Defensive fallback for any future action key.
-                    // eslint-disable-next-line no-console
-                    console.warn(`[base] unhandled quick action: ${key}`);
-                }
+                const route = QUICK_ACTION_ROUTES[key];
+                if (route) router.push(route);
               }}
             />
           </div>
@@ -365,7 +343,11 @@ export default function BaseHomePage() {
           </div>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </Screen>
     </div>
   );

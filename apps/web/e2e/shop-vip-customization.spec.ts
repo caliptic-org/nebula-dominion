@@ -17,7 +17,16 @@ import { test, expect, Page } from '@playwright/test';
 
 // ── Common mock data ─────────────────────────────────────────────────────────
 
-const VIP_STATUS_ACTIVE = {
+interface VipStatusFixture {
+  vip_level: number;
+  current_xp: number;
+  next_level_xp: number;
+  expiry_date: string | null;
+  is_active: boolean;
+  daily_claimed_at: string | null;
+}
+
+const VIP_STATUS_ACTIVE: VipStatusFixture = {
   vip_level: 1,
   current_xp: 500,
   next_level_xp: 1500,
@@ -26,7 +35,7 @@ const VIP_STATUS_ACTIVE = {
   daily_claimed_at: null,
 };
 
-const VIP_STATUS_INACTIVE = {
+const VIP_STATUS_INACTIVE: VipStatusFixture = {
   vip_level: 0,
   current_xp: 0,
   next_level_xp: 1500,

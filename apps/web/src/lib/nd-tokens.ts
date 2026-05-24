@@ -35,7 +35,18 @@ export type SigilKey = 'TRIDENT' | 'HIVE' | 'CORE' | 'FANG' | 'SIGIL';
 /* ── Race shape ───────────────────────────────────────────────────────── */
 
 export interface RaceUnit { n: string; t: number }
-export interface RaceBuild { n: string; t: string; locked: boolean }
+export interface RaceBuild {
+  n: string;
+  t: string;
+  locked: boolean;
+  /**
+   * URL-safe identifier used by deep links (e.g. `/base/build?focus=<slug>`)
+   * and by the SLUG_TO_BACKEND_TYPE map that joins race-flavoured slots to
+   * the generic backend BuildingType enum. Optional because legacy callers
+   * may construct mock RaceBuild objects without it.
+   */
+  slug?: string;
+}
 export interface RaceCommander { n: string; t: string; lv: number; tier: string; skill: string }
 
 export interface RaceTheme {
@@ -82,6 +93,10 @@ export const ND = {
   text:         'oklch(0.96 0.01 240)',
   textDim:      'oklch(0.72 0.02 240)',
   textMute:     'oklch(0.52 0.02 240)',
+  /** Inverted text colour for use on a race-primary fill (buttons, level chips). */
+  textInverted: '#0A0E1A',
+  /** Soft white fade end-stop for connector / progress gradients. */
+  lineFade:     'rgba(255, 255, 255, 0.2)',
   danger:       'oklch(0.65 0.22 25)',
   ok:           'oklch(0.72 0.16 145)',
   warn:         'oklch(0.80 0.15 80)',
@@ -90,6 +105,13 @@ export const ND = {
   mono:         'var(--font-nd-mono), "JetBrains Mono", ui-monospace, monospace',
   /** Cool violet accent used in non-race-specific nebula gradients. */
   nebulaAccent: 'oklch(0.55 0.18 280)',
+  /**
+   * Translucent scrim layer over content, anchored to the deep base bg
+   * (`#06080F`). Use for sticky headers, action bars, slot empties and other
+   * surfaces that need to dim what is behind without introducing a new
+   * arbitrary alpha. Common alphas: 0.55, 0.6, 0.65, 0.92, 0.94, 0.96.
+   */
+  scrim:        (alpha: number) => `rgba(6, 8, 15, ${alpha})`,
   radii: { sm: 3, md: 6, lg: 12, pill: 999 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 10, lg: 16, xl: 24 },
 } as const;
@@ -126,12 +148,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
       { n: 'Captain',         t: 5 },
     ],
     buildings: [
-      { n: 'Komuta Üssü',     t: 'Ana yapı',             locked: false },
-      { n: 'Reaktör Modülü',  t: 'Enerji üretir',        locked: false },
-      { n: 'Kışla',           t: 'Birim eğitimi',        locked: false },
-      { n: 'Bilim Akademisi', t: 'Araştırma',            locked: false },
-      { n: 'Subspace Anteni', t: 'Galaksi haberleşmesi', locked: true  },
-      { n: 'Genetik Lab',     t: 'Tier-4 birimleri',     locked: true  },
+      { slug: 'komuta_ussu',     n: 'Komuta Üssü',     t: 'Ana yapı',             locked: false },
+      { slug: 'reaktor_modulu',  n: 'Reaktör Modülü',  t: 'Enerji üretir',        locked: false },
+      { slug: 'kisla',           n: 'Kışla',           t: 'Birim eğitimi',        locked: false },
+      { slug: 'bilim_akademisi', n: 'Bilim Akademisi', t: 'Araştırma',            locked: false },
+      { slug: 'subspace_anteni', n: 'Subspace Anteni', t: 'Galaksi haberleşmesi', locked: true  },
+      { slug: 'genetik_lab',     n: 'Genetik Lab',     t: 'Tier-4 birimleri',     locked: true  },
     ],
     commanders: [
       { n: 'Kmt. Aleksander Voss',  t: 'Genetik Savaşçı', lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm filo +12% hasar' },
@@ -172,12 +194,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
       { n: 'Beyin Kurt',     t: 5 },
     ],
     buildings: [
-      { n: 'Kovan Çekirdeği',  t: 'Ana yapı',         locked: false },
-      { n: 'Biyokütle Havuzu', t: 'Kaynak depo',      locked: false },
-      { n: 'Mutasyon Çukuru',  t: 'Birim üretimi',    locked: false },
-      { n: 'Genom Tümseği',    t: 'Mutasyon hızı',    locked: false },
-      { n: 'Yutucu Tümsek',    t: 'Kadim güç emme',   locked: true  },
-      { n: 'Subspace Damarı',  t: 'Boyut seyahati',   locked: true  },
+      { slug: 'kovan_cekirdegi', n: 'Kovan Çekirdeği',  t: 'Ana yapı',       locked: false },
+      { slug: 'biyokutle_havuzu',n: 'Biyokütle Havuzu', t: 'Kaynak depo',    locked: false },
+      { slug: 'mutasyon_cukuru', n: 'Mutasyon Çukuru',  t: 'Birim üretimi',  locked: false },
+      { slug: 'genom_tumsegi',   n: 'Genom Tümseği',    t: 'Mutasyon hızı',  locked: false },
+      { slug: 'yutucu_tumsek',   n: 'Yutucu Tümsek',    t: 'Kadim güç emme', locked: true  },
+      { slug: 'subspace_damari', n: 'Subspace Damarı',  t: 'Boyut seyahati', locked: true  },
     ],
     commanders: [
       { n: 'Ana Kraliçe Vex’thara', t: 'Kovan Bilinci',  lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı' },
@@ -218,12 +240,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
       { n: 'Demiurge Birimi', t: 5 },
     ],
     buildings: [
-      { n: 'Sonsuzluk Çekirdeği', t: 'Ana yapı',        locked: false },
-      { n: 'Veri Kaynağı',        t: 'Hesap üretir',    locked: false },
-      { n: 'Montaj Hattı',        t: 'Birim üretimi',   locked: false },
-      { n: 'Mantık Matrisi',      t: 'Araştırma',       locked: false },
-      { n: 'Cihaz Hazinesi',      t: 'Kadim teknoloji', locked: true  },
-      { n: 'Subspace Çözücü',     t: 'Boyutlar arası',  locked: true  },
+      { slug: 'sonsuzluk_cekirdegi', n: 'Sonsuzluk Çekirdeği', t: 'Ana yapı',        locked: false },
+      { slug: 'veri_kaynagi',        n: 'Veri Kaynağı',        t: 'Hesap üretir',    locked: false },
+      { slug: 'montaj_hatti',        n: 'Montaj Hattı',        t: 'Birim üretimi',   locked: false },
+      { slug: 'mantik_matrisi',      n: 'Mantık Matrisi',      t: 'Araştırma',       locked: false },
+      { slug: 'cihaz_hazinesi',      n: 'Cihaz Hazinesi',      t: 'Kadim teknoloji', locked: true  },
+      { slug: 'subspace_cozucu',     n: 'Subspace Çözücü',     t: 'Boyutlar arası',  locked: true  },
     ],
     commanders: [
       { n: 'Demiurge Prime',         t: 'Merkez YZ',       lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%' },
@@ -264,12 +286,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
       { n: 'Beast God Yavru', t: 5 },
     ],
     buildings: [
-      { n: 'Alfa Tahtı',       t: 'Ana yapı',        locked: false },
-      { n: 'Av Kampı',         t: 'Et üretimi',      locked: false },
-      { n: 'Vahşi Çukur',      t: 'Birim eğitimi',   locked: false },
-      { n: 'Atalar Sunağı',    t: 'Kan Özü üretimi', locked: false },
-      { n: 'Atalar Mağarası',  t: 'Kadim güçler',    locked: true  },
-      { n: 'Boyut Yarığı',     t: 'Subspace av',     locked: true  },
+      { slug: 'alfa_tahti',      n: 'Alfa Tahtı',       t: 'Ana yapı',        locked: false },
+      { slug: 'av_kampi',        n: 'Av Kampı',         t: 'Et üretimi',      locked: false },
+      { slug: 'vahsi_cukur',     n: 'Vahşi Çukur',      t: 'Birim eğitimi',   locked: false },
+      { slug: 'atalar_sunagi',   n: 'Atalar Sunağı',    t: 'Kan Özü üretimi', locked: false },
+      { slug: 'atalar_magarasi', n: 'Atalar Mağarası',  t: 'Kadim güçler',    locked: true  },
+      { slug: 'boyut_yarigi',    n: 'Boyut Yarığı',     t: 'Subspace av',     locked: true  },
     ],
     commanders: [
       { n: 'Alpha Khorvash',          t: 'Sürü Lideri', lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Yakın dövüş +18%' },
@@ -310,12 +332,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
       { n: 'Demon Lord',     t: 5 },
     ],
     buildings: [
-      { n: 'Karanlık Taht',  t: 'Ana yapı',         locked: false },
-      { n: 'Ruh Toplayıcı',  t: 'Ruh Özü üretir',   locked: false },
-      { n: 'Lanet Tapınağı', t: 'Birim çağırma',    locked: false },
-      { n: 'Pakt Sembolü',   t: 'Pakt yetenekleri', locked: false },
-      { n: 'Yasak Grimoire', t: 'Kadim yetenekler', locked: true  },
-      { n: 'Yarık Kapısı',   t: 'Boyut seyahati',   locked: true  },
+      { slug: 'karanlik_taht',  n: 'Karanlık Taht',  t: 'Ana yapı',         locked: false },
+      { slug: 'ruh_toplayici',  n: 'Ruh Toplayıcı',  t: 'Ruh Özü üretir',   locked: false },
+      { slug: 'lanet_tapinagi', n: 'Lanet Tapınağı', t: 'Birim çağırma',    locked: false },
+      { slug: 'pakt_sembolu',   n: 'Pakt Sembolü',   t: 'Pakt yetenekleri', locked: false },
+      { slug: 'yasak_grimoire', n: 'Yasak Grimoire', t: 'Kadim yetenekler', locked: true  },
+      { slug: 'yarik_kapisi',   n: 'Yarık Kapısı',   t: 'Boyut seyahati',   locked: true  },
     ],
     commanders: [
       { n: 'Karanlık Lord Malphas',   t: 'Sürgün Lord',   lv: 24, tier: 'BAŞ KOMUTAN', skill: 'Pakt maliyeti -15%' },

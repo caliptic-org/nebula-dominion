@@ -50,6 +50,26 @@ function toView(p: UserProfile): UserProfileView {
   return { ...p, raceKey: p.race ? BE_TO_FE[p.race] : null };
 }
 
+/**
+ * Mirror the backend-confirmed race into localStorage so subsequent renders
+ * — including the next page's theme provider — pick up the right race
+ * without needing another network round-trip. Used by the post-login flow
+ * when the user might have committed to a race on a different device.
+ */
+const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
+
+export function syncRaceCommitmentFromBackend(race: NDRaceKey): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      RACE_COMMITMENT_KEY,
+      JSON.stringify({ race, committedAt: Date.now() }),
+    );
+  } catch {
+    /* localStorage may throw in private mode — best-effort. */
+  }
+}
+
 export const raceApi = {
   async getProfile(): Promise<UserProfileView> {
     const p = await api.get<UserProfile>('/users/profile');

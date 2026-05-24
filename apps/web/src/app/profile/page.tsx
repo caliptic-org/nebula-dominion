@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -15,10 +16,10 @@ import {
   Caption,
   Chip,
   Code,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useGameResources } from '@/hooks/useGameResources';
@@ -93,8 +94,17 @@ function fmtDuration(sec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function ProfilePage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('stats');
   // Backend profile. When signed-in: handle/level/xp/alliance come from the API;
   // race-derived placeholders fill in cosmetic fields (title/avatar/capitalBase)
@@ -366,7 +376,11 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

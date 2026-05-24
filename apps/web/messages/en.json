@@ -1,0 +1,137 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "continue": "Continue",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "yes": "Yes",
+    "no": "No",
+    "skip": "Skip"
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "subtitle": "Continue your conquest",
+      "username": "Username or email",
+      "password": "Password",
+      "submit": "Log In",
+      "forgotPassword": "Forgot your password?",
+      "noAccount": "No account yet?",
+      "registerLink": "Sign up",
+      "errorInvalid": "Invalid credentials. Try again.",
+      "errorGeneric": "Login failed. Try again."
+    },
+    "register": {
+      "title": "Sign Up",
+      "subtitle": "Join the Nebula Dominion",
+      "username": "Username",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "submit": "Create Account",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Log in",
+      "errorMismatch": "Passwords don't match",
+      "errorTaken": "This username is already taken",
+      "errorGeneric": "Registration failed. Try again."
+    },
+    "logout": "Log Out"
+  },
+  "races": {
+    "selectTitle": "Choose Your Race",
+    "selectSubtitle": "This decision shapes your destiny",
+    "confirmTitle": "Awakening",
+    "confirmContinue": "Continue",
+    "lockedHint": "Once locked, your race cannot be changed"
+  },
+  "hud": {
+    "level": "Level",
+    "age": "Age",
+    "xp": "XP",
+    "resources": {
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "crystal": "Crystal"
+    },
+    "tierMax": "MAX",
+    "tierProgress": "{current} / {max} → AGE {next}"
+  },
+  "nav": {
+    "base": "Base",
+    "galaxy": "Galaxy",
+    "commanders": "Officers",
+    "story": "Story",
+    "more": "More",
+    "build": "Build",
+    "production": "Produce",
+    "inventory": "Inventory",
+    "battle": "Battle",
+    "missions": "Missions",
+    "alliance": "Alliance",
+    "shop": "Shop",
+    "settings": "Settings",
+    "profile": "Profile"
+  },
+  "base": {
+    "title": "Base",
+    "buildingActive": "ACTIVE",
+    "buildingLocked": "LOCKED",
+    "detailButton": "Details",
+    "productionDone": "production complete",
+    "statusOk": "All systems nominal"
+  },
+  "build": {
+    "title": "Build Catalog",
+    "morphHint": "Long press to swap slot",
+    "lockedCount": "{count} locked",
+    "filterButton": "Filter",
+    "compareButton": "Compare",
+    "costLabel": "Cost",
+    "timeLabel": "Time",
+    "queueLabel": "Queue"
+  },
+  "tutorial": {
+    "skip": "Skip Tutorial",
+    "next": "Next",
+    "finish": "Finish",
+    "step": "Step {current} of {total}"
+  },
+  "battle": {
+    "prepare": "Prepare for Battle",
+    "engage": "Engage",
+    "retreat": "Retreat",
+    "victory": "Victory",
+    "defeat": "Defeat",
+    "ourPower": "Our Power",
+    "enemyPower": "Enemy Power",
+    "winProbability": "Victory Probability"
+  },
+  "story": {
+    "newChapter": "✦ NEW AGE {age} STORY CHAPTER UNLOCKED · TAP ›",
+    "title": "Story Gallery"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageHint": "Auto-detected from your device. To change it, switch your browser or system language.",
+    "audio": "Audio",
+    "graphics": "Graphics",
+    "notifications": "Notifications",
+    "account": "Account",
+    "about": "About"
+  },
+  "errors": {
+    "networkOffline": "You appear to be offline",
+    "sessionExpired": "Your session expired. Please log in again.",
+    "notFound": "Unknown sector",
+    "notFoundDescription": "The coordinates you sought are in an unmapped region of the galaxy."
+  }
+}

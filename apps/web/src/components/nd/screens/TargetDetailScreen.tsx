@@ -162,7 +162,7 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
           ‹
         </button>
         <div>
-          <Eyebrow>Screen 12 · Hedef Detayı</Eyebrow>
+          <Eyebrow>{race.allianceTag} İSTİHBARAT · HEDEF DOSYASI</Eyebrow>
           <H3 style={{ color: enemy.primary, textShadow: `0 0 12px ${enemy.glow}55` }}>
             {node.label}
           </H3>

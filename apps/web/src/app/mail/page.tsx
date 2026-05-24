@@ -13,22 +13,9 @@ export default function MailPage() {
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--color-bg)',
       }}
     >
-      <main
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          maxWidth: 900,
-          width: '100%',
-          margin: '0 auto',
-          minHeight: 0,
-        }}
-      >
-        <MailScreen />
-      </main>
+      <MailScreen />
     </div>
   )
 }

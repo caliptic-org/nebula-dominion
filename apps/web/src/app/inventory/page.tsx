@@ -16,8 +16,10 @@ import {
   NDButton,
   NebulaBg,
   Panel,
+  RaceTierBadge,
   ResIcon,
   Sigil,
+  raceShape,
   toast,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
@@ -26,6 +28,7 @@ import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useGameUnits';
 import { useGameResources } from '@/hooks/useGameResources';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
+import { useHudState } from '@/hooks/useHudState';
 
 const ROSTER_NAMES: Record<string, string> = {
   insan:   'Birim Envanteri',
@@ -70,8 +73,18 @@ const STATE_LABEL: Record<UnitState, string> = {
   fleet:   'FİLODA',
 };
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function RosterPage() {
   const race = useNDRace();
+  const router = useRouter();
+  const hud = useHudState();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -157,37 +170,64 @@ export default function RosterPage() {
           </Chip>
         </div>
 
-        <HUD race={race} level={9} levelName="Metropol" />
+        <HUD
+          race={race}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
+        />
 
-        {/* Tier filter strip */}
+        {/* Tier filter strip — race-shaped buttons with RaceTierBadge */}
         <div style={{ padding: '12px 14px 0' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {(['all', 1, 2, 3, 4, 5] as const).map((t) => {
               const on = t === tierFilter;
-              const label = t === 'all' ? 'TÜM' : `T${t}`;
+              const tierCount = typeof t === 'number'
+                ? units.filter((u) => u.tier === t).length
+                : units.length;
+              const locked = typeof t === 'number' && tierCount === 0;
               return (
                 <button
                   key={String(t)}
                   type="button"
                   onClick={() => setTierFilter(t)}
                   aria-pressed={on}
+                  aria-label={
+                    t === 'all'
+                      ? `Tüm tier'ları göster (${tierCount} birim)`
+                      : `Tier ${t}${locked ? ' (kilitli)' : ''} · ${tierCount} birim`
+                  }
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
                     flex: 1,
-                    padding: '7px 0',
-                    textAlign: 'center',
+                    minHeight: 32,
+                    padding: '5px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
                     fontFamily: ND.display,
                     fontSize: 10,
                     letterSpacing: '0.10em',
-                    color: on ? '#0A0E1A' : ND.textDim,
+                    color: on ? '#0A0E1A' : locked ? ND.textMute : ND.textDim,
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
-                    borderRadius: 3,
                     fontWeight: on ? 700 : 500,
+                    boxShadow: on ? `0 0 10px ${race.glow}44` : 'none',
+                    ...raceShape(race.key, 'tab'),
                   }}
                 >
-                  {label}
+                  {t === 'all' ? (
+                    <span>TÜM</span>
+                  ) : (
+                    <>
+                      <RaceTierBadge race={race} tier={t} size={16} locked={locked} active={on} />
+                      <span>T{t}</span>
+                    </>
+                  )}
                 </button>
               );
             })}
@@ -310,7 +350,11 @@ export default function RosterPage() {
           </div>
         )}
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

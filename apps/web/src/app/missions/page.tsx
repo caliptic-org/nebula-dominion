@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ND,
   Sigil,
@@ -16,14 +17,13 @@ import {
   Chip,
   Code,
   NDButton,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 import { useMissions, type Quest } from '@/hooks/useMissions';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { toast } from '@/components/handoff/Toaster';
-import { useRouter } from 'next/navigation';
 
 type Tab = 'story' | 'daily' | 'weekly' | 'achievement';
 type State = 'active' | 'completed' | 'locked';
@@ -133,8 +133,17 @@ function questToMission(q: Quest): Mission {
   };
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export default function MissionsPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('story');
   const resetCountdown = useDailyCountdown();
 
@@ -235,7 +244,11 @@ export default function MissionsPage() {
         )}
       </div>
 
-      <BottomNav />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

@@ -239,7 +239,7 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
           ‹
         </button>
         <div>
-          <Eyebrow>Screen 13 · Savaş Hazırlık</Eyebrow>
+          <Eyebrow>{race.allianceTag} · SAVAŞ HAZIRLIĞI</Eyebrow>
           <H3 style={{ color: race.primary }}>FORMASYON KUR</H3>
         </div>
         <div style={{ flex: 1 }} />

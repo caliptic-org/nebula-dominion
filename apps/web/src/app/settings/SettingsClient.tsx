@@ -17,10 +17,10 @@ import {
   Chip,
   Code,
   NDButton,
+  BottomNav,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 import { clearTokens, hasSession } from '@/lib/session';
 import { useNDTweaks, type NDDensity, type NDOnOff } from '@/hooks/useNDTweaks';
 import { raceApi } from '@/lib/race-api';
@@ -83,8 +83,17 @@ function loadSettings(): SettingsState {
   }
 }
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 export function SettingsClient() {
   const race = useNDRace();
+  const router = useRouter();
   const { tweaks, setTweak, reset: resetTweaks } = useNDTweaks();
   const [hydrated, setHydrated] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
@@ -257,7 +266,11 @@ export function SettingsClient() {
         </Caption>
       </div>
 
-      <BottomNav />
+      <BottomNav
+        race={race}
+        active="more"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+      />
     </Screen>
   );
 }

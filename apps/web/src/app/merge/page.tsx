@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bar,
   BottomNav,
@@ -23,6 +24,7 @@ import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
 import { useMergePreview } from '@/hooks/useMergePreview';
 import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
+import { useHudState } from '@/hooks/useHudState';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 
@@ -61,6 +63,14 @@ const MERGE_HINT: Record<NDRaceKey, string> = {
 const SLOT_COUNT = 3;
 const COST_B = 200;
 
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base: '/base',
+  galaxy: '/map',
+  cmd: '/commanders',
+  story: '/story-gallery',
+  more: '/settings',
+};
+
 function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
   if (label === 'GÜVENLİ') return ND.ok;
   if (label === 'RİSKLİ') return ND.warn;
@@ -69,6 +79,8 @@ function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
 
 export default function MergePage() {
   const race = useNDRace();
+  const router = useRouter();
+  const hud = useHudState();
   const [selected, setSelected] = useState<number[]>([]);
   const [sourceTier, setSourceTier] = useState(3);
 
@@ -116,8 +128,8 @@ export default function MergePage() {
     setSelected([]);
     try {
       const ids = snapshot.map((idx) => pool[idx]?.id).filter(Boolean);
-      await gameServerApi.post('/units/merge', { unitIds: ids, targetTier: tier + 1 });
-      toast.success(`Birleştirme başarılı: ${ids.length} birim Tier ${tier + 1}'e yükseltildi`);
+      await gameServerApi.post('/units/merge', { unitIds: ids, targetTier: sourceTier + 1 });
+      toast.success(`Birleştirme başarılı: ${ids.length} birim Tier ${sourceTier + 1}'e yükseltildi`);
     } catch (err) {
       // Restore selection so the player can retry without re-picking.
       setSelected(snapshot);
@@ -172,7 +184,14 @@ export default function MergePage() {
           <Chip color={race.primary}>×3 → +1</Chip>
         </div>
 
-        <HUD race={race} level={9} levelName="Metropol" />
+        <HUD
+          race={race}
+          level={hud.level}
+          levelName={hud.levelName}
+          resA={hud.resA}
+          resB={hud.resB}
+          crystal={hud.crystal}
+        />
 
         {/* Hint */}
         <div style={{ padding: '12px 14px 0' }}>
@@ -401,7 +420,11 @@ export default function MergePage() {
           </NDButton>
         </div>
 
-        <BottomNav race={race} active="base" />
+        <BottomNav
+          race={race}
+          active="base"
+          onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
+        />
       </div>
     </div>
   );

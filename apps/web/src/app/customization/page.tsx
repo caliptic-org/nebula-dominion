@@ -4,6 +4,23 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
+  Caption,
+  Chip,
+  Code,
+  Eyebrow,
+  H3,
+  ND,
+  NDButton,
+  NebulaBg,
+  Panel,
+  RaceTabs,
+  ResIcon,
+  ResPill,
+  Sigil,
+  useNDRace,
+  type NDRace,
+} from '@/components/handoff';
+import {
   CosmeticItem,
   CosmeticCategory,
   RARITY_META,
@@ -15,19 +32,15 @@ import {
   purchaseCosmetic,
 } from '@/lib/cosmetics-api';
 
-// ─── Category metadata ────────────────────────────────────────────────────────
+/* ── Category metadata ────────────────────────────────────────────────── */
+
 const CATEGORIES: { id: CosmeticCategory; label: string; icon: string }[] = [
-  { id: 'skin',   label: 'Skinler',    icon: '⚔️' },
-  { id: 'frame',  label: 'Çerçeveler', icon: '🖼️' },
-  { id: 'title',  label: 'Unvanlar',   icon: '🎖️' },
-  { id: 'effect', label: 'Efektler',   icon: '✨' },
+  { id: 'skin',   label: 'Skinler',    icon: '⚔' },
+  { id: 'frame',  label: 'Çerçeveler', icon: '◇' },
+  { id: 'title',  label: 'Unvanlar',   icon: '✦' },
+  { id: 'effect', label: 'Efektler',   icon: '✺' },
 ];
 
-// Names of the no-op default items per category (matches DB seed in
-// database/migrations/007_cosmetics.sql). Used to suppress visual decorations
-// (frame ring, title badge, effect particles, category-tab dot) when the
-// equipped item is the category default. We can't compare by ID because the
-// backend uses UUIDs; if backend later exposes an `isDefault` flag, swap to it.
 const DEFAULT_ITEM_NAMES: Record<CosmeticCategory, string> = {
   skin:   'Standart Zırh',
   frame:  'Standart Çerçeve',
@@ -39,92 +52,83 @@ function isDefaultItem(item: CosmeticItem): boolean {
   return DEFAULT_ITEM_NAMES[item.category] === item.name;
 }
 
-// ─── Shared color tokens (match design system) ────────────────────────────────
-const TOKEN = {
-  bg:          'var(--color-bg)',
-  bgSurface:   'var(--color-bg-surface)',
-  bgElevated:  'var(--color-bg-elevated)',
-  textPrimary: 'var(--color-text-primary)',
-  textSecondary:'var(--color-text-secondary)',
-  textMuted:   'var(--color-text-muted)',
-  border:      'rgba(255,255,255,0.07)',
-  borderHover: 'rgba(255,255,255,0.14)',
-  brand:       'var(--color-brand)',
-  brandDim:    'var(--color-brand-dim,  rgba(74,158,255,0.12))',
-  brandGlow:   'var(--color-brand-glow, rgba(74,158,255,0.35))',
-  energy:      'var(--color-energy)',
-  energyDim:   'var(--color-energy-dim, rgba(255,200,50,0.12))',
-  success:     'var(--color-success)',
-  danger:      'var(--color-danger)',
-  dangerDim:   'rgba(255,74,110,0.12)',
-};
+/* ── Toasts ───────────────────────────────────────────────────────────── */
 
-// ─── Toast types ──────────────────────────────────────────────────────────────
 type ToastKind = 'success' | 'error';
 interface ToastState { id: number; kind: ToastKind; message: string }
 
-// ─── CosmeticCard component ───────────────────────────────────────────────────
+/* ── CosmeticCard ─────────────────────────────────────────────────────── */
+
 function CosmeticCard({
   item,
   selected,
   onSelect,
   pending,
+  race,
 }: {
   item: CosmeticItem;
   selected: boolean;
   onSelect: (item: CosmeticItem) => void;
   pending?: boolean;
+  race: NDRace;
 }) {
   const rarity = RARITY_META[item.rarity];
   const isLocked = !item.isOwned;
+  const accent = isLocked ? ND.textMute : rarity.color;
+  const ring = selected ? race.primary : `${accent}55`;
+  const glow = selected ? race.glow : rarity.glow;
 
   return (
     <button
+      type="button"
       onClick={() => onSelect(item)}
       aria-pressed={selected}
       aria-busy={pending || undefined}
       aria-label={`${item.name}${isLocked ? ' (kilitli)' : item.isEquipped ? ' (giyili)' : ''}`}
+      className="nd-cosmetic-card"
       style={{
+        all: 'unset',
         position: 'relative',
-        background: selected
-          ? `linear-gradient(135deg, ${item.rarityColor}18 0%, ${TOKEN.bgSurface} 100%)`
-          : TOKEN.bgSurface,
-        border: `1px solid ${selected ? item.rarityColor : TOKEN.border}`,
-        borderRadius: 12,
-        padding: 0,
+        display: 'block',
         cursor: 'pointer',
-        overflow: 'hidden',
-        transition: 'all 0.3s cubic-bezier(0.32,0.72,0,1)',
+        background: selected
+          ? `linear-gradient(135deg, ${race.primary}1a 0%, ${ND.surface} 70%)`
+          : ND.surface,
+        border: `1px solid ${ring}`,
         boxShadow: selected
-          ? `0 0 18px ${item.rarityGlow}, 0 4px 20px rgba(0,0,0,0.4)`
-          : '0 2px 12px rgba(0,0,0,0.3)',
+          ? `0 0 0 1px ${race.primary}66, 0 0 22px -4px ${glow}`
+          : `0 2px 12px rgba(0,0,0,0.25)`,
+        clipPath:
+          'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
+        overflow: 'hidden',
         filter: isLocked ? 'grayscale(0.65)' : 'none',
-        opacity: isLocked ? 0.72 : 1,
-        textAlign: 'left',
+        opacity: isLocked ? 0.78 : 1,
+        transition: 'all 250ms cubic-bezier(0.32,0.72,0,1)',
       }}
     >
       {/* Rarity top accent bar */}
       <div
+        aria-hidden
         style={{
           position: 'absolute',
           top: 0, left: 0, right: 0,
           height: 2,
-          background: isLocked ? 'rgba(255,255,255,0.08)' : rarity.color,
-          opacity: isLocked ? 1 : 0.9,
+          background: isLocked ? `${ND.border}` : rarity.color,
+          opacity: 0.9,
         }}
       />
 
-      {/* Icon / preview area */}
+      {/* Preview area */}
       <div
         style={{
           position: 'relative',
-          height: 80,
+          height: 84,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           background: isLocked
-            ? 'rgba(0,0,0,0.3)'
-            : `radial-gradient(circle at 50% 60%, ${item.rarityGlow} 0%, transparent 70%)`,
+            ? ND.bgDeep
+            : `radial-gradient(ellipse 70% 65% at 50% 55%, ${rarity.glow} 0%, transparent 70%), ${ND.bgDeep}`,
           fontSize: 32,
         }}
       >
@@ -137,93 +141,93 @@ function CosmeticCard({
             sizes="150px"
           />
         ) : (
-          <span role="img" aria-hidden>{item.icon}</span>
+          <span aria-hidden>{item.icon}</span>
         )}
 
-        {/* Equipped badge */}
+        {/* Equipped marker */}
         {item.isEquipped && !isLocked && (
           <span
             style={{
               position: 'absolute',
               top: 6, right: 6,
-              width: 20, height: 20,
-              borderRadius: '50%',
-              background: TOKEN.success,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, color: 'var(--color-bg-base)', fontWeight: 800,
-              boxShadow: `0 0 8px ${TOKEN.success}`,
+              padding: '2px 6px',
+              fontFamily: ND.mono,
+              fontSize: 8,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              background: `${ND.ok}22`,
+              color: ND.ok,
+              border: `1px solid ${ND.ok}55`,
+              backdropFilter: 'blur(4px)',
             }}
             aria-label="Giyili"
           >
-            ✓
+            ◉ GİYİLİ
           </span>
         )}
 
-        {/* Pending overlay */}
+        {/* Pending spinner */}
         {pending && (
           <div
+            aria-hidden
             style={{
               position: 'absolute', inset: 0,
-              background: 'rgba(8,10,16,0.55)',
+              background: 'rgba(6,8,15,0.55)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            aria-hidden
           >
             <span
               style={{
                 width: 16, height: 16,
-                border: '2px solid rgba(255,255,255,0.25)',
-                borderTopColor: 'var(--color-on-race)',
+                border: `2px solid ${race.primary}33`,
+                borderTopColor: race.primary,
                 borderRadius: '50%',
-                display: 'inline-block',
                 animation: 'spin 0.7s linear infinite',
               }}
             />
           </div>
         )}
 
-        {/* Selected glow ring */}
+        {/* Selected inner ring */}
         {selected && (
           <div
+            aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
-              borderRadius: 11,
-              boxShadow: `inset 0 0 0 2px ${item.rarityColor}`,
+              boxShadow: `inset 0 0 0 2px ${race.primary}`,
               pointerEvents: 'none',
             }}
-            aria-hidden
           />
         )}
 
         {/* Lock overlay */}
         {isLocked && !pending && (
           <div
+            aria-hidden
             style={{
               position: 'absolute', inset: 0,
-              background: 'rgba(0,0,0,0.55)',
-              display: 'flex', flexDirection: 'column',
+              background: 'linear-gradient(180deg, rgba(3,5,11,0.30) 0%, rgba(3,5,11,0.82) 100%)',
+              display: 'flex',
               alignItems: 'center', justifyContent: 'center',
-              gap: 4,
             }}
-            aria-hidden
           >
-            <span style={{ fontSize: 20 }}>🔒</span>
+            <LockIcon color={ND.warn} size={22} />
           </div>
         )}
       </div>
 
       {/* Info */}
       <div style={{ padding: '8px 10px 10px' }}>
-        <p
+        <div
           style={{
-            fontFamily: 'var(--font-display, Orbitron, system-ui)',
+            fontFamily: ND.display,
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: '0.04em',
-            color: isLocked ? TOKEN.textMuted : TOKEN.textPrimary,
+            letterSpacing: '0.05em',
+            color: isLocked ? ND.textMute : ND.text,
             marginBottom: 4,
             lineHeight: 1.3,
             whiteSpace: 'nowrap',
@@ -232,40 +236,43 @@ function CosmeticCard({
           }}
         >
           {item.name}
-        </p>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Rarity label */}
           <span
             style={{
+              fontFamily: ND.mono,
               fontSize: 9,
-              fontFamily: 'var(--font-display, Orbitron, system-ui)',
               fontWeight: 700,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase' as const,
-              color: isLocked ? TOKEN.textMuted : rarity.color,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: isLocked ? ND.textMute : rarity.color,
             }}
           >
             {rarity.label}
           </span>
 
-          {/* Price or owned badge */}
           {isLocked && item.price ? (
             <span
               style={{
-                display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: 10, fontWeight: 700,
-                color: TOKEN.energy,
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontFamily: ND.mono,
+                fontSize: 10,
+                fontWeight: 700,
+                color: ND.warn,
               }}
             >
-              💎 {item.price}
+              <ResIcon kind="crystal" size={10} color={ND.warn} />
+              {item.price}
             </span>
           ) : !isLocked && !item.isEquipped ? (
             <span
               style={{
-                fontSize: 9, color: TOKEN.textMuted,
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                fontFamily: ND.mono,
+                fontSize: 9,
+                letterSpacing: '0.14em',
+                color: ND.textMute,
+                textTransform: 'uppercase',
               }}
             >
               SAHİP
@@ -277,84 +284,58 @@ function CosmeticCard({
   );
 }
 
-// ─── Skeleton card ────────────────────────────────────────────────────────────
+/* ── Skeletons ────────────────────────────────────────────────────────── */
+
 function SkeletonCard() {
   return (
     <div
-      style={{
-        background: TOKEN.bgSurface,
-        border: `1px solid ${TOKEN.border}`,
-        borderRadius: 12,
-        overflow: 'hidden',
-        height: 132,
-      }}
       aria-hidden
+      style={{
+        background: ND.surface,
+        border: `1px solid ${ND.border}`,
+        clipPath:
+          'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
+        overflow: 'hidden',
+        height: 134,
+      }}
     >
       <div
         style={{
-          height: 80,
-          background: 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+          height: 84,
+          background:
+            'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(120,160,220,0.10), rgba(255,255,255,0.02))',
           backgroundSize: '200% 100%',
           animation: 'shimmer 1.4s linear infinite',
         }}
       />
       <div style={{ padding: '8px 10px 10px' }}>
-        <div
-          style={{
-            height: 10,
-            width: '70%',
-            borderRadius: 4,
-            background: 'rgba(255,255,255,0.08)',
-            marginBottom: 6,
-          }}
-        />
-        <div
-          style={{
-            height: 8,
-            width: '40%',
-            borderRadius: 4,
-            background: 'rgba(255,255,255,0.05)',
-          }}
-        />
+        <div style={{ height: 10, width: '72%', background: 'rgba(255,255,255,0.08)', marginBottom: 6 }} />
+        <div style={{ height: 8, width: '40%', background: 'rgba(255,255,255,0.05)' }} />
       </div>
     </div>
   );
 }
 
-// ─── Skeleton preview ─────────────────────────────────────────────────────────
 function SkeletonPreview() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} aria-hidden>
-      <div
-        style={{
-          paddingBottom: 12,
-          borderBottom: `1px solid ${TOKEN.border}`,
-          height: 24,
-        }}
-      />
+    <div aria-hidden style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ height: 16, background: ND.surface, border: `1px solid ${ND.border}` }} />
       <div
         style={{
           aspectRatio: '3/4',
-          borderRadius: 16,
-          border: `1px solid ${TOKEN.border}`,
-          background: 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(120,160,220,0.10), rgba(255,255,255,0.02))',
           backgroundSize: '200% 100%',
           animation: 'shimmer 1.4s linear infinite',
+          border: `1px solid ${ND.border}`,
         }}
       />
-      <div
-        style={{
-          height: 84,
-          borderRadius: 12,
-          background: TOKEN.bgElevated,
-          border: `1px solid ${TOKEN.border}`,
-        }}
-      />
+      <div style={{ height: 80, background: ND.surface, border: `1px solid ${ND.border}` }} />
     </div>
   );
 }
 
-// ─── PreviewPanel component ───────────────────────────────────────────────────
+/* ── PreviewPanel ─────────────────────────────────────────────────────── */
+
 function PreviewPanel({
   item,
   equippedItems,
@@ -364,6 +345,7 @@ function PreviewPanel({
   purchasing,
   justApplied,
   balance,
+  race,
 }: {
   item: CosmeticItem | null;
   equippedItems: Record<CosmeticCategory, CosmeticItem | undefined>;
@@ -373,6 +355,7 @@ function PreviewPanel({
   purchasing: boolean;
   justApplied: boolean;
   balance: number | null;
+  race: NDRace;
 }) {
   const equippedSkin   = equippedItems['skin'];
   const equippedFrame  = equippedItems['frame'];
@@ -385,156 +368,131 @@ function PreviewPanel({
 
   return (
     <aside
-      style={{
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}
       aria-label="Önizleme paneli"
+      style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}
     >
-      {/* Panel header */}
+      {/* Header strip */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingBottom: 12,
-          borderBottom: `1px solid ${TOKEN.border}`,
+          paddingBottom: 10,
+          borderBottom: `1px solid ${ND.border}`,
         }}
       >
-        <span
-          style={{
-            fontFamily: 'var(--font-display, Orbitron, system-ui)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase' as const,
-            color: TOKEN.textMuted,
-          }}
-        >
-          Önizleme
-        </span>
+        <Eyebrow color={race.primary}>ÖNİZLEME</Eyebrow>
         {item && (
-          <span
-            style={{
-              fontSize: 9,
-              fontFamily: 'var(--font-display, Orbitron, system-ui)',
-              fontWeight: 700,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase' as const,
-              color: RARITY_META[item.rarity].color,
-              background: `${RARITY_META[item.rarity].glow}`,
-              padding: '2px 8px',
-              borderRadius: 20,
-              border: `1px solid ${RARITY_META[item.rarity].border}`,
-            }}
-          >
+          <Chip color={RARITY_META[item.rarity].color}>
             {RARITY_META[item.rarity].label}
-          </span>
+          </Chip>
         )}
       </div>
 
-      {/* Character preview area */}
-      <div
+      {/* Portrait panel */}
+      <Panel
+        race={race}
+        glow
         style={{
           position: 'relative',
-          borderRadius: 16,
-          overflow: 'hidden',
-          background: `radial-gradient(ellipse 80% 70% at 50% 30%,
-            ${TOKEN.brandDim} 0%,
-            ${TOKEN.bgSurface} 65%)`,
-          border: `1px solid ${TOKEN.border}`,
           aspectRatio: '3/4',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          overflow: 'hidden',
+          padding: 0,
+          background: `radial-gradient(ellipse 78% 65% at 50% 35%, ${race.glow}33 0%, ${ND.bgDeep} 70%)`,
         }}
       >
-        {/* Halftone texture */}
+        {/* Halftone */}
         <div
+          aria-hidden
           style={{
             position: 'absolute', inset: 0,
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundImage:
+              'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
             backgroundSize: '6px 6px',
             pointerEvents: 'none',
           }}
-          aria-hidden
         />
 
         {/* Speed line corners */}
         <svg
+          aria-hidden
           style={{ position: 'absolute', top: 0, left: 0, width: 40, height: 40, pointerEvents: 'none' }}
-          viewBox="0 0 40 40" fill="none" aria-hidden
+          viewBox="0 0 40 40" fill="none"
         >
-          <path d="M0 0 L40 0 L0 40 Z" fill="rgba(255,255,255,0.02)" />
-          <path d="M0 0 L20 0" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
-          <path d="M0 0 L0 20" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+          <path d="M0 0 L40 0 L0 40 Z" fill={`${race.primary}10`} />
+          <path d="M0 0 L20 0" stroke={`${race.primary}55`} strokeWidth="2" />
+          <path d="M0 0 L0 20" stroke={`${race.primary}55`} strokeWidth="2" />
         </svg>
         <svg
+          aria-hidden
           style={{ position: 'absolute', top: 0, right: 0, width: 40, height: 40, pointerEvents: 'none', transform: 'scaleX(-1)' }}
-          viewBox="0 0 40 40" fill="none" aria-hidden
+          viewBox="0 0 40 40" fill="none"
         >
-          <path d="M0 0 L40 0 L0 40 Z" fill="rgba(255,255,255,0.02)" />
-          <path d="M0 0 L20 0" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
-          <path d="M0 0 L0 20" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+          <path d="M0 0 L40 0 L0 40 Z" fill={`${race.primary}10`} />
+          <path d="M0 0 L20 0" stroke={`${race.primary}55`} strokeWidth="2" />
+          <path d="M0 0 L0 20" stroke={`${race.primary}55`} strokeWidth="2" />
         </svg>
 
         {/* Commander portrait */}
         <div
           style={{
-            position: 'relative',
-            width: '75%',
-            aspectRatio: '1/1',
-            borderRadius: '50%',
-            overflow: 'hidden',
-            border: item
-              ? `2px solid ${item.rarityColor}`
-              : `2px solid ${TOKEN.border}`,
-            boxShadow: item
-              ? `0 0 32px ${item.rarityGlow}, 0 0 64px ${item.rarityGlow}80`
-              : `0 0 20px rgba(0,0,0,0.5)`,
-            transition: 'all 0.5s cubic-bezier(0.32,0.72,0,1)',
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          {equippedSkin?.previewImage ? (
-            <Image
-              src={equippedSkin.previewImage}
-              alt="Komutan görünümü"
-              fill
-              style={{ objectFit: 'cover', objectPosition: 'top' }}
-              sizes="200px"
-            />
-          ) : (
-            <div
-              style={{
-                width: '100%', height: '100%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 48,
-                background: TOKEN.bgElevated,
-              }}
-            >
-              {equippedSkin?.icon ?? '⚔️'}
-            </div>
-          )}
+          <div
+            style={{
+              position: 'relative',
+              width: '70%',
+              aspectRatio: '1/1',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              border: item
+                ? `2px solid ${item.rarityColor}`
+                : `2px solid ${race.primary}66`,
+              boxShadow: item
+                ? `0 0 28px ${item.rarityGlow}, 0 0 56px ${item.rarityGlow}66`
+                : `0 0 22px ${race.glow}55`,
+              transition: 'all 500ms cubic-bezier(0.32,0.72,0,1)',
+            }}
+          >
+            {equippedSkin?.previewImage ? (
+              <Image
+                src={equippedSkin.previewImage}
+                alt="Komutan görünümü"
+                fill
+                style={{ objectFit: 'cover', objectPosition: 'top' }}
+                sizes="200px"
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%', height: '100%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: ND.surfaceSolid,
+                }}
+              >
+                <Sigil race={race} size={88} glow />
+              </div>
+            )}
 
-          {/* Frame overlay ring */}
-          {equippedFrame && !isDefaultItem(equippedFrame) && (
-            <div
-              style={{
-                position: 'absolute', inset: -4,
-                borderRadius: '50%',
-                border: `4px solid ${equippedFrame.rarityColor}`,
-                boxShadow: `0 0 16px ${equippedFrame.rarityGlow}, inset 0 0 16px ${equippedFrame.rarityGlow}`,
-                pointerEvents: 'none',
-                animation: 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
-              }}
-              aria-hidden
-            />
-          )}
+            {equippedFrame && !isDefaultItem(equippedFrame) && (
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute', inset: -4,
+                  borderRadius: '50%',
+                  border: `4px solid ${equippedFrame.rarityColor}`,
+                  boxShadow: `0 0 16px ${equippedFrame.rarityGlow}, inset 0 0 16px ${equippedFrame.rarityGlow}`,
+                  pointerEvents: 'none',
+                  animation: 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+                }}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Effect particles (decorative) */}
+        {/* Effect particles */}
         {equippedEffect && !isDefaultItem(equippedEffect) && (
           <>
             {['10%,20%', '85%,15%', '5%,75%', '90%,70%', '50%,88%'].map((pos, i) => {
@@ -542,6 +500,7 @@ function PreviewPanel({
               return (
                 <div
                   key={i}
+                  aria-hidden
                   style={{
                     position: 'absolute',
                     left, top,
@@ -552,311 +511,151 @@ function PreviewPanel({
                     animation: `float ${3 + i * 0.4}s ease-in-out infinite`,
                     animationDelay: `${i * 0.6}s`,
                   }}
-                  aria-hidden
                 />
               );
             })}
           </>
         )}
 
-        {/* Apply flash animation overlay */}
+        {/* Apply flash */}
         {justApplied && (
           <div
+            aria-hidden
             style={{
               position: 'absolute', inset: 0,
-              borderRadius: 16,
-              background: `radial-gradient(circle, ${item?.rarityColor ?? TOKEN.brand}44 0%, transparent 70%)`,
+              background: `radial-gradient(circle, ${item?.rarityColor ?? race.primary}55 0%, transparent 70%)`,
               animation: 'applyFlash 0.6s cubic-bezier(0.32,0.72,0,1) forwards',
               pointerEvents: 'none',
             }}
-            aria-hidden
           />
         )}
-      </div>
+      </Panel>
 
-      {/* Selected item title display (when in title tab) */}
+      {/* Equipped title chip */}
       {equippedTitle && !isDefaultItem(equippedTitle) && (
         <div style={{ textAlign: 'center' }}>
-          <span
-            style={{
-              display: 'inline-block',
-              fontFamily: 'var(--font-display, Orbitron, system-ui)',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase' as const,
-              color: equippedTitle.rarityColor,
-              background: `${equippedTitle.rarityGlow}`,
-              padding: '4px 14px',
-              borderRadius: 20,
-              border: `1px solid ${equippedTitle.rarityColor}50`,
-            }}
-          >
-            {equippedTitle.icon} {equippedTitle.name}
-          </span>
+          <Chip color={equippedTitle.rarityColor}>
+            {equippedTitle.name}
+          </Chip>
         </div>
       )}
 
-      {/* Selected item info */}
+      {/* Selected item info card */}
       {item ? (
-        <div
-          style={{
-            padding: 16,
-            borderRadius: 12,
-            background: TOKEN.bgElevated,
-            border: `1px solid ${TOKEN.border}`,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
-            <span style={{ fontSize: 24 }}>{item.icon}</span>
+        <Panel style={{ padding: 14 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }} aria-hidden>{item.icon}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h3
-                style={{
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                  fontSize: 13,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  color: item.rarityColor,
-                  marginBottom: 4,
-                }}
-              >
-                {item.name}
-              </h3>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: TOKEN.textSecondary,
-                  lineHeight: 1.5,
-                  fontFamily: 'var(--font-body, Rajdhani, system-ui)',
-                }}
-              >
-                {item.description}
-              </p>
+              <Eyebrow color={item.rarityColor}>{RARITY_META[item.rarity].label}</Eyebrow>
+              <H3 style={{ color: ND.text, marginTop: 4 }}>{item.name}</H3>
+              <Caption style={{ marginTop: 6 }}>{item.description}</Caption>
             </div>
           </div>
 
-          {/* Price or status */}
-          {!item.isOwned && item.price && (
+          {/* Price row */}
+          {!item.isOwned && typeof item.price === 'number' && (
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 padding: '8px 12px',
-                borderRadius: 8,
-                background: insufficientFunds ? TOKEN.dangerDim : TOKEN.energyDim,
-                border: `1px solid ${insufficientFunds ? `${TOKEN.danger}40` : 'rgba(255,200,50,0.2)'}`,
+                background: insufficientFunds ? `${ND.danger}15` : `${ND.warn}12`,
+                border: `1px solid ${insufficientFunds ? `${ND.danger}55` : `${ND.warn}55`}`,
                 marginBottom: 12,
               }}
             >
-              <span style={{ fontSize: 16 }}>💎</span>
+              <ResIcon kind="crystal" size={14} color={insufficientFunds ? ND.danger : ND.warn} />
               <span
                 style={{
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                  fontFamily: ND.display,
                   fontSize: 14,
-                  fontWeight: 800,
-                  color: insufficientFunds ? TOKEN.danger : TOKEN.energy,
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  color: insufficientFunds ? ND.danger : ND.warn,
                 }}
               >
                 {item.price}
               </span>
-              <span style={{ fontSize: 11, color: insufficientFunds ? TOKEN.danger : TOKEN.textMuted, marginLeft: 'auto' }}>
-                {insufficientFunds ? 'Yetersiz bakiye' : 'Gem gerekli'}
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontFamily: ND.mono,
+                  fontSize: 10,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: insufficientFunds ? ND.danger : ND.textMute,
+                }}
+              >
+                {insufficientFunds ? 'YETERSİZ BAKİYE' : 'GEM GEREKLİ'}
               </span>
             </div>
           )}
 
-          {/* Apply / Buy / Equipped button */}
+          {/* Action */}
           {isAlreadyEquipped ? (
             <div
+              role="status"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                padding: '12px 24px',
-                borderRadius: 9999,
-                background: `${TOKEN.success}18`,
-                border: `1px solid ${TOKEN.success}40`,
-                color: TOKEN.success,
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
+                height: 40,
+                padding: '0 16px',
+                background: `${ND.ok}14`,
+                border: `1px solid ${ND.ok}55`,
+                color: ND.ok,
+                fontFamily: ND.display,
                 fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const,
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                clipPath:
+                  'polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)',
               }}
-              role="status"
             >
-              <span>✓</span>
-              <span>Giyili</span>
+              ◉ Giyili
             </div>
           ) : item.isOwned ? (
-            <button
-              onClick={onApply}
+            <NDButton
+              race={race}
+              variant="primary"
+              size="md"
+              full
               disabled={applying}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                padding: '13px 24px',
-                borderRadius: 9999,
-                background: applying ? `${item.rarityColor}aa` : item.rarityColor,
-                border: 'none',
-                cursor: applying ? 'wait' : 'pointer',
-                color: 'var(--color-bg-base)',
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase' as const,
-                transition: 'all 0.3s cubic-bezier(0.32,0.72,0,1)',
-                boxShadow: applying
-                  ? 'none'
-                  : `0 4px 20px ${item.rarityGlow}, 0 0 0 1px ${item.rarityColor}40`,
-                transform: applying ? 'scale(0.97)' : 'scale(1)',
-              }}
-              aria-busy={applying}
+              onClick={onApply}
             >
-              {applying ? (
-                <>
-                  <span
-                    style={{
-                      width: 14, height: 14,
-                      border: '2px solid rgba(0,0,0,0.3)',
-                      borderTopColor: 'var(--color-bg-base)',
-                      borderRadius: '50%',
-                      display: 'inline-block',
-                      animation: 'spin 0.7s linear infinite',
-                    }}
-                    aria-hidden
-                  />
-                  <span>Uygulanıyor…</span>
-                </>
-              ) : (
-                <>
-                  <span>Uygula</span>
-                  <span
-                    style={{
-                      width: 22, height: 22,
-                      borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.2)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      transition: 'transform 0.3s cubic-bezier(0.32,0.72,0,1)',
-                    }}
-                    aria-hidden
-                  >
-                    ✦
-                  </span>
-                </>
-              )}
-            </button>
+              {applying ? 'UYGULANIYOR…' : 'UYGULA'}
+            </NDButton>
           ) : (
-            <button
-              onClick={onPurchase}
+            <NDButton
+              race={race}
+              variant="outline"
+              size="md"
+              full
               disabled={purchasing || insufficientFunds || balance === null}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                padding: '13px 24px',
-                borderRadius: 9999,
-                background: TOKEN.energyDim,
-                border: `1px solid ${TOKEN.energy}40`,
-                cursor: purchasing
-                  ? 'wait'
-                  : insufficientFunds || balance === null
-                  ? 'not-allowed'
-                  : 'pointer',
-                color: TOKEN.energy,
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase' as const,
-                transition: 'all 0.3s cubic-bezier(0.32,0.72,0,1)',
-                opacity: insufficientFunds || balance === null ? 0.55 : 1,
-              }}
-              aria-busy={purchasing}
+              onClick={onPurchase}
+              icon={<ResIcon kind="crystal" size={12} color={race.primary} />}
             >
-              {purchasing ? (
-                <>
-                  <span
-                    style={{
-                      width: 14, height: 14,
-                      border: `2px solid ${TOKEN.energy}40`,
-                      borderTopColor: TOKEN.energy,
-                      borderRadius: '50%',
-                      display: 'inline-block',
-                      animation: 'spin 0.7s linear infinite',
-                    }}
-                    aria-hidden
-                  />
-                  <span>Satın alınıyor…</span>
-                </>
-              ) : (
-                <>
-                  <span>💎</span>
-                  <span>
-                    {insufficientFunds ? 'Yetersiz Bakiye' : `Satın Al — ${item.price} Gem`}
-                  </span>
-                </>
-              )}
-            </button>
+              {purchasing
+                ? 'SATIN ALINIYOR…'
+                : insufficientFunds
+                ? 'YETERSİZ BAKİYE'
+                : `SATIN AL · ${item.price}`}
+            </NDButton>
           )}
-        </div>
+        </Panel>
       ) : (
-        <div
-          style={{
-            padding: 20,
-            borderRadius: 12,
-            background: TOKEN.bgElevated,
-            border: `1px solid ${TOKEN.border}`,
-            textAlign: 'center',
-          }}
-        >
-          <p
-            style={{
-              fontFamily: 'var(--font-display, Orbitron, system-ui)',
-              fontSize: 11,
-              color: TOKEN.textMuted,
-              letterSpacing: '0.08em',
-            }}
-          >
-            Bir item seç
-          </p>
-        </div>
+        <Panel style={{ padding: 20, textAlign: 'center' }}>
+          <Caption>Bir item seç</Caption>
+        </Panel>
       )}
 
-      {/* Currently equipped summary */}
-      <div
-        style={{
-          padding: '12px 16px',
-          borderRadius: 12,
-          background: TOKEN.bgSurface,
-          border: `1px solid ${TOKEN.border}`,
-        }}
-      >
-        <p
-          style={{
-            fontFamily: 'var(--font-display, Orbitron, system-ui)',
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase' as const,
-            color: TOKEN.textMuted,
-            marginBottom: 10,
-          }}
-        >
-          Aktif Set
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      {/* Active set */}
+      <Panel style={{ padding: 14 }}>
+        <Eyebrow color={race.primary}>AKTİF SET</Eyebrow>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
           {CATEGORIES.map((cat) => {
             const equipped = equippedItems[cat.id];
             return (
@@ -867,54 +666,57 @@ function PreviewPanel({
                   alignItems: 'center',
                   gap: 8,
                   padding: '6px 8px',
-                  borderRadius: 8,
-                  background: TOKEN.bgElevated,
-                  border: `1px solid ${TOKEN.border}`,
+                  background: ND.surfaceHi,
+                  border: `1px solid ${ND.border}`,
                 }}
               >
-                <span style={{ fontSize: 14 }}>{cat.icon}</span>
+                <span style={{ fontSize: 14 }} aria-hidden>{cat.icon}</span>
                 <div style={{ minWidth: 0 }}>
-                  <p
+                  <div
                     style={{
-                      fontSize: 9,
-                      color: TOKEN.textMuted,
-                      fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase' as const,
+                      fontFamily: ND.mono,
+                      fontSize: 8,
+                      letterSpacing: '0.16em',
+                      textTransform: 'uppercase',
+                      color: ND.textMute,
                     }}
                   >
                     {cat.label}
-                  </p>
-                  <p
+                  </div>
+                  <div
                     style={{
+                      fontFamily: ND.display,
                       fontSize: 11,
-                      color: equipped ? TOKEN.textPrimary : TOKEN.textMuted,
-                      fontFamily: 'var(--font-body, Rajdhani, system-ui)',
                       fontWeight: 600,
+                      letterSpacing: '0.02em',
+                      color: equipped ? ND.text : ND.textMute,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                     }}
                   >
                     {equipped?.name ?? '—'}
-                  </p>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
-      </div>
+      </Panel>
     </aside>
   );
 }
 
-// ─── Toast viewport ───────────────────────────────────────────────────────────
+/* ── Toasts ───────────────────────────────────────────────────────────── */
+
 function ToastViewport({ toasts, onDismiss }: { toasts: ToastState[]; onDismiss: (id: number) => void }) {
   return (
     <div
+      role="region"
+      aria-live="polite"
       style={{
         position: 'fixed',
-        bottom: 80,
+        bottom: 24,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
@@ -925,8 +727,6 @@ function ToastViewport({ toasts, onDismiss }: { toasts: ToastState[]; onDismiss:
         width: 'calc(100% - 32px)',
         pointerEvents: 'none',
       }}
-      role="region"
-      aria-live="polite"
     >
       {toasts.map((t) => {
         const isError = t.kind === 'error';
@@ -940,32 +740,29 @@ function ToastViewport({ toasts, onDismiss }: { toasts: ToastState[]; onDismiss:
               alignItems: 'center',
               gap: 10,
               padding: '10px 14px',
-              borderRadius: 12,
-              background: isError ? TOKEN.dangerDim : `${TOKEN.success}18`,
-              border: `1px solid ${isError ? TOKEN.danger : TOKEN.success}55`,
-              color: isError ? TOKEN.danger : TOKEN.success,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              background: isError ? `${ND.danger}18` : `${ND.ok}18`,
+              border: `1px solid ${isError ? ND.danger : ND.ok}66`,
+              color: isError ? ND.danger : ND.ok,
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              fontFamily: 'var(--font-body, Rajdhani, system-ui)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              fontFamily: ND.body,
               fontSize: 13,
               fontWeight: 600,
               animation: 'fadeSlideUp 0.3s cubic-bezier(0.32,0.72,0,1)',
             }}
           >
-            <span style={{ fontSize: 16 }}>{isError ? '⚠️' : '✓'}</span>
+            <span aria-hidden style={{ fontSize: 14 }}>{isError ? '⚠' : '◉'}</span>
             <span style={{ flex: 1 }}>{t.message}</span>
             <button
+              type="button"
               onClick={() => onDismiss(t.id)}
               aria-label="Kapat"
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'inherit',
+                all: 'unset',
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: 13,
                 opacity: 0.7,
-                padding: 0,
               }}
             >
               ✕
@@ -977,19 +774,35 @@ function ToastViewport({ toasts, onDismiss }: { toasts: ToastState[]; onDismiss:
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-export default function CustomizationPage() {
-  const [activeCategory, setActiveCategory] = useState<CosmeticCategory>('skin');
-  const [selectedItem, setSelectedItem]     = useState<CosmeticItem | null>(null);
-  const [applying, setApplying]             = useState(false);
-  const [purchasing, setPurchasing]         = useState(false);
-  const [justApplied, setJustApplied]       = useState(false);
+/* ── Lock icon ────────────────────────────────────────────────────────── */
 
-  const [cosmetics, setCosmetics]           = useState<CosmeticItem[] | null>(null);
-  const [balance, setBalance]               = useState<number | null>(null);
-  const [loadError, setLoadError]           = useState<string | null>(null);
-  const [toasts, setToasts]                 = useState<ToastState[]>([]);
-  const [pendingItemId, setPendingItemId]   = useState<string | null>(null);
+function LockIcon({ color, size = 22 }: { color: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden>
+      <rect x="3" y="10" width="16" height="10" rx="1" stroke={color} strokeWidth="1.5" />
+      <path d="M7 10V7a4 4 0 0 1 8 0v3" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────── */
+
+export default function CustomizationPage() {
+  const race = useNDRace();
+
+  const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
+  const activeCategory = CATEGORIES[activeCategoryIdx].id;
+
+  const [selectedItem, setSelectedItem]   = useState<CosmeticItem | null>(null);
+  const [applying, setApplying]           = useState(false);
+  const [purchasing, setPurchasing]       = useState(false);
+  const [justApplied, setJustApplied]     = useState(false);
+
+  const [cosmetics, setCosmetics]         = useState<CosmeticItem[] | null>(null);
+  const [balance, setBalance]             = useState<number | null>(null);
+  const [loadError, setLoadError]         = useState<string | null>(null);
+  const [toasts, setToasts]               = useState<ToastState[]>([]);
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 
   const toastIdRef = useRef(0);
 
@@ -1005,7 +818,6 @@ export default function CustomizationPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Initial load
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1024,7 +836,6 @@ export default function CustomizationPage() {
     return () => { cancelled = true; };
   }, [pushToast]);
 
-  // Re-sync the selected item with the latest cosmetics list (post-update).
   useEffect(() => {
     if (!selectedItem || !cosmetics) return;
     const fresh = cosmetics.find((c) => c.id === selectedItem.id);
@@ -1047,7 +858,6 @@ export default function CustomizationPage() {
     const target = selectedItem;
     const previous = cosmetics;
 
-    // Optimistic update: equip target, unequip others in same category.
     const optimistic = cosmetics.map((c) => {
       if (c.category === target.category) {
         return { ...c, isEquipped: c.id === target.id };
@@ -1090,21 +900,17 @@ export default function CustomizationPage() {
     const previousCosmetics = cosmetics;
     const previousBalance = balance;
 
-    // Optimistic: subtract price, mark owned.
     const optimisticCosmetics = cosmetics.map((c) =>
       c.id === target.id ? { ...c, isOwned: true } : c,
     );
-    const optimisticBalance = balance - price;
 
     setPurchasing(true);
     setPendingItemId(target.id);
     setCosmetics(optimisticCosmetics);
-    setBalance(optimisticBalance);
+    setBalance(balance - price);
 
     try {
       await purchaseCosmetic(target.id);
-      // Backend returns the cosmetic DTO, not the new balance. Refetch the
-      // server-authoritative balance so it stays in sync.
       const fresh = await fetchBalance();
       setBalance(fresh);
       pushToast('success', `${target.name} satın alındı`);
@@ -1123,7 +929,6 @@ export default function CustomizationPage() {
 
   return (
     <>
-      {/* ── Keyframe animations injected via style tag ─────────────────── */}
       <style>{`
         @keyframes applyFlash {
           0%   { opacity: 0; transform: scale(0.8); }
@@ -1132,11 +937,9 @@ export default function CustomizationPage() {
         }
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-8px); }
+          50%      { transform: translateY(-8px); }
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0);    }
@@ -1145,385 +948,186 @@ export default function CustomizationPage() {
           0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
-        .cosmetic-card-hover:hover {
-          transform: translateY(-4px) !important;
-          border-color: rgba(255,255,255,0.18) !important;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+        @keyframes pulse {
+          0%, 100% { opacity: 0.85; }
+          50%      { opacity: 1;    }
         }
-        .cosmetic-card-hover:active {
-          transform: scale(0.97) !important;
+        @keyframes nd-blink {
+          0%, 100% { opacity: 1;   }
+          50%      { opacity: 0.3; }
         }
-        .apply-btn-hover:hover:not(:disabled) {
-          transform: translateY(-2px) scale(1.01) !important;
+        .nd-cosmetic-card:hover {
+          transform: translateY(-3px);
         }
-        .apply-btn-hover:active:not(:disabled) {
-          transform: scale(0.97) !important;
+        .nd-cosmetic-card:active {
+          transform: scale(0.98);
         }
       `}</style>
 
       <div
+        data-race={race.key}
         style={{
-          height: '100dvh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
           position: 'relative',
-          background: TOKEN.bg,
+          minHeight: '100dvh',
+          background: ND.bg,
+          color: ND.text,
+          fontFamily: ND.body,
+          overflow: 'hidden',
         }}
       >
-        {/* ── Background nebula gradient ────────────────────────────── */}
+        <NebulaBg race={race} intensity={0.85} dim={0.8} />
+
         <div
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'var(--gradient-nebula, radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,158,255,0.08) 0%, var(--color-bg-base) 70%))',
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
           aria-hidden
-        />
-        <div
           style={{
-            position: 'fixed', inset: 0,
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)',
-            backgroundSize: '6px 6px',
-            pointerEvents: 'none',
+            position: 'fixed',
+            inset: 0,
             zIndex: 0,
+            pointerEvents: 'none',
+            background: `radial-gradient(ellipse 60% 40% at 50% 90%, ${race.glow}22 0%, transparent 65%)`,
           }}
-          aria-hidden
         />
 
-        {/* ── Top bar ───────────────────────────────────────────────── */}
-        <header
-          style={{
-            position: 'sticky', top: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px',
-            background: 'rgba(8,10,16,0.88)',
-            borderBottom: `1px solid ${TOKEN.border}`,
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            zIndex: 40,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Link
-              href="/"
-              style={{
-                fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                fontSize: 11,
-                color: TOKEN.textMuted,
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'color 0.2s',
-                letterSpacing: '0.06em',
-              }}
-            >
-              ← Geri
-            </Link>
-
-            <div
-              style={{
-                width: 1, height: 16,
-                background: TOKEN.border,
-              }}
-            />
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span
-                style={{
-                  display: 'inline-flex', alignItems: 'center',
-                  padding: '2px 10px',
-                  borderRadius: 20,
-                  fontSize: 9,
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase' as const,
-                  color: TOKEN.brand,
-                  background: TOKEN.brandDim,
-                  border: `1px solid ${TOKEN.brandGlow}`,
-                }}
-              >
-                Kozmetik
-              </span>
-              <h1
-                style={{
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                  fontSize: 14,
-                  fontWeight: 900,
-                  letterSpacing: '0.06em',
-                  color: TOKEN.textPrimary,
-                }}
-              >
-                Kişiselleştirme
-              </h1>
-            </div>
-          </div>
-
-          {/* Gem balance */}
-          <div
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+          {/* Header */}
+          <header
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px',
-              borderRadius: 9999,
-              background: TOKEN.energyDim,
-              border: `1px solid rgba(255,200,50,0.2)`,
-              minWidth: 88,
-              justifyContent: 'center',
-            }}
-            aria-live="polite"
-            aria-label="Gem bakiyesi"
-          >
-            <span style={{ fontSize: 14 }}>💎</span>
-            {balance === null ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 44,
-                  height: 12,
-                  borderRadius: 4,
-                  background: 'rgba(255,200,50,0.18)',
-                  animation: 'shimmer 1.4s linear infinite',
-                  backgroundSize: '200% 100%',
-                  backgroundImage:
-                    'linear-gradient(90deg, rgba(255,200,50,0.10), rgba(255,200,50,0.30), rgba(255,200,50,0.10))',
-                }}
-                aria-label="Bakiye yükleniyor"
-              />
-            ) : (
-              <span
-                style={{
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: TOKEN.energy,
-                }}
-              >
-                {balance.toLocaleString('tr-TR')}
-              </span>
-            )}
-          </div>
-        </header>
-
-        {/* ── Main layout ───────────────────────────────────────────── */}
-        <main
-          style={{
-            position: 'relative', zIndex: 10,
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0,
-            maxWidth: 1280,
-            width: '100%',
-            margin: '0 auto',
-            padding: '0 0 80px',
-          }}
-        >
-          {/* ── Category tab bar ──────────────────────────────────── */}
-          <nav
-            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 30,
               display: 'flex',
-              gap: 8,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
               padding: '12px 16px',
-              overflowX: 'auto',
-              borderBottom: `1px solid ${TOKEN.border}`,
-              scrollbarWidth: 'none',
+              background: 'rgba(6,8,15,0.92)',
+              borderBottom: `1px solid ${ND.border}`,
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
             }}
-            aria-label="Kozmetik kategorileri"
           >
-            {CATEGORIES.map((cat) => {
-              const active = cat.id === activeCategory;
-              const equippedInCat = (cosmetics ?? []).find(
-                (c) => c.category === cat.id && c.isEquipped
-              );
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setSelectedItem(null); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 18px',
-                    borderRadius: 9999,
-                    border: `1px solid ${active ? TOKEN.brand : TOKEN.border}`,
-                    background: active ? TOKEN.brandDim : 'rgba(255,255,255,0.02)',
-                    color: active ? TOKEN.brand : TOKEN.textSecondary,
-                    fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase' as const,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.25s cubic-bezier(0.32,0.72,0,1)',
-                    boxShadow: active ? `0 0 12px ${TOKEN.brandGlow}` : 'none',
-                    flexShrink: 0,
-                  }}
-                  aria-pressed={active}
-                >
-                  <span style={{ fontSize: 14 }}>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                  {/* Active item dot indicator */}
-                  {equippedInCat && !isDefaultItem(equippedInCat) && (
-                    <span
-                      style={{
-                        width: 6, height: 6,
-                        borderRadius: '50%',
-                        background: TOKEN.success,
-                        flexShrink: 0,
-                      }}
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+              <Link
+                href="/"
+                style={{
+                  fontFamily: ND.display,
+                  fontSize: 11,
+                  letterSpacing: '0.10em',
+                  color: ND.textDim,
+                  textDecoration: 'none',
+                }}
+              >
+                ← ANA ÜS
+              </Link>
+              <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.12)' }} />
+              <Chip color={race.primary}>KOZMETİK</Chip>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <ResPill kind="crystal" value={balance === null ? '—' : balance.toLocaleString('tr-TR')} accent={ND.warn} />
+              <Sigil race={race} size={20} />
+            </div>
+          </header>
 
-          {/* ── Content: grid + preview ───────────────────────────── */}
-          <div
+          <main
             style={{
+              position: 'relative',
+              flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              gap: 0,
+              maxWidth: 1280,
+              width: '100%',
+              margin: '0 auto',
+              padding: '0 0 32px',
             }}
           >
-            {/* Mobile: preview panel at top when item is selected */}
-            <div
-              style={{
-                display: 'block',
-                padding: '16px 16px 0',
-              }}
-              className="lg-hide"
-            >
-              {selectedItem && !isLoading && (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    animation: 'fadeSlideUp 0.35s cubic-bezier(0.32,0.72,0,1)',
-                  }}
-                >
-                  <PreviewPanel
-                    item={selectedItem}
-                    equippedItems={equippedItems}
-                    onApply={handleApply}
-                    onPurchase={handlePurchase}
-                    applying={applying}
-                    purchasing={purchasing}
-                    justApplied={justApplied}
-                    balance={balance}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Desktop two-column layout */}
+            {/* Tab row */}
             <div
               style={{
                 display: 'flex',
-                gap: 0,
-                flex: 1,
+                alignItems: 'center',
+                gap: 8,
+                padding: '12px 16px',
+                borderBottom: `1px solid ${ND.border}`,
+                background: 'rgba(8,10,16,0.55)',
               }}
             >
-              {/* ── Card grid ─────────────────────────────────────── */}
-              <div
-                style={{
-                  flex: 1,
-                  padding: 16,
-                  overflowY: 'auto',
-                  minWidth: 0,
+              <RaceTabs
+                race={race}
+                items={CATEGORIES.map((c) => c.label.toUpperCase())}
+                active={activeCategoryIdx}
+                onChange={(i) => {
+                  setActiveCategoryIdx(i);
+                  setSelectedItem(null);
                 }}
-              >
-                {/* Category label */}
+              />
+            </div>
+
+            {/* Two-column body */}
+            <div
+              className="customization-layout"
+              style={{
+                flex: 1,
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 320px)',
+              }}
+            >
+              {/* Card grid */}
+              <section style={{ padding: '16px', minWidth: 0 }}>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    marginBottom: 16,
+                    marginBottom: 14,
                   }}
                 >
-                  <span style={{ fontSize: 18 }}>
-                    {CATEGORIES.find((c) => c.id === activeCategory)?.icon}
-                  </span>
-                  <h2
-                    style={{
-                      fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                      fontSize: 13,
-                      fontWeight: 900,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase' as const,
-                      color: TOKEN.textPrimary,
-                    }}
-                  >
-                    {CATEGORIES.find((c) => c.id === activeCategory)?.label}
-                  </h2>
+                  <Sigil race={race} size={16} />
+                  <H3 style={{ color: ND.text }}>
+                    {CATEGORIES[activeCategoryIdx].label}
+                  </H3>
                   <div
                     style={{
                       flex: 1, height: 1,
-                      background: `linear-gradient(90deg, ${TOKEN.borderHover}, transparent)`,
+                      background: `linear-gradient(90deg, ${race.primary}66, transparent)`,
                     }}
                   />
                   {!isLoading && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: TOKEN.textMuted,
-                        fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                      }}
-                    >
-                      {filteredItems.filter((i) => i.isOwned).length}/{filteredItems.length} Sahip
-                    </span>
+                    <Code style={{ color: race.primary }}>
+                      {filteredItems.filter((i) => i.isOwned).length}/{filteredItems.length} SAHİP
+                    </Code>
                   )}
                 </div>
 
-                {/* Grid */}
                 {isLoading ? (
                   <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                      gap: 12,
-                    }}
                     role="status"
                     aria-label="Kozmetikler yükleniyor"
-                  >
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <SkeletonCard key={i} />
-                    ))}
-                  </div>
-                ) : loadError && filteredItems.length === 0 ? (
-                  <div
-                    role="alert"
                     style={{
-                      padding: 24,
-                      borderRadius: 12,
-                      background: TOKEN.dangerDim,
-                      border: `1px solid ${TOKEN.danger}40`,
-                      color: TOKEN.danger,
-                      textAlign: 'center',
-                      fontFamily: 'var(--font-body, Rajdhani, system-ui)',
-                      fontSize: 13,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                      gap: 12,
                     }}
                   >
-                    <p style={{ fontWeight: 700, marginBottom: 6 }}>Yüklenemedi</p>
-                    <p style={{ opacity: 0.85 }}>{loadError}</p>
+                    {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
                   </div>
+                ) : loadError && filteredItems.length === 0 ? (
+                  <Panel style={{ padding: 24, textAlign: 'center', borderColor: `${ND.danger}55` }}>
+                    <Eyebrow color={ND.danger}>YÜKLENEMEDİ</Eyebrow>
+                    <Caption style={{ marginTop: 6 }}>{loadError}</Caption>
+                  </Panel>
                 ) : (
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                       gap: 12,
                     }}
                   >
                     {filteredItems.map((item, i) => (
                       <div
                         key={item.id}
-                        className="cosmetic-card-hover"
                         style={{
-                          animation: `fadeSlideUp 0.4s cubic-bezier(0.32,0.72,0,1) ${i * 0.05}s both`,
+                          animation: `fadeSlideUp 0.4s cubic-bezier(0.32,0.72,0,1) ${i * 0.04}s both`,
                         }}
                       >
                         <CosmeticCard
@@ -1531,20 +1135,21 @@ export default function CustomizationPage() {
                           selected={selectedItem?.id === item.id}
                           onSelect={setSelectedItem}
                           pending={pendingItemId === item.id}
+                          race={race}
                         />
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
 
-              {/* ── Preview panel (desktop sticky sidebar) ────────── */}
+              {/* Preview aside */}
               <aside
+                className="customization-aside"
                 style={{
-                  width: 300,
-                  flexShrink: 0,
+                  borderLeft: `1px solid ${ND.border}`,
+                  background: `linear-gradient(180deg, ${race.primary}0d 0%, rgba(8,10,16,0.85) 50%)`,
                   padding: 16,
-                  borderLeft: `1px solid ${TOKEN.border}`,
                   position: 'sticky',
                   top: 56,
                   alignSelf: 'flex-start',
@@ -1565,78 +1170,29 @@ export default function CustomizationPage() {
                     purchasing={purchasing}
                     justApplied={justApplied}
                     balance={balance}
+                    race={race}
                   />
                 )}
               </aside>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
 
-        {/* ── Toasts ────────────────────────────────────────────────── */}
         <ToastViewport toasts={toasts} onDismiss={dismissToast} />
 
-        {/* ── Bottom navigation ─────────────────────────────────────── */}
-        <nav
-          style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0,
-            display: 'flex',
-            background: 'rgba(8,10,16,0.95)',
-            borderTop: `1px solid ${TOKEN.border}`,
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            zIndex: 50,
-            padding: '6px 0',
-          }}
-          aria-label="Alt navigasyon"
-        >
-          {[
-            { href: '/',              icon: '🏠', label: 'Üs'       },
-            { href: '/commanders',    icon: '👤', label: 'Komutanlar' },
-            { href: '/customization', icon: '🎨', label: 'Kozmetik', active: true },
-            { href: '/progression',   icon: '⬆️', label: 'İlerleme' },
-            { href: '/dashboard',     icon: '⚙️', label: 'Ayarlar'  },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                flex: 1,
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 3, padding: '6px 4px',
-                textDecoration: 'none',
-                color: item.active ? TOKEN.brand : TOKEN.textMuted,
-                transition: 'color 0.2s',
-              }}
-              aria-current={item.active ? 'page' : undefined}
-            >
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
-              <span
-                style={{
-                  fontSize: 9,
-                  fontFamily: 'var(--font-display, Orbitron, system-ui)',
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase' as const,
-                }}
-              >
-                {item.label}
-              </span>
-              {item.active && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    width: 24, height: 2,
-                    borderRadius: 1,
-                    background: TOKEN.brand,
-                    boxShadow: `0 0 8px ${TOKEN.brandGlow}`,
-                  }}
-                  aria-hidden
-                />
-              )}
-            </Link>
-          ))}
-        </nav>
+        <style jsx>{`
+          @media (max-width: 768px) {
+            :global([data-race]) .customization-layout {
+              grid-template-columns: minmax(0, 1fr) !important;
+            }
+            :global([data-race]) .customization-aside {
+              border-left: none !important;
+              border-top: 1px solid ${ND.border};
+              position: static !important;
+              max-height: none !important;
+            }
+          }
+        `}</style>
       </div>
     </>
   );

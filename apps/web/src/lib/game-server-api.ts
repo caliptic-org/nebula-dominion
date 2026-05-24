@@ -1,0 +1,66 @@
+import { getAccessToken } from './session';
+import { FetchError } from './api';
+
+/* Game-server HTTP client.
+ *
+ * Mirrors `lib/api.ts` but points at `NEXT_PUBLIC_GAME_SERVER_URL` and
+ * prefixes paths with `/api` (game-server's global prefix). The bearer
+ * token is the same one issued by api `/auth/login` — both services now
+ * share `JWT_SECRET`, so an api-issued token authorises game-server
+ * routes guarded by `HttpJwtGuard`.
+ *
+ * Endpoints reachable from here:
+ *   GET  /api/buildings/types        (public)
+ *   GET  /api/buildings              (JWT)
+ *   POST /api/buildings              (JWT)
+ *   GET  /api/units/configs/:race    (public)
+ *   GET  /api/units                  (JWT)
+ *   POST /api/units/train            (JWT)
+ *   GET  /api/units/training-queue   (JWT)
+ */
+
+const RAW = process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? 'http://localhost:3001';
+const NORMALIZED = RAW.replace(/\/+$/, '');
+const BASE_URL = /\/api$/.test(NORMALIZED) ? NORMALIZED : `${NORMALIZED}/api`;
+
+type RequestOptions = Omit<RequestInit, 'body'> & {
+  body?: unknown;
+};
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { body, ...rest } = options;
+  const token = getAccessToken();
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...rest,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...rest.headers,
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const message =
+      (data as { message?: string }).message ??
+      `Game-server error: ${res.status} ${res.statusText}`;
+    throw new FetchError(res.status, res.statusText, message, data);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export const gameServerApi = {
+  get: <T>(path: string, opts?: RequestOptions) =>
+    request<T>(path, { ...opts, method: 'GET' }),
+
+  post: <T>(path: string, body?: unknown, opts?: RequestOptions) =>
+    request<T>(path, { ...opts, method: 'POST', body }),
+
+  delete: <T>(path: string, opts?: RequestOptions) =>
+    request<T>(path, { ...opts, method: 'DELETE' }),
+};

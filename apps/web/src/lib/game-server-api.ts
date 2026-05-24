@@ -1,5 +1,6 @@
 import { getAccessToken } from './session';
 import { FetchError } from './api';
+import { translateBackendError } from './translate-backend-error';
 
 /* Game-server HTTP client.
  *
@@ -44,9 +45,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    const message =
-      (data as { message?: string }).message ??
-      `Game-server error: ${res.status} ${res.statusText}`;
+    // NestJS returns either {message: "..."} or {message: ["...", "..."]}
+    // — flatten then translate to Turkish so toast.error(err.message)
+    // renders in the UI language.
+    const raw = (data as { message?: string | string[] }).message;
+    const flat =
+      Array.isArray(raw) ? raw.join(' · ')
+      : typeof raw === 'string' ? raw
+      : `Game-server error: ${res.status} ${res.statusText}`;
+    const message = translateBackendError(flat);
     throw new FetchError(res.status, res.statusText, message, data);
   }
 

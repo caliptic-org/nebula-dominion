@@ -1,4 +1,5 @@
 import { getAccessToken } from './session'
+import { translateBackendError } from './translate-backend-error'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 const NORMALIZED = RAW_API_URL.replace(/\/+$/, '')
@@ -39,9 +40,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    const message =
-      (data as { message?: string }).message ??
-      `API error: ${res.status} ${res.statusText}`
+    // NestJS returns either {message: "..."} or {message: ["...", "..."]}
+    // (class-validator multi-error case). Flatten then translate to Turkish
+    // so toast.error(err.message) renders in the UI language.
+    const raw = (data as { message?: string | string[] }).message
+    const flat =
+      Array.isArray(raw) ? raw.join(' · ')
+      : typeof raw === 'string' ? raw
+      : `API error: ${res.status} ${res.statusText}`
+    const message = translateBackendError(flat)
     throw new FetchError(res.status, res.statusText, message, data)
   }
 

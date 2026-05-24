@@ -14,3 +14,4 @@ export * from './race-shape';
 export * from './RaceActionIcon';
 export * from './RaceWidgets';
 export * from './RaceTierBadge';
+export * from './WizardHint';

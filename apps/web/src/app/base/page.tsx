@@ -22,6 +22,7 @@ import {
   Screen,
   Sigil,
   TierBanner,
+  WizardHint,
   raceLex,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
@@ -385,6 +386,12 @@ export default function BaseHomePage() {
           active="base"
           onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
         />
+
+        {/* New-player progression hint — reads live server state and
+         *  surfaces the first incomplete step (build resource bldg,
+         *  train first unit, visit galaxy, …). Auto-dismisses each step
+         *  as the player completes it; user can opt out entirely. */}
+        <WizardHint />
       </Screen>
     </div>
   );

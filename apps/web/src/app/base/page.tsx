@@ -214,7 +214,13 @@ export default function BaseHomePage() {
               top: 76,
               right: 12,
               padding: '8px 10px',
-              maxWidth: 178,
+              // Fixed width (not max) so the panel renders the same size
+              // regardless of unit-name length — shrink-to-fit was making
+              // it 95px and the "Sniper" text crammed against the right
+              // viewport edge. 178px sits flush with the vitals widget
+              // above and the quick-actions stack beneath without
+              // overlapping the iso buildings.
+              width: 178,
             }}
           >
             <Code style={{ color: race.primary }}>{lex.productionVerb} TAMAM</Code>
@@ -225,6 +231,9 @@ export default function BaseHomePage() {
                 color: ND.text,
                 marginTop: 2,
                 letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               ×4 {race.units[1]?.n ?? race.units[0].n}

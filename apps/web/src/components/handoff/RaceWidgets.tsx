@@ -127,7 +127,7 @@ interface VitalsCell { label: string; value: string }
 interface VitalsData { title: string; a: VitalsCell; b: VitalsCell; c: VitalsCell }
 
 const VITALS: Record<NDRaceKey, VitalsData> = {
-  insan:   { title: 'OPERASYONEL', a: { label: 'SEKTÖR', value: '4/4 ONLINE' }, b: { label: 'ALARM', value: '2' }, c: { label: 'KIT.', value: '%87' } },
+  insan:   { title: 'SAVUNMA HATTI', a: { label: 'SEKTÖR', value: '4/4 ONLINE' }, b: { label: 'ALARM', value: '2' }, c: { label: 'KIT.', value: '%87' } },
   zerg:    { title: 'KOVAN VİTAL.', a: { label: 'VİTAL', value: '%92' },         b: { label: 'LARVA', value: '1.2K' }, c: { label: 'MUT.', value: '4 HAZIR' } },
   otomat:  { title: '::system_load', a: { label: 'CPU', value: '64%' },         b: { label: 'PROC', value: '08/16' }, c: { label: 'WARN', value: '2' } },
   canavar: { title: 'SÜRÜ MORALİ',   a: { label: 'MORAL', value: '+18' },        b: { label: 'AV', value: '3 ✓' },     c: { label: 'AY', value: 'DOLUN.' } },

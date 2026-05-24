@@ -216,12 +216,15 @@ interface BaseFieldProps {
 }
 
 /** Building footprint on the iso plane — width is the building image's
- *  horizontal extent in SVG units. A single building anchors to one tile
- *  centre and renders the PNG so its base sits on the tile's diamond.
- *  Multiplier 1.6 → 0.8 halves the on-map sprite, so the iso tilemap reads
- *  as "many small structures on a wide field" instead of giant icons
- *  crowding their neighbours. */
-const BUILDING_IMG_W = TILE_W * 0.9;
+ *  horizontal extent in SVG units. The PNG is rendered with
+ *  preserveAspectRatio="xMidYMax meet" so each one scales to fit the
+ *  bounding box while keeping its bottom-centre pinned to the tile
+ *  diamond. Bumped 0.9 → 1.4 so the buildings actually fill their plot
+ *  visually — combined with the bottom-pinning anchor this hides most
+ *  of the per-PNG framing inconsistency (some renders frame the
+ *  subject loosely, some tightly). Once the regenerated sweep with
+ *  strict-iso prompts lands these can drop back to 1.0-ish. */
+const BUILDING_IMG_W = TILE_W * 1.4;
 
 export function BaseField({
   race,
@@ -355,11 +358,15 @@ export function BaseField({
         // sits on the centre — i.e., image bottom-centre aligns with tile
         // centre, image extends UPWARD into the sky area.
         const imgW = BUILDING_IMG_W;
-        const imgH = imgW; // square crop
+        const imgH = imgW; // square crop matches PNG aspect (1:1)
         const tileCx = x;
         const tileCy = y + TILE_H / 2;
         const imgX = tileCx - imgW / 2;
-        const imgY = tileCy - imgH * 0.78; // 78% up so the base "feet" sit ON the tile
+        // Bottom of the image bounding box sits just BELOW the tile centre
+        // so `xMidYMax meet` pins the building's base on the diamond floor.
+        // Slight over-extend (+TILE_H * 0.18) so the platform shadow blends
+        // into the tile instead of floating above it.
+        const imgY = tileCy + TILE_H * 0.18 - imgH;
 
         const slug = race.buildings[i]?.slug;
         const assetHref = slug ? `/assets/buildings/${race.key}/${slug}.png` : null;

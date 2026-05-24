@@ -85,11 +85,18 @@ const BASE_AGES = [
 ];
 
 const NEGATIVE_PROMPT =
-  // Suppress interior-shot bias + UI clutter + humans.
+  // Suppress interior-shot bias + UI clutter + humans + wrong angles.
   'interior view, room interior, inside view, indoors, furniture, chairs, desk, monitors, screens, ' +
   'people, person, human figure, character, hands, ' +
   'text, words, watermark, signature, logo, UI, hud, ' +
   'multiple objects, cluttered scene, perspective lines, grid lines, ' +
+  // Wrong-angle suppressors so buildings don't come back as top-down or
+  // straight-on or 45° (the v1 sweep mixed all three).
+  'top-down view, birds-eye view, straight overhead, plan view, ' +
+  'front view, side view, profile view, 45 degree angle, ' +
+  'wide-angle distortion, fish-eye lens, dramatic perspective, ' +
+  'cropped building, building extending beyond canvas, partial building, ' +
+  'tiny building lost in empty canvas, building in corner, off-center subject, ' +
   'blurry, low quality, jpeg artifacts, oversaturated, distorted, deformed';
 
 /* ── ComfyUI workflow ───────────────────────────────────────────────────── */
@@ -213,16 +220,24 @@ async function generateOne(race, slug, subject) {
 
 async function generateBuilding(race, slug, subject) {
   const style = STYLE_BY_RACE[race];
+  // Important: every building must use the same EXACT iso angle and the
+  // same proportional fill of the canvas, otherwise the /base tilemap
+  // ends up with mixed perspectives and inconsistent sizes (the v1 sweep
+  // hit this — some buildings looked top-down, others 45°, others tiny).
+  // The first three clauses are the strictest the prompt can be about
+  // angle + scale; the model often still drifts a bit but the variance
+  // is much smaller than the previous "isometric 3D game asset" alone.
   const positive = [
-    // Lead with the camera + composition framing so SDXL doesn't drift to
-    // interior shots. "exterior" + "3/4 view" + "single structure" anchor it.
-    'isometric 3D game asset, 3/4 view from above, exterior shot of a single building',
+    'exact 30-degree isometric projection, 2:1 width-to-height pixel ratio',
+    'camera angle 30 degrees above ground level, looking down at the building',
+    'building fills 70 to 80 percent of the square canvas, centered, base sits at bottom-center',
     `subject: ${subject}`,
-    'standalone structure on a small dark base platform, centered, full building visible',
-    'video game base-builder strategy asset, RTS unit icon style',
+    'standalone single structure on a small dark iso diamond base platform',
+    'consistent uniform scale, no perspective foreshortening, no fish-eye',
+    'video game base-builder strategy asset, RTS unit portrait composition',
     `nebula dominion: dark sci-fi manga aesthetic, ${style}`,
-    'dramatic rim lighting, deep shadows, clean dark background, no scene clutter',
-    'highly detailed concept art, sharp focus, octane render quality',
+    'dramatic rim lighting, deep shadows, transparent or clean dark background',
+    'highly detailed concept art, sharp focus, octane render quality, no scene clutter',
   ].join(', ');
 
   return runAndSave(positive, OUTPUT_DIR, race, slug);

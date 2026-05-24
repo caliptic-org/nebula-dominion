@@ -485,15 +485,25 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
-  /* Local optimistic messages per tab, layered on top of the static mock arrays.
-   * Until `POST /api/v1/chat/{tab}` exists this lets the player at least see
-   * their typed messages appear in the stream. Keyed by tab so global drafts
-   * don't bleed into guild and vice versa. */
-  const [draftsByTab, setDraftsByTab] = useState<Record<ChatTab, ChatMessage[]>>({
-    global: [],
-    guild: [],
-    dm: [],
+  /* Local optimistic messages per tab, persisted to localStorage so the
+   * player's drafts survive navigate-away-and-back. Layered on top of the
+   * static mock arrays. Until `POST /api/v1/chat/{tab}` exists this lets
+   * the player at least see their typed messages appear in the stream.
+   * Keyed by tab so global drafts don't bleed into guild and vice versa. */
+  const [draftsByTab, setDraftsByTab] = useState<Record<ChatTab, ChatMessage[]>>(() => {
+    if (typeof window === 'undefined') return { global: [], guild: [], dm: [] };
+    try {
+      const raw = window.localStorage.getItem('nebula:chat:drafts:v1');
+      if (raw) return JSON.parse(raw) as Record<ChatTab, ChatMessage[]>;
+    } catch { /* ignore — bad JSON or private mode */ }
+    return { global: [], guild: [], dm: [] };
   });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('nebula:chat:drafts:v1', JSON.stringify(draftsByTab));
+    } catch { /* quota / private mode — silently OK */ }
+  }, [draftsByTab]);
   const baseMessages = activeTab === 'global' ? GLOBAL_MESSAGES : GUILD_MESSAGES;
   const messages = [...baseMessages, ...(draftsByTab[activeTab] ?? [])];
 

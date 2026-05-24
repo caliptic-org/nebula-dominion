@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAlliances } from '@/hooks/useAlliances';
 import {
   RACES,
   ND,
@@ -133,6 +134,10 @@ export default function AlliancePage() {
   // every player is in a 7-member alliance from day 1.
   const { profile } = useUserProfile();
   const hasAlliance = Boolean(profile?.allianceTag);
+  // Public alliance list — surfaces under "Henüz bir ittifaka katılmadın"
+  // empty state so the player can scroll real options instead of clicking
+  // a "yakında" button that goes nowhere.
+  const { alliances: discoverableAlliances, loading: alliancesLoading } = useAlliances();
 
   const summary = {
     name: profile?.allianceTag ? race.allianceName : 'İttifak Yok',
@@ -194,25 +199,77 @@ export default function AlliancePage() {
          *  player understands the numbers below are placeholder until
          *  they actually join a guild. Honest > "fake 7 members" */}
         {!hasAlliance && (
-          <NotchPanel race={race}>
-            <Eyebrow color={race.primary}>İTTİFAK YOK</Eyebrow>
-            <H3 style={{ marginTop: 6, color: ND.text }}>Henüz bir ittifaka katılmadın</H3>
-            <Caption style={{ marginTop: 6 }}>
-              İttifak haftalık raid, ortak araştırma ve savaş katılımı
-              sağlar. Aşağıdaki sayfa içeriği <strong>örnek görünüm</strong>
-              — gerçek üye, savaş ve hedef verileri ittifaka katılınca
-              gelir.
-            </Caption>
-            <div style={{ marginTop: 10 }}>
-              <NDButton
-                race={race}
-                full
-                onClick={() => toast.info('İttifak keşfi yakında — şimdilik sadece görünüm')}
-              >
-                İttifak Bul
-              </NDButton>
-            </div>
-          </NotchPanel>
+          <>
+            <NotchPanel race={race}>
+              <Eyebrow color={race.primary}>İTTİFAK YOK</Eyebrow>
+              <H3 style={{ marginTop: 6, color: ND.text }}>Henüz bir ittifaka katılmadın</H3>
+              <Caption style={{ marginTop: 6 }}>
+                İttifak haftalık raid, ortak araştırma ve savaş katılımı
+                sağlar. Aşağıdaki sayfa içeriği <strong>örnek görünüm</strong>
+                — gerçek üye, savaş ve hedef verileri ittifaka katılınca
+                gelir.
+              </Caption>
+            </NotchPanel>
+            {/* Live discovery — pulls public /alliances. Render up to 5
+              * so the panel doesn't dominate the page; player can scroll
+              * to "Daha fazla" once an alliance directory route lands. */}
+            <Panel race={race}>
+              <div style={panelHeader()}>
+                <Eyebrow color={race.primary}>KEŞFET</Eyebrow>
+                <Code>
+                  {alliancesLoading
+                    ? '…'
+                    : `${discoverableAlliances.length} ittifak`}
+                </Code>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {alliancesLoading && (
+                  <Caption style={{ padding: 12, textAlign: 'center' }}>
+                    Yükleniyor…
+                  </Caption>
+                )}
+                {!alliancesLoading && discoverableAlliances.length === 0 && (
+                  <Caption style={{ padding: 12, textAlign: 'center' }}>
+                    Henüz keşfedilebilir ittifak yok. İlk ittifakı kuran sen ol.
+                  </Caption>
+                )}
+                {discoverableAlliances.slice(0, 5).map((a) => (
+                  <div
+                    key={a.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: 8,
+                      padding: '10px 12px',
+                      borderBottom: `1px solid ${ND.border}`,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: ND.display, fontSize: 12, color: ND.text }}>
+                        {a.name}
+                      </div>
+                      <Caption style={{ fontSize: 10 }}>[{a.tag}]</Caption>
+                    </div>
+                    <Code style={{ color: ND.textDim }}>
+                      {a.memberCount ?? '?'} üye
+                    </Code>
+                    <NDButton
+                      race={race}
+                      variant="outline"
+                      onClick={() =>
+                        toast.info(
+                          'İttifaka katılma akışı yakında — backend join endpoint sıraya alındı',
+                        )
+                      }
+                    >
+                      Katıl
+                    </NDButton>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </>
         )}
         {tab === 'genel' && (
           <>

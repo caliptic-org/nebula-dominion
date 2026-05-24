@@ -25,6 +25,8 @@ import {
 } from '@/components/handoff';
 import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
+import { useGameResources } from '@/hooks/useGameResources';
+import { useVipStatus } from '@/hooks/useVip';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
@@ -116,9 +118,14 @@ const TAG_COLOR: Record<Tag, string> = {
   hot: 'oklch(0.72 0.18 50)',
 };
 
-const PLAYER_CURRENCY = { gem: 1250, gold: 8400 };
-const PLAYER_VIP_LEVEL = 3;
-const PLAYER_VIP_XP = 1_650;
+/* Wallet + VIP placeholders — kept as fallbacks for guest/loading state.
+ * Live values come from useGameResources (energy = gem in HUD lore) and
+ * useVipStatus inside the component. The shop renders 0-stats during the
+ * brief flash before hooks resolve so the player never sees a fake
+ * 1250-gem wallet they don't actually own. */
+const GUEST_CURRENCY = { gem: 0, gold: 0 };
+const GUEST_VIP_LEVEL = 0;
+const GUEST_VIP_XP = 0;
 
 function useCountdown(secs: number) {
   const [s, setS] = useState(secs);
@@ -150,6 +157,21 @@ export default function ShopPage() {
   const [currency, setCurrency] = useState<Currency>('gem');
   const promoTimer = useCountdown(2 * 86_400 + 4 * 3_600);
 
+  // Live wallet — game-server's energy column doubles as "gem" in HUD lore
+  // (Kristal/Nebula Kristali). Gold has no backend column yet; fall back to
+  // 0 until a gold ledger lands. Loading → 0 so the header never flashes
+  // the legacy 1250/8400 mock values.
+  const { data: liveResources } = useGameResources();
+  const playerCurrency = liveResources
+    ? { gem: liveResources.energy, gold: GUEST_CURRENCY.gold }
+    : GUEST_CURRENCY;
+  // Live VIP — uses real GET /api/vip/status. Falls back to "VIP 0 / 0 XP"
+  // when the player isn't a VIP yet so the section honestly shows "not
+  // subscribed" instead of pretending they're VIP III.
+  const { status: vipStatus } = useVipStatus();
+  const playerVipLevel = vipStatus?.vipLevel ?? GUEST_VIP_LEVEL;
+  const playerVipXp = vipStatus?.currentXp ?? GUEST_VIP_XP;
+
   const visible = useMemo(() => {
     if (tab === 'vip') return [] as ShopProduct[];
     if (tab === 'gecis') return [] as ShopProduct[];
@@ -175,8 +197,8 @@ export default function ShopPage() {
           <H2 style={{ marginTop: 2 }}>NEBULA MARKET</H2>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <ResPill kind="crystal" value={PLAYER_CURRENCY.gem.toLocaleString('tr-TR')} accent={race.primary} />
-          <ResPill kind="cred" value={PLAYER_CURRENCY.gold.toLocaleString('tr-TR')} accent={ND.warn} />
+          <ResPill kind="crystal" value={playerCurrency.gem.toLocaleString('tr-TR')} accent={race.primary} />
+          <ResPill kind="cred" value={playerCurrency.gold.toLocaleString('tr-TR')} accent={ND.warn} />
         </div>
       </header>
 
@@ -232,7 +254,13 @@ export default function ShopPage() {
       )}
 
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {tab === 'vip' && <VipSection race={race} />}
+        {tab === 'vip' && (
+          <VipSection
+            race={race}
+            playerLevel={playerVipLevel}
+            playerXp={playerVipXp}
+          />
+        )}
         {tab === 'gecis' && <BattlePassSection race={race} />}
         {tab !== 'vip' && tab !== 'gecis' && (
           <>
@@ -385,11 +413,19 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
   );
 }
 
-function VipSection({ race }: { race: NDRace }) {
-  const currentTier = VIP_TIERS.find(t => t.level === PLAYER_VIP_LEVEL) ?? VIP_TIERS[0];
-  const nextTier = VIP_TIERS.find(t => t.level === PLAYER_VIP_LEVEL + 1);
+function VipSection({
+  race,
+  playerLevel,
+  playerXp,
+}: {
+  race: NDRace;
+  playerLevel: number;
+  playerXp: number;
+}) {
+  const currentTier = VIP_TIERS.find(t => t.level === playerLevel) ?? VIP_TIERS[0];
+  const nextTier = VIP_TIERS.find(t => t.level === playerLevel + 1);
   const progressPct = nextTier
-    ? Math.max(0, Math.min(100, ((PLAYER_VIP_XP - currentTier.xp) / (nextTier.xp - currentTier.xp)) * 100))
+    ? Math.max(0, Math.min(100, ((playerXp - currentTier.xp) / (nextTier.xp - currentTier.xp)) * 100))
     : 100;
 
   return (
@@ -413,12 +449,12 @@ function VipSection({ race }: { race: NDRace }) {
               fontWeight: 800,
             }}
           >
-            {PLAYER_VIP_LEVEL}
+            {playerLevel}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Eyebrow color={race.primary}>SEN · {currentTier.label}</Eyebrow>
             <H3 style={{ marginTop: 2, color: ND.text }}>
-              {nextTier ? `${nextTier.label} için ${(nextTier.xp - PLAYER_VIP_XP).toLocaleString('tr-TR')} XP` : 'En yüksek seviye'}
+              {nextTier ? `${nextTier.label} için ${(nextTier.xp - playerXp).toLocaleString('tr-TR')} XP` : 'En yüksek seviye'}
             </H3>
             <div style={{ marginTop: 6 }}>
               <Bar value={progressPct} color={race.primary} />
@@ -431,7 +467,7 @@ function VipSection({ race }: { race: NDRace }) {
       <Panel race={race}>
         <div style={panelHeader()}>
           <Eyebrow color={race.primary}>GÜNLÜK ÖDÜL</Eyebrow>
-          <Code>VIP {PLAYER_VIP_LEVEL}</Code>
+          <Code>VIP {playerLevel}</Code>
         </div>
         <div style={{ padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <Caption>
@@ -506,7 +542,7 @@ function VipSection({ race }: { race: NDRace }) {
         </div>
         <div>
           {VIP_TIERS.map(t => {
-            const owned = t.level <= PLAYER_VIP_LEVEL;
+            const owned = t.level <= playerLevel;
             return (
               <div
                 key={t.level}

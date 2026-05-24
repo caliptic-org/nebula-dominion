@@ -42,7 +42,8 @@
     "class-transformer": "^0.5.1",
     "uuid": "^9.0.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "@sentry/node": "^8.55.0"
   },
   "devDependencies": {
     "prisma": "^5.0.0",

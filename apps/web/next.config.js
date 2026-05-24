@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+// next-intl plugin wraps the config so getRequestConfig (src/i18n/request.ts)
+// is picked up automatically. Without this every server-rendered route 500s
+// with "Couldn't find next-intl config file" during RSC render.
+const createNextIntlPlugin = require('next-intl/plugin');
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+
 const nextConfig = {
   output: 'standalone',
   images: {
@@ -57,4 +63,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withNextIntl(nextConfig);

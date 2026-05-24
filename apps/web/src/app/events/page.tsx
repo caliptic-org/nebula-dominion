@@ -177,8 +177,15 @@ interface NDCountdownProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Use a stable placeholder for SSR + initial hydration so the server-rendered
+// markup matches the first client render byte-for-byte. Real countdown digits
+// land on the client only after mount. Without this the digits drift between
+// SSR's Date.now() and the browser's, throwing React's hydration mismatch
+// warning on every visit to /events.
+const ZERO_TIME: TimeLeft = { d: 0, h: 0, m: 0, s: 0, total: 0 };
+
 function NDCountdown({ targetDate, color, size = 'md' }: NDCountdownProps) {
-  const [t, setT] = useState<TimeLeft>(() => computeTime(targetDate));
+  const [t, setT] = useState<TimeLeft>(ZERO_TIME);
   useEffect(() => {
     setT(computeTime(targetDate));
     const id = setInterval(() => setT(computeTime(targetDate)), 1000);

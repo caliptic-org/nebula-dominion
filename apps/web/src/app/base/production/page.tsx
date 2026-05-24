@@ -24,6 +24,7 @@ import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { formatResource, useGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
+import { useTrainingQueue, type TrainingQueueDto } from '@/hooks/useTrainingQueue';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
@@ -96,21 +97,20 @@ export default function ProductionPage() {
   /* MERGE: useBaseState dropped — useHudState above now drives level/tier. */
   const { data: resources } = useGameResources();
 
-  // Local resource state still tracks "what the player WOULD spend" — we
-  // reconcile against live data on the HUD. Real spend lands when the
-  // train POST is wired (TODO: replace handleAdd with /units/train).
-  const [crystal, setCrystal] = useState(42);
-  const [resA, setResA] = useState(12_480);
-  const [resB, setResB] = useState(3_210);
-  // When live resources land, replace the local fallback once.
-  const hydrated = useRef(false);
+  // Local resource state mirrors the live wallet — initially 0 so the UI
+  // never renders the legacy 12,480/3,210/42 mock values. handleAdd
+  // applies optimistic deductions, then the real /units/train POST
+  // reconciles the backend wallet (next useGameResources poll lands the
+  // canonical value within 5s).
+  const [crystal, setCrystal] = useState(0);
+  const [resA, setResA] = useState(0);
+  const [resB, setResB] = useState(0);
+  // Mirror live values whenever they advance (poll tick or refresh).
   useEffect(() => {
-    if (hydrated.current) return;
     if (!resources) return;
     setResA(resources.mineral);
     setResB(resources.gas);
     setCrystal(resources.energy);
-    hydrated.current = true;
   }, [resources]);
 
   // Live backend unit configs (race-specific). Overlay onto the first 5
@@ -121,13 +121,54 @@ export default function ProductionPage() {
     () => buildUnits(race, backendUnits),
     [race, backendUnits],
   );
-  const [queue, setQueue] = useState<QueueItem[]>(() => buildInitialQueue(race));
+
+  // Live training queue from game-server. Empty list = "nothing currently
+  // training" — that's the legitimate fresh-account state, not a loading
+  // shimmer. Local state below mirrors this so optimistic adds + speed-ups
+  // can render before the next 30s poll arrives.
+  const { data: liveQueue, refresh: refreshQueue } = useTrainingQueue();
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [flashId, setFlashId] = useState<string | null>(null);
 
-  // Re-seed queue when race changes (race-select navigation).
+  // Hydrate the local queue every time the server-side queue advances.
+  // Maps backend rows → QueueItem by computing remainingSec from
+  // (completesAt − now). Unit names + tiers fall back to race lex when
+  // the backend type doesn't match a known race unit.
   useEffect(() => {
-    setQueue(buildInitialQueue(race));
-  }, [race]);
+    if (!liveQueue) return;
+    const now = Date.now();
+    const mapped: QueueItem[] = liveQueue
+      .filter((row) => !row.isComplete)
+      .map((row) => {
+        const remainingSec = Math.max(
+          0,
+          Math.round((new Date(row.completesAt).getTime() - now) / 1000),
+        );
+        const totalSec = Math.max(
+          remainingSec,
+          Math.round(
+            (new Date(row.completesAt).getTime() - new Date(row.createdAt).getTime()) /
+              1000,
+          ),
+        );
+        // Best-effort race-flavoured name: match backend unit type
+        // against the race's units list, else show the raw type code.
+        const def = race.units.find((u) =>
+          u.n.toLowerCase().replace(/\s+/g, '_') === row.unitType.toLowerCase() ||
+          row.unitType.toLowerCase().includes(u.n.toLowerCase().slice(0, 5)),
+        );
+        return {
+          id: row.id,
+          unitName: def?.n ?? row.unitType,
+          count: 1, // backend tracks 1 row per unit; multi-batch could fold them
+          tier: def?.t ?? 1,
+          totalSec,
+          remainingSec,
+          speedUpCost: crystalCostFor(totalSec),
+        };
+      });
+    setQueue(mapped);
+  }, [liveQueue, race]);
 
   // Live countdown tick.
   useEffect(() => {
@@ -235,6 +276,10 @@ export default function ProductionPage() {
           unitType,
         });
         toast.success(`${selectedUnit.name} eğitimi başlatıldı (${total}s)`);
+        // Pull the canonical queue row that the backend just inserted —
+        // replaces our optimistic stub with the real id + completesAt
+        // so subsequent ticks stay in sync with server time.
+        refreshQueue();
       } catch (err) {
         const msg = err instanceof FetchError ? err.message : 'Eğitim reddedildi';
         toast.error(msg);
@@ -929,58 +974,25 @@ function EmptySlot({ race, index }: { race: NDRace; index: number }) {
 function buildUnits(race: NDRace, backend: UnitConfigDto[]): UnitDef[] {
   const fmt = (n: number) => n.toLocaleString('tr-TR');
   return race.units.slice(0, 5).map((u, i) => {
-    const rows: [string, string, number][] = [
-      ['80',    '20',   24],
-      ['180',   '60',   80],
-      ['440',   '180',  240],
-      ['1,200', '480',  720],
-      ['2,800', '1,000', 1800],
-    ];
-    const row = rows[i] ?? rows[rows.length - 1];
     const live = backend[i];
     return {
       name: u.n,
       tier: live?.tier ?? u.t,
-      costA: live?.cost ? fmt(live.cost.mineral) : row[0],
-      costB: live?.cost ? fmt(live.cost.gas) : row[1],
-      durationSec: live?.trainTimeSeconds ?? row[2],
+      // No more hardcoded fallback rows — show "—" until the public
+      // /api/units/configs/:race endpoint resolves. canAfford guards
+      // the "İnşa Et" button so undefined costs can't trigger a spend.
+      costA: live?.cost ? fmt(live.cost.mineral) : '—',
+      costB: live?.cost ? fmt(live.cost.gas) : '—',
+      durationSec: live?.trainTimeSeconds ?? 0,
     };
   });
 }
 
-function buildInitialQueue(race: NDRace): QueueItem[] {
-  const u = race.units;
-  if (u.length < 4) return [];
-  return [
-    {
-      id: 'seed-1',
-      unitName: u[0].n,
-      count: 8,
-      tier: u[0].t,
-      totalSec: 60,
-      remainingSec: 22,
-      speedUpCost: 5,
-    },
-    {
-      id: 'seed-2',
-      unitName: u[1].n,
-      count: 4,
-      tier: u[1].t,
-      totalSec: 240,
-      remainingSec: 200,
-      speedUpCost: 14,
-    },
-    {
-      id: 'seed-3',
-      unitName: u[3].n,
-      count: 2,
-      tier: u[3].t,
-      totalSec: 720,
-      remainingSec: 680,
-      speedUpCost: 38,
-    },
-  ];
-}
+// buildInitialQueue removed — the queue now hydrates from the live
+// useTrainingQueue hook (game-server /api/units/training-queue). Empty
+// queue = "nothing currently training", which is the correct fresh-
+// account state instead of the legacy 3-seed mock that made every new
+// player think they already had units in production.
 
 function TierBadge({ race, tier }: { race: NDRace; tier: number }) {
   return (

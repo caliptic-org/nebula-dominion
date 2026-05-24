@@ -509,6 +509,16 @@ interface HUDProps {
   resB?: string;
   crystal?: string;
   pop?: string;
+  /** Optional per-resource live telemetry fed straight from useHudState.
+   *  When present, the help popover surfaces "+X/tick · Y / Z depo" so
+   *  the player can see whether they're producing anything and whether
+   *  they're capped out. */
+  resAPerTick?: number;
+  resBPerTick?: number;
+  crystalPerTick?: number;
+  resACap?: number;
+  resBCap?: number;
+  crystalCap?: number;
 }
 
 /* Per-resource help copy — shown when the player taps a HUD resource pill.
@@ -553,6 +563,12 @@ export function HUD({
   resA = '—',
   resB = '—',
   crystal = '—',
+  resAPerTick,
+  resBPerTick,
+  crystalPerTick,
+  resACap,
+  resBCap,
+  crystalCap,
 }: HUDProps) {
   // Single-slot popover: tap a pill to open, tap again or outside to close.
   // Lives in HUD so all three pills share one open-state (only one popover
@@ -656,6 +672,17 @@ export function HUD({
           info={resInfoFor(openSlot, race)}
           race={race}
           slot={openSlot}
+          perTick={
+            openSlot === 'A' ? resAPerTick
+            : openSlot === 'B' ? resBPerTick
+            : crystalPerTick
+          }
+          currentValue={openSlot === 'A' ? resA : openSlot === 'B' ? resB : crystal}
+          cap={
+            openSlot === 'A' ? resACap
+            : openSlot === 'B' ? resBCap
+            : crystalCap
+          }
           onClose={() => setOpenSlot(null)}
         />
       )}
@@ -669,15 +696,37 @@ function ResInfoPopover({
   info,
   race,
   slot,
+  perTick,
+  currentValue,
+  cap,
   onClose,
 }: {
   info: ResInfo;
   race: NDRace;
   slot: ResSlot;
+  perTick?: number;
+  currentValue?: string;
+  cap?: number;
   onClose: () => void;
 }) {
   const isCrystal = slot === 'crystal';
   const accent = isCrystal ? 'oklch(0.82 0.16 80)' : race.primary;
+  const fmtNum = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1000 ? `${(n / 1000).toFixed(1)}K`
+    : Math.floor(n).toLocaleString('tr-TR');
+  const rateText = perTick !== undefined ? (perTick > 0 ? `+${fmtNum(perTick)}/tick` : '0/tick') : null;
+  const capText = cap !== undefined && cap > 0 ? `${currentValue ?? '—'} / ${fmtNum(cap)}` : null;
+  // Race-aware "build this to earn more" hint. Slot 1 of every race is the
+  // primary resource building, slot 3 is the research/secondary building —
+  // most races map slot 1→A, slot 1→crystal, slot 3→B, with some variation
+  // for canavar/seytan. We point at slot 1 for A+crystal and slot 3 for B
+  // as a sensible default that always resolves to a real race building.
+  const focusSlotIdx = slot === 'B' ? 3 : 1;
+  const focusBuilding = race.buildings[focusSlotIdx];
+  const focusHref = focusBuilding?.slug
+    ? `/base/build?focus=${focusBuilding.slug}`
+    : '/base/build';
   return (
     <div
       id="hud-res-popover"
@@ -747,6 +796,39 @@ function ResInfoPopover({
           ×
         </button>
       </div>
+
+      {/* Live telemetry row — answers "kaç tane üretiyorum, depo doldu mu"
+       *  before the player even reads the description. Rate first (the
+       *  actionable number), cap second. */}
+      {(rateText || capText) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 6,
+            fontFamily: ND.mono,
+            fontSize: 10,
+          }}
+        >
+          {rateText && (
+            <span
+              style={{
+                color: perTick && perTick > 0 ? accent : ND.danger,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {rateText}
+            </span>
+          )}
+          {capText && (
+            <span style={{ color: ND.textDim, letterSpacing: '0.02em' }}>
+              · {capText}
+            </span>
+          )}
+        </div>
+      )}
+
       <p
         style={{
           margin: 0,
@@ -784,10 +866,18 @@ function ResInfoPopover({
         >
           NASIL KAZANIRSIN
         </span>
-        {info.howTo}
+        {focusBuilding ? (
+          <>
+            <strong style={{ color: accent }}>{focusBuilding.n}</strong>{' '}
+            inşa et veya seviye atla — bina sayısı arttıkça tick başına
+            üretim artar.
+          </>
+        ) : (
+          info.howTo
+        )}
       </div>
       <a
-        href="/base/build"
+        href={focusHref}
         onClick={onClose}
         style={{
           display: 'inline-block',
@@ -804,7 +894,7 @@ function ResInfoPopover({
           boxShadow: `0 0 10px -3px ${accent}99`,
         }}
       >
-        Yapı Kataloğunu Aç →
+        {focusBuilding?.n ? `${focusBuilding.n} İnşa Et →` : 'Yapı Kataloğunu Aç →'}
       </a>
     </div>
   );

@@ -13,6 +13,18 @@ export interface HudState {
   resA: string;
   resB: string;
   crystal: string;
+  /** Per-tick production rates (raw numbers from game-server snapshot).
+   *  Used by the resource help popover so the player sees concrete
+   *  "+5/tick" instead of a vague "build a resource building". 0 = no
+   *  production yet; undefined = data hasn't arrived. */
+  resAPerTick?: number;
+  resBPerTick?: number;
+  crystalPerTick?: number;
+  /** Storage caps — popover shows "X / Y" so the player knows if
+   *  they're capped out and shouldn't bother investing yet. */
+  resACap?: number;
+  resBCap?: number;
+  crystalCap?: number;
   loading: boolean;
 }
 
@@ -55,6 +67,12 @@ export function useHudState(): HudState {
     resA: formatAmount(resources?.mineral),
     resB: formatAmount(resources?.gas),
     crystal: formatAmount(resources?.energy),
+    resAPerTick: resources?.mineralPerTick,
+    resBPerTick: resources?.gasPerTick,
+    crystalPerTick: resources?.energyPerTick,
+    resACap: resources?.mineralCap,
+    resBCap: resources?.gasCap,
+    crystalCap: resources?.energyCap,
     loading: tierLoading || resourcesLoading,
   };
 }

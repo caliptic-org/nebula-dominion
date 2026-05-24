@@ -285,36 +285,6 @@ export function BaseField({
           <stop offset="0%" stopColor={palette.glow.replace(/[\d.]+\)$/, '0.32)')} />
           <stop offset="100%" stopColor="rgba(0,0,0,0)" />
         </radialGradient>
-
-        {/* Per-race tile pattern — one shared texture covers ALL 96 tiles,
-         *  so neighbours read as one continuous ground instead of 96
-         *  isolated diamonds. patternTransform applies the classic iso
-         *  projection (rotate 45° + scale Y 50%) which converts a square
-         *  texture into a 2:1 diamond grid. Pattern phase is aligned to
-         *  ORIGIN_X / ORIGIN_Y so the diamonds land on tile centres.
-         *  Hidden when the sprite hasn't loaded yet — fall back to flat
-         *  polygon fills below. */}
-        {(['ground', 'resource', 'blocked'] as const).map((variant) => (
-          <pattern
-            key={`tex-${race.key}-${variant}`}
-            id={`tile-tex-${race.key}-${variant}`}
-            patternUnits="userSpaceOnUse"
-            width={TILE_W}
-            height={TILE_H}
-            x={ORIGIN_X - TILE_W / 2}
-            y={ORIGIN_Y}
-            patternTransform="rotate(45) scale(1, 0.5)"
-          >
-            <image
-              href={TILE_SPRITES[race.key][variant]}
-              x={0}
-              y={0}
-              width={TILE_W}
-              height={TILE_W}
-              preserveAspectRatio="xMidYMid slice"
-            />
-          </pattern>
-        ))}
       </defs>
 
       {/* Plane glow — soft race-tinted halo under the centre tiles so the
@@ -328,32 +298,53 @@ export function BaseField({
         fill={`url(#plane-glow-${race.key})`}
       />
 
-      {/* Ground tiles — single shared pattern fills each diamond polygon,
-       *  giving cross-tile continuity (a "real ground" feel instead of
-       *  96 isolated diamond stamps). When the sprite hasn't loaded yet
-       *  the polygon falls back to a flat TILE_PALETTE colour so the
-       *  page never flashes empty.
+      {/* Ground tiles — per-tile <image> rendered with iso projection
+       *  (rotate 45° + scaleY 50%) so each PNG fits exactly one tile
+       *  diamond. The source PNG is rendered as a TILE_W / √2 × TILE_W / √2
+       *  square; after the iso transform around the tile centre it lands
+       *  as a TILE_W × TILE_H diamond on the polygon below.
        *
-       *  Variant logic stays: building tiles use `ground`, decorative
-       *  tiles pick from the {ground, resource, blocked} hash so the
-       *  field shows a sprinkling of richer terrain. */}
-      {tiles.map(({ col, row, key }) => {
-        const checker = (col + row) % 2 === 0;
-        const isBuildingTile = buildingByTile.has(`${col},${row}`);
-        const variant = isBuildingTile ? 'ground' : getTileVariant(col, row, race.key);
-        const fillStyle = hasTileSprite
-          ? `url(#tile-tex-${race.key}-${variant})`
-          : (checker ? palette.ground : palette.groundAlt);
-        return (
-          <polygon
-            key={`g-${key}`}
-            points={tileDiamondPoints(col, row)}
-            fill={fillStyle}
-            stroke={palette.edge}
-            strokeWidth={0.6}
-          />
-        );
-      })}
+       *  Math: square side `S = TILE_W/√2`. rotate(45) gives an S√2 × S√2
+       *  diamond → TILE_W × TILE_W. scaleY(0.5) squashes height → TILE_H.
+       *  translate(x, y + TILE_H/2) lands the pivot on the tile centre.
+       *
+       *  The polygon below is kept as fallback fill (colour + edge stroke)
+       *  so the tile is still legible if the sprite hasn't loaded yet. */}
+      {(() => {
+        const S = TILE_W / Math.SQRT2; // source square side (≈ 45.25 for TILE_W=64)
+        return tiles.map(({ col, row, key }) => {
+          const checker = (col + row) % 2 === 0;
+          const { x, y } = tileToScreen(col, row);
+          const isBuildingTile = buildingByTile.has(`${col},${row}`);
+          const variant = isBuildingTile ? 'ground' : getTileVariant(col, row, race.key);
+          const variantHref = TILE_SPRITES[race.key][variant];
+          return (
+            <g key={`g-${key}`}>
+              {/* Fallback fill + grid stroke (visible only if sprite 404s
+               *  or the iso-transform <image> hasn't decoded yet). */}
+              <polygon
+                points={tileDiamondPoints(col, row)}
+                fill={checker ? palette.ground : palette.groundAlt}
+                stroke={palette.edge}
+                strokeWidth={0.6}
+              />
+              {hasTileSprite && (
+                <g transform={`translate(${x}, ${y + TILE_H / 2}) scale(1, 0.5) rotate(45)`}>
+                  <image
+                    href={variantHref}
+                    x={-S / 2}
+                    y={-S / 2}
+                    width={S}
+                    height={S}
+                    preserveAspectRatio="xMidYMid slice"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </g>
+              )}
+            </g>
+          );
+        });
+      })()}
 
       {/* Buildings — one per BUILDING_TILES entry, anchored by tile centre.
        *  Rendered AFTER all ground tiles so they overlap onto adjacent tiles

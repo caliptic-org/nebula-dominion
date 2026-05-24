@@ -400,7 +400,7 @@ function Inner({ slug }: { slug: string }) {
               <Eyebrow color={race.primary}>YÜKSELTME</Eyebrow>
               <Caption style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55 }}>
                 {owned
-                  ? `Mevcut seviye: ${owned.level}. Yükseltme oranı arka uçta henüz tanımlı değil — sıradaki seviyeyi ${Math.round(costA * 1.5).toLocaleString('tr-TR')} mineral + ${Math.round(costB * 1.5).toLocaleString('tr-TR')} gas + ${fmtDuration(Math.round(buildSec * 1.4))} ile tahmin ediyoruz.`
+                  ? `Mevcut seviye: ${owned.level}. Yükseltme oranı arka uçta henüz tanımlı değil — sıradaki seviyeyi ${Math.round(costA * 1.5).toLocaleString('tr-TR')} ${race.resourceA.name} + ${Math.round(costB * 1.5).toLocaleString('tr-TR')} ${race.resourceB.name} + ${fmtDuration(Math.round(buildSec * 1.4))} ile tahmin ediyoruz.`
                   : 'Bu slot henüz inşa edilmemiş. Önce yapımı başlat, sonra seviyeleri buradan görürsün.'}
               </Caption>
               <div style={{ marginTop: 12 }}>

@@ -39,6 +39,19 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
   more: '/settings',
 };
 
+/* Race → existing illustrated base sprite, used as the /base backdrop
+ * until we regenerate the 30-image age-aware ComfyUI sweep that should
+ * live under /assets/bases/<race>/age-<n>.png. These sprites are also
+ * referenced by battle-result / map screens, so we don't move or rename
+ * the underlying files — just point /base at them. */
+const BASE_BG_FALLBACK: Record<string, string> = {
+  insan:   '/sprites/base-insan.png',
+  zerg:    '/sprites/base-bocek.png',
+  otomat:  '/sprites/enemy-otomat.png',
+  canavar: '/sprites/enemy-canavar.png',
+  seytan:  '/sprites/base-seytan.png',
+};
+
 const QUICK_ACTION_ROUTES: Record<string, string> = {
   build:    '/base/build',
   prod:     '/base/production',
@@ -108,12 +121,20 @@ export default function BaseHomePage() {
     router.replace(`/tutorial?step=${resume}`);
   }, [hydrated, isFirstSession, router]);
 
-  /* Age-aware backdrop: 5 races × 6 ages of ComfyUI-generated landscape art
-   * live under /assets/bases/<race>/age-<n>.png. Clamp age into the valid
-   * range so a fresh player (age 1) and a max-tier veteran (age 6) get the
-   * matching era visual. */
+  /* Age-aware backdrop: the original plan was 5 races × 6 ages of
+   * ComfyUI-generated landscape art under /assets/bases/<race>/age-<n>.png,
+   * but those files were never committed (gitignored ComfyUI output) and
+   * are no longer on disk. Until we regenerate the 30-image sweep, fall
+   * back to each race's existing illustrated sprite — they're cleaner
+   * single-figure scenes than the era landscapes but they don't 404 and
+   * keep the page from rendering with a blank backdrop. Other consumers
+   * of these sprites (battle-result, map) keep using them unchanged.
+   *
+   * Once the sweep regenerates, swap this back to the age-aware path
+   * and delete the BASE_BG_FALLBACK map below. */
   const safeAge = Math.min(6, Math.max(1, liveAge ?? 1));
-  const baseBg = `/assets/bases/${race.key}/age-${safeAge}.png`;
+  void safeAge; // kept for the future age-aware swap-back
+  const baseBg = BASE_BG_FALLBACK[race.key];
 
   /* Story-unlock toast: when the player's `safeAge` advances past the value
    * we last surfaced, pop a chip pointing at /story-gallery. Persisted in

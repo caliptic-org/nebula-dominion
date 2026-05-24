@@ -291,14 +291,19 @@ function BuildMenuInner() {
 
             {/* CTAs */}
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              {/* Reset filter — jumps back to "Tümü" tab when the player
+               *  drilled into a sub-category and wants to see everything
+               *  again. Replaces the old "Filtre yakında" stub button that
+               *  duplicated functionality already provided by RaceTabs above. */}
               <NDButton
                 race={race}
                 variant="ghost"
                 size="md"
                 style={{ flex: 1 }}
-                onClick={() => toast.info('Filtre yakında — şu anda tüm yapılar listede')}
+                disabled={activeTab === 0}
+                onClick={() => setActiveTab(0)}
               >
-                FİLTRE
+                TÜMÜ
               </NDButton>
               <NDButton
                 race={race}

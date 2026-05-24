@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
 import {
@@ -953,7 +953,46 @@ export default function ResearchPage() {
   const race = useNDRace();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('ekonomi');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [categories, setCategories] = useState<CategoryData[]>(INITIAL_CATEGORIES);
+  // Local-only research progression — no backend POST endpoint yet, so
+  // started/completed states would normally evaporate on reload and the
+  // player wouldn't understand why their progress disappeared. Persist
+  // the node states in localStorage as a stop-gap so the demo flow at
+  // least feels durable until a real /tech/{id}/research endpoint lands.
+  const RESEARCH_KEY = 'nebula:research:v1';
+  const [categories, setCategories] = useState<CategoryData[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_CATEGORIES;
+    try {
+      const raw = window.localStorage.getItem(RESEARCH_KEY);
+      if (!raw) return INITIAL_CATEGORIES;
+      const saved = JSON.parse(raw) as { id: string; state: NodeState; progress?: number }[];
+      const byId = new Map(saved.map((s) => [s.id, s] as const));
+      return INITIAL_CATEGORIES.map((c) => ({
+        ...c,
+        nodes: c.nodes.map((n) => {
+          const hit = byId.get(n.id);
+          return hit ? { ...n, state: hit.state, progress: hit.progress } : n;
+        }),
+      }));
+    } catch {
+      return INITIAL_CATEGORIES;
+    }
+  });
+  // Persist any state change as a flat {id, state, progress} list so we
+  // don't write the entire static catalog (~30 nodes × ~10 fields) on
+  // every research click.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const flat = categories.flatMap((c) =>
+        c.nodes
+          .filter((n) => n.state !== 'available' && n.state !== 'locked')
+          .map((n) => ({ id: n.id, state: n.state, progress: n.progress })),
+      );
+      window.localStorage.setItem(RESEARCH_KEY, JSON.stringify(flat));
+    } catch {
+      /* private mode — fall through */
+    }
+  }, [categories]);
   /* MERGE: kept the useGameResources poll active so the resource cache stays
    * warm for downstream screens; the header in this version no longer renders
    * resources directly (remote moved to a chip count). */

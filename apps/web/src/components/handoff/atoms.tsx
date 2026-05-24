@@ -676,9 +676,6 @@ function ResInfoPopover({
   slot: ResSlot;
   onClose: () => void;
 }) {
-  // Match the visual horizontal position of the pill it anchors to —
-  // resource pills sit in the right cluster of the HUD, so popover
-  // anchors to the right edge and grows down.
   const isCrystal = slot === 'crystal';
   const accent = isCrystal ? 'oklch(0.82 0.16 80)' : race.primary;
   return (
@@ -688,21 +685,28 @@ function ResInfoPopover({
       aria-label={`${info.title} hakkında`}
       style={{
         position: 'absolute',
-        // Right-side pills; the rightmost (crystal) gets right:10 to align with
-        // its pill; the middle (B) shifts left ~78px; the leftmost (A) shifts
-        // ~156px. Approximations since pill widths vary with content but it
-        // keeps the arrow under the correct pill at typical resource sizes.
-        right: slot === 'A' ? 156 : slot === 'B' ? 78 : 10,
+        // Anchor to the right edge of the HUD — same edge as the pill
+        // cluster — and let the width clamp keep it on-screen instead
+        // of computing a per-pill offset that overflows on narrow
+        // viewports. Mobile 375px viewport can't safely shift a 240px
+        // panel 156px to the left of the right pill (= overflow -21).
+        right: 10,
         top: 'calc(100% + 6px)',
         zIndex: 30,
-        width: 240,
+        // Clamp keeps the popover under the rightmost pill on desktop
+        // (240px wide) but shrinks to viewport-edge-aware width on
+        // narrow phones (375 - 20 padding = 355 max; usually hits 232).
+        width: 232,
+        maxWidth: 'calc(100vw - 20px)',
         background: 'rgba(6,8,15,0.96)',
         border: `1px solid ${accent}55`,
         borderRadius: 6,
-        padding: '10px 12px',
+        padding: '8px 10px',
         boxShadow: `0 12px 28px -10px rgba(0,0,0,0.6), 0 0 16px -6px ${accent}66`,
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
+        fontSize: 11,
+        lineHeight: 1.4,
       }}
     >
       <div
@@ -711,16 +715,17 @@ function ResInfoPopover({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
-          marginBottom: 6,
+          marginBottom: 4,
         }}
       >
         <div
           style={{
             fontFamily: ND.display,
-            fontSize: 13,
+            fontSize: 12,
             color: accent,
             letterSpacing: '0.06em',
             textTransform: 'uppercase',
+            lineHeight: 1.1,
           }}
         >
           {info.title}
@@ -735,7 +740,8 @@ function ResInfoPopover({
             padding: '0 4px',
             color: ND.textMute,
             fontFamily: ND.mono,
-            fontSize: 14,
+            fontSize: 13,
+            lineHeight: 1,
           }}
         >
           ×
@@ -745,8 +751,8 @@ function ResInfoPopover({
         style={{
           margin: 0,
           fontFamily: ND.body,
-          fontSize: 11,
-          lineHeight: 1.45,
+          fontSize: 10.5,
+          lineHeight: 1.4,
           color: ND.textDim,
         }}
       >
@@ -754,14 +760,14 @@ function ResInfoPopover({
       </p>
       <div
         style={{
-          marginTop: 8,
-          padding: '6px 8px',
+          marginTop: 6,
+          padding: '5px 7px',
           borderRadius: 4,
           background: `${accent}14`,
           border: `1px solid ${accent}33`,
           fontFamily: ND.body,
-          fontSize: 10.5,
-          lineHeight: 1.4,
+          fontSize: 10,
+          lineHeight: 1.35,
           color: ND.text,
         }}
       >
@@ -769,11 +775,11 @@ function ResInfoPopover({
           style={{
             display: 'block',
             fontFamily: ND.mono,
-            fontSize: 8,
+            fontSize: 7.5,
             letterSpacing: '0.18em',
             color: accent,
             textTransform: 'uppercase',
-            marginBottom: 3,
+            marginBottom: 2,
           }}
         >
           NASIL KAZANIRSIN
@@ -785,17 +791,17 @@ function ResInfoPopover({
         onClick={onClose}
         style={{
           display: 'inline-block',
-          marginTop: 10,
-          padding: '6px 10px',
+          marginTop: 8,
+          padding: '5px 8px',
           background: accent,
           color: '#06080F',
           fontFamily: ND.display,
-          fontSize: 10,
+          fontSize: 9.5,
           letterSpacing: '0.10em',
           textTransform: 'uppercase',
           textDecoration: 'none',
           borderRadius: 3,
-          boxShadow: `0 0 12px -3px ${accent}99`,
+          boxShadow: `0 0 10px -3px ${accent}99`,
         }}
       >
         Yapı Kataloğunu Aç →

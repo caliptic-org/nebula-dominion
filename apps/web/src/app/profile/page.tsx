@@ -74,12 +74,12 @@ const POWER_BREAKDOWN = [
   { label: 'Birim',      value: 35 },
 ];
 
-const ACTIVE_BUFFS = [
-  { id: 'b1', label: 'Savaş Frenezisi', effect: '+25% Saldırı',      remainingSec: 3_240, totalSec: 7_200 },
-  { id: 'b2', label: 'Zırh Protokolü',  effect: '+18% Savunma',     remainingSec: 1_800, totalSec: 3_600 },
-  { id: 'b3', label: 'Enerji Akışı',    effect: '+40% Üretim',      remainingSec: 540,   totalSec: 3_600 },
-  { id: 'b4', label: 'XP Katalizörü',   effect: '+50% XP',          remainingSec: 5_400, totalSec: 14_400 },
-];
+// Empty by default — the buffs panel renders honest "no active buffs"
+// state instead of pretending every account has 4 timed buffs running.
+// Once a /buffs endpoint lands this is fed from there; until then a
+// player who's never used a /shop "Savaş Kalkanı" / "XP Katalizörü"
+// item sees the truthful empty state.
+const ACTIVE_BUFFS: { id: string; label: string; effect: string; remainingSec: number; totalSec: number }[] = [];
 
 function fmt(n: number) {
   return new Intl.NumberFormat('tr-TR').format(n);
@@ -135,29 +135,37 @@ export default function ProfilePage() {
       allianceTag: live?.allianceTag ?? race.allianceTag,
       allianceName: race.allianceName,
       capitalBase: race.capitalBase,
-      level: liveTier?.tier?.currentLevel ?? live?.level ?? 47,
-      power: livePower ?? 142_800,
+      level: liveTier?.tier?.currentLevel ?? live?.level ?? 1,
+      power: livePower ?? 0,
       // Per-account ranking / PvP stats need dedicated backend endpoints
-      // (/leaderboard/me, /pvp/stats, /battles/history). Until those land
-      // we show literals; the chart bars still render meaningfully because
-      // win-rate is derived from wins/battles below.
-      globalRank: 1_247,
-      pvpScore: 4_287,
-      pvpRank: 338,
-      wins: 384,
-      losses: 97,
-      battles: 481,
-      bestStreak: 17,
-      guildContrib: 18_420,
-      xp: liveTier?.tier ? Number(liveTier.tier.xp) : live?.xp ?? 74_200,
-      xpNext: liveTier?.tier ? Number(liveTier.tier.xpToNextLevel) : 100_000,
-      seasonPass: 68,
+      // (/leaderboard/me, /pvp/stats, /battles/history). Until those
+      // land, default to zeros instead of literal "Rank #1247 / 384 wins
+      // / 97 losses" that's identical for every account. The UI below
+      // already handles 0/0 via the winRate guard and the empty stats
+      // panels render naturally.
+      globalRank: 0,
+      pvpScore: 0,
+      pvpRank: 0,
+      wins: 0,
+      losses: 0,
+      battles: 0,
+      bestStreak: 0,
+      guildContrib: 0,
+      xp: liveTier?.tier ? Number(liveTier.tier.xp) : live?.xp ?? 0,
+      xpNext: liveTier?.tier ? Number(liveTier.tier.xpToNextLevel) : 1000,
+      seasonPass: 0,
     }),
     [race, live, liveTier, livePower],
   );
 
-  const winRate = Math.round((profile.wins / profile.battles) * 100);
-  const xpPct = Math.round((profile.xp / profile.xpNext) * 100);
+  // Guard against div-by-zero when the player has no battles yet —
+  // returns 0 instead of NaN so the bar renders empty cleanly.
+  const winRate = profile.battles > 0
+    ? Math.round((profile.wins / profile.battles) * 100)
+    : 0;
+  const xpPct = profile.xpNext > 0
+    ? Math.round((profile.xp / profile.xpNext) * 100)
+    : 0;
   const earned = ACHIEVEMENTS.filter(a => a.earned).length;
   const totalPower = profile.power;
 
@@ -307,9 +315,17 @@ export default function ProfilePage() {
                 <Code>{ACTIVE_BUFFS.length}</Code>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}>
-                {ACTIVE_BUFFS.map(b => (
-                  <BuffRow key={b.id} buff={b} race={race} />
-                ))}
+                {ACTIVE_BUFFS.length === 0 ? (
+                  <Caption style={{ textAlign: 'center', padding: '12px 8px', color: ND.textMute }}>
+                    Aktif buff yok. Mağazadan{' '}
+                    <Link href="/shop" style={{ color: race.primary, textDecoration: 'none' }}>
+                      Savaş Kalkanı veya XP Katalizörü
+                    </Link>{' '}
+                    al, savaşta aktive et.
+                  </Caption>
+                ) : (
+                  ACTIVE_BUFFS.map(b => <BuffRow key={b.id} buff={b} race={race} />)
+                )}
               </div>
             </Panel>
 

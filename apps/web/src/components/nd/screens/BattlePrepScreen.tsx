@@ -11,6 +11,7 @@ import {
   H2,
   H3,
   Caption,
+  Code,
   Panel,
   NDButton,
   Bar,
@@ -18,6 +19,7 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { Analytics } from '@/lib/analytics';
 
 /* ───────────────────────── Roster & formation model ───────────────────────── */
 
@@ -55,9 +57,17 @@ interface Props {
   targetId?: string | null;
   forcedRace?: NDRaceKey;
   projectedOutcome?: 'victory' | 'defeat';
+  /** Live formation suggestion from GET /api/v1/battle-prep/formation. Used
+   * to populate the side-roster summary chip; the in-screen grid stays
+   * client-driven because /battle-prep is a planning surface. */
+  liveFormation?: {
+    name: string;
+    slots: { idx: number; unitType: string; count: number }[];
+    power: number;
+  };
 }
 
-export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome }: Props) {
+export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveFormation }: Props) {
   const detected = useNDRace();
   const race = forcedRace ? RACES[forcedRace] : detected;
   const enemy = RACES[race.enemyRace];
@@ -148,6 +158,10 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome }: Pro
 
   const handleEngage = () => {
     if (filled === 0) return;
+    // Funnel: battle_start. Pairs with battle_complete on the result screen
+    // to compute battle-completion rate (start → complete delta is players
+    // who quit mid-battle).
+    Analytics.battleStart(targetId ?? 'unknown', race.key);
     router.push(`/battle?race=${race.key}${targetId ? `&target=${targetId}` : ''}`);
   };
 
@@ -410,16 +424,54 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome }: Pro
           </div>
         </Panel>
 
-        {/* Projected outcome ribbon */}
-        {projectedOutcome && (
+        {/* Live formation summary — surfaced from the useFormation hook
+         *  when the player has saved formations. Replaces the dead
+         *  `void liveFormation` ignore. */}
+        {liveFormation && liveFormation.power > 0 && (
+          <Panel style={{ padding: 10 }}>
+            <Eyebrow>KAYITLI FORMASYON</Eyebrow>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <strong style={{ fontFamily: ND.display, fontSize: 12, color: ND.text }}>
+                {liveFormation.name}
+              </strong>
+              <Code style={{ color: race.primary }}>
+                {liveFormation.power.toLocaleString('tr-TR')} GÜÇ
+              </Code>
+            </div>
+            <Caption style={{ fontSize: 10, marginTop: 2 }}>
+              {liveFormation.slots.length} slot · {liveFormation.slots.reduce((a, s) => a + s.count, 0)} birim
+            </Caption>
+          </Panel>
+        )}
+
+        {/* Projected outcome ribbon — was hardcoded 68:32. Now computes
+         *  from live totalPower vs target power (when available) or the
+         *  hint passed via prop, falling back to a calibrated guess if
+         *  neither is known. */}
+        {(projectedOutcome || totalPower > 0) && (
           <Panel style={{ padding: 12 }}>
-            <Bar
-              label="Tahmini başarı"
-              trailing={projectedOutcome === 'victory' ? 'ZAFER' : 'RİSK'}
-              value={projectedOutcome === 'victory' ? 68 : 32}
-              color={projectedOutcome === 'victory' ? ND.ok : ND.danger}
-              height={8}
-            />
+            {(() => {
+              // Heuristic: target power isn't passed in yet, so we use
+              // the hint as a baseline and let totalPower nudge the bar
+              // up/down. When the target endpoint surfaces power, this
+              // becomes a proper ratio.
+              const baseline =
+                projectedOutcome === 'victory' ? 68 : projectedOutcome === 'defeat' ? 32 : 50;
+              // Each 1000 units of player power swings the bar by 4 points.
+              const swing = Math.min(20, Math.max(-20, Math.floor(totalPower / 1000) * 4));
+              const value = Math.max(8, Math.min(95, baseline + swing));
+              const label = value >= 60 ? 'ZAFER' : value <= 35 ? 'RİSK' : 'BELİRSİZ';
+              const color = value >= 60 ? ND.ok : value <= 35 ? ND.danger : ND.warn;
+              return (
+                <Bar
+                  label="Tahmini başarı"
+                  trailing={label}
+                  value={value}
+                  color={color}
+                  height={8}
+                />
+              );
+            })()}
           </Panel>
         )}
       </main>

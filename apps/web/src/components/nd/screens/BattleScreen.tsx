@@ -233,9 +233,21 @@ function reducer(state: SimState, action: SimAction): SimState {
 
 interface Props {
   forcedRace?: NDRaceKey;
+  /** Optional live battle state from /api/v1/battles/:id. When present, the
+   * win-probability dial and turn log surface real backend numbers; the
+   * stub advances one turn per refetch so an interval-driven page animates
+   * forward. The cinematic visual layer stays client-side. */
+  liveBattle?: {
+    id: string;
+    status: 'pending' | 'in-progress' | 'won' | 'lost';
+    turnsElapsed: number;
+    maxTurns: number;
+    winProb: number;
+    log: { turn: number; text: string }[];
+  };
 }
 
-export function BattleScreen({ forcedRace }: Props) {
+export function BattleScreen({ forcedRace, liveBattle }: Props) {
   const detected = useNDRace();
   const race = forcedRace ? RACES[forcedRace] : detected;
   const enemy = RACES[race.enemyRace];
@@ -316,7 +328,16 @@ export function BattleScreen({ forcedRace }: Props) {
         <button
           type="button"
           aria-label="Geri çekil"
-          onClick={() => router.push('/map')}
+          // router.back() honours where the player came from (battle-prep,
+          // map, missions, etc.) instead of always force-routing to /map.
+          // Falls back to /map if there's no history (rare — direct nav).
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push('/map');
+            }
+          }}
           style={{
             all: 'unset',
             cursor: 'pointer',
@@ -339,6 +360,40 @@ export function BattleScreen({ forcedRace }: Props) {
           <H3 style={{ color: race.primary }}>{race.short} vs {enemy.short}</H3>
         </div>
         <div style={{ flex: 1 }} />
+        {/* Live backend win-probability chip — the cinematic combat below
+         *  runs client-side via reducer (it's frame-accurate). The api's
+         *  poll-driven `liveBattle.winProb` is surfaced here as a small
+         *  authoritative read-out so the player sees the "real" odds
+         *  alongside the simulated fight. Hidden when backend hasn't
+         *  resolved yet so we never flash 0%. */}
+        {liveBattle && (
+          <span
+            aria-label="Canlı kazanma olasılığı"
+            style={{
+              fontFamily: ND.mono,
+              fontSize: 11,
+              color:
+                liveBattle.winProb >= 0.6
+                  ? ND.ok
+                  : liveBattle.winProb <= 0.35
+                    ? ND.danger
+                    : ND.warn,
+              letterSpacing: '0.10em',
+              padding: '3px 8px',
+              border: `1px solid ${
+                liveBattle.winProb >= 0.6
+                  ? ND.ok
+                  : liveBattle.winProb <= 0.35
+                    ? ND.danger
+                    : ND.warn
+              }55`,
+              borderRadius: 3,
+              background: 'rgba(6,8,15,0.7)',
+            }}
+          >
+            P(W) {Math.round(liveBattle.winProb * 100)}%
+          </span>
+        )}
         <span
           style={{
             fontFamily: ND.mono,

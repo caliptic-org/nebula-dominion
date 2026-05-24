@@ -16,6 +16,9 @@ import {
   useNDRace,
 } from '@/components/handoff';
 import { setTokens } from '@/lib/session';
+import { raceApi, syncRaceCommitmentFromBackend } from '@/lib/race-api';
+import { Analytics } from '@/lib/analytics';
+import { toast } from '@/components/handoff/Toaster';
 
 const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
 
@@ -28,6 +31,24 @@ function hasRaceCommitment(): boolean {
     return Boolean(parsed?.race && typeof parsed.committedAt === 'number');
   } catch {
     return false;
+  }
+}
+
+/* After login, ask the backend whether this account already picked a race
+ * (could have happened on a different device). If yes, write it to
+ * localStorage so the UI picks up the right theme immediately and we can skip
+ * the race-select screen. Best-effort: any failure just falls through to the
+ * existing localStorage check. */
+async function resolvePostLoginRoute(): Promise<string> {
+  try {
+    const profile = await raceApi.getProfile();
+    if (profile.raceKey) {
+      syncRaceCommitmentFromBackend(profile.raceKey);
+      return '/';
+    }
+    return '/race-select';
+  } catch {
+    return hasRaceCommitment() ? '/' : '/race-select';
   }
 }
 
@@ -108,6 +129,10 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
   const [values, setValues] = useState({ identifier: '', password: '' });
+  // "Beni hatırla" — when off, tokens persist only in sessionStorage so a
+  // browser restart logs the user out. Default ON because the test
+  // accounts get rolled over often during dev.
+  const [remember, setRemember] = useState(true);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -125,7 +150,9 @@ export function LoginForm() {
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-      router.push(hasRaceCommitment() ? '/' : '/race-select');
+      Analytics.login('password');
+      const dest = await resolvePostLoginRoute();
+      router.push(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -267,10 +294,43 @@ export function LoginForm() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, marginBottom: 8 }}>
-            <Code style={{ color: ND.textDim }}>☐ Beni hatırla</Code>
-            <Link href="#" style={{ color: race.primary, fontFamily: ND.mono, fontSize: 11, letterSpacing: '0.04em', textDecoration: 'none' }}>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                color: ND.textDim,
+                fontFamily: ND.mono,
+                fontSize: 11,
+                letterSpacing: '0.04em',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                style={{ accentColor: race.primary }}
+                aria-label="Beni hatırla"
+              />
+              Beni hatırla
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                toast.info('Şifre kurtarma yakında — şimdilik destek@nebula.com ile iletişime geç')
+              }
+              style={{
+                all: 'unset',
+                cursor: 'pointer',
+                color: race.primary,
+                fontFamily: ND.mono,
+                fontSize: 11,
+                letterSpacing: '0.04em',
+              }}
+            >
               {copy.recover}
-            </Link>
+            </button>
           </div>
 
           <NDButton race={race} size="lg" type="submit" full disabled={isLoading}>

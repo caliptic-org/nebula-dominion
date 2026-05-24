@@ -229,7 +229,7 @@ function ShopPageInner() {
               <H3 style={{ color: ND.text, marginTop: 2 }}>{race.short} Irk Paketi · %33 İndirim</H3>
             </div>
             <Code style={{ color: ND.warn }}>
-              ⏱ {promoTimer.d}g {String(promoTimer.h).padStart(2, '0')}s {String(promoTimer.m).padStart(2, '0')}d
+              ⏱ {promoTimer.d}g {String(promoTimer.h).padStart(2, '0')}sa {String(promoTimer.m).padStart(2, '0')}dk
             </Code>
           </div>
         </NotchPanel>

@@ -901,9 +901,30 @@ export default function ChatPage() {
                 gap: 2,
               }}
             >
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} myRace={race} />
-              ))}
+              {messages.length === 0 ? (
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: 24,
+                    color: ND.textMute,
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 32, opacity: 0.4 }} aria-hidden>💬</div>
+                  <div style={{ fontFamily: ND.body, fontSize: 12 }}>
+                    Henüz mesaj yok. İlk konuşmayı sen başlat.
+                  </div>
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} myRace={race} />
+                ))
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}

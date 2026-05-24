@@ -1087,6 +1087,28 @@ export default function ResearchPage() {
           <Chip color={race.primary}>{totalCompleted}/{totalNodes}</Chip>
         </div>
 
+        {/* Local-only notice — research progress lives in localStorage
+         *  until a /tech/{id}/research backend endpoint lands. Inform
+         *  the player so they don't expect cross-device sync. */}
+        <div
+          role="note"
+          style={{
+            margin: '0 16px 12px',
+            padding: '6px 10px',
+            border: `1px dashed ${ND.warn}55`,
+            borderRadius: 4,
+            background: `${ND.warn}11`,
+            fontFamily: ND.mono,
+            fontSize: 9.5,
+            letterSpacing: '0.04em',
+            color: ND.textDim,
+          }}
+        >
+          <strong style={{ color: ND.warn }}>BETA ·</strong>{' '}
+          Araştırma ilerlemen şu an sadece bu cihaza kaydediliyor —
+          sunucu senkronizasyonu yakında.
+        </div>
+
         {/* Category tabs */}
         <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: '0 16px 12px' }}>
           {categories.map((cat) => {

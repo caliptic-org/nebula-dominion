@@ -96,6 +96,29 @@ async function main() {
             [userId, b.type, b.level, b.positionX, b.positionY],
           );
         }
+
+        // Starter units — gives /inventory non-empty roster + something for
+        // /battle-prep to draft. The player_units enum only covers Terran
+        // + Zerg unit types right now; insan / zerg get real spawns and
+        // otomat / canavar / seytan re-use the closest analogue (a future
+        // migration should expand `player_units_race_enum`).
+        const starterUnits = starterUnitsFor(acc.race);
+        for (const u of starterUnits) {
+          // Spawn count units of each type.
+          for (let i = 0; i < u.count; i++) {
+            await client.query(
+              `INSERT INTO player_units
+                 (player_id, type, race, hp, max_hp, attack, defense, speed,
+                  position_x, position_y, abilities, is_alive, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9, '[]'::jsonb, true, now(), now())
+               ON CONFLICT DO NOTHING;`,
+              [
+                userId, u.type, u.race, u.hp, u.attack, u.defense, u.speed,
+                Math.floor(Math.random() * 8), Math.floor(Math.random() * 8),
+              ],
+            );
+          }
+        }
       }
 
       console.log(
@@ -135,6 +158,48 @@ function starterBuildingsFor(race) {
   if (race === 'canavar') return [...common, { type: 'hangar',           level: 1, positionX: 3, positionY: 6 }];
   if (race === 'seytan')  return [...common, { type: 'turret',           level: 1, positionX: 3, positionY: 6 }];
   return common;
+}
+
+/** Starter unit roster per race. The DB enum currently only knows
+ *  {marine,medic,siege_tank,ghost,zergling,hydralisk,ultralisk,queen}
+ *  and races {human,zerg,automaton}. Non-Terran/Zerg races re-use a
+ *  closest analogue until the enum is expanded.
+ *
+ *  Each entry spawns `count` rows of `type`, all alive, with race-typical
+ *  stats. The randomized position_x/y inside starterBuildingsFor caller
+ *  ensures units don't overlap on the 8×8 grid. */
+function starterUnitsFor(race) {
+  if (race === 'insan') {
+    return [
+      { type: 'marine',  race: 'human', count: 8, hp: 100, attack: 12, defense: 5, speed: 8 },
+      { type: 'medic',   race: 'human', count: 2, hp: 80,  attack: 0,  defense: 4, speed: 9 },
+    ];
+  }
+  if (race === 'zerg') {
+    return [
+      { type: 'zergling', race: 'zerg', count: 12, hp: 50,  attack: 8,  defense: 2, speed: 14 },
+      { type: 'hydralisk',race: 'zerg', count: 4,  hp: 140, attack: 18, defense: 6, speed: 7  },
+    ];
+  }
+  if (race === 'otomat') {
+    return [
+      { type: 'siege_tank', race: 'automaton', count: 3, hp: 250, attack: 35, defense: 12, speed: 4 },
+      { type: 'ghost',      race: 'automaton', count: 2, hp: 90,  attack: 22, defense: 5,  speed: 11 },
+    ];
+  }
+  if (race === 'canavar') {
+    // No "creature" enum value — borrow Zerg units as visual placeholder.
+    return [
+      { type: 'ultralisk', race: 'zerg', count: 2, hp: 400, attack: 40, defense: 18, speed: 5 },
+    ];
+  }
+  if (race === 'seytan') {
+    // No "demon" enum value — borrow Queen as the closest "caster" placeholder.
+    return [
+      { type: 'queen', race: 'zerg', count: 3, hp: 200, attack: 16, defense: 9, speed: 7 },
+    ];
+  }
+  return [];
 }
 
 main().catch((err) => {

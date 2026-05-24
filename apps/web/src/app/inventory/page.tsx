@@ -23,6 +23,7 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
+import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useGameUnits';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 
 const ROSTER_NAMES: Record<string, string> = {
@@ -76,12 +77,14 @@ export default function RosterPage() {
 
   // Backend stats overlay: ATK / DEF / SPD numbers come from the game-server
   // unit catalog (race-spesifik). Count / level / state stay synthesized
-  // until the JWT-protected per-player roster (GET /api/units) is wired
-  // (needs cross-service JWT — bkz. Adım 7 sınırlamaları).
+  // Per-player live roster (was previously mock-only). Once the user is
+  // signed in, real `count` values fill in from /api/units; for guests
+  // the synthetic counts stay so the screen never looks empty.
   const { configs: backendUnits } = useUnitConfigs(race.key);
+  const { data: liveUnits } = useGameUnits();
   const units: RosterUnit[] = useMemo(
-    () => buildRoster(race, backendUnits),
-    [race, backendUnits],
+    () => buildRoster(race, backendUnits, liveUnits),
+    [race, backendUnits, liveUnits],
   );
 
   const visible = useMemo(() => {
@@ -321,13 +324,32 @@ function clamp(n: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildRoster(race: NDRace, backend: UnitConfigDto[]): RosterUnit[] {
+function buildRoster(
+  race: NDRace,
+  backend: UnitConfigDto[],
+  liveUnits: PlayerUnitDto[] | null,
+): RosterUnit[] {
   const states: UnitState[] = ['ready', 'fleet', 'wounded'];
+  // When the player has live owned units, key the count map by lowercase
+  // backend type so the synthetic catalog can swap in real numbers. Race
+  // tokens carry race-flavoured names but the catalog index aligns with
+  // the backend config order, which is keyed by `type`.
+  const liveByType = liveUnits ? groupUnitsByType(liveUnits) : null;
+
   return race.units.map((u, i) => {
     const id = `${race.key}-${u.n}-${i}`;
     const seed = hash(id);
-    const baseCount = [86, 42, 26, 14, 6, 2][i] ?? 1;
     const live = backend[i];
+    const liveType = (live?.type as string | undefined)?.toLowerCase();
+    const realCount = liveType && liveByType ? (liveByType.get(liveType)?.length ?? 0) : 0;
+    // When live roster is populated AND has this unit type, prefer the
+    // real count. Otherwise fall back to the mock count so the screen
+    // never looks empty for unauthenticated visitors.
+    const baseCount = realCount > 0
+      ? realCount
+      : liveUnits != null && liveUnits.length === 0
+        ? 0  // logged in but empty — show truthful zero
+        : [86, 42, 26, 14, 6, 2][i] ?? 1;
     // Backend stats are absolute (hp/attack/defense/speed); scale to the
     // 0-100 display the roster card uses so the bars stay legible.
     const atk = live?.attack != null
@@ -345,7 +367,7 @@ function buildRoster(race: NDRace, backend: UnitConfigDto[]): RosterUnit[] {
       tier: live?.tier ?? u.t,
       level: Math.max(1, 10 - i * 2),
       count: baseCount,
-      state: states[i % states.length],
+      state: realCount > 0 ? 'ready' : states[i % states.length],
       atk,
       def,
       spd,

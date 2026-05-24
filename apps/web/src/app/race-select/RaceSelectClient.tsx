@@ -184,19 +184,29 @@ export function RaceSelectClient() {
         }}
       />
 
+      {/* Locked-height column with three regions:
+       *   1. header — fixed at top
+       *   2. race list — scrolls when 5 cards + header don't fit
+       *      the viewport (the common case on phones / narrow preview)
+       *   3. footer with caption + sticky CTA — never leaves the viewport
+       *
+       * Without this split the CTA at the bottom of a flex-column with
+       * `minHeight: 100dvh` gets pushed below the fold on short screens
+       * and there's no visible scroll affordance to find it. */}
       <main
         className="nd-slide-up"
         style={{
           position: 'relative',
           maxWidth: 440,
           margin: '0 auto',
-          minHeight: '100dvh',
-          padding: '52px 16px 32px',
+          height: '100dvh',
+          padding: '52px 16px 16px',
           display: 'flex',
           flexDirection: 'column',
+          gap: 12,
         }}
       >
-        <header style={{ textAlign: 'center', padding: '0 8px 14px' }}>
+        <header style={{ textAlign: 'center', padding: '0 8px', flexShrink: 0 }}>
           <Eyebrow color={selected.primary} style={{ marginBottom: 6 }}>
             I. KOZMİK YANKI / İLK AŞAMA
           </Eyebrow>
@@ -210,6 +220,10 @@ export function RaceSelectClient() {
           role="radiogroup"
           aria-label="Irk listesi"
           style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
@@ -226,49 +240,48 @@ export function RaceSelectClient() {
           ))}
         </div>
 
-        <div style={{ flex: 1, minHeight: 18 }} />
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                padding: '8px 12px',
+                borderRadius: 4,
+                fontFamily: ND.mono,
+                fontSize: 11,
+                background: 'color-mix(in oklch, oklch(0.65 0.22 25), transparent 84%)',
+                border: '1px solid color-mix(in oklch, oklch(0.65 0.22 25), transparent 60%)',
+                color: ND.danger,
+                textAlign: 'center',
+              }}
+            >
+              ÇEVRİMDIŞI · YEREL DEVAM · {error}
+            </div>
+          )}
 
-        {error && (
-          <div
-            role="alert"
-            style={{
-              padding: '8px 12px',
-              marginBottom: 10,
-              borderRadius: 4,
-              fontFamily: ND.mono,
-              fontSize: 11,
-              background: 'color-mix(in oklch, oklch(0.65 0.22 25), transparent 84%)',
-              border: '1px solid color-mix(in oklch, oklch(0.65 0.22 25), transparent 60%)',
-              color: ND.danger,
-              textAlign: 'center',
-            }}
+          <Caption style={{ textAlign: 'center' }}>
+            <span
+              style={{
+                color: selected.primary,
+                fontFamily: ND.display,
+                letterSpacing: '0.12em',
+              }}
+            >
+              {selected.name.toUpperCase()}
+            </span>{' '}
+            seçildi · {selected.title}
+          </Caption>
+
+          <NDButton
+            race={selected}
+            size="lg"
+            full
+            onClick={handleStart}
+            disabled={submitting}
           >
-            ÇEVRİMDIŞI · YEREL DEVAM · {error}
-          </div>
-        )}
-
-        <Caption style={{ textAlign: 'center', marginBottom: 10 }}>
-          <span
-            style={{
-              color: selected.primary,
-              fontFamily: ND.display,
-              letterSpacing: '0.12em',
-            }}
-          >
-            {selected.name.toUpperCase()}
-          </span>{' '}
-          seçildi · {selected.title}
-        </Caption>
-
-        <NDButton
-          race={selected}
-          size="lg"
-          full
-          onClick={handleStart}
-          disabled={submitting}
-        >
-          {submitting ? 'BAĞLANIYOR…' : `${CTA_LABEL[selectedKey]} →`}
-        </NDButton>
+            {submitting ? 'BAĞLANIYOR…' : `${CTA_LABEL[selectedKey]} →`}
+          </NDButton>
+        </div>
       </main>
     </div>
   );

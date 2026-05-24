@@ -1,8 +1,10 @@
 # Autonomous QA Run — Report
 
-> Generated during the 4-hour autonomous loop you kicked off. Three
-> commits landed on `main`:
-> `e24f562`, `90ee7c9`, `32de76b`.
+> Started as a 4-hour loop; extended to keep-going-until-cancel.
+> Seven commits landed on `main` so far:
+> `e24f562`, `90ee7c9`, `32de76b`, `63a5c4e`, `22c620a`, `4513650`,
+> `26a5df8`, `8bd0fdc`. Diff vs starting point in
+> `git log --since='4 hours ago' --oneline`.
 
 ## TL;DR
 
@@ -155,10 +157,64 @@ Each of these is logged with a TODO comment at the relevant callsite.
 ## Files added
 
 - `apps/web/src/components/handoff/Toaster.tsx` — global toast bus
-- `apps/web/src/components/handoff/base-iso.ts` — iso tile math + palette
-  (from the earlier `/base` tilemap work, included here for completeness)
+- `apps/web/src/components/handoff/base-iso.ts` — iso tile math + palette + variant picker
 - `apps/web/src/hooks/useGameResources.ts` — live wallet polling
+- `apps/web/src/hooks/useGameUnits.ts` — live owned-units roster
 - `apps/web/e2e/route-crawl.spec.ts` — autonomous crawler
 - `apps/web/route-crawl-summary.json` — latest crawler snapshot
-- `apps/web/public/assets/tiles/<race>/ground.png` — 5 ComfyUI tile sprites
+- `apps/web/public/assets/tiles/<race>/{ground,resource,blocked}.png` — 15 ComfyUI tile sprites
 - `AUTONOMOUS-RUN-REPORT.md` — this file
+
+## Round 3-5 follow-ups landed
+
+After the initial run, kept going on these:
+
+**Hydration cleanup (39/40 now 100% clean)**
+- `/events` and `/events/:id`: replaced module-level `Date.now()` with
+  a fixed 2026-05-24 anchor. Eliminated text-mismatch warnings.
+- All `toLocaleString()` calls in events + mail pinned to `'tr-TR'`
+  so server (`en-US` default) and client emit identical thousand
+  separators (was `5,000` vs `5.000`).
+- `/leaderboard` reset-countdown initializer + weekly/seasonal
+  timestamps deferred to `useEffect` (was running during SSR).
+- `/formation` page-level playerId now stays `null` until mounted, so
+  FormationScreen no longer fires demo-id fetches that 404'd.
+
+**Live data wiring**
+- `/profile` power derived from live mineral+gas+energy+population
+  (was flat 142,800 literal). xpNext/xp/level all wired to `useBaseState`.
+- `/leaderboard` "Sen" row de-duplicates against backend `meEntry` so
+  once the real row arrives it overrides the synthetic.
+- `/base/production` HUD uses `useBaseState` + `useGameResources`
+  with one-time hydration into local fallback state.
+- `/map` resource pills wired to `useGameResources`, back arrow → `/base`.
+- `/research` resource mini-bar wired to live wallet.
+- `/inventory` roster swaps in real per-type counts from `useGameUnits`
+  when the player owns units; empty roster shows truthful 0.
+- `/battle-prep` roster + projected outcome ribbon now react to
+  live owned units. Was hardcoded 68:32 + `Math.max(2, 8 - tier)`.
+- `BattleScreen` surfaces live `liveBattle.winProb` as a P(W) chip
+  next to the elapsed-time counter. Back button → `router.back()`.
+
+**Backend gaps closed**
+- `seed-test-accounts.js` inserts 4 starter buildings + 2-16 starter
+  units per non-account-1 player. `/buildings` and `/units` now
+  return non-empty for test2-6.
+- `formation-api` wrapper catches 404 (formation backend doesn't
+  exist) and returns empty collections so `/formation` doesn't
+  throw 8 exceptions on every visit.
+
+**Visual / asset**
+- ComfyUI sweep added 2 new tile variants (`resource`, `blocked`)
+  per race — 15 total sprites. BaseField picks a deterministic
+  variant per (col, row) so /base shows resource + blocked patches.
+- `/splash` build-tag footer split into a real "Giriş Yap" CTA + a
+  separate inert build version label.
+- LoginForm "Beni hatırla" promoted to a real `<input type="checkbox">`
+  with React state. "Şifre kaybı?" link wired to a toast instead of
+  `href="#"` that refreshed the page.
+
+**Crawler final state**
+- 39/40 routes: 100% clean (0 console errors, 0 4xx, 0 JS exceptions).
+- /formation: 3 silent 404s (backend formation endpoints don't exist)
+  but renders empty-state without crashing.

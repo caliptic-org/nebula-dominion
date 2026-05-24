@@ -265,19 +265,38 @@ export function SplashClient() {
             {copy.cta}
           </NDButton>
 
-          <Link
-            href="/login"
-            style={{
-              fontFamily: ND.mono,
-              fontSize: 10,
-              color: ND.textMute,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-            }}
-          >
-            v0.1 · MVP BUILD 0426 · {race.short}-CHANNEL
-          </Link>
+          {/* Build-tag footer. The previous version wrapped this in a
+           *  <Link href="/login"> styled as a label — looked like static
+           *  text and confused players who didn't realise it was tappable.
+           *  Splitting into a real "Giriş Yap" CTA + a non-interactive
+           *  build tag keeps both legible. */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <Link
+              href="/login"
+              style={{
+                fontFamily: ND.mono,
+                fontSize: 11,
+                color: race.primary,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+              }}
+            >
+              Hesabın var mı? Giriş Yap ›
+            </Link>
+            <span
+              aria-hidden
+              style={{
+                fontFamily: ND.mono,
+                fontSize: 9,
+                color: ND.textMute,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+              }}
+            >
+              v0.1 · MVP BUILD 0426 · {race.short}-CHANNEL
+            </span>
+          </div>
         </div>
       </main>
     </div>

@@ -275,6 +275,24 @@ const TILE_TYPES = {
     canavar: 'volcanic basalt cobble with hairline orange ember cracks and a dusting of bone shards',
     seytan:  'obsidian floor tile with engraved deep-red sigil glyphs and faint smoke wisps clinging to the surface',
   },
+  // Resource tiles — visually distinct from ground so the player can spot a
+  // yield bonus at a glance. Adds a luminous deposit in the centre of each.
+  resource: {
+    insan:   'metal plating with a glowing blue crystalline mineral deposit erupting from the centre, sparks',
+    zerg:    'pulsating biomass with bright magenta nutrient pool in the centre, organic spores rising',
+    otomat:  'chrome floor with floating holographic cyan data-cube hovering over the centre',
+    canavar: 'volcanic rock with a glowing orange lava vent in the centre spilling molten ore',
+    seytan:  'obsidian with a swirling violet soul-fire flame burning at the centre, sigils glowing red',
+  },
+  // Blocked / impassable tiles — visually "rough" so the player skips them
+  // when planning placements.
+  blocked: {
+    insan:   'damaged metal plating with twisted girders and warning hazard stripes, no surface to build on',
+    zerg:    'dead chitinous scab with cracked bone protrusions blocking the centre, brown rot',
+    otomat:  'fried circuit boards with broken cables and a dark glitched holographic error overlay',
+    canavar: 'jagged spike of black volcanic rock erupting up from the tile, impassable',
+    seytan:  'cracked obsidian shattered with red glow leaking from the cracks, cursed and unsafe',
+  },
 };
 
 async function generateTile(race, type = 'ground') {

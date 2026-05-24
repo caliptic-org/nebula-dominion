@@ -122,7 +122,7 @@ export default function GuildHubPage() {
         style={{ background: 'rgba(7,11,22,0.85)', backdropFilter: 'blur(12px)' }}
       >
         <div className="flex items-center gap-3 pl-2">
-          <Link href="/dashboard" className="btn-ghost text-xs px-3 py-1.5" aria-label="Dashboard">
+          <Link href="/base" className="btn-ghost text-xs px-3 py-1.5" aria-label="Üs">
             ← Komuta
           </Link>
           <h1 className="manga-title" style={{ fontSize: 'clamp(1rem, 2.5vw, 1.5rem)' }}>

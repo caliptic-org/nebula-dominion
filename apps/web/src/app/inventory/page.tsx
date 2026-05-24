@@ -279,6 +279,34 @@ export default function RosterPage() {
 
         {/* Roster grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          {/* Honest empty state — when the authenticated player owns
+           *  ZERO units across all roster slots, the cards render as
+           *  ×0 ×0 ×0 ×0 ×0 which looks broken. Show a one-shot CTA
+           *  to /base/production instead so the player knows where to
+           *  go to train their first batch. */}
+          {liveUnits != null && units.every((u) => u.count === 0) && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: 14,
+                border: `1px dashed ${race.primary}55`,
+                borderRadius: 6,
+                background: `${race.primary}0a`,
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: 28, opacity: 0.7 }} aria-hidden>⚙</div>
+              <H3 style={{ color: ND.text, marginTop: 4 }}>Henüz birim eğitmedin</H3>
+              <Caption style={{ marginTop: 4 }}>
+                Üretim sayfasından ilk birimini eğitim kuyruğuna ekle.
+              </Caption>
+              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
+                <NDButton race={race} onClick={() => router.push('/base/production')}>
+                  Üretime Git
+                </NDButton>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {visible.map((u) => (
               <RosterCard

@@ -234,17 +234,27 @@ jobs:
           fi
 
       # ── Smoke test ─────────────────────────────────────────────────────────
+      # Per-host probe path — both NestJS backends 404 on `/` because they
+      # mount their routes under prefixes (api/v1 for the REST API,
+      # api for the game-server). Hit each service's documented liveness
+      # surface so the smoke test reflects actual reachability instead of
+      # a misleading 404 from the root.
       - name: Smoke test
         run: |
           sleep 5
-          for host in nebula.caliptic.com api-nebula.caliptic.com game-nebula.caliptic.com; do
-            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${host}/" || echo "000")
-            echo "https://${host} → HTTP ${STATUS}"
+          for entry in \
+            "nebula.caliptic.com:/" \
+            "api-nebula.caliptic.com:/api/docs" \
+            "game-nebula.caliptic.com:/api/health"; do
+            host="${entry%%:*}"
+            path="${entry#*:}"
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${host}${path}" || echo "000")
+            echo "https://${host}${path} → HTTP ${STATUS}"
             # 2xx, 3xx (redirects), and 401 (api endpoints requiring auth)
             # are all acceptable post-deploy. 404/5xx fail the smoke test.
             case "$STATUS" in
               2*|3*|401|405) echo "✅ ${host} reachable" ;;
-              *) echo "❌ ${host} returned ${STATUS}" ; exit 1 ;;
+              *) echo "❌ ${host}${path} returned ${STATUS}" ; exit 1 ;;
             esac
           done
 

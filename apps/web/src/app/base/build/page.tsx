@@ -477,64 +477,52 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
 
 /* Slot-slug → backend BuildingType enum string mapping.
  *
- * Schema drift gotcha: the TypeScript BuildingType enum exposes 16 values
- * (mineral_extractor, gas_refinery, solar_plant, academy, factory, …) but
- * the live Postgres `buildings_type_enum` only has 8 (command_center,
- * mine, refinery, barracks, hangar, research_lab, shield_generator,
- * turret). The two sets only share **4 values**:
- *
- *     command_center · barracks · shield_generator · turret
- *
- * Sending anything else triggers either:
- *   - 400 "type must be one of ..." (DB-only values blocked by TS DTO)
- *   - 500 invalid enum (TS-only values rejected by Postgres at INSERT)
- *
- * Until a migration aligns the two enums (TODO: `ALTER TYPE
- * buildings_type_enum ADD VALUE` for the missing TS values), every slug
- * here MUST resolve to one of the 4 valid intersection values. Capital
- * slot (index 0) is `command_center` (max 1 per player); the remaining
- * 5 slots round-robin between `barracks`, `shield_generator`, `turret`
- * so a race's build menu produces a mix when fully constructed. */
+ * After migration `1779635000000-AddTsBuildingEnumValues`, the Postgres
+ * buildings_type_enum and the TS enum are aligned — all 16 TS values are
+ * insertable. So every race slug now maps to a thematically appropriate
+ * specific type (mineral_extractor for "resource extractor" themes,
+ * academy/research_lab for "science" themes, etc.) instead of the
+ * generic 4-type intersection. */
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // Insan — sleek military sci-fi
   komuta_ussu:        'command_center',
-  reaktor_modulu:     'shield_generator',
-  kisla:              'barracks',
-  bilim_akademisi:    'shield_generator',
-  subspace_anteni:    'turret',
-  genetik_lab:        'barracks',
+  reaktor_modulu:     'solar_plant',       // power generator
+  kisla:              'barracks',          // unit training
+  bilim_akademisi:    'academy',           // advanced research
+  subspace_anteni:    'shield_generator',  // long-range defense
+  genetik_lab:        'factory',           // heavy unit production
 
   // Zerg — organic hive
   kovan_cekirdegi:    'command_center',
-  biyokutle_havuzu:   'barracks',
-  mutasyon_cukuru:    'barracks',
-  genom_tumsegi:      'shield_generator',
-  yutucu_tumsek:      'shield_generator',
-  subspace_damari:    'turret',
+  biyokutle_havuzu:   'mineral_extractor', // biomass extraction
+  mutasyon_cukuru:    'spawning_pool',     // unit spawn
+  genom_tumsegi:      'hatchery',          // genome research
+  yutucu_tumsek:      'shield_generator',  // defensive carapace
+  subspace_damari:    'gas_refinery',      // exotic resource
 
   // Otomat — cybernetic
   sonsuzluk_cekirdegi:'command_center',
-  veri_kaynagi:       'shield_generator',
-  montaj_hatti:       'barracks',
-  mantik_matrisi:     'shield_generator',
-  cihaz_hazinesi:     'shield_generator',
-  subspace_cozucu:    'turret',
+  veri_kaynagi:       'solar_plant',       // data/power core
+  montaj_hatti:       'nano_forge',        // assembly line
+  mantik_matrisi:     'cyber_core',        // logic matrix
+  cihaz_hazinesi:     'quantum_reactor',   // device storage
+  subspace_cozucu:    'defense_matrix',    // subspace defense
 
   // Canavar — primal tribal
   alfa_tahti:         'command_center',
-  av_kampi:           'barracks',
-  vahsi_cukur:        'barracks',
-  atalar_sunagi:      'shield_generator',
-  atalar_magarasi:    'shield_generator',
-  boyut_yarigi:       'turret',
+  av_kampi:           'mineral_extractor', // hunt/forage
+  vahsi_cukur:        'barracks',          // savage training
+  atalar_sunagi:      'gas_refinery',      // blood essence
+  atalar_magarasi:    'shield_generator',  // ancestral defense
+  boyut_yarigi:       'factory',           // dimension rift forge
 
   // Seytan — dark occult
   karanlik_taht:      'command_center',
-  ruh_toplayici:      'shield_generator',
-  lanet_tapinagi:     'barracks',
-  pakt_sembolu:       'shield_generator',
-  yasak_grimoire:     'shield_generator',
-  yarik_kapisi:       'turret',
+  ruh_toplayici:      'gas_refinery',      // soul essence
+  lanet_tapinagi:     'barracks',          // summon training
+  pakt_sembolu:       'academy',           // pact knowledge
+  yasak_grimoire:     'shield_generator',  // dark wards
+  yarik_kapisi:       'turret',            // dimensional gate
 };
 
 /* Build the displayed catalog. We always show 6 race-flavoured slots from

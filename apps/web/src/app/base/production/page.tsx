@@ -22,6 +22,11 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { useBaseState } from '@/hooks/useBaseState';
 import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { useGameBuildings } from '@/hooks/useGameBuildings';
+import { gameServerApi } from '@/lib/game-server-api';
+import { FetchError } from '@/lib/api';
+import { toast } from '@/components/handoff/Toaster';
+import { hasSession } from '@/lib/session';
 import '@/styles/production-queue.css';
 
 const PRODUCTION_NAMES: Record<string, string> = {
@@ -164,19 +169,46 @@ export default function ProductionPage() {
     resA >= toNum(selectedUnit.costA) * count &&
     resB >= toNum(selectedUnit.costB) * count;
 
-  const handleAdd = useCallback(() => {
+  // Live owned-buildings so we can pick a training building (barracks /
+  // hangar / spawning_pool) when POSTing /units/train. Without an owned
+  // training building the backend returns 400; we surface that as a
+  // toast so the user knows they need to construct one first.
+  const { data: liveBuildings } = useGameBuildings();
+  const [submittingTrain, setSubmittingTrain] = useState(false);
+
+  const handleAdd = useCallback(async () => {
     if (!selectedUnit) return;
     if (slotsUsed >= SLOT_TOTAL) return;
     if (!canAfford) return;
+    if (submittingTrain) return;
+
+    // Try the real backend flow first (POST /units/train). Falls back to
+    // the optimistic local queue if the player isn't authed or the
+    // backend can't accept the train order — that keeps the demo
+    // playable without a fully-wired training pipeline.
+    const backendCfg = backendUnits[selected];
+    const unitType = backendCfg?.type;
+    const reqBuilding = (backendCfg as { requiredBuilding?: string } | undefined)?.requiredBuilding;
+    const trainingBuilding =
+      liveBuildings && reqBuilding
+        ? liveBuildings.find(
+            (b) => b.type === reqBuilding && b.status === 'active',
+          ) ?? null
+        : null;
+
     const a = toNum(selectedUnit.costA) * count;
     const b = toNum(selectedUnit.costB) * count;
+    const total = selectedUnit.durationSec * count;
+    const queueId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    // Optimistic local update — pop the unit into the queue immediately
+    // so the player gets visual feedback, then reconcile with backend.
     setResA(v => v - a);
     setResB(v => v - b);
-    const total = selectedUnit.durationSec * count;
     setQueue(q => [
       ...q,
       {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: queueId,
         unitName: selectedUnit.name,
         count,
         tier: selectedUnit.tier,
@@ -186,7 +218,33 @@ export default function ProductionPage() {
       },
     ]);
     setCount(1);
-  }, [selectedUnit, slotsUsed, canAfford, count]);
+
+    if (hasSession() && unitType && trainingBuilding) {
+      setSubmittingTrain(true);
+      try {
+        await gameServerApi.post('/units/train', {
+          buildingId: trainingBuilding.id,
+          unitType,
+        });
+        toast.success(`${selectedUnit.name} eğitimi başlatıldı (${total}s)`);
+      } catch (err) {
+        const msg = err instanceof FetchError ? err.message : 'Eğitim reddedildi';
+        toast.error(msg);
+        // Roll back the optimistic update on backend rejection.
+        setResA(v => v + a);
+        setResB(v => v + b);
+        setQueue(q => q.filter((it) => it.id !== queueId));
+      } finally {
+        setSubmittingTrain(false);
+      }
+    } else if (hasSession() && unitType && !trainingBuilding) {
+      // Player is authed but doesn't own the needed training building.
+      // The local queue still ticks (optimistic) so the demo flows.
+      toast.info(
+        `${selectedUnit.name} için ${reqBuilding ?? 'eğitim binası'} gerekli — yerel kuyrukta gösteriliyor`,
+      );
+    }
+  }, [selectedUnit, slotsUsed, canAfford, count, backendUnits, selected, liveBuildings, submittingTrain]);
 
   const handleSpeedUp = useCallback((id: string) => {
     setQueue(prev => {

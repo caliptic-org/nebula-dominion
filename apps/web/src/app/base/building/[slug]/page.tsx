@@ -57,40 +57,38 @@ import { hasSession } from '@/lib/session';
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
 // shared lib once a third consumer appears.
-// Intersection of TS BuildingType enum + Postgres buildings_type_enum:
-// only command_center, barracks, shield_generator, turret are accepted by
-// BOTH layers. Anything else 400s (DTO) or 500s (DB). Mirror /base/build's
-// SLUG_TO_BACKEND_TYPE for the same reason — extract to a shared lib once
-// a 3rd consumer appears.
+// Post-migration full 16-type mapping — mirrors /base/build. Aligned
+// with migration 1779635000000-AddTsBuildingEnumValues which added the
+// 12 TS-only enum values to Postgres.
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   komuta_ussu:        'command_center',
-  reaktor_modulu:     'shield_generator',
+  reaktor_modulu:     'solar_plant',
   kisla:              'barracks',
-  bilim_akademisi:    'shield_generator',
-  subspace_anteni:    'turret',
-  genetik_lab:        'barracks',
+  bilim_akademisi:    'academy',
+  subspace_anteni:    'shield_generator',
+  genetik_lab:        'factory',
   kovan_cekirdegi:    'command_center',
-  biyokutle_havuzu:   'barracks',
-  mutasyon_cukuru:    'barracks',
-  genom_tumsegi:      'shield_generator',
+  biyokutle_havuzu:   'mineral_extractor',
+  mutasyon_cukuru:    'spawning_pool',
+  genom_tumsegi:      'hatchery',
   yutucu_tumsek:      'shield_generator',
-  subspace_damari:    'turret',
+  subspace_damari:    'gas_refinery',
   sonsuzluk_cekirdegi:'command_center',
-  veri_kaynagi:       'shield_generator',
-  montaj_hatti:       'barracks',
-  mantik_matrisi:     'shield_generator',
-  cihaz_hazinesi:     'shield_generator',
-  subspace_cozucu:    'turret',
+  veri_kaynagi:       'solar_plant',
+  montaj_hatti:       'nano_forge',
+  mantik_matrisi:     'cyber_core',
+  cihaz_hazinesi:     'quantum_reactor',
+  subspace_cozucu:    'defense_matrix',
   alfa_tahti:         'command_center',
-  av_kampi:           'barracks',
+  av_kampi:           'mineral_extractor',
   vahsi_cukur:        'barracks',
-  atalar_sunagi:      'shield_generator',
+  atalar_sunagi:      'gas_refinery',
   atalar_magarasi:    'shield_generator',
-  boyut_yarigi:       'turret',
+  boyut_yarigi:       'factory',
   karanlik_taht:      'command_center',
-  ruh_toplayici:      'shield_generator',
+  ruh_toplayici:      'gas_refinery',
   lanet_tapinagi:     'barracks',
-  pakt_sembolu:       'shield_generator',
+  pakt_sembolu:       'academy',
   yasak_grimoire:     'shield_generator',
   yarik_kapisi:       'turret',
 };

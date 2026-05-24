@@ -24,6 +24,7 @@ import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useGameUnits';
+import { useGameResources } from '@/hooks/useGameResources';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 
 const ROSTER_NAMES: Record<string, string> = {
@@ -101,7 +102,12 @@ export default function RosterPage() {
     [units, selectedId],
   );
 
-  const popRatio = POP_USED / POP_MAX;
+  // Use live population from /buildings/resources when authed. Falls back to
+  // the static demo values so guests still see a populated meter.
+  const { data: liveRes } = useGameResources();
+  const popUsed = liveRes ? liveRes.population : POP_USED;
+  const popMax = liveRes && liveRes.populationCap > 0 ? liveRes.populationCap : POP_MAX;
+  const popRatio = popMax > 0 ? popUsed / popMax : 0;
 
   return (
     <div
@@ -147,7 +153,7 @@ export default function RosterPage() {
           <H3 style={{ color: ND.text }}>{ROSTER_NAMES[race.key] ?? 'Birim Envanteri'}</H3>
           <div style={{ flex: 1 }} />
           <Chip color={popRatio > 0.85 ? ND.warn : race.primary}>
-            {POP_USED} / {POP_MAX} POP
+            {popUsed.toLocaleString('tr-TR')} / {popMax.toLocaleString('tr-TR')} POP
           </Chip>
         </div>
 

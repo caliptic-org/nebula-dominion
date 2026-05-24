@@ -395,11 +395,11 @@ function buildRoster(
     // When live roster is populated AND has this unit type, prefer the
     // real count. Otherwise fall back to the mock count so the screen
     // never looks empty for unauthenticated visitors.
-    const baseCount = realCount > 0
-      ? realCount
-      : liveUnits != null && liveUnits.length === 0
-        ? 0  // logged in but empty — show truthful zero
-        : [86, 42, 26, 14, 6, 2][i] ?? 1;
+    // Guest (liveUnits === null) → 0 instead of the legacy 86/42/26
+    // mock counts; honest empty roster beats pretending the visitor
+    // owns 86 marines. Authed-but-empty → 0 (already correct).
+    // Authed-with-units → real count from groupUnitsByType.
+    const baseCount = realCount;
     // Backend stats are absolute (hp/attack/defense/speed); scale to the
     // 0-100 display the roster card uses so the bars stay legible.
     const atk = live?.attack != null

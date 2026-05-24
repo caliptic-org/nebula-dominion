@@ -22,6 +22,7 @@ import {
   type NDRaceKey,
 } from '@/components/handoff';
 import { useLeaderboard, type LeaderboardCategory, type LeaderboardEntry } from '@/hooks/useLeaderboard';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 type Category = 'power' | 'pvp' | 'alliance';
 
@@ -138,6 +139,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 
 export default function LeaderboardPage() {
   const playerRace = useNDRace();
+  const { profile: liveProfile } = useUserProfile();
   const router = useRouter();
   const [category, setCategory] = useState<Category>('power');
   const [period, setPeriod] = useState<'weekly' | 'seasonal'>('weekly');
@@ -181,19 +183,23 @@ export default function LeaderboardPage() {
   const baseEntries = liveAsEntries ?? DATA[category];
   // "Me" injection only fires when the backend hasn't returned a meEntry
   // (which it doesn't yet — TODO: extend /leaderboard to include the
-  // authenticated user's own row). Until then, the synthetic Sen row uses
-  // the player's actual race + a placeholder rank/score; we surface a
-  // tooltip via aria-label so the user knows it's not real.
+  // authenticated user's own row). Pull what we CAN from useUserProfile
+  // so the row at least uses the real handle + alliance tag + currentLevel
+  // for an XP-shaped score; rank stays "—" until a /leaderboard/me
+  // endpoint lands. Honest placeholder beats the fake "Rank 42 · 1.29M
+  // power" row that was identical for every account.
+  const liveScore = liveProfile?.xp ?? liveProfile?.level ?? 0;
   const me: Entry = {
-    rank: 42,
+    rank: 0,
     id: 'me',
-    name: 'Sen',
+    name: liveProfile?.username ?? 'Sen',
     race: playerRace.key,
-    score: 1_287_400,
-    scoreLabel: category === 'pvp' ? '4.287 Puan' : '1.29M',
-    allianceTag: playerRace.allianceTag,
+    score: liveScore,
+    scoreLabel: liveScore > 0
+      ? (category === 'pvp' ? `${liveScore.toLocaleString('tr-TR')} Puan` : fmtScore(liveScore, category))
+      : '— · sıralama yakında',
+    allianceTag: liveProfile?.allianceTag ?? playerRace.allianceTag,
     isMe: true,
-    delta: 7,
   };
 
   // De-duplicate by id so a real me-entry from backend (when present)

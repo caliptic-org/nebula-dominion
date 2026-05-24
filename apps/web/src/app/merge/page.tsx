@@ -25,6 +25,7 @@ import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
 import { useMergePreview } from '@/hooks/useMergePreview';
 import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
 import { useHudState } from '@/hooks/useHudState';
+import { useGameUnits } from '@/hooks/useGameUnits';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 
@@ -84,7 +85,20 @@ export default function MergePage() {
   const [selected, setSelected] = useState<number[]>([]);
   const [sourceTier, setSourceTier] = useState(3);
 
-  const pool = useMemo(() => buildPool(race, sourceTier), [race, sourceTier]);
+  // Live unit roster — when the player has trained units of the chosen
+  // source tier, render them as real merge candidates so a successful
+  // merge actually consumes the right server-side ids. Falls back to
+  // the demo pool (8 placeholder slots) when the player has no units
+  // yet so the screen still demos the merge mechanic.
+  const { data: liveUnits } = useGameUnits();
+  const livePool = useMemo(
+    () => liveUnitsToPool(liveUnits, race, sourceTier),
+    [liveUnits, race, sourceTier],
+  );
+  const pool = useMemo(
+    () => (livePool.length > 0 ? livePool : buildPool(race, sourceTier)),
+    [livePool, race, sourceTier],
+  );
   const preview = useMergePreview({
     race,
     sourceTier,
@@ -437,12 +451,47 @@ interface PoolUnit {
 }
 
 function buildPool(race: NDRace, tier: number): PoolUnit[] {
+  // Fallback pool — used for guest / pre-login state OR until the
+  // game-server's training queue has produced enough units of this
+  // tier for the player. Renders 8 visual slots so the layout doesn't
+  // collapse, but each carries the same race-flavoured unit name.
   const base = race.units.find((u) => u.t === tier)?.n ?? race.units[0].n;
   return Array.from({ length: 8 }, (_, i) => ({
-    id: `${race.key}-${tier}-${i}`,
+    id: `demo-${race.key}-${tier}-${i}`,
     name: base,
     tier,
   }));
+}
+
+/* Map a live game-server PlayerUnitDto into the merge-screen PoolUnit
+ * shape. Backend unit `type` codes (marine_t1, sniper_t2, ...) don't
+ * match the race-lex pretty names — best-effort tier extraction via
+ * the last "_tN" suffix, falls back to the slot index. */
+function liveUnitsToPool(
+  liveUnits: { id: string; type: string }[] | null,
+  race: NDRace,
+  tier: number,
+): PoolUnit[] {
+  if (!liveUnits || liveUnits.length === 0) return [];
+  // Try to match the backend type back to a race unit name (case-insensitive
+  // prefix match), else show the raw type code so the player at least sees
+  // something recognisable.
+  const tierMatch = (type: string): number => {
+    const m = type.match(/_t(\d+)/);
+    return m ? Number(m[1]) : 1;
+  };
+  return liveUnits
+    .filter((u) => tierMatch(u.type) === tier)
+    .map((u) => {
+      const def = race.units.find((ru) =>
+        ru.n.toLowerCase().replace(/\s+/g, '_').startsWith(u.type.split('_')[0]),
+      );
+      return {
+        id: u.id,
+        name: def?.n ?? u.type,
+        tier: tierMatch(u.type),
+      };
+    });
 }
 
 function MergeSlot({

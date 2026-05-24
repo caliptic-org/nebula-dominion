@@ -29,10 +29,20 @@ export class FormationApiError extends Error {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  // The formation endpoints are JWT-guarded — without an Authorization
+  // header the api returns 401, which gets swallowed by `callOr404` (only
+  // 404 hits the empty-result branch). Pull the token from session so
+  // /units/player/:id, /formations, and /formations/templates can resolve.
+  const token =
+    typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null;
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'include',
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
 
   if (!res.ok) {
@@ -173,17 +183,18 @@ export function isCommanderEligible(u: BackendUnit): boolean {
 
 // ─── API surface ──────────────────────────────────────────────────────────────
 
-/** Wrap a call so a backend 404 produces an empty result instead of an
- *  exception. The formations + per-player-units endpoints don't exist on
- *  the api yet (no FormationsController, no /units/player/:id route).
- *  Returning empty keeps the FormationScreen rendering its empty-state UI
- *  cleanly instead of crashing and bubbling 8 unhandled exceptions to the
- *  console. Once the backend ships, this helper goes away. */
+/** Wrap a call so backend gaps produce an empty result instead of an
+ *  exception. Treats 404 (route missing) AND 401 (guest mode) as empty
+ *  so the screen renders its empty-state UI cleanly. Once the formation
+ *  backend ships and the player is required to be authenticated, this
+ *  helper can stop swallowing 401. */
 async function callOr404<T>(path: string, fallback: T, init?: RequestInit): Promise<T> {
   try {
     return await call<T>(path, init);
   } catch (err) {
-    if (err instanceof FormationApiError && err.status === 404) return fallback;
+    if (err instanceof FormationApiError && (err.status === 404 || err.status === 401)) {
+      return fallback;
+    }
     throw err;
   }
 }

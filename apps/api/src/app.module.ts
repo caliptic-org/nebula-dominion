@@ -23,7 +23,13 @@ import { StoryModule } from './modules/story/story.module';
 import { TierModule } from './modules/tier/tier.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { HealthModule } from './health/health.module';
+import { AllianceModule } from './modules/alliance/alliance.module';
+import { VipModule } from './modules/vip/vip.module';
+import { Age2ContentModule } from './modules/age2-content/age2-content.module';
+import { MetaModule } from './meta/meta.module';
 import { MapModule } from '../../../backend/src/map/map.module';
+import { ConversionsModule } from './modules/conversions/conversions.module';
+import { FormationsModule } from './modules/formations/formations.module';
 
 @Module({
   imports: [
@@ -49,7 +55,13 @@ import { MapModule } from '../../../backend/src/map/map.module';
     TierModule,
     OnboardingModule,
     HealthModule,
+    AllianceModule,
+    VipModule,
+    Age2ContentModule,
+    MetaModule,
     MapModule,
+    ConversionsModule,
+    FormationsModule,
   ],
 })
 export class AppModule {}

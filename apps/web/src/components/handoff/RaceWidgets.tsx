@@ -285,6 +285,36 @@ export function BaseField({
           <stop offset="0%" stopColor={palette.glow.replace(/[\d.]+\)$/, '0.32)')} />
           <stop offset="100%" stopColor="rgba(0,0,0,0)" />
         </radialGradient>
+
+        {/* Per-race tile pattern — one shared texture covers ALL 96 tiles,
+         *  so neighbours read as one continuous ground instead of 96
+         *  isolated diamonds. patternTransform applies the classic iso
+         *  projection (rotate 45° + scale Y 50%) which converts a square
+         *  texture into a 2:1 diamond grid. Pattern phase is aligned to
+         *  ORIGIN_X / ORIGIN_Y so the diamonds land on tile centres.
+         *  Hidden when the sprite hasn't loaded yet — fall back to flat
+         *  polygon fills below. */}
+        {(['ground', 'resource', 'blocked'] as const).map((variant) => (
+          <pattern
+            key={`tex-${race.key}-${variant}`}
+            id={`tile-tex-${race.key}-${variant}`}
+            patternUnits="userSpaceOnUse"
+            width={TILE_W}
+            height={TILE_H}
+            x={ORIGIN_X - TILE_W / 2}
+            y={ORIGIN_Y}
+            patternTransform="rotate(45) scale(1, 0.5)"
+          >
+            <image
+              href={TILE_SPRITES[race.key][variant]}
+              x={0}
+              y={0}
+              width={TILE_W}
+              height={TILE_W}
+              preserveAspectRatio="xMidYMid slice"
+            />
+          </pattern>
+        ))}
       </defs>
 
       {/* Plane glow — soft race-tinted halo under the centre tiles so the
@@ -298,47 +328,30 @@ export function BaseField({
         fill={`url(#plane-glow-${race.key})`}
       />
 
-      {/* Ground tiles — flat-colour polygon FIRST so each cell has a fill even
-       *  if the sprite 404s. Then the diamond PNG sprite layered on top via
-       *  <image>: when ComfyUI has produced /assets/tiles/<race>/ground.png
-       *  the browser cache hits the same URL for all 96 tiles (the bitmap is
-       *  decoded once) and the field reads as photoreal terrain. Until the
-       *  asset exists, every tile keeps its TILE_PALETTE colour and the page
-       *  works exactly as before.
+      {/* Ground tiles — single shared pattern fills each diamond polygon,
+       *  giving cross-tile continuity (a "real ground" feel instead of
+       *  96 isolated diamond stamps). When the sprite hasn't loaded yet
+       *  the polygon falls back to a flat TILE_PALETTE colour so the
+       *  page never flashes empty.
        *
-       *  Grid stroke + checker tint stay on the polygon so the tilemap shape
-       *  is still legible even with sprites on (subtle edge highlight + a
-       *  hint of the race tint shining through transparent sprite edges). */}
+       *  Variant logic stays: building tiles use `ground`, decorative
+       *  tiles pick from the {ground, resource, blocked} hash so the
+       *  field shows a sprinkling of richer terrain. */}
       {tiles.map(({ col, row, key }) => {
         const checker = (col + row) % 2 === 0;
-        const { x, y } = tileToScreen(col, row);
-        // Tiles under buildings always use the default ground sprite
-        // (the building art already implies "occupied"). Empty tiles
-        // pick a variant via the deterministic hash so the field shows
-        // a sprinkling of resource and blocked patches.
         const isBuildingTile = buildingByTile.has(`${col},${row}`);
         const variant = isBuildingTile ? 'ground' : getTileVariant(col, row, race.key);
-        const variantHref = TILE_SPRITES[race.key][variant];
+        const fillStyle = hasTileSprite
+          ? `url(#tile-tex-${race.key}-${variant})`
+          : (checker ? palette.ground : palette.groundAlt);
         return (
-          <g key={`g-${key}`}>
-            <polygon
-              points={tileDiamondPoints(col, row)}
-              fill={checker ? palette.ground : palette.groundAlt}
-              stroke={palette.edge}
-              strokeWidth={0.6}
-            />
-            {hasTileSprite && (
-              <image
-                href={variantHref}
-                x={x - TILE_W / 2}
-                y={y}
-                width={TILE_W}
-                height={TILE_H}
-                preserveAspectRatio="none"
-                style={{ pointerEvents: 'none', transform: rotate(45deg) }}
-              />
-            )}
-          </g>
+          <polygon
+            key={`g-${key}`}
+            points={tileDiamondPoints(col, row)}
+            fill={fillStyle}
+            stroke={palette.edge}
+            strokeWidth={0.6}
+          />
         );
       })}
 

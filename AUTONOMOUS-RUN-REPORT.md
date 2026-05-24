@@ -1,10 +1,9 @@
 # Autonomous QA Run — Report
 
 > Started as a 4-hour loop; extended to keep-going-until-cancel.
-> Seven commits landed on `main` so far:
-> `e24f562`, `90ee7c9`, `32de76b`, `63a5c4e`, `22c620a`, `4513650`,
-> `26a5df8`, `8bd0fdc`. Diff vs starting point in
-> `git log --since='4 hours ago' --oneline`.
+> 13+ commits landed on `main` so far. See `git log --since='6 hours ago'
+> --oneline` for the full list. The HEAD of the autonomous run is
+> always tagged in the final commit summary.
 
 ## TL;DR
 
@@ -218,3 +217,46 @@ After the initial run, kept going on these:
 - 39/40 routes: 100% clean (0 console errors, 0 4xx, 0 JS exceptions).
 - /formation: 3 silent 404s (backend formation endpoints don't exist)
   but renders empty-state without crashing.
+
+## Round 6 follow-ups (last extension)
+
+- New `useGameBuildings` hook + `/base` focused-building card now shows
+  live status chip (AKTİF · Lv N / İNŞA EDİLİYOR / YAPILMAMIŞ) instead
+  of the binary KİLİTLİ/AKTİF placeholder.
+- `/target/[id]` playerPower derived from owned-units stats (was a flat
+  4180 literal). The win-probability dial finally reacts to what the
+  player actually owns.
+- `/handoff` design showcase auto-redirects to `/base` in production
+  builds; dev still renders for designers/QA.
+- BaseField building tiles get SVG `<title>` tooltips on hover for
+  zero-cost discoverability.
+- Seed script extended again to insert starter `player_units` per race
+  (marine+medic / zergling+hydralisk / etc.). test2-6 now have 2-16
+  live units returned by `/api/units`.
+
+## Stack snapshot when you return
+
+| Service | Where | Health |
+|---|---|---|
+| web (HMR) | local `pnpm dev` on :3000 | ✅ |
+| api | docker :4000 | ✅ healthy |
+| game-server | docker :4001 | ✅ healthy (CORS for :3000 wired) |
+| postgres | docker :5433 | ✅ healthy |
+| redis | docker :6379 | ✅ healthy |
+| minio | docker :9000 | ✅ healthy |
+
+Crawler last run: **39/40 routes 100% clean.** /formation still shows
+3 silent 404s for non-existent backend endpoints (formation backend
+hasn't been built yet — the page renders empty-state without crashing).
+
+All 6 test accounts now have starter buildings + units + tier progress
+ready for end-to-end click-through:
+
+```
+test1@nebula.com / Test1234!  — fresh, no race, no starter content
+test2@nebula.com / Test1234!  — Insan,   lv 9,  5 buildings + 10 units
+test3@nebula.com / Test1234!  — Zerg,    lv 18, 4 buildings + 16 units
+test4@nebula.com / Test1234!  — Otomat,  lv 27, 4 buildings + 5 units
+test5@nebula.com / Test1234!  — Canavar, lv 36, 4 buildings + 2 units
+test6@nebula.com / Test1234!  — Seytan,  lv 45, 4 buildings + 3 units
+```

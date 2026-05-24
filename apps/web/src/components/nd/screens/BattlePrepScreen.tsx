@@ -20,6 +20,7 @@ import {
   type NDRaceKey,
 } from '@/components/handoff';
 import { Analytics } from '@/lib/analytics';
+import { useGameUnits, groupUnitsByType } from '@/hooks/useGameUnits';
 
 /* ───────────────────────── Roster & formation model ───────────────────────── */
 
@@ -38,14 +39,38 @@ const FORMATION_COLS = 5;
 /** Slot index (0..14) → assigned unit id or null. */
 type FormationGrid = (string | null)[];
 
-function buildRoster(race: NDRace): RosterUnit[] {
-  return race.units.map((u, i) => ({
-    id: `${race.key}-${i}`,
-    name: u.n,
-    tier: u.t,
-    power: 60 + u.t * 40,
-    count: Math.max(2, 8 - u.t),
-  }));
+function buildRoster(
+  race: NDRace,
+  liveUnits: import('@/hooks/useGameUnits').PlayerUnitDto[] | null,
+): RosterUnit[] {
+  // Live-unit fast-path: when the player is logged in and has owned
+  // units, use real per-type counts. Otherwise synthesize from race
+  // tokens so the screen still has something to drag/drop in guest mode.
+  const liveByType = liveUnits ? groupUnitsByType(liveUnits) : null;
+
+  return race.units.map((u, i) => {
+    // The race token's unit name doesn't 1:1 match backend types
+    // (race-flavoured vs StarCraft-generic), so we fall back to the
+    // ordered backend list when matching by lowercase keyword fails.
+    const liveTypeForSlot = liveByType
+      ? Array.from(liveByType.keys())[i] ?? null
+      : null;
+    const realCount = liveTypeForSlot
+      ? liveByType!.get(liveTypeForSlot)?.length ?? 0
+      : 0;
+    const baseCount = realCount > 0
+      ? realCount
+      : liveUnits != null && liveUnits.length === 0
+        ? 0
+        : Math.max(2, 8 - u.t);
+    return {
+      id: `${race.key}-${i}`,
+      name: u.n,
+      tier: u.t,
+      power: 60 + u.t * 40,
+      count: baseCount,
+    };
+  });
 }
 
 function emptyGrid(): FormationGrid {
@@ -73,7 +98,8 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
   const enemy = RACES[race.enemyRace];
   const router = useRouter();
 
-  const roster = useMemo(() => buildRoster(race), [race]);
+  const { data: liveUnits } = useGameUnits();
+  const roster = useMemo(() => buildRoster(race, liveUnits), [race, liveUnits]);
   const [grid, setGrid] = useState<FormationGrid>(() => emptyGrid());
   const [dragId, setDragId] = useState<string | null>(null);
 

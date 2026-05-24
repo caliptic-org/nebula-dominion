@@ -138,28 +138,74 @@ export const TILE_PALETTE: Record<NDRaceKey, TilePalette> = {
   },
 };
 
-/* ── Per-race ground tile sprite paths ────────────────────────────────── */
+/* ── Per-race tile sprite paths ───────────────────────────────────────── */
 
-/** ComfyUI-generated iso diamond tile sprite, one per race. Rendered as
- *  SVG <image> at every (col,row) inside BaseField. When the file is not
- *  yet present the <image> renders nothing — the underlying TILE_PALETTE
- *  polygon stays visible, so the page never breaks.
+/** Three sprite variants per race generated via ComfyUI:
+ *  - `ground`   — default terrain on every tile
+ *  - `resource` — bonus yield (mineral/gas/energy deposit)
+ *  - `blocked`  — impassable hazard tile
  *
- *  Generate via:
- *    node scripts/comfy-gen.js --all-tiles        (5 races)
- *    node scripts/comfy-gen.js --tile insan       (one race)
- *
- *  Output naming: /assets/tiles/<race>/ground.png — 1024×512 transparent
- *  diamond. Future variants (resource / blocked / water tiles) can be
- *  generated as ground-<variant>.png and slotted into a richer Map keyed
- *  by tile type. */
-export const TILE_SPRITE: Record<NDRaceKey, string> = {
-  insan:   '/assets/tiles/insan/ground.png',
-  zerg:    '/assets/tiles/zerg/ground.png',
-  otomat:  '/assets/tiles/otomat/ground.png',
-  canavar: '/assets/tiles/canavar/ground.png',
-  seytan:  '/assets/tiles/seytan/ground.png',
+ *  See `getTileVariant(col, row, race)` for the deterministic placement
+ *  heuristic; the grid model itself stays simple (no per-tile state) but
+ *  the visuals get varied. Once a real "tile type" data layer lands, the
+ *  variant becomes a server-driven attribute and this hash function is
+ *  retired. */
+export type TileVariant = 'ground' | 'resource' | 'blocked';
+
+export const TILE_SPRITES: Record<NDRaceKey, Record<TileVariant, string>> = {
+  insan: {
+    ground:   '/assets/tiles/insan/ground.png',
+    resource: '/assets/tiles/insan/resource.png',
+    blocked:  '/assets/tiles/insan/blocked.png',
+  },
+  zerg: {
+    ground:   '/assets/tiles/zerg/ground.png',
+    resource: '/assets/tiles/zerg/resource.png',
+    blocked:  '/assets/tiles/zerg/blocked.png',
+  },
+  otomat: {
+    ground:   '/assets/tiles/otomat/ground.png',
+    resource: '/assets/tiles/otomat/resource.png',
+    blocked:  '/assets/tiles/otomat/blocked.png',
+  },
+  canavar: {
+    ground:   '/assets/tiles/canavar/ground.png',
+    resource: '/assets/tiles/canavar/resource.png',
+    blocked:  '/assets/tiles/canavar/blocked.png',
+  },
+  seytan: {
+    ground:   '/assets/tiles/seytan/ground.png',
+    resource: '/assets/tiles/seytan/resource.png',
+    blocked:  '/assets/tiles/seytan/blocked.png',
+  },
 };
+
+/** Back-compat alias for callers that only want the default ground. */
+export const TILE_SPRITE: Record<NDRaceKey, string> = {
+  insan:   TILE_SPRITES.insan.ground,
+  zerg:    TILE_SPRITES.zerg.ground,
+  otomat:  TILE_SPRITES.otomat.ground,
+  canavar: TILE_SPRITES.canavar.ground,
+  seytan:  TILE_SPRITES.seytan.ground,
+};
+
+/** Deterministic variant picker — hashes (col, row, race) so the same
+ *  tile always renders the same variant across page loads, but the
+ *  pattern still feels organic. Hits ~15% resource and ~10% blocked,
+ *  leaving 75% as ordinary ground. Excludes tiles that are occupied by
+ *  buildings (caller is responsible for not calling this for those). */
+export function getTileVariant(col: number, row: number, race: NDRaceKey): TileVariant {
+  // Cheap xorshift over the inputs — race adds salt so two races see
+  // different patterns. Bit-twiddly but no per-render alloc.
+  const raceCode = race.charCodeAt(0);
+  let h = (col * 73856093) ^ (row * 19349663) ^ (raceCode * 83492791);
+  h = (h ^ (h >>> 13)) * 1274126177;
+  h = h ^ (h >>> 16);
+  const bucket = (h >>> 0) % 100;
+  if (bucket < 10) return 'blocked';
+  if (bucket < 25) return 'resource';
+  return 'ground';
+}
 
 /* ── Per-race building tile placements ────────────────────────────────── */
 

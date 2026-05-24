@@ -17,9 +17,11 @@ import {
   TILE_H,
   TILE_PALETTE,
   TILE_SPRITE,
+  TILE_SPRITES,
   TILE_W,
   VIEW_H,
   VIEW_W,
+  getTileVariant,
   tileDiamondPoints,
   tileToScreen,
 } from './base-iso';
@@ -313,6 +315,13 @@ export function BaseField({
       {tiles.map(({ col, row, key }) => {
         const checker = (col + row) % 2 === 0;
         const { x, y } = tileToScreen(col, row);
+        // Tiles under buildings always use the default ground sprite
+        // (the building art already implies "occupied"). Empty tiles
+        // pick a variant via the deterministic hash so the field shows
+        // a sprinkling of resource and blocked patches.
+        const isBuildingTile = buildingByTile.has(`${col},${row}`);
+        const variant = isBuildingTile ? 'ground' : getTileVariant(col, row, race.key);
+        const variantHref = TILE_SPRITES[race.key][variant];
         return (
           <g key={`g-${key}`}>
             <polygon
@@ -323,7 +332,7 @@ export function BaseField({
             />
             {hasTileSprite && (
               <image
-                href={tileSpriteHref}
+                href={variantHref}
                 x={x - TILE_W / 2}
                 y={y}
                 width={TILE_W}

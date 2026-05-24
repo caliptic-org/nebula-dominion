@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ND, type NDRace, type NDResIconKind } from './nd-tokens';
 import { NebulaBg } from './Sigil';
 
@@ -444,24 +444,55 @@ export function ResIcon({ kind, size = 14, color }: ResIconProps) {
   );
 }
 
-interface ResPillProps { kind: NDResIconKind; value: string | number; accent?: string }
-export function ResPill({ kind, value, accent }: ResPillProps) {
+interface ResPillProps {
+  kind: NDResIconKind;
+  value: string | number;
+  accent?: string;
+  /** When provided, the pill renders as a button and calls this on click —
+   *  used by the HUD to surface a "what is this / how to earn it" popover. */
+  onClick?: () => void;
+  /** When `onClick` is set, this lights the border in race accent and
+   *  serves as the popover anchor's aria-controls relationship. */
+  ariaControls?: string;
+  /** When `onClick` is set + popover is open, true marks the pill active. */
+  active?: boolean;
+}
+export function ResPill({ kind, value, accent, onClick, ariaControls, active }: ResPillProps) {
+  const sharedStyle: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '4px 8px 4px 6px',
+    background: 'rgba(8, 12, 26, 0.7)',
+    border: `1px solid ${active && accent ? accent : ND.border}`,
+    borderRadius: 3,
+    fontFamily: ND.mono,
+    fontSize: 11,
+    color: ND.text,
+    letterSpacing: '0.04em',
+    transition: 'border-color 120ms ease',
+  };
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-haspopup="dialog"
+        aria-expanded={Boolean(active)}
+        aria-controls={ariaControls}
+        style={{
+          ...sharedStyle,
+          cursor: 'pointer',
+          font: 'inherit',
+        }}
+      >
+        <ResIcon kind={kind} size={12} color={accent}/>
+        <span>{value}</span>
+      </button>
+    );
+  }
   return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '4px 8px 4px 6px',
-        background: 'rgba(8, 12, 26, 0.7)',
-        border: `1px solid ${ND.border}`,
-        borderRadius: 3,
-        fontFamily: ND.mono,
-        fontSize: 11,
-        color: ND.text,
-        letterSpacing: '0.04em',
-      }}
-    >
+    <div style={sharedStyle}>
       <ResIcon kind={kind} size={12} color={accent}/>
       <span>{value}</span>
     </div>
@@ -480,6 +511,41 @@ interface HUDProps {
   pop?: string;
 }
 
+/* Per-resource help copy — shown when the player taps a HUD resource pill.
+ * Three slots map to game-server resource columns: A=mineral, B=gas,
+ * crystal=energy. The race's own resourceA.name / resourceB.name supply
+ * the title so insan reads "Mineral / Gas", zerg reads "Biyokütle /
+ * Genetik" etc. — keeps the lore consistent. */
+type ResSlot = 'A' | 'B' | 'crystal';
+
+interface ResInfo {
+  title: string;
+  description: string;
+  howTo: string;
+}
+
+function resInfoFor(slot: ResSlot, race: NDRace): ResInfo {
+  if (slot === 'A') {
+    return {
+      title: race.resourceA.name,
+      description: `Üssünün birincil kaynağı. Yapı inşaatı ve birim eğitiminin temel maliyeti.`,
+      howTo: `Üssünde ana kaynak binası inşa et — her tick'te otomatik üretilir. Daha fazla bina = daha hızlı üretim.`,
+    };
+  }
+  if (slot === 'B') {
+    return {
+      title: race.resourceB.name,
+      description: `İleri seviye birimler ve araştırmalar için gerekli ikincil kaynak.`,
+      howTo: `Çekim binası inşa et + zamanla pasif üretim al. Boss ve raid drop'larından da kazanılır.`,
+    };
+  }
+  return {
+    title: 'Enerji',
+    description: `Birim üretimi ve özel yetenekler için tüketilir. Yüksek seviye birimler daha fazla harcar.`,
+    howTo: `Reaktör/enerji binası inşa et. Aktif kalkan + buff kullanırken hızla biter — depoyu izle.`,
+  };
+}
+
 export function HUD({
   race,
   level = 1,
@@ -488,9 +554,34 @@ export function HUD({
   resB = '—',
   crystal = '—',
 }: HUDProps) {
+  // Single-slot popover: tap a pill to open, tap again or outside to close.
+  // Lives in HUD so all three pills share one open-state (only one popover
+  // visible at a time keeps the top-bar from getting cluttered).
+  const [openSlot, setOpenSlot] = useState<ResSlot | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openSlot) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpenSlot(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+    };
+  }, [openSlot]);
+
+  const toggle = (slot: ResSlot) =>
+    setOpenSlot((cur) => (cur === slot ? null : slot));
+
   return (
     <div
+      ref={containerRef}
       style={{
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
         gap: 6,
@@ -535,9 +626,180 @@ export function HUD({
         </div>
       </NotchSurface>
       <div style={{ flex: 1 }} />
-      <ResPill kind={race.resourceA.icon} value={resA} accent={race.primary}/>
-      <ResPill kind={race.resourceB.icon} value={resB} accent={race.primary}/>
-      <ResPill kind="crystal" value={crystal} accent="oklch(0.82 0.16 80)"/>
+      <ResPill
+        kind={race.resourceA.icon}
+        value={resA}
+        accent={race.primary}
+        onClick={() => toggle('A')}
+        active={openSlot === 'A'}
+        ariaControls="hud-res-popover"
+      />
+      <ResPill
+        kind={race.resourceB.icon}
+        value={resB}
+        accent={race.primary}
+        onClick={() => toggle('B')}
+        active={openSlot === 'B'}
+        ariaControls="hud-res-popover"
+      />
+      <ResPill
+        kind="crystal"
+        value={crystal}
+        accent="oklch(0.82 0.16 80)"
+        onClick={() => toggle('crystal')}
+        active={openSlot === 'crystal'}
+        ariaControls="hud-res-popover"
+      />
+
+      {openSlot && (
+        <ResInfoPopover
+          info={resInfoFor(openSlot, race)}
+          race={race}
+          slot={openSlot}
+          onClose={() => setOpenSlot(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── HUD resource info popover ────────────────────────────────────────── */
+
+function ResInfoPopover({
+  info,
+  race,
+  slot,
+  onClose,
+}: {
+  info: ResInfo;
+  race: NDRace;
+  slot: ResSlot;
+  onClose: () => void;
+}) {
+  // Match the visual horizontal position of the pill it anchors to —
+  // resource pills sit in the right cluster of the HUD, so popover
+  // anchors to the right edge and grows down.
+  const isCrystal = slot === 'crystal';
+  const accent = isCrystal ? 'oklch(0.82 0.16 80)' : race.primary;
+  return (
+    <div
+      id="hud-res-popover"
+      role="dialog"
+      aria-label={`${info.title} hakkında`}
+      style={{
+        position: 'absolute',
+        // Right-side pills; the rightmost (crystal) gets right:10 to align with
+        // its pill; the middle (B) shifts left ~78px; the leftmost (A) shifts
+        // ~156px. Approximations since pill widths vary with content but it
+        // keeps the arrow under the correct pill at typical resource sizes.
+        right: slot === 'A' ? 156 : slot === 'B' ? 78 : 10,
+        top: 'calc(100% + 6px)',
+        zIndex: 30,
+        width: 240,
+        background: 'rgba(6,8,15,0.96)',
+        border: `1px solid ${accent}55`,
+        borderRadius: 6,
+        padding: '10px 12px',
+        boxShadow: `0 12px 28px -10px rgba(0,0,0,0.6), 0 0 16px -6px ${accent}66`,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: ND.display,
+            fontSize: 13,
+            color: accent,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {info.title}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Kapat"
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            padding: '0 4px',
+            color: ND.textMute,
+            fontFamily: ND.mono,
+            fontSize: 14,
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontFamily: ND.body,
+          fontSize: 11,
+          lineHeight: 1.45,
+          color: ND.textDim,
+        }}
+      >
+        {info.description}
+      </p>
+      <div
+        style={{
+          marginTop: 8,
+          padding: '6px 8px',
+          borderRadius: 4,
+          background: `${accent}14`,
+          border: `1px solid ${accent}33`,
+          fontFamily: ND.body,
+          fontSize: 10.5,
+          lineHeight: 1.4,
+          color: ND.text,
+        }}
+      >
+        <span
+          style={{
+            display: 'block',
+            fontFamily: ND.mono,
+            fontSize: 8,
+            letterSpacing: '0.18em',
+            color: accent,
+            textTransform: 'uppercase',
+            marginBottom: 3,
+          }}
+        >
+          NASIL KAZANIRSIN
+        </span>
+        {info.howTo}
+      </div>
+      <a
+        href="/base/build"
+        onClick={onClose}
+        style={{
+          display: 'inline-block',
+          marginTop: 10,
+          padding: '6px 10px',
+          background: accent,
+          color: '#06080F',
+          fontFamily: ND.display,
+          fontSize: 10,
+          letterSpacing: '0.10em',
+          textTransform: 'uppercase',
+          textDecoration: 'none',
+          borderRadius: 3,
+          boxShadow: `0 0 12px -3px ${accent}99`,
+        }}
+      >
+        Yapı Kataloğunu Aç →
+      </a>
     </div>
   );
 }

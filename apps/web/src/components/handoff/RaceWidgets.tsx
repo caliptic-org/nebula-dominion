@@ -364,12 +364,21 @@ export function BaseField({
         const slug = race.buildings[i]?.slug;
         const assetHref = slug ? `/assets/buildings/${race.key}/${slug}.png` : null;
 
+        const tokenBuilding = race.buildings[i];
+        // SVG <title> renders as a native browser tooltip on hover —
+        // free a11y + discoverability boost. Shows the building's name
+        // and lock status without needing a JS popover layer.
+        const titleText = tokenBuilding
+          ? `${tokenBuilding.n}${tokenBuilding.locked ? ' (kilitli)' : ''}`
+          : `Yapı slotu ${i + 1}`;
+
         return (
           <g
             key={`b-${i}`}
             onClick={interactive ? () => onSelect!(i) : undefined}
             style={interactive ? { cursor: 'pointer' } : undefined}
           >
+            <title>{titleText}</title>
             {/* Tile highlight under the building — a brighter diamond so
              *  occupied tiles read as "owned plots" against bare ground. */}
             <polygon

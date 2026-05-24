@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   RACES,
   ND,
@@ -27,6 +28,17 @@ import {
 const RACE_KEYS: NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 
 export default function HandoffShowcasePage() {
+  const router = useRouter();
+  // Internal design-system reference page. Production deploys redirect
+  // to /base so end-users don't land on a wall of design tokens. Dev
+  // builds keep the showcase rendered so designers + QA can inspect
+  // every component variant.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      router.replace('/base');
+    }
+  }, [router]);
+
   const [raceKey, setRaceKey] = useState<NDRaceKey>('insan');
   const race = RACES[raceKey];
 

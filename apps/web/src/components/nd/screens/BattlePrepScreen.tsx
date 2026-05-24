@@ -246,6 +246,70 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
         <Sigil race={race} size={28} glow />
       </header>
 
+      {/* No-units guard — when the player is authed AND owns zero
+       *  units, the drag-and-drop roster pool would be empty and they
+       *  couldn't form anything. Show a centred CTA pointing them at
+       *  /base/production instead of letting them stare at empty cells. */}
+      {liveUnits != null && liveUnits.length === 0 && (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 5,
+            margin: '20px auto',
+            padding: '20px 18px',
+            maxWidth: 360,
+            border: `1px dashed ${race.primary}55`,
+            borderRadius: 6,
+            background: 'rgba(8,12,26,0.85)',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: 32, opacity: 0.6 }} aria-hidden>⚔</div>
+          <div
+            style={{
+              fontFamily: ND.display,
+              fontSize: 14,
+              color: ND.text,
+              marginTop: 6,
+            }}
+          >
+            Savaşa hazır birim yok
+          </div>
+          <div
+            style={{
+              fontFamily: ND.body,
+              fontSize: 11,
+              color: ND.textDim,
+              marginTop: 4,
+              lineHeight: 1.4,
+            }}
+          >
+            Formasyon kurmak için önce üretim sayfasından en az bir birim
+            eğit. Sonra buraya dönüp savaşa hazırlan.
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/base/production')}
+            style={{
+              marginTop: 12,
+              padding: '8px 16px',
+              background: race.primary,
+              color: '#06080F',
+              border: 'none',
+              borderRadius: 4,
+              fontFamily: ND.display,
+              fontSize: 11,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              boxShadow: `0 0 14px -3px ${race.glow}`,
+            }}
+          >
+            Üretime Git →
+          </button>
+        </div>
+      )}
+
       <main
         style={{
           position: 'relative',

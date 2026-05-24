@@ -50,7 +50,8 @@ interface EventDetail {
   leaderboard: LeaderboardEntry[];
 }
 
-const now = Date.now();
+// Same deterministic anchor as events/page.tsx — see comment there.
+const now = new Date('2026-05-24T12:00:00Z').getTime();
 
 const SAFE_BG = 'linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg) 100%)';
 
@@ -268,7 +269,7 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
             className="font-display font-black text-sm shrink-0"
             style={{ color: entry.rank <= 3 ? (entry.rank === 1 ? 'var(--color-energy)' : entry.rank === 2 ? 'var(--color-rarity-silver)' : 'var(--color-rarity-bronze)') : 'var(--color-text-secondary)' }}
           >
-            {entry.score.toLocaleString()}
+            {entry.score.toLocaleString("tr-TR")}
           </span>
         </div>
       ))}

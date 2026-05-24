@@ -27,7 +27,12 @@ interface GameEvent {
   featured?: boolean;
 }
 
-const now = Date.now();
+/* Deterministic "demo now" so SSR + client hydration agree. The events
+ * dataset is currently static mock copy — once the backend lands, dates
+ * will arrive as ISO strings from the server and this constant goes away.
+ * Picking a fixed point in 2026 keeps the "in 2 days" / "in 5 days"
+ * relative offsets readable without re-rendering on the clock. */
+const now = new Date('2026-05-24T12:00:00Z').getTime();
 const EVENTS: GameEvent[] = [
   {
     id: 'zerg-domination-s1',
@@ -214,7 +219,7 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
               <div className="text-right">
                 <p className="text-[9px] tracking-widest uppercase text-text-muted">Katılımcı</p>
                 <p className="font-display font-black text-2xl" style={{ color: c }}>
-                  {event.participants.toLocaleString()}
+                  {event.participants.toLocaleString("tr-TR")}
                 </p>
               </div>
               <div className="text-right">
@@ -316,7 +321,7 @@ function EventCard({ event }: { event: GameEvent }) {
           )}
           {isArchive && (
             <p className="text-xs text-text-muted">
-              {event.participants.toLocaleString()} katılımcı · {event.topPrize}
+              {event.participants.toLocaleString("tr-TR")} katılımcı · {event.topPrize}
             </p>
           )}
 
@@ -324,7 +329,7 @@ function EventCard({ event }: { event: GameEvent }) {
           {!isArchive && (
             <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${c}15` }}>
               <span className="text-[10px] text-text-muted">
-                {event.participants.toLocaleString()} oyuncu
+                {event.participants.toLocaleString("tr-TR")} oyuncu
               </span>
               <span
                 className="text-[10px] font-bold transition-transform duration-300 group-hover:translate-x-1"

@@ -173,12 +173,27 @@ export function isCommanderEligible(u: BackendUnit): boolean {
 
 // ─── API surface ──────────────────────────────────────────────────────────────
 
+/** Wrap a call so a backend 404 produces an empty result instead of an
+ *  exception. The formations + per-player-units endpoints don't exist on
+ *  the api yet (no FormationsController, no /units/player/:id route).
+ *  Returning empty keeps the FormationScreen rendering its empty-state UI
+ *  cleanly instead of crashing and bubbling 8 unhandled exceptions to the
+ *  console. Once the backend ships, this helper goes away. */
+async function callOr404<T>(path: string, fallback: T, init?: RequestInit): Promise<T> {
+  try {
+    return await call<T>(path, init);
+  } catch (err) {
+    if (err instanceof FormationApiError && err.status === 404) return fallback;
+    throw err;
+  }
+}
+
 export async function fetchPlayerUnits(playerId: string): Promise<BackendUnit[]> {
-  return call<BackendUnit[]>(`${API}/units/player/${encodeURIComponent(playerId)}`);
+  return callOr404<BackendUnit[]>(`${API}/units/player/${encodeURIComponent(playerId)}`, []);
 }
 
 export async function fetchTemplates(): Promise<FormationTemplate[]> {
-  return call<FormationTemplate[]>(`${API}/formations/templates`);
+  return callOr404<FormationTemplate[]>(`${API}/formations/templates`, []);
 }
 
 export async function fetchFormations(
@@ -187,7 +202,12 @@ export async function fetchFormations(
   limit = 20,
 ): Promise<ListFormationsResponse> {
   const qs = new URLSearchParams({ playerId, page: String(page), limit: String(limit) });
-  return call<ListFormationsResponse>(`${API}/formations?${qs}`);
+  return callOr404<ListFormationsResponse>(`${API}/formations?${qs}`, {
+    formations: [],
+    page: 1,
+    limit,
+    total: 0,
+  } as ListFormationsResponse);
 }
 
 export async function createFormation(req: CreateFormationRequest): Promise<Formation> {

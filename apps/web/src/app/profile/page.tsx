@@ -20,6 +20,8 @@ import {
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useBaseState } from '@/hooks/useBaseState';
+import { useGameResources } from '@/hooks/useGameResources';
 
 type Tab = 'stats' | 'achievements' | 'history';
 
@@ -99,6 +101,21 @@ export default function ProfilePage() {
   // that the backend profile DTO doesn't currently expose. Guests see the full
   // race-derived placeholder as before.
   const { profile: live } = useUserProfile();
+  const { data: liveTier } = useBaseState();
+  const { data: liveResources } = useGameResources();
+
+  // Power is derived from live data when available: each resource tier
+  // contributes a coarse weighted sum so the number reacts to gameplay
+  // rather than being a flat literal. Falls back to the mock when the
+  // hooks haven't resolved yet so the screen never flashes empty.
+  const livePower = liveResources
+    ? Math.round(
+        liveResources.mineral * 1.2 +
+          liveResources.gas * 2.5 +
+          liveResources.energy * 1.8 +
+          liveResources.population * 30,
+      ) + (liveTier?.tier?.currentLevel ?? 1) * 4_200
+    : null;
 
   const profile = useMemo(
     () => ({
@@ -108,8 +125,12 @@ export default function ProfilePage() {
       allianceTag: live?.allianceTag ?? race.allianceTag,
       allianceName: race.allianceName,
       capitalBase: race.capitalBase,
-      level: live?.level ?? 47,
-      power: 142_800,
+      level: liveTier?.tier?.currentLevel ?? live?.level ?? 47,
+      power: livePower ?? 142_800,
+      // Per-account ranking / PvP stats need dedicated backend endpoints
+      // (/leaderboard/me, /pvp/stats, /battles/history). Until those land
+      // we show literals; the chart bars still render meaningfully because
+      // win-rate is derived from wins/battles below.
       globalRank: 1_247,
       pvpScore: 4_287,
       pvpRank: 338,
@@ -118,11 +139,11 @@ export default function ProfilePage() {
       battles: 481,
       bestStreak: 17,
       guildContrib: 18_420,
-      xp: live?.xp ?? 74_200,
-      xpNext: 100_000,
+      xp: liveTier?.tier ? Number(liveTier.tier.xp) : live?.xp ?? 74_200,
+      xpNext: liveTier?.tier ? Number(liveTier.tier.xpToNextLevel) : 100_000,
       seasonPass: 68,
     }),
-    [race, live],
+    [race, live, liveTier, livePower],
   );
 
   const winRate = Math.round((profile.wins / profile.battles) * 100);

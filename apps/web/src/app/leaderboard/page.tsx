@@ -104,20 +104,25 @@ const CATEGORY_LABEL: Record<Category, { eyebrow: string; unit: string }> = {
 const DATA: Record<Category, Entry[]> = { power: POWER, pvp: PVP, alliance: ALLIANCE };
 
 function useResetCountdown(targetMs: number) {
-  const compute = () => {
-    const diff = Math.max(0, targetMs - Date.now());
-    return {
-      d: Math.floor(diff / 86_400_000),
-      h: Math.floor((diff % 86_400_000) / 3_600_000),
-      m: Math.floor((diff % 3_600_000) / 60_000),
-      s: Math.floor((diff % 60_000) / 1_000),
-    };
-  };
-  const [t, setT] = useState(compute);
+  // Important: `useState(compute)` would run the initializer during SSR with
+  // one Date.now() and again on client hydration with a different one → text
+  // mismatch warning. Defer all clock reads to useEffect so SSR always emits
+  // 0:0:0:0 and the client populates after mount.
+  const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 });
   useEffect(() => {
+    if (!targetMs) return;
+    const compute = () => {
+      const diff = Math.max(0, targetMs - Date.now());
+      return {
+        d: Math.floor(diff / 86_400_000),
+        h: Math.floor((diff % 86_400_000) / 3_600_000),
+        m: Math.floor((diff % 3_600_000) / 60_000),
+        s: Math.floor((diff % 60_000) / 1_000),
+      };
+    };
+    setT(compute());
     const id = setInterval(() => setT(compute()), 1000);
     return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetMs]);
   return t;
 }
@@ -127,14 +132,19 @@ export default function LeaderboardPage() {
   const [category, setCategory] = useState<Category>('power');
   const [period, setPeriod] = useState<'weekly' | 'seasonal'>('weekly');
 
-  const weeklyReset = useMemo(() => {
+  // Both reset timestamps are clock-derived → defer to useEffect so SSR emits
+  // 0 and the client populates after mount. useResetCountdown also gates on
+  // a truthy targetMs so the visible countdown stays at 0:0:0:0 until then.
+  const [weeklyReset, setWeeklyReset] = useState(0);
+  const [seasonalReset, setSeasonalReset] = useState(0);
+  useEffect(() => {
     const d = new Date();
     const daysUntilMonday = (8 - d.getUTCDay()) % 7 || 7;
     d.setUTCDate(d.getUTCDate() + daysUntilMonday);
     d.setUTCHours(0, 0, 0, 0);
-    return d.getTime();
+    setWeeklyReset(d.getTime());
+    setSeasonalReset(Date.now() + 60 * 86_400_000);
   }, []);
-  const seasonalReset = useMemo(() => Date.now() + 60 * 86_400_000, []);
   const timer = useResetCountdown(period === 'weekly' ? weeklyReset : seasonalReset);
 
   // Live leaderboard from /api/v1/leaderboard. Falls back to the local mock
@@ -159,7 +169,11 @@ export default function LeaderboardPage() {
       }))
     : null;
   const baseEntries = liveAsEntries ?? DATA[category];
-  // Inject "me" row using player race
+  // "Me" injection only fires when the backend hasn't returned a meEntry
+  // (which it doesn't yet — TODO: extend /leaderboard to include the
+  // authenticated user's own row). Until then, the synthetic Sen row uses
+  // the player's actual race + a placeholder rank/score; we surface a
+  // tooltip via aria-label so the user knows it's not real.
   const me: Entry = {
     rank: 42,
     id: 'me',
@@ -172,7 +186,19 @@ export default function LeaderboardPage() {
     delta: 7,
   };
 
-  const entries = [...baseEntries, me].sort((a, b) => a.rank - b.rank);
+  // De-duplicate by id so a real me-entry from backend (when present)
+  // overrides the synthetic row.
+  const merged = [...baseEntries, me].reduce<Entry[]>((acc, cur) => {
+    const existingIdx = acc.findIndex((e) => e.id === cur.id);
+    if (existingIdx >= 0) {
+      // Prefer the backend entry over the synthetic.
+      if (cur.id !== 'me') acc[existingIdx] = cur;
+      return acc;
+    }
+    acc.push(cur);
+    return acc;
+  }, []);
+  const entries = merged.sort((a, b) => a.rank - b.rank);
   const podium = entries.filter(e => e.rank <= 3);
   const list = entries.filter(e => e.rank > 3);
 

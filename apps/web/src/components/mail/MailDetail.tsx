@@ -404,7 +404,7 @@ function RewardCard({ reward, index, claimed, animating }: RewardCardProps) {
           letterSpacing: '0.03em',
         }}
       >
-        {reward.amount.toLocaleString()}
+        {reward.amount.toLocaleString("tr-TR")}
       </span>
       <span style={{ fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center', letterSpacing: '0.03em' }}>
         {reward.label}

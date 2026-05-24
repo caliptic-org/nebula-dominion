@@ -209,7 +209,7 @@ export function MailListItem({
                     fontWeight: 600,
                   }}
                 >
-                  {r.icon} {r.amount.toLocaleString()}
+                  {r.icon} {r.amount.toLocaleString("tr-TR")}
                 </span>
               ))}
             </div>

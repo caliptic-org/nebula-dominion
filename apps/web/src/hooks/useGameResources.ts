@@ -61,13 +61,20 @@ const sListeners = new Set<() => void>();
 let sTimer: ReturnType<typeof setTimeout> | null = null;
 let sRunning = false;
 
+// Generation counter: incremented on every startPolling/stopPolling cycle.
+// An in-flight fetchOnce checks its captured generation against this before
+// arming a new timer — stale callbacks from previous cycles are silently
+// dropped.  This prevents React 18 StrictMode's "mount → unmount → remount"
+// lifecycle from creating multiple concurrent polling loops.
+let sGeneration = 0;
+
 const POLL_MS = 5_000;
 
 function notify() {
   sListeners.forEach((fn) => fn());
 }
 
-async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
+async function fetchOnce(gen: number, opts: { rearm: boolean } = { rearm: true }) {
   if (!hasSession()) {
     sAuthenticated = false;
     sLoading = false;
@@ -97,8 +104,11 @@ async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
   } finally {
     sLoading = false;
     notify();
-    if (opts.rearm && sRunning) {
-      sTimer = setTimeout(() => void fetchOnce({ rearm: true }), POLL_MS);
+    // Only rearm if this fetch belongs to the current generation and the loop
+    // is still running.  Stale fetches (from a previous StrictMode cycle) must
+    // not arm new timers.
+    if (gen === sGeneration && opts.rearm && sRunning) {
+      sTimer = setTimeout(() => void fetchOnce(sGeneration, { rearm: true }), POLL_MS);
     }
   }
 }
@@ -106,11 +116,13 @@ async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
 function startPolling() {
   if (sRunning) return; // idempotent
   sRunning = true;
-  void fetchOnce({ rearm: true });
+  const gen = ++sGeneration;
+  void fetchOnce(gen, { rearm: true });
 }
 
 function stopPolling() {
   sRunning = false;
+  sGeneration++; // invalidate any in-flight fetchOnce from the previous cycle
   if (sTimer !== null) {
     clearTimeout(sTimer);
     sTimer = null;
@@ -120,6 +132,15 @@ function stopPolling() {
   sLoading = true;
   sError = null;
   sAuthenticated = false;
+}
+
+// HMR safety: when the module hot-reloads in dev, kill any timer from the
+// previous module version so we don't accumulate stale polling loops.
+if (typeof window !== 'undefined') {
+  const HMR_KEY = '__nebula_resources_stop__';
+  const prev = (window as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
+  if (prev) prev();
+  (window as Record<string, unknown>)[HMR_KEY] = stopPolling;
 }
 
 // ── Cross-tree refresh signal ──────────────────────────────────────────────
@@ -147,7 +168,7 @@ export function useGameResources(): UseGameResourcesResult {
 
     // Event-driven refetch — fires a one-shot fetch without rearming the
     // normal timer (so the scheduled tick still fires on schedule).
-    const onRefetch = () => void fetchOnce({ rearm: false });
+    const onRefetch = () => void fetchOnce(sGeneration, { rearm: false });
     if (typeof window !== 'undefined') {
       window.addEventListener(WALLET_REFETCH_EVENT, onRefetch);
     }

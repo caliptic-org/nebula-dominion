@@ -50,6 +50,7 @@ let sAuthenticated = false;
 const sListeners = new Set<() => void>();
 let sTimer: ReturnType<typeof setTimeout> | null = null;
 let sRunning = false;
+let sGeneration = 0;
 
 const POLL_MS = 30_000;
 
@@ -64,7 +65,7 @@ function notify() {
   sListeners.forEach((fn) => fn());
 }
 
-async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
+async function fetchOnce(gen: number, opts: { rearm: boolean } = { rearm: true }) {
   if (!hasSession()) {
     sAuthenticated = false;
     sLoading = false;
@@ -92,8 +93,8 @@ async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
   } finally {
     sLoading = false;
     notify();
-    if (opts.rearm && sRunning) {
-      sTimer = setTimeout(() => void fetchOnce({ rearm: true }), POLL_MS);
+    if (gen === sGeneration && opts.rearm && sRunning) {
+      sTimer = setTimeout(() => void fetchOnce(sGeneration, { rearm: true }), POLL_MS);
     }
   }
 }
@@ -101,16 +102,26 @@ async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
 function startPolling() {
   if (sRunning) return;
   sRunning = true;
-  void fetchOnce({ rearm: true });
+  const gen = ++sGeneration;
+  void fetchOnce(gen, { rearm: true });
 }
 
 function stopPolling() {
   sRunning = false;
+  sGeneration++;
   if (sTimer !== null) { clearTimeout(sTimer); sTimer = null; }
   sData = null;
   sLoading = true;
   sError = null;
   sAuthenticated = false;
+}
+
+// HMR safety: kill stale timers from previous module versions.
+if (typeof window !== 'undefined') {
+  const HMR_KEY = '__nebula_buildings_stop__';
+  const prev = (window as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
+  if (prev) prev();
+  (window as Record<string, unknown>)[HMR_KEY] = stopPolling;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
@@ -121,7 +132,7 @@ export function useGameBuildings(): UseGameBuildingsResult {
     sListeners.add(forceUpdate);
     startPolling();
 
-    const onRefetch = () => void fetchOnce({ rearm: false });
+    const onRefetch = () => void fetchOnce(sGeneration, { rearm: false });
     if (typeof window !== 'undefined') {
       window.addEventListener(BUILDINGS_REFETCH_EVENT, onRefetch);
     }

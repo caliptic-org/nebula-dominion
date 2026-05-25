@@ -15,7 +15,7 @@ import { HttpJwtGuard } from '../auth/http-jwt.guard';
 import { BasesService } from './bases.service';
 import { QueueUnitDto } from './dto/queue-unit.dto';
 
-@Controller('api/bases/:id/production-queue')
+@Controller('bases/:id/production-queue')
 @UseGuards(HttpJwtGuard)
 export class BasesProductionQueueController {
   constructor(private readonly bases: BasesService) {}

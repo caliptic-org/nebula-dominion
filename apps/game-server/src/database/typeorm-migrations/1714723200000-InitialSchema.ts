@@ -105,9 +105,12 @@ export class InitialSchema1714723200000 implements MigrationInterface {
     `);
     await this.createUpdatedAtTrigger(queryRunner, 'players');
 
-    // ─── buildings ──────────────────────────────────────────────────────────
+    // ─── player_buildings ────────────────────────────────────────────────────
+    // NOTE: the api service owns a "buildings" table with a gameId/type/level/health
+    // model (linked to the games table). Game-server uses "player_buildings" to avoid
+    // colliding with that table when both services share the same Postgres DB.
     await queryRunner.query(`
-      CREATE TABLE IF NOT EXISTS buildings (
+      CREATE TABLE IF NOT EXISTS player_buildings (
         id                        UUID                     PRIMARY KEY DEFAULT gen_random_uuid(),
         player_id                 UUID                     NOT NULL,
         type                      buildings_type_enum      NOT NULL,
@@ -121,9 +124,9 @@ export class InitialSchema1714723200000 implements MigrationInterface {
         updated_at                TIMESTAMPTZ              NOT NULL DEFAULT NOW()
       )
     `);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_buildings_player_id ON buildings (player_id)`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_buildings_player_status ON buildings (player_id, status)`);
-    await this.createUpdatedAtTrigger(queryRunner, 'buildings');
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_player_buildings_player_id ON player_buildings (player_id)`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_player_buildings_player_status ON player_buildings (player_id, status)`);
+    await this.createUpdatedAtTrigger(queryRunner, 'player_buildings');
 
     // ─── player_resources ────────────────────────────────────────────────────
     // NOTE: the api service owns a "resources" table with an EAV model
@@ -468,8 +471,8 @@ export class InitialSchema1714723200000 implements MigrationInterface {
       'loot_box_awards',
       'login_streaks',
       'chat_messages',
-      'resources',
-      'buildings',
+      'player_resources',
+      'player_buildings',
       'players',
     ];
     for (const t of tables) {

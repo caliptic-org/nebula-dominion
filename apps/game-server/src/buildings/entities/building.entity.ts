@@ -33,7 +33,11 @@ export enum BuildingStatus {
   DESTROYED = 'destroyed',
 }
 
-@Entity('buildings')
+// "player_buildings" is the game-server's canonical buildings table.
+// The api service owns a separate "buildings" table with a gameId/type/level/health
+// model; both share the same Postgres DB, so we use distinct table names to avoid
+// collision. The correct table for this entity is "player_buildings".
+@Entity('player_buildings')
 @Index(['playerId', 'status'])
 export class Building {
   @PrimaryGeneratedColumn('uuid')

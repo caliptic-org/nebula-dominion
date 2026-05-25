@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { PlayersModule } from './players/players.module';
 import { ResourcesModule } from './resources/resources.module';
 import { BuildingsModule } from './buildings/buildings.module';
+import { BasesModule } from './bases/bases.module';
 import { WorkersModule } from './workers/workers.module';
 import { MatchmakingModule } from './matchmaking/matchmaking.module';
 import { GameModule } from './game/game.module';
@@ -46,6 +47,7 @@ import { GuildsModule } from './guilds/guilds.module';
     PlayersModule,
     ResourcesModule,
     BuildingsModule,
+    BasesModule,
     WorkersModule,
     MatchmakingModule,
     GameModule,

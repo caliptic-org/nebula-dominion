@@ -32,6 +32,9 @@ import { useBaseState } from '@/hooks/useBaseState';
 import { useGameBuildings, indexBuildingsByType, type PlayerBuildingDto } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
 import type { NDRaceLex } from '@/components/handoff/race-lex';
+import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
+import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
+
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base: '/base',
@@ -371,6 +374,20 @@ export default function BaseHomePage() {
             setFocusedIdx={setFocusedIdx}
           />
         </div>
+
+        {/* Right-rail shortcuts (chat / missions / inventory) and bottom-left
+         *  production queue — both are HUD overlays that sit above the iso
+         *  field but below the bottom nav. Demo prop values for now; once
+         *  the messaging + production-queue hooks exist they wire in here. */}
+        <ShortcutButtons
+          unreadMessages={3}
+          activeMissions={2}
+          inventoryStatus="full"
+          onChatClick={() => router.push('/chat')}
+          onMissionsClick={() => router.push('/missions')}
+          onInventoryClick={() => router.push('/inventory')}
+        />
+        <UnitProductionQueue />
 
         <BottomNav
           race={race}

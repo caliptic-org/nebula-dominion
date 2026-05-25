@@ -26,6 +26,7 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useHudState } from '@/hooks/useHudState';
+import { useGameBuildings } from '@/hooks/useGameBuildings';
 import { refreshGameResources } from '@/hooks/useGameResources';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
@@ -85,6 +86,10 @@ function BuildMenuInner() {
   // game-server's BUILDING_CONFIGS. Used to overlay real values on the
   // race-flavoured slots; if the fetch fails we keep the mock numbers.
   const { types: backendTypes } = useBuildingTypes();
+  // Live owned-buildings roster. Drives the "already built — upgrade
+  // instead" branch in handleStartBuild so the player can't accidentally
+  // spawn N duplicate command centers by tapping "İnşa Başlat" twice.
+  const { data: liveBuildings } = useGameBuildings();
   const catalog = useMemo<BuildEntry[]>(
     () => buildCatalog(race, backendTypes, liveLevel ?? null),
     [race, backendTypes, liveLevel],
@@ -135,13 +140,44 @@ function BuildMenuInner() {
       toast.info(`${selected.name} için arka uç eşlemesi yok — yakında`);
       return;
     }
+    // Already-built guard. The capital starter has a `COMMAND_CENTER` row
+    // from seed; if the player taps "İnşa Başlat" on the capital slot, we
+    // used to POST `/buildings` again and spawn a duplicate at a random
+    // tile — repeated taps stacked N command centers.  Now we route to the
+    // existing building's detail page where the upgrade flow lives.  Most
+    // building configs in game-server have maxPerPlayer === 1, so duplicate
+    // creation isn't actually a feature — POSTing a second one was just a
+    // backend permissiveness bug.
+    if (liveBuildings && liveBuildings.some((b) => b.type === type)) {
+      const existing = liveBuildings.find((b) => b.type === type)!;
+      // Resolve to the same race-flavored slug the existing /base/building
+      // detail page expects.
+      const slug =
+        race.buildings.find((b) => b.n === selected.name)?.slug ??
+        selected.name.toLowerCase().replace(/\s+/g, '-');
+      toast.info(`${selected.name} zaten inşa edilmiş — yükseltme sayfası açılıyor`);
+      router.push(`/base/building/${slug}?id=${existing.id}`);
+      return;
+    }
+    // Find a tile that isn't already occupied. The 8×8 grid the backend
+    // uses gives 64 slots, and starter accounts have ≤6 buildings, so a
+    // simple random retry loop terminates in O(1) practice. Falls back
+    // to (0,0) after 20 tries (extremely unlikely).
+    function pickFreeTile(): { x: number; y: number } {
+      const occupied = new Set(
+        (liveBuildings ?? []).map((b) => `${b.positionX},${b.positionY}`),
+      );
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const x = Math.floor(Math.random() * 8);
+        const y = Math.floor(Math.random() * 8);
+        if (!occupied.has(`${x},${y}`)) return { x, y };
+      }
+      return { x: 0, y: 0 };
+    }
+
     setBusy(true);
     try {
-      // Pick a random unoccupied-ish tile. Without the live `buildings`
-      // roster we can't truly check occupation, but the 8×8 grid the
-      // backend uses gives plenty of room for the first few placements.
-      const positionX = Math.floor(Math.random() * 8);
-      const positionY = Math.floor(Math.random() * 8);
+      const { x: positionX, y: positionY } = pickFreeTile();
       await gameServerApi.post('/buildings', { type, positionX, positionY });
       toast.success(`${selected.name} inşaatı başlatıldı (${selected.durationSec}s)`);
       // Wallet just got debited server-side — broadcast so every mounted

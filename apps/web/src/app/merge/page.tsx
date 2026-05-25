@@ -26,8 +26,10 @@ import { useMergePreview } from '@/hooks/useMergePreview';
 import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
 import { useHudState } from '@/hooks/useHudState';
 import { useGameUnits } from '@/hooks/useGameUnits';
+import { refreshGameResources } from '@/hooks/useGameResources';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
 
 const MERGE_NAMES: Record<NDRaceKey, string> = {
   insan:   'Promosyon Töreni',
@@ -120,9 +122,17 @@ export default function MergePage() {
       race.units.find((u) => u.n.toLowerCase().includes(liveMerge.resultUnitId!.toLowerCase()))?.n) ||
     preview.promotedName;
   const { successRate, projectedRate, riskLabel } = preview;
+  // Demo mode = no live units (guest, or authed-but-no-tier-N-yet). In demo
+  // we still RENDER the pool grid so the player learns the mechanic, but we
+  // hard-gate canMerge so a click can't POST fake demo-* ids and get rejected
+  // with a confusing toast.
+  const isDemoMode = livePool.length === 0;
+  const authenticated = hasSession();
   // Authoritative `canMerge` comes from backend when present; client estimate
-  // is used only while waiting on the network round-trip.
-  const canMerge = liveMerge ? liveMerge.canMerge : preview.canMerge;
+  // is used only while waiting on the network round-trip. Demo mode never
+  // allows merge — the button shows "Önce birim eğit" instead.
+  const canMerge =
+    isDemoMode ? false : (liveMerge ? liveMerge.canMerge : preview.canMerge);
   const risk = { color: riskColor(riskLabel), label: riskLabel };
 
   function toggle(idx: number) {
@@ -135,6 +145,10 @@ export default function MergePage() {
 
   async function performMerge() {
     if (!canMerge) return;
+    if (isDemoMode) {
+      toast.info('Önizleme modunda gerçek birleştirme yapılamaz — önce birim eğit.');
+      return;
+    }
     // Optimistic: clear local selection immediately for snappy feel, then
     // attempt the real merge POST. Falls back to a toast if the backend
     // rejects (e.g. resource cost not met).
@@ -144,6 +158,9 @@ export default function MergePage() {
       const ids = snapshot.map((idx) => pool[idx]?.id).filter(Boolean);
       await gameServerApi.post('/units/merge', { unitIds: ids, targetTier: sourceTier + 1 });
       toast.success(`Birleştirme başarılı: ${ids.length} birim Tier ${sourceTier + 1}'e yükseltildi`);
+      // Merge consumes resources server-side — pop the HUD without waiting
+      // for the 5s poll tick.
+      refreshGameResources();
     } catch (err) {
       // Restore selection so the player can retry without re-picking.
       setSelected(snapshot);
@@ -413,6 +430,33 @@ export default function MergePage() {
           </div>
         </div>
 
+        {/* Demo-mode banner — surfaces when the player has no real T-N units
+          *  of the selected source tier.  Without this, the page renders the
+          *  same 8 placeholder slots for everyone and clicking "Birleştir"
+          *  fires a backend POST with demo-* ids that gets rejected with a
+          *  generic "Birleştirme reddedildi" toast — a confusing first
+          *  impression.  The button itself is hard-gated via canMerge so the
+          *  POST can never actually fire in demo mode. */}
+        {isDemoMode && (
+          <div style={{
+            padding: '10px 14px',
+            background: `linear-gradient(180deg, ${race.primaryDim}26, transparent)`,
+            borderTop: `1px dashed ${race.primary}`,
+            borderBottom: `1px dashed ${race.primary}`,
+          }}>
+            <Eyebrow color={race.primary}>ÖNİZLEME MODU</Eyebrow>
+            <Caption style={{ marginTop: 4 }}>
+              {authenticated
+                ? `Henüz Tier ${sourceTier} birimin yok — önce `
+                : 'Birleştirmek için '}
+              <Link href={authenticated ? '/base/production' : '/login'} style={{ color: race.primary, textDecoration: 'underline' }}>
+                {authenticated ? 'birim eğit' : 'giriş yap'}
+              </Link>
+              {authenticated ? ', ardından buradan birleştirebilirsin.' : '. Aşağıdaki kart düzeni mekaniği gösterir.'}
+            </Caption>
+          </div>
+        )}
+
         {/* Bottom CTA */}
         <div style={{
           padding: '10px 14px',
@@ -427,9 +471,13 @@ export default function MergePage() {
           </NDButton>
           <NDButton race={race} size="md" style={{ flex: 2 }} disabled={!canMerge} onClick={performMerge}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'} · {COST_B}
-              <ResIcon kind={race.resourceB.icon} size={12} color="var(--color-bg-elevated)" />
-              <span style={{ letterSpacing: '0.06em' }}>{race.resourceB.name.toUpperCase()}</span>
+              {isDemoMode ? 'Önce birim eğit' : `${MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'} · ${COST_B}`}
+              {!isDemoMode && (
+                <>
+                  <ResIcon kind={race.resourceB.icon} size={12} color="var(--color-bg-elevated)" />
+                  <span style={{ letterSpacing: '0.06em' }}>{race.resourceB.name.toUpperCase()}</span>
+                </>
+              )}
             </span>
           </NDButton>
         </div>

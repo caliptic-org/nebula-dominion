@@ -25,7 +25,7 @@ import {
 } from '@/components/handoff';
 import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
-import { useGameResources } from '@/hooks/useGameResources';
+import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useVipStatus } from '@/hooks/useVip';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
@@ -413,11 +413,19 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
               // POST /api/v1/shop/purchase exists; we send the product id
               // and the chosen currency. Backend validates balance + fires
               // ledger entry. Success = inventory refresh on next nav.
+              //
+              // PREVIOUS BUG: always sent currency: 'gem' when product had a
+              // gemPrice, regardless of which tab the player was on.  On the
+              // "Gold" tab the visible price was gold but the POST debited
+              // gems — looked like a scam.  Now we use the same useGem flag
+              // the card already computed so the request matches the display.
               await api.post('/shop/purchase', {
                 sku: product.id,
-                currency: product.gemPrice !== undefined ? 'gem' : 'gold',
+                currency: useGem ? 'gem' : 'gold',
               });
               toast.success(`${product.name} alındı`);
+              // Wallet just changed — pop the HUD without waiting for poll.
+              refreshGameResources();
             } catch (err) {
               const msg = err instanceof FetchError ? err.message : 'Satın alma başarısız';
               toast.error(msg);

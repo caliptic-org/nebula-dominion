@@ -7,7 +7,11 @@ import {
   Index,
 } from 'typeorm';
 
-@Entity('resources')
+// "player_resources" is the game-server's canonical resources table.
+// The api service owns a separate "resources" table with an EAV model
+// (type/amount); both share the same Postgres DB, so we use distinct
+// table names to avoid collision.
+@Entity('player_resources')
 export class Resource {
   @PrimaryGeneratedColumn('uuid')
   id: string;

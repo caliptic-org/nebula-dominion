@@ -125,9 +125,12 @@ export class InitialSchema1714723200000 implements MigrationInterface {
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_buildings_player_status ON buildings (player_id, status)`);
     await this.createUpdatedAtTrigger(queryRunner, 'buildings');
 
-    // ─── resources ──────────────────────────────────────────────────────────
+    // ─── player_resources ────────────────────────────────────────────────────
+    // NOTE: the api service owns a "resources" table with an EAV model
+    // (id/gameId/type/amount). Game-server uses "player_resources" to avoid
+    // colliding with that table when both services share the same Postgres DB.
     await queryRunner.query(`
-      CREATE TABLE IF NOT EXISTS resources (
+      CREATE TABLE IF NOT EXISTS player_resources (
         id                    UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
         player_id             UUID            NOT NULL UNIQUE,
         mineral               NUMERIC(12,4)   NOT NULL DEFAULT 100,
@@ -147,8 +150,8 @@ export class InitialSchema1714723200000 implements MigrationInterface {
         updated_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW()
       )
     `);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_resources_player_id ON resources (player_id)`);
-    await this.createUpdatedAtTrigger(queryRunner, 'resources');
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_player_resources_player_id ON player_resources (player_id)`);
+    await this.createUpdatedAtTrigger(queryRunner, 'player_resources');
 
     // ─── chat_messages ──────────────────────────────────────────────────────
     await queryRunner.query(`

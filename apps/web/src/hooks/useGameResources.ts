@@ -1,22 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import { getAccessToken, hasSession } from '@/lib/session';
 
-/* Live in-game resources from game-server's `/api/buildings/resources` endpoint.
+/* Live in-game resources from game-server's `/api/buildings/resources`.
  *
- * The HUD on /base and /base/build previously showed hardcoded mock values
- * (12,480 / 3,210 / 42) regardless of the player's actual balance. Once the
- * player has a JWT, this hook polls the game-server every 5 seconds so the
- * HUD reflects the real wallet (matching the design's "always-live" feel).
+ * ## Singleton poll design
+ * Previous design: every `useGameResources()` call started its own 5-second
+ * timer → N mounted consumers = N parallel identical requests.  On the
+ * /base/building/[slug] page alone the HUD (via useHudState) + the page
+ * component both called the hook, producing 2 requests per tick; on pages
+ * with more HUD-like widgets the count climbed to 6+.
  *
- * Unauthenticated visitors (guest mode) get `data: null` so the page can
- * keep its mock placeholders without flicker — same pattern as useBaseState.
+ * New design: **one fetch loop at module scope**, shared by all consumers.
+ * Individual hook calls just subscribe to the shared state via a force-
+ * update callback registered in a `Set`.  No matter how many components
+ * mount, exactly one network request fires per poll cycle.
  *
- * Why a separate hook from useBaseState: game-server has its own JWT
- * pipeline (HttpJwtGuard) and its own base URL (NEXT_PUBLIC_GAME_SERVER_URL),
- * so the request shape differs from `api.get(...)`. Co-locating it would
- * couple the two backends in a single hook for no benefit.
+ * The public API (return shape, `refreshGameResources`, event name) is
+ * unchanged so all call-sites keep working without modification.
  */
 
 const GAME_SERVER_BASE = (
@@ -46,96 +48,126 @@ interface UseGameResourcesResult {
   authenticated: boolean;
 }
 
-const POLL_MS = 5000;
+// ── Singleton state ────────────────────────────────────────────────────────
+let sData: ResourceSnapshotDto | null = null;
+let sLoading = true;
+let sError: string | null = null;
+let sAuthenticated = false;
 
-/** Cross-tree refresh signal — any component (e.g. a mission-claim button
- *  in a different render branch from the HUD) can call this to force every
- *  mounted useGameResources to refetch immediately. Avoids waiting for the
- *  5s poll after a wallet-changing action. SSR-safe — falls back to a no-op
- *  before the window object exists. */
+// All mounted hook instances register a forceUpdate here.
+const sListeners = new Set<() => void>();
+
+// Single shared timer + in-flight guard.
+let sTimer: ReturnType<typeof setTimeout> | null = null;
+let sRunning = false;
+
+const POLL_MS = 5_000;
+
+function notify() {
+  sListeners.forEach((fn) => fn());
+}
+
+async function fetchOnce(opts: { rearm: boolean } = { rearm: true }) {
+  if (!hasSession()) {
+    sAuthenticated = false;
+    sLoading = false;
+    notify();
+    return;
+  }
+
+  const token = getAccessToken();
+  if (!token) {
+    sAuthenticated = false;
+    sLoading = false;
+    notify();
+    return;
+  }
+
+  sAuthenticated = true;
+
+  try {
+    const res = await fetch(`${GAME_SERVER_BASE}/api/buildings/resources`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sData = (await res.json()) as ResourceSnapshotDto;
+    sError = null;
+  } catch (err) {
+    sError = err instanceof Error ? err.message : String(err);
+  } finally {
+    sLoading = false;
+    notify();
+    if (opts.rearm && sRunning) {
+      sTimer = setTimeout(() => void fetchOnce({ rearm: true }), POLL_MS);
+    }
+  }
+}
+
+function startPolling() {
+  if (sRunning) return; // idempotent
+  sRunning = true;
+  void fetchOnce({ rearm: true });
+}
+
+function stopPolling() {
+  sRunning = false;
+  if (sTimer !== null) {
+    clearTimeout(sTimer);
+    sTimer = null;
+  }
+  // Reset state so next mount starts fresh (user logged out / navigated away).
+  sData = null;
+  sLoading = true;
+  sError = null;
+  sAuthenticated = false;
+}
+
+// ── Cross-tree refresh signal ──────────────────────────────────────────────
+// Any module that mutates the wallet (mission claim, building construction,
+// unit train…) can call `refreshGameResources()` and every mounted consumer
+// picks up the new value without waiting for the next 5 s tick.
 export const WALLET_REFETCH_EVENT = 'nebula:wallet:refetch';
+
 export function refreshGameResources(): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(WALLET_REFETCH_EVENT));
 }
 
+// ── Hook ───────────────────────────────────────────────────────────────────
 export function useGameResources(): UseGameResourcesResult {
-  const [data, setData] = useState<ResourceSnapshotDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [authenticated, setAuthenticated] = useState(false);
+  // Each consumer gets a private forceUpdate so React re-renders the
+  // component whenever shared state changes.
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
-    if (!hasSession()) {
-      setLoading(false);
-      setAuthenticated(false);
-      return;
-    }
-    setAuthenticated(true);
+    sListeners.add(forceUpdate);
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    // First consumer starts the poll; subsequent ones just subscribe.
+    startPolling();
 
-    async function fetchOnce(opts: { rearm?: boolean } = { rearm: true }) {
-      const token = getAccessToken();
-      if (!token) {
-        if (!cancelled) {
-          setAuthenticated(false);
-          setLoading(false);
-        }
-        return;
-      }
-      try {
-        const res = await fetch(`${GAME_SERVER_BASE}/api/buildings/resources`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const json = (await res.json()) as ResourceSnapshotDto;
-        if (!cancelled) {
-          setData(json);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-      } finally {
-        if (!cancelled && opts.rearm !== false) {
-          setLoading(false);
-          // Re-arm the poll AFTER each completion so a slow response doesn't
-          // pile up overlapping requests.
-          timer = setTimeout(() => fetchOnce({ rearm: true }), POLL_MS);
-        } else if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchOnce({ rearm: true });
-
-    // Event-driven refetch — any module that mutates the wallet (mission
-    // claim, building construction, unit train) can `refreshGameResources()`
-    // and every mounted instance picks it up without a 5s wait. The current
-    // poll timer stays running so cancellation semantics don't change.
-    const handler = () => {
-      void fetchOnce({ rearm: false });
-    };
+    // Event-driven refetch — fires a one-shot fetch without rearming the
+    // normal timer (so the scheduled tick still fires on schedule).
+    const onRefetch = () => void fetchOnce({ rearm: false });
     if (typeof window !== 'undefined') {
-      window.addEventListener(WALLET_REFETCH_EVENT, handler);
+      window.addEventListener(WALLET_REFETCH_EVENT, onRefetch);
     }
 
     return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
+      sListeners.delete(forceUpdate);
       if (typeof window !== 'undefined') {
-        window.removeEventListener(WALLET_REFETCH_EVENT, handler);
+        window.removeEventListener(WALLET_REFETCH_EVENT, onRefetch);
       }
+      // Last consumer leaving — stop the shared poll loop.
+      if (sListeners.size === 0) stopPolling();
     };
-  }, []);
+  }, [forceUpdate]);
 
-  return { data, loading, error, authenticated };
+  return {
+    data: sData,
+    loading: sLoading,
+    error: sError,
+    authenticated: sAuthenticated,
+  };
 }
 
 /** Compact 12,480 → "12,480" / 1,234,567 → "1.2M" formatter for the HUD. */

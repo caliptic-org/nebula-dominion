@@ -31,6 +31,7 @@ import { useOnboarding } from '@/hooks/useOnboarding';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useGameBuildings, indexBuildingsByType, type PlayerBuildingDto } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
+import { useBaseProductionQueue } from '@/hooks/useBaseProductionQueue';
 import type { NDRaceLex } from '@/components/handoff/race-lex';
 import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
 import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
@@ -102,6 +103,16 @@ export default function BaseHomePage() {
   // hashed to a likely-type via the same first letters.
   const { data: liveBuildings } = useGameBuildings();
   const bldgIndex = liveBuildings ? indexBuildingsByType(liveBuildings) : null;
+
+  // COMMAND_CENTER building UUID — used as the base ID for the production
+  // queue endpoint.  Fresh accounts have no COMMAND_CENTER yet (null →
+  // hook no-ops and the overlay shows nothing).
+  const commandCenterBuilding = liveBuildings?.find(
+    (b) => b.type === 'command_center',
+  ) ?? null;
+  const { queue: liveProductionQueue } = useBaseProductionQueue(
+    commandCenterBuilding?.id ?? null,
+  );
   // Coarse slug→type fallback: when the player owns ≥1 instance of any
   // building type, the focused slot picks the first one to surface its
   // level. Once we share SLUG_TO_BACKEND_TYPE between /base + /base/build
@@ -377,8 +388,9 @@ export default function BaseHomePage() {
 
         {/* Right-rail shortcuts (chat / missions / inventory) and bottom-left
          *  production queue — both are HUD overlays that sit above the iso
-         *  field but below the bottom nav. Demo prop values for now; once
-         *  the messaging + production-queue hooks exist they wire in here. */}
+         *  field but below the bottom nav.  The queue is live-wired to
+         *  GET /api/bases/:id/production-queue (CAL-586); collapses to
+         *  nothing when the player has no units in flight. */}
         <ShortcutButtons
           unreadMessages={3}
           activeMissions={2}
@@ -387,7 +399,11 @@ export default function BaseHomePage() {
           onMissionsClick={() => router.push('/missions')}
           onInventoryClick={() => router.push('/inventory')}
         />
-        <UnitProductionQueue />
+        {/* Pass the live queue array; the component returns null when empty,
+          * so the overlay disappears automatically when nothing is in
+          * flight.  DEMO_QUEUE is no longer injected now that CAL-586 is
+          * wired. */}
+        <UnitProductionQueue queue={liveProductionQueue} />
 
         <BottomNav
           race={race}

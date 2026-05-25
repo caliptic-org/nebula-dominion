@@ -18,6 +18,9 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { api, FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
+import { refreshGameResources } from '@/hooks/useGameResources';
 
 /* ───────────────────────── Simulation model ───────────────────────── */
 
@@ -462,9 +465,35 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
           status={state.status}
           race={race}
           enemy={enemy}
-          onContinue={() =>
-            router.push(`/battle-result?race=${race.key}&outcome=${state.status}`)
-          }
+          onContinue={async () => {
+            // Record the battle on the backend before navigating so the
+            // /profile Geçmiş tab + /battles/history endpoint pick it up.
+            // The simulation runs client-side (POST /battles starts a new
+            // server-side state machine independently), but for history
+            // purposes a single POST with the actual outcome is enough.
+            //
+            // Fire-and-forget — we don't want a network hiccup to block
+            // the navigation. The history-entry is best-effort.
+            if (hasSession()) {
+              try {
+                await api.post('/battles', {
+                  attackerRace: race.key,
+                  defenderRace: enemy.key,
+                });
+                // Battle rewards (XP, gold) typically debit/credit the
+                // wallet on completion — broadcast so the HUD picks it up.
+                refreshGameResources();
+              } catch (err) {
+                // Silent fail — the history-entry is non-critical to the
+                // post-battle UX. Worst case the player sees the result
+                // screen without /profile.Geçmiş updating, same as before.
+                if (err instanceof FetchError) {
+                  console.warn('battle history record failed:', err.message);
+                }
+              }
+            }
+            router.push(`/battle-result?race=${race.key}&outcome=${state.status}`);
+          }}
         />
       )}
     </div>

@@ -343,12 +343,20 @@ export function LoginForm() {
             <div style={{ flex: 1, height: 1, background: ND.border }} />
           </div>
 
+          {/* "Misafir" / quick-start used to route to /race-select directly,
+            * but downstream screens (race-commit, /base resource APIs) all
+            * require a JWT, so guests landed on /base, hit a 401, and got
+            * bounced back to /login with no idea why. Now we route to
+            * /register — the player creates a real account in ~30s, gets a
+            * token, and the rest of the flow (race-select → confirm → base)
+            * works end-to-end. The race-flavored label keeps the same
+            * "fresh start" feel without lying about what happens next. */}
           <NDButton
             race={race}
             variant="ghost"
             size="md"
             full
-            onClick={() => router.push('/race-select')}
+            onClick={() => router.push('/register')}
           >
             {copy.guest}
           </NDButton>

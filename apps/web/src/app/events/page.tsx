@@ -467,8 +467,15 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
                     {event.topPrize}
                   </div>
                 </div>
+                {/* The button used to read "◈ Katıl" but had no onClick and
+                  * was nested inside the outer <Link> that navigates to
+                  * /events/[id]. Clicking it went to the detail page but
+                  * never "joined" anything — there's no /events/:id/join
+                  * endpoint yet. Re-label to match reality so we stop
+                  * promising a feature that doesn't exist. The button just
+                  * inherits navigation from the parent Link. */}
                 <NDButton race={race ?? undefined} variant="primary" size="md">
-                  ◈ Katıl
+                  ◈ Detayları Gör
                 </NDButton>
               </div>
             </div>

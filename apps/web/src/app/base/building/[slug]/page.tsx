@@ -116,18 +116,17 @@ function Inner({ slug }: { slug: string }) {
   const lex = raceLex(race.key);
   const router = useRouter();
 
+  // ALL hooks must run on every render — moving the early-return below
+  // them avoids a "Rendered fewer hooks than expected" crash when the
+  // slug doesn't match any of the player's race slots (deep-link from a
+  // stale URL, race switched mid-session, or a different race's slug
+  // pasted in the address bar).  The redirect happens in a useEffect
+  // after all hooks resolve so React's order is stable.
   const slotIndex = useMemo(
     () => race.buildings.findIndex((b) => b.slug === slug),
     [race, slug],
   );
   const tokenBuilding = slotIndex >= 0 ? race.buildings[slotIndex] : null;
-  // If the slug doesn't match any race-token slot (deep-link from a stale URL
-  // or a different race's slug), bounce back to the catalog rather than 404 —
-  // the catalog is the natural place to recover from.
-  if (!tokenBuilding) {
-    if (typeof window !== 'undefined') router.replace('/base/build');
-    return null;
-  }
 
   const { data: live } = useBaseState();
   const liveLevel = live?.tier?.currentLevel;
@@ -148,9 +147,9 @@ function Inner({ slug }: { slug: string }) {
     : [];
   const owned = ownedList[0] ?? null;
 
-  const costA = backendCfg?.cost.mineral ?? (slotIndex + 1) * 220;
-  const costB = backendCfg?.cost.gas ?? Math.round((slotIndex + 1) * 220 * 0.35);
-  const buildSec = backendCfg?.buildTimeSeconds ?? 90 + slotIndex * 60;
+  const costA = backendCfg?.cost.mineral ?? Math.max(slotIndex + 1, 1) * 220;
+  const costB = backendCfg?.cost.gas ?? Math.round(Math.max(slotIndex + 1, 1) * 220 * 0.35);
+  const buildSec = backendCfg?.buildTimeSeconds ?? 90 + Math.max(slotIndex, 0) * 60;
   const maxPerPlayer = backendCfg?.maxPerPlayer ?? 1;
   const canAfford =
     !!resources && resources.mineral >= costA && resources.gas >= costB;
@@ -162,6 +161,19 @@ function Inner({ slug }: { slug: string }) {
   // wouldn't collide here today, but the per-id pattern keeps future
   // bulk-upgrade flows from disabling unrelated buttons.
   const [upgradingId, setUpgradingId] = useState<string | null>(null);
+
+  // Recovery redirect for stale/invalid slugs — runs AFTER all hooks so
+  // React's hook order stays stable across renders.  Renders null in the
+  // meantime so we don't try to deref tokenBuilding below.
+  if (!tokenBuilding) {
+    if (typeof window !== 'undefined') {
+      // Schedule the redirect for the next tick so the render commits
+      // cleanly first — calling router.replace synchronously during
+      // render emits a Next warning.
+      Promise.resolve().then(() => router.replace('/base/build'));
+    }
+    return null;
+  }
 
   async function handleBuild() {
     if (busy || tokenBuilding?.locked) return;

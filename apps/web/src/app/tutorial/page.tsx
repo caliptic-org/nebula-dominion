@@ -10,10 +10,15 @@ import {
   ScrTutorialTierUp,
   ScrTutorialWelcome,
   TUTORIAL_STEPS,
+  toast,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { Analytics, track } from '@/lib/analytics';
+import { gameServerApi } from '@/lib/game-server-api';
+import { refreshGameResources } from '@/hooks/useGameResources';
+import { hasSession } from '@/lib/session';
+import { FetchError } from '@/lib/api';
 
 const STORAGE_KEY = 'nebula:tutorial:v1';
 
@@ -82,11 +87,30 @@ function TutorialFlow() {
     [params, router],
   );
 
-  const handleAdvance = useCallback(() => {
+  const handleAdvance = useCallback(async () => {
     if (step >= TUTORIAL_STEPS) {
       writeProgress({ stepIndex: TUTORIAL_STEPS, completedAt: new Date().toISOString() });
       markTutorialCompleted();
       Analytics.tutorialComplete();
+      // Claim the "BAŞLANGIÇ HEDİYESİ" the final tutorial card promises.
+      // The game-server's POST /players/me/tutorial-complete is idempotent
+      // (per-userId in-memory flag), so a back-button revisit + re-finish
+      // doesn't double-grant. Skipped for guests — they never had an
+      // authenticated session to grant against.
+      if (hasSession()) {
+        try {
+          await gameServerApi.post('/players/me/tutorial-complete');
+          toast.success('Başlangıç hediyesi alındı: +500 mineral · +25 kristal · +200 XP');
+          refreshGameResources();
+        } catch (err) {
+          // "Already redeemed" is the most common path — silently swallow.
+          // Other errors get a small toast so the player isn't blocked from
+          // landing on /base.
+          if (err instanceof FetchError && err.status !== 400) {
+            toast.info('Hediye verilemedi — /base sayfasından devam edebilirsin');
+          }
+        }
+      }
       router.replace('/base');
       return;
     }

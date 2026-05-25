@@ -414,19 +414,51 @@ export default function ProfilePage() {
           </Panel>
         )}
 
-        {tab === 'history' && (
-          <Panel race={race}>
-            <div style={panelHeader()}>
-              <Eyebrow color={race.primary}>SON SAVAŞLAR</Eyebrow>
-              <Code>{HISTORY.length}</Code>
-            </div>
-            <div>
-              {HISTORY.map(h => (
-                <HistoryRow key={h.id} entry={h} race={race} />
-              ))}
-            </div>
-          </Panel>
-        )}
+        {tab === 'history' && (() => {
+          // /battles/history → entries[] with shape:
+          //   { id, outcome: 'won'|'lost'|'in-progress'|'pending',
+          //     opponent, score, mvp, when }
+          // Maps to the existing HistoryRow view-model. When the player
+          // hasn't fought yet, render an honest empty state instead of the
+          // fake "Khorvash / Malphas / Iron Grid" mock — that contradicts
+          // the 0/0/0 counters above and confuses new players.
+          //
+          // Pending / in-progress entries are filtered out so the row count
+          // matches the W/L counters in the stats tab (which only count
+          // 'won' + 'lost').
+          const rows: HistoryEntry[] = (liveHistory?.entries ?? [])
+            .filter((e) => e.outcome === 'won' || e.outcome === 'lost')
+            .map((e) => ({
+              id: e.id,
+              result: e.outcome === 'won' ? ('win' as const) : ('loss' as const),
+              mode: 'PvP' as const,
+              opponent: e.opponent,
+              delta: e.score,
+              unit: 'PUAN',
+              when: e.when,
+            }));
+          return (
+            <Panel race={race}>
+              <div style={panelHeader()}>
+                <Eyebrow color={race.primary}>SON SAVAŞLAR</Eyebrow>
+                <Code>{rows.length}</Code>
+              </div>
+              {rows.length > 0 ? (
+                <div>
+                  {rows.map(h => (
+                    <HistoryRow key={h.id} entry={h} race={race} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: 16, textAlign: 'center' }}>
+                  <Caption>
+                    Henüz savaş kaydın yok. <Link href="/battle-prep" style={{ color: race.primary, textDecoration: 'underline' }}>İlk savaşa başla</Link> ve geçmişin burada belirsin.
+                  </Caption>
+                </div>
+              )}
+            </Panel>
+          );
+        })()}
       </div>
 
       <BottomNav

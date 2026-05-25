@@ -370,7 +370,11 @@ export default function AlliancePage() {
           </>
         )}
 
-        {tab === 'savas' && (
+        {/* War / member / news tabs only render when the player actually has
+         *  an alliance — otherwise we'd show the fake 7-member roster + the
+         *  KVN war as if they were the player's. The Genel tab is safe
+         *  because `summary` zeros out fields when hasAlliance is false. */}
+        {tab === 'savas' && hasAlliance && (
           <>
             {WARS.map(w => (
               <WarCard key={w.id} war={w} myRace={race} />
@@ -385,7 +389,7 @@ export default function AlliancePage() {
           </>
         )}
 
-        {tab === 'uyeler' && (
+        {tab === 'uyeler' && hasAlliance && (
           <Panel race={race}>
             <div style={panelHeader()}>
               <Eyebrow color={race.primary}>ÜYELER</Eyebrow>
@@ -397,6 +401,25 @@ export default function AlliancePage() {
               ))}
             </div>
           </Panel>
+        )}
+
+        {/* Guildless empty states for the non-Genel tabs. The Genel tab gets
+         *  its own banner above + the discovery list. These three tabs
+         *  silently fall back to a single-line nudge so the player isn't
+         *  staring at a blank screen. */}
+        {!hasAlliance && tab !== 'genel' && (
+          <NotchPanel race={race}>
+            <Eyebrow color={race.primary}>İTTİFAK YOK</Eyebrow>
+            <H3 style={{ marginTop: 6, color: ND.text }}>
+              {tab === 'savas' ? 'Savaş geçmişi yok' :
+                tab === 'uyeler' ? 'Üye listesi yok' :
+                'Olay günlüğü yok'}
+            </H3>
+            <Caption style={{ marginTop: 6 }}>
+              Bu içerik bir ittifaka katıldıktan sonra gelir. <strong>Genel</strong>
+              {' '}sekmesindeki keşif listesinden katılabilirsin.
+            </Caption>
+          </NotchPanel>
         )}
 
         {tab === 'haberler' && (

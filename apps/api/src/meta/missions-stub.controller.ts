@@ -1,5 +1,15 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Param,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /* Daily quest stub.
  *
@@ -19,6 +29,10 @@ interface Quest {
   reward: { gold?: number; gems?: number; xp?: number };
   claimed: boolean;
 }
+
+// Module-level singleton: which quest ids each user has already claimed today.
+// The stub doesn't reset per-day; production DailyEngagement will.
+const CLAIMED = new Map<string, Set<string>>();
 
 const QUESTS: Quest[] = [
   { id: 'q1', kind: 'pve',    title: 'PvE Avı',         description: '3 PvE savaş kazan',                  progress: 1, target: 3, reward: { gold: 200, xp: 60 },  claimed: false },
@@ -63,5 +77,28 @@ export class MissionsStubController {
         { day: 7, reward: { gems: 150, titleUnlock: 'Sürekli Komutan' }, claimed: false },
       ],
     };
+  }
+
+  @Post('quests/:questId/claim')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Claim a quest reward (idempotent — second call returns alreadyClaimed)' })
+  claim(@Request() req: any, @Param('questId') questId: string) {
+    const quest = QUESTS.find((q) => q.id === questId);
+    if (!quest) {
+      throw new HttpException('Görev bulunamadı.', HttpStatus.NOT_FOUND);
+    }
+    const userId: string = req.user?.id ?? 'unknown';
+    let set = CLAIMED.get(userId);
+    if (!set) {
+      set = new Set<string>();
+      CLAIMED.set(userId, set);
+    }
+    if (set.has(questId)) {
+      // Not an error — UI handles the "already claimed" case gracefully.
+      return { claimed: false, alreadyClaimed: true };
+    }
+    set.add(questId);
+    return { claimed: true, rewards: quest.reward, alreadyClaimed: false };
   }
 }

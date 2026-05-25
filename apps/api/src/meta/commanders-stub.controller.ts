@@ -1,5 +1,16 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /* Commander catalog stub.
  *
@@ -58,6 +69,17 @@ const ROSTER: Record<RaceKey, Commander[]> = {
 const isRaceKey = (v: unknown): v is RaceKey =>
   typeof v === 'string' && (v === 'insan' || v === 'zerg' || v === 'otomat' || v === 'canavar' || v === 'seytan');
 
+function findCommanderById(id: string): Commander | undefined {
+  for (const race of Object.keys(ROSTER) as RaceKey[]) {
+    const found = ROSTER[race].find((c) => c.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+// Module-level singleton: which commander each user has activated.
+const ACTIVE = new Map<string, { commanderId: string; activatedAt: string }>();
+
 @ApiTags('commanders (stub)')
 @Controller('commanders')
 export class CommandersStubController {
@@ -70,13 +92,47 @@ export class CommandersStubController {
     return (Object.keys(ROSTER) as RaceKey[]).flatMap((k) => ROSTER[k]);
   }
 
+  @Get('me/active')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get my currently-active commander, or 404 if none' })
+  meActive(@Request() req: any) {
+    const userId: string = req.user?.id ?? 'unknown';
+    const active = ACTIVE.get(userId);
+    if (!active) {
+      throw new HttpException('Aktif komutan yok.', HttpStatus.NOT_FOUND);
+    }
+    const commander = findCommanderById(active.commanderId);
+    return {
+      commanderId: active.commanderId,
+      activatedAt: active.activatedAt,
+      name: commander?.name ?? active.commanderId,
+    };
+  }
+
+  @Post(':id/activate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Activate one of my unlocked commanders' })
+  activate(@Request() req: any, @Param('id') id: string) {
+    const commander = findCommanderById(id);
+    if (!commander) {
+      throw new HttpException('Komutan bulunamadı.', HttpStatus.NOT_FOUND);
+    }
+    if (!commander.unlocked) {
+      throw new HttpException('Bu komutan henüz kilitli.', HttpStatus.BAD_REQUEST);
+    }
+    const userId: string = req.user?.id ?? 'unknown';
+    const activatedAt = new Date().toISOString();
+    ACTIVE.set(userId, { commanderId: id, activatedAt });
+    return { commanderId: id, activatedAt, name: commander.name };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get commander detail by id' })
   byId(@Param('id') id: string) {
-    for (const race of Object.keys(ROSTER) as RaceKey[]) {
-      const found = ROSTER[race].find((c) => c.id === id);
-      if (found) return found;
-    }
+    const found = findCommanderById(id);
+    if (found) return found;
     return { id, found: false };
   }
 }

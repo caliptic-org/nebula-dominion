@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /* Battle + battle-prep stub.
  *
@@ -104,6 +105,25 @@ export class BattlesStubController {
   last() {
     const list = [...BATTLES.values()];
     return list[list.length - 1] ?? null;
+  }
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'My last 20 battles (stub — currently device-global)' })
+  history(@Request() _req: any) {
+    const all = [...BATTLES.values()].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const entries = all.slice(0, 20).map((b) => ({
+      id: b.id,
+      outcome: b.status,
+      opponent: b.defenderRace,
+      score: b.rewards.gold + b.rewards.xp * 5,
+      mvp: null as string | null,
+      when: b.createdAt,
+    }));
+    return { total: entries.length, entries };
   }
 
   @Get(':id')

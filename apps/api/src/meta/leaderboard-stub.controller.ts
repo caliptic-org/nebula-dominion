@@ -1,5 +1,6 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /* Lightweight leaderboard stub.
  *
@@ -53,8 +54,21 @@ export class LeaderboardStubController {
   }
 
   @Get('me')
-  @ApiOperation({ summary: 'Authenticated user rank (stub)' })
-  me() {
-    return { rank: 47, name: 'Sen', score: 142_800, percentile: 0.78 };
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'My leaderboard entry (rank null until cross-player ranking lands)',
+  })
+  me(@Request() req: any) {
+    const id: string = req.user?.id ?? 'unknown';
+    const name: string = req.user?.username ?? 'Sen';
+    // Stable, deterministic score per user id: FNV-1a 32-bit hash → 50000..149999.
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const score = (Math.abs(h) % 100_000) + 50_000;
+    return { rank: null as number | null, name, score };
   }
 }

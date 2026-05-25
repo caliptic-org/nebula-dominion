@@ -4,6 +4,9 @@ import { MissionsStubController } from './missions-stub.controller';
 import { CommandersStubController } from './commanders-stub.controller';
 import { TargetStubController } from './target-stub.controller';
 import { BattlesStubController, BattlePrepStubController } from './battles-stub.controller';
+import { ChatStubController } from './chat-stub.controller';
+import { BuffsStubController } from './buffs-stub.controller';
+import { ResearchStubController } from './research-stub.controller';
 
 /* MetaModule
  *
@@ -25,6 +28,9 @@ import { BattlesStubController, BattlePrepStubController } from './battles-stub.
     TargetStubController,
     BattlesStubController,
     BattlePrepStubController,
+    ChatStubController,
+    BuffsStubController,
+    ResearchStubController,
   ],
 })
 export class MetaModule {}

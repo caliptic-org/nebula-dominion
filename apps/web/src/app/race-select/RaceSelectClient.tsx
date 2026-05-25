@@ -152,7 +152,7 @@ export function RaceSelectClient() {
       data-race={selectedKey}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,

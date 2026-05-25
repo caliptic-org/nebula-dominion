@@ -1172,7 +1172,7 @@ export default function ResearchPage() {
   const totalNodes = useMemo(() => categories.flatMap((c) => c.nodes).length, [categories]);
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh' }}>
+    <Screen race={race} style={{ height: '100dvh' }}>
       {/* Header */}
       <header
         style={{

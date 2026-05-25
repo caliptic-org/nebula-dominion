@@ -117,13 +117,14 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
     <div
       data-race={race.key}
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,
-        paddingBottom: 120,
         position: 'relative',
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Backdrop race={race} enemy={enemy} />
@@ -173,10 +174,13 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
         style={{
           position: 'relative',
           zIndex: 5,
+          flex: 1,
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
           padding: 14,
+          paddingBottom: 120,
           maxWidth: 520,
           margin: '0 auto',
         }}

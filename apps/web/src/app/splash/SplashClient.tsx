@@ -199,11 +199,13 @@ export function SplashClient() {
       data-race={race.key}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <NebulaBackdrop race={race} />
@@ -215,7 +217,8 @@ export function SplashClient() {
           position: 'relative',
           maxWidth: 420,
           margin: '0 auto',
-          minHeight: '100dvh',
+          flex: 1,
+          overflowY: 'auto',
           padding: '88px 32px 60px',
           display: 'flex',
           flexDirection: 'column',

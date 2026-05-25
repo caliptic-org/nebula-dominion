@@ -300,8 +300,8 @@ function TutorialFrame({
 }) {
   const c = tutCopy(race.key, step);
   return (
-    <div data-race={race.key} style={{ position: 'relative', minHeight: '100dvh' }}>
-      <Screen race={race} dim={0.5} intensity={step === 1 || step === 6 ? 1.3 : 1} style={{ minHeight: '100dvh' }}>
+    <div data-race={race.key} style={{ position: 'relative', height: '100dvh', overflow: 'hidden' }}>
+      <Screen race={race} dim={0.5} intensity={step === 1 || step === 6 ? 1.3 : 1} style={{ height: '100dvh' }}>
         {backdrop}
         {hero}
         {pointer}

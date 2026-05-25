@@ -450,7 +450,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
       <div
         data-race={race.key}
         style={{
-          minHeight: '100dvh',
+          height: '100dvh',
           background: ND.bgDeep,
           color: ND.text,
           fontFamily: ND.body,
@@ -476,13 +476,14 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
     <div
       data-race={race.key}
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,
         position: 'relative',
         overflow: 'hidden',
-        paddingBottom: 96,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Backdrop race={race} />
@@ -622,7 +623,10 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
         style={{
           position: 'relative',
           zIndex: 5,
+          flex: 1,
+          overflowY: 'auto',
           padding: 14,
+          paddingBottom: 96,
           maxWidth: 1240,
           margin: '0 auto',
           display: 'grid',

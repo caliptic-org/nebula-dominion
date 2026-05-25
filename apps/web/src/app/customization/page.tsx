@@ -968,7 +968,7 @@ export default function CustomizationPage() {
         data-race={race.key}
         style={{
           position: 'relative',
-          minHeight: '100dvh',
+          height: '100dvh',
           background: ND.bg,
           color: ND.text,
           fontFamily: ND.body,
@@ -988,7 +988,7 @@ export default function CustomizationPage() {
           }}
         />
 
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
           {/* Header */}
           <header
             style={{

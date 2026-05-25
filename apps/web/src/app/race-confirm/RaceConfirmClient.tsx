@@ -113,11 +113,13 @@ export function RaceConfirmClient() {
       data-race={resolvedKey}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <div
@@ -153,7 +155,8 @@ export function RaceConfirmClient() {
           padding: '48px 22px 28px',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '100dvh',
+          flex: 1,
+          overflowY: 'auto',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>

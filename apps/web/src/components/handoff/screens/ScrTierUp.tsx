@@ -66,7 +66,7 @@ export function ScrTierUp({
       data-testid="scr-tier-up"
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,

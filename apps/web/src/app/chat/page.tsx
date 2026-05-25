@@ -710,7 +710,7 @@ export default function ChatPage() {
   ];
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh', height: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <Screen race={race} style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <header
         style={{

@@ -394,8 +394,8 @@ export default function ProductionPage() {
           crystal={resources ? formatResource(resources.energy) : String(crystal)}
         />
 
-        {/* Production flow */}
-        <div style={{ padding: '12px 14px 0' }}>
+        {/* Production flow — capped so the unit library always gets space */}
+        <div style={{ padding: '12px 14px 0', flexShrink: 0, maxHeight: '42dvh', overflowY: 'auto' }}>
           <Panel race={race} style={{ padding: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <Eyebrow color={race.primary}>ŞU AN ÜRETİLİYOR</Eyebrow>
@@ -464,12 +464,15 @@ export default function ProductionPage() {
           </Panel>
         </div>
 
+        {/* Library section — takes all remaining flex space so unit list can scroll */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
         {/* Library label + tabs */}
-        <div style={{ padding: '14px 14px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 14px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <Eyebrow color={race.primary}>BİRİM KÜTÜPHANESİ</Eyebrow>
           <Code>{units.length} BİRİM</Code>
         </div>
-        <div style={{ padding: '8px 14px 0' }}>
+        <div style={{ padding: '8px 14px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
             {(TABS[race.key] ?? TABS.insan).map((t, i) => {
               const on = i === tab;
@@ -596,6 +599,9 @@ export default function ProductionPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* /Library section */}
         </div>
 
         {/* Bottom CTA — flexShrink: 0 keeps it visible even when the

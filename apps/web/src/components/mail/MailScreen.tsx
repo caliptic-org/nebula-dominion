@@ -139,7 +139,7 @@ export function MailScreen() {
   ).length
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh' }}>
+    <Screen race={race} style={{ height: '100dvh' }}>
       {/* ── Header ────────────────────────────────────────────── */}
       <header
         style={{

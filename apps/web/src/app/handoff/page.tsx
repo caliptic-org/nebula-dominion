@@ -46,7 +46,7 @@ export default function HandoffShowcasePage() {
     <div
       data-race={raceKey}
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,

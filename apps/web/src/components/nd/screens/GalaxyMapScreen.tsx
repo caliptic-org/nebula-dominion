@@ -163,7 +163,7 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
     <div
       data-race={race.key}
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,

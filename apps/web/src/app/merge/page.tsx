@@ -174,17 +174,18 @@ export default function MergePage() {
       data-race={race.key}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
       <NebulaBg race={race} intensity={0.8} dim={0.5} />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Back strip */}
         <div style={{
           display: 'flex',

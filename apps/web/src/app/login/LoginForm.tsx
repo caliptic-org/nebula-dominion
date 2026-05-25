@@ -188,11 +188,13 @@ export function LoginForm() {
     <div
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Background: subtle race-tinted gradient over deep bg */}
@@ -228,7 +230,8 @@ export function LoginForm() {
           padding: '72px 24px 32px',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '100dvh',
+          flex: 1,
+          overflowY: 'auto',
         }}
       >
         {/* Brand row */}

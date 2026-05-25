@@ -170,7 +170,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
       data-testid="scr-commanders"
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,
@@ -193,7 +193,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
         }}
       />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* Header */}
         <header
           style={{

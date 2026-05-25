@@ -778,7 +778,7 @@ export default function EventsPage() {
   const showFeatured = tab === 'active' && featured !== null;
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh', height: 'auto', overflow: 'auto' }}>
+    <Screen race={race} style={{ height: '100dvh', overflow: 'auto' }}>
       <style jsx global>{`
         @keyframes nd-pulse {
           0%, 100% { opacity: 1; }

@@ -210,8 +210,8 @@ function Inner({ slug }: { slug: string }) {
       : 'YAPILMAMIŞ';
 
   return (
-    <div data-race={race.key} style={{ position: 'relative', minHeight: '100dvh' }}>
-      <Screen race={race} dim={0.5} style={{ minHeight: '100dvh' }}>
+    <div data-race={race.key} style={{ position: 'relative', height: '100dvh', overflow: 'hidden' }}>
+      <Screen race={race} dim={0.5} style={{ height: '100dvh' }}>
         <HUD
           race={race}
           level={liveLevel ?? 9}

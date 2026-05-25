@@ -195,7 +195,7 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
     <div
       data-race={race.key}
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         background: ND.bgDeep,
         color: ND.text,
         fontFamily: ND.body,

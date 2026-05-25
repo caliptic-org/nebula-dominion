@@ -52,6 +52,13 @@ export class PlayerUnit {
   @Column({ name: 'is_alive', default: true })
   isAlive: boolean;
 
+  /** Upgrade tier — starts at 1, bumped by POST /units/:id/upgrade. Stats
+   *  get a +10% per level boost applied at upgrade time (persisted on the
+   *  hp/attack/defense/speed columns themselves) so combat math doesn't
+   *  have to re-derive scaling at runtime. */
+  @Column({ type: 'int', default: 1 })
+  level: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

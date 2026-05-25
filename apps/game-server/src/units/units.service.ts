@@ -176,6 +176,35 @@ export class UnitsService {
     });
   }
 
+  /** Upgrade a unit one level. Validates ownership + caps level at 10.
+   *  Bumps level + applies +10% to hp/maxHp/attack/defense; speed stays
+   *  fixed so high-tier units don't outrun the grid. Persisted directly
+   *  on the row so combat math doesn't have to re-derive scaling.
+   *
+   *  No resource cost yet — when an "upgrade fee" mechanic lands, hook
+   *  it through ResourcesService.canAfford/deduct the same way
+   *  startConstruction does. For now this is the "free upgrade" demo
+   *  flow so the /inventory + /base/building YÜKSELT buttons actually
+   *  do something. */
+  async upgradeUnit(playerId: string, unitId: string): Promise<PlayerUnit> {
+    const unit = await this.unitRepo.findOne({
+      where: { id: unitId, playerId, isAlive: true },
+    });
+    if (!unit) {
+      throw new NotFoundException(`Unit ${unitId} not found or not alive.`);
+    }
+    if (unit.level >= 10) {
+      throw new BadRequestException(`Unit is already at max level (10).`);
+    }
+    unit.level += 1;
+    const mul = 1.1;
+    unit.maxHp = Math.round(unit.maxHp * mul);
+    unit.hp = Math.min(unit.hp + Math.round(unit.maxHp * 0.2), unit.maxHp);
+    unit.attack = Math.round(unit.attack * mul);
+    unit.defense = Math.round(unit.defense * mul);
+    return this.unitRepo.save(unit);
+  }
+
   /**
    * Move a unit on the map.
    * Max Manhattan distance per move = unit's speed.

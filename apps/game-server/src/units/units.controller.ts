@@ -45,6 +45,13 @@ export class UnitsController {
     return this.units.moveUnit(userId, dto);
   }
 
+  /** POST /api/v1/units/:id/upgrade — bump a unit one level (+10% stats) */
+  @Post(':id/upgrade')
+  @HttpCode(HttpStatus.OK)
+  async upgradeUnit(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.units.upgradeUnit(userId, id);
+  }
+
   /** GET /api/v1/units/configs/:race — get unit type configs for a race */
   @Get('configs/:race')
   getConfigsForRace(@Param('race') race: Race) {

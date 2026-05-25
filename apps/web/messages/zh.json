@@ -142,7 +142,14 @@
     "toastAlreadyBuilt": "{name} 已建造 — 正在打开升级页面",
     "toastStarted": "{name} 建造已开始（{duration}秒）",
     "toastRejected": "建造被拒绝：{message}",
-    "toastUnknownError": "未知错误"
+    "toastUnknownError": "未知错误",
+    "toastBuildFirst": "请先建造此建筑",
+    "toastLoginForUpgrade": "升级需要登录",
+    "toastUpgraded": "{name}升级至Lv {level}",
+    "toastUpgradeFailed": "升级失败",
+    "upgrading": "升级中…",
+    "upgradeToLevel": "升级至Lv {level}",
+    "upgradeLocked": "升级锁定"
   },
   "tutorial": {
     "skip": "跳过教程",

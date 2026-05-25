@@ -138,9 +138,9 @@ function stopPolling() {
 // previous module version so we don't accumulate stale polling loops.
 if (typeof window !== 'undefined') {
   const HMR_KEY = '__nebula_resources_stop__';
-  const prev = (window as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
+  const prev = (window as unknown as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
   if (prev) prev();
-  (window as Record<string, unknown>)[HMR_KEY] = stopPolling;
+  (window as unknown as Record<string, unknown>)[HMR_KEY] = stopPolling;
 }
 
 // ── Cross-tree refresh signal ──────────────────────────────────────────────

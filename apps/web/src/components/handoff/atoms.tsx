@@ -719,7 +719,7 @@ function ResInfoPopover({
   const fmtNum = (n: number) =>
     n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
     : n >= 1000 ? `${(n / 1000).toFixed(1)}K`
-    : Math.floor(n).toLocaleString('tr-TR');
+    : Math.floor(n).toLocaleString();
   const rateText = perTick !== undefined ? (perTick > 0 ? `+${fmtNum(perTick)}/tick` : '0/tick') : null;
   const capText = cap !== undefined && cap > 0 ? `${currentValue ?? '—'} / ${fmtNum(cap)}` : null;
   // Race-aware "build this to earn more" hint. Slot 1 of every race is the

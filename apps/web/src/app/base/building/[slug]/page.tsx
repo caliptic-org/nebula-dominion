@@ -26,6 +26,7 @@ import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Bar,
   BottomNav,
@@ -115,6 +116,7 @@ function Inner({ slug }: { slug: string }) {
   const race = useNDRace();
   const lex = raceLex(race.key);
   const router = useRouter();
+  const t = useTranslations('build');
 
   // ALL hooks must run on every render — moving the early-return below
   // them avoids a "Rendered fewer hooks than expected" crash when the
@@ -178,11 +180,11 @@ function Inner({ slug }: { slug: string }) {
   async function handleBuild() {
     if (busy || tokenBuilding?.locked) return;
     if (!hasSession()) {
-      toast.error('Giriş yapmadan inşaat başlatılamaz');
+      toast.error(t('toastLoginRequired'));
       return;
     }
     if (!backendType) {
-      toast.info(`${tokenBuilding?.n} için arka uç eşlemesi yok`);
+      toast.info(t('toastNoMapping', { name: tokenBuilding?.n ?? slug }));
       return;
     }
     setBusy(true);
@@ -190,9 +192,9 @@ function Inner({ slug }: { slug: string }) {
       const positionX = Math.floor(Math.random() * 8);
       const positionY = Math.floor(Math.random() * 8);
       await gameServerApi.post('/buildings', { type: backendType, positionX, positionY });
-      toast.success(`${tokenBuilding?.n} inşaatı başlatıldı (${buildSec}s)`);
+      toast.success(t('toastStarted', { name: tokenBuilding?.n ?? slug, duration: buildSec }));
     } catch (err) {
-      const msg = err instanceof FetchError ? err.message : 'İnşaat reddedildi';
+      const msg = err instanceof FetchError ? err.message : t('toastUnknownError');
       toast.error(msg);
     } finally {
       setBusy(false);
@@ -428,11 +430,11 @@ function Inner({ slug }: { slug: string }) {
                   disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id}
                   onClick={async () => {
                     if (!owned) {
-                      toast.info('Önce yapıyı inşa et');
+                      toast.info(t('toastBuildFirst'));
                       return;
                     }
                     if (!hasSession()) {
-                      toast.error('Yükseltme için giriş yapmalısın');
+                      toast.error(t('toastLoginForUpgrade'));
                       return;
                     }
                     setUpgradingId(owned.id);
@@ -444,7 +446,7 @@ function Inner({ slug }: { slug: string }) {
                       // one tick. Wallet refresh fires immediately so the
                       // HUD pill doesn't lag the visible level bump.
                       await gameServerApi.post(`/buildings/${owned.id}/upgrade`);
-                      toast.success(`${tokenBuilding.n} Lv ${owned.level + 1}'e yükseltildi`);
+                      toast.success(t('toastUpgraded', { name: tokenBuilding.n, level: owned.level + 1 }));
                       refreshGameResources();
                     } catch (err) {
                       const msg =
@@ -452,7 +454,7 @@ function Inner({ slug }: { slug: string }) {
                           ? err.message
                           : err instanceof Error
                             ? err.message
-                            : 'Yükseltme başarısız';
+                            : t('toastUpgradeFailed');
                       toast.error(msg);
                     } finally {
                       setUpgradingId(null);
@@ -460,10 +462,10 @@ function Inner({ slug }: { slug: string }) {
                   }}
                 >
                   {upgradingId === owned?.id
-                    ? 'YÜKSELTİLİYOR…'
+                    ? t('upgrading')
                     : owned
-                      ? `Lv ${owned.level + 1}'e YÜKSELT`
-                      : 'YÜKSELTME KİLİTLİ'}
+                      ? t('upgradeToLevel', { level: owned.level + 1 })
+                      : t('upgradeLocked')}
                 </NDButton>
               </div>
             </Panel>

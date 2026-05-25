@@ -142,7 +142,14 @@
     "toastAlreadyBuilt": "{name} already built — opening upgrade page",
     "toastStarted": "{name} construction started ({duration}s)",
     "toastRejected": "Construction rejected: {message}",
-    "toastUnknownError": "Unknown error"
+    "toastUnknownError": "Unknown error",
+    "toastBuildFirst": "Build this structure first",
+    "toastLoginForUpgrade": "Login required to upgrade",
+    "toastUpgraded": "{name} upgraded to Lv {level}",
+    "toastUpgradeFailed": "Upgrade failed",
+    "upgrading": "UPGRADING…",
+    "upgradeToLevel": "UPGRADE TO Lv {level}",
+    "upgradeLocked": "UPGRADE LOCKED"
   },
   "tutorial": {
     "skip": "Skip Tutorial",

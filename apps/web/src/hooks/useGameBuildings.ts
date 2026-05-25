@@ -119,9 +119,9 @@ function stopPolling() {
 // HMR safety: kill stale timers from previous module versions.
 if (typeof window !== 'undefined') {
   const HMR_KEY = '__nebula_buildings_stop__';
-  const prev = (window as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
+  const prev = (window as unknown as Record<string, unknown>)[HMR_KEY] as (() => void) | undefined;
   if (prev) prev();
-  (window as Record<string, unknown>)[HMR_KEY] = stopPolling;
+  (window as unknown as Record<string, unknown>)[HMR_KEY] = stopPolling;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────

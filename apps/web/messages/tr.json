@@ -142,7 +142,14 @@
     "toastAlreadyBuilt": "{name} zaten inşa edilmiş — yükseltme sayfası açılıyor",
     "toastStarted": "{name} inşaatı başlatıldı ({duration}s)",
     "toastRejected": "İnşaat reddedildi: {message}",
-    "toastUnknownError": "Bilinmeyen hata"
+    "toastUnknownError": "Bilinmeyen hata",
+    "toastBuildFirst": "Önce yapıyı inşa et",
+    "toastLoginForUpgrade": "Yükseltme için giriş yapmalısın",
+    "toastUpgraded": "{name} Lv {level}'e yükseltildi",
+    "toastUpgradeFailed": "Yükseltme başarısız",
+    "upgrading": "YÜKSELTİLİYOR…",
+    "upgradeToLevel": "Lv {level}'e YÜKSELT",
+    "upgradeLocked": "YÜKSELTME KİLİTLİ"
   },
   "tutorial": {
     "skip": "Eğitimi Atla",

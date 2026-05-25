@@ -23,6 +23,7 @@ import {
 } from '@/components/handoff';
 import { useLeaderboard, type LeaderboardCategory, type LeaderboardEntry } from '@/hooks/useLeaderboard';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useLeaderboardMe } from '@/hooks/useLeaderboardMe';
 
 type Category = 'power' | 'pvp' | 'alliance';
 
@@ -163,6 +164,11 @@ export default function LeaderboardPage() {
   // when the fetch hasn't resolved yet so we never flash an empty list.
   const liveCategory: LeaderboardCategory = category === 'alliance' ? 'guild' : category;
   const { data: live } = useLeaderboard(liveCategory, 20);
+  // Server-side me-row from /leaderboard/me — gives a deterministic per-user
+  // score that's identical across reloads (FNV-1a of user id, currently).
+  // Rank is null until cross-player ranking lands; we still render "—" but
+  // surface the honest server score instead of profile.xp drift.
+  const { data: liveMe } = useLeaderboardMe();
   const fmtScore = (n: number, cat: Category) =>
     cat === 'pvp'
       ? `${n.toLocaleString('tr-TR')} Puan`
@@ -181,23 +187,20 @@ export default function LeaderboardPage() {
       }))
     : null;
   const baseEntries = liveAsEntries ?? DATA[category];
-  // "Me" injection only fires when the backend hasn't returned a meEntry
-  // (which it doesn't yet — TODO: extend /leaderboard to include the
-  // authenticated user's own row). Pull what we CAN from useUserProfile
-  // so the row at least uses the real handle + alliance tag + currentLevel
-  // for an XP-shaped score; rank stays "—" until a /leaderboard/me
-  // endpoint lands. Honest placeholder beats the fake "Rank 42 · 1.29M
-  // power" row that was identical for every account.
-  const liveScore = liveProfile?.xp ?? liveProfile?.level ?? 0;
+  // Prefer the server-side score from /leaderboard/me; fall back to the
+  // profile xp/level when the player is unauthenticated. Rank stays "—"
+  // until cross-player ranking lands.
+  const liveScore = liveMe?.score ?? liveProfile?.xp ?? liveProfile?.level ?? 0;
+  const scoreLabel = liveScore > 0
+    ? (category === 'pvp' ? `${liveScore.toLocaleString('tr-TR')} Puan` : fmtScore(liveScore, category))
+    : '— · sıralama yakında';
   const me: Entry = {
-    rank: 0,
+    rank: liveMe?.rank ?? 0,
     id: 'me',
-    name: liveProfile?.username ?? 'Sen',
+    name: liveMe?.name ?? liveProfile?.username ?? 'Sen',
     race: playerRace.key,
     score: liveScore,
-    scoreLabel: liveScore > 0
-      ? (category === 'pvp' ? `${liveScore.toLocaleString('tr-TR')} Puan` : fmtScore(liveScore, category))
-      : '— · sıralama yakında',
+    scoreLabel,
     allianceTag: liveProfile?.allianceTag ?? playerRace.allianceTag,
     isMe: true,
   };
@@ -383,6 +386,10 @@ function tabStyle(on: boolean, race: NDRace): React.CSSProperties {
 
 function PodiumCard({ entry, accent }: { entry: Entry; accent: string }) {
   const r = RACES[entry.race];
+  // Server returns rank=null for the authenticated player until cross-player
+  // ranking lands. We surface that as "—" so the podium card doesn't render
+  // a misleading "0" for the player's own row.
+  const rankLabel = entry.isMe && entry.rank === 0 ? '—' : entry.rank;
   return (
     <Panel race={r} glow style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', textAlign: 'center' }}>
       <div
@@ -400,7 +407,7 @@ function PodiumCard({ entry, accent }: { entry: Entry; accent: string }) {
           justifyContent: 'center',
         }}
       >
-        {entry.rank}
+        {rankLabel}
       </div>
       <Sigil race={r} size={36} glow />
       <H3 style={{ color: ND.text }}>{entry.name}</H3>
@@ -416,6 +423,8 @@ function PlayerRow({ entry, playerRace }: { entry: Entry; playerRace: NDRace }) 
   const meTint = entry.isMe ? playerRace.primary : null;
   const deltaSign = entry.delta && entry.delta > 0 ? '+' : '';
   const deltaColor = !entry.delta ? ND.textMute : entry.delta > 0 ? ND.ok : ND.danger;
+  // Same "—" treatment as PodiumCard so the unknown me-rank stays honest.
+  const rankLabel = entry.isMe && entry.rank === 0 ? '—' : entry.rank;
 
   return (
     <div
@@ -431,7 +440,7 @@ function PlayerRow({ entry, playerRace }: { entry: Entry; playerRace: NDRace }) 
       }}
     >
       <div>
-        <div style={{ fontFamily: ND.display, fontSize: 13, color: meTint || ND.text }}>{entry.rank}</div>
+        <div style={{ fontFamily: ND.display, fontSize: 13, color: meTint || ND.text }}>{rankLabel}</div>
         {entry.delta !== undefined && entry.delta !== 0 && (
           <div style={{ fontFamily: ND.mono, fontSize: 9, color: deltaColor }}>
             {deltaSign}

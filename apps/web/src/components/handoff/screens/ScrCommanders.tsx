@@ -20,6 +20,8 @@ import {
   type NDRaceCmdr,
   type NDRaceKey,
 } from '@/components/handoff';
+import { api, FetchError } from '@/lib/api';
+import { useActiveCommander } from '@/hooks/useActiveCommander';
 
 const RACE_KEYS: NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 
@@ -127,6 +129,10 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
   const [filter, setFilter] = useState<Filter>('all');
   const [showLockedOnly, setShowLockedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Live "currently activated" id from /commanders/me/active. Used to render
+  // an AKTİF badge on the matching card and to keep the detail-panel CTA
+  // consistent. Hook handles 404 / 401 / guest gracefully → null.
+  const { data: activeCommander, refresh: refreshActive } = useActiveCommander();
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -332,6 +338,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                         key={c.id}
                         entry={c}
                         selected={c.id === selected.id}
+                        active={activeCommander?.commanderId === c.id}
                         onSelect={() => setSelectedId(c.id)}
                       />
                     ))}
@@ -351,7 +358,11 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                 className="commanders-detail"
                 aria-label="Komutan detay paneli"
               >
-                <CommanderDetail entry={selected} />
+                <CommanderDetail
+                  entry={selected}
+                  isActive={activeCommander?.commanderId === selected.id}
+                  onActivated={refreshActive}
+                />
               </aside>
             </div>
           </div>
@@ -412,10 +423,12 @@ function FilterChip({
 function CommanderCard({
   entry,
   selected,
+  active,
   onSelect,
 }: {
   entry: CommanderEntry;
   selected: boolean;
+  active?: boolean;
   onSelect: () => void;
 }) {
   const { race, locked } = entry;
@@ -512,6 +525,31 @@ function CommanderCard({
               </span>
             </div>
 
+            {active && !locked && (
+              <span
+                aria-label="Aktif komutan"
+                style={{
+                  position: 'absolute',
+                  top: 28,
+                  left: 6,
+                  padding: '2px 6px',
+                  fontFamily: ND.mono,
+                  fontSize: 8,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  background: `${ND.ok}22`,
+                  color: ND.ok,
+                  border: `1px solid ${ND.ok}66`,
+                  borderRadius: 2,
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: `0 0 10px ${ND.ok}44`,
+                  zIndex: 2,
+                }}
+              >
+                ★ AKTİF
+              </span>
+            )}
+
             {locked && (
               <div
                 aria-hidden
@@ -590,8 +628,17 @@ function CommanderCard({
   );
 }
 
-function CommanderDetail({ entry }: { entry: CommanderEntry }) {
+function CommanderDetail({
+  entry,
+  isActive,
+  onActivated,
+}: {
+  entry: CommanderEntry;
+  isActive?: boolean;
+  onActivated?: () => void;
+}) {
   const { race, locked } = entry;
+  const [activating, setActivating] = useState(false);
   return (
     <div style={{ padding: '20px 18px 32px' }}>
       <div
@@ -738,28 +785,43 @@ function CommanderDetail({ entry }: { entry: CommanderEntry }) {
         </Link>
         <NDButton
           race={race}
-          variant={locked ? 'outline' : 'primary'}
+          variant={locked ? 'outline' : isActive ? 'outline' : 'primary'}
           full
-          disabled={locked}
-          onClick={() => {
-            if (locked) return;
-            // No backend endpoint for "active commander" yet — persist
-            // the selection in localStorage so it survives reload and
-            // the player can see "ACTIVE" badge if/when we wire it.
-            // Once POST /commanders/:id/activate lands, swap the storage
-            // line for a fetch + cache invalidation.
+          disabled={locked || activating || isActive}
+          onClick={async () => {
+            if (locked || activating || isActive) return;
+            setActivating(true);
+            // Cache the selection optimistically so guest mode still feels
+            // responsive — the auth-required POST below upgrades it to the
+            // server-authoritative source when the player has a token.
+            const writeCache = () => {
+              try {
+                window.localStorage.setItem(
+                  'nebula:active-commander:v1',
+                  JSON.stringify({ id: entry.id, name: entry.n, race: race.key, ts: Date.now() }),
+                );
+              } catch {
+                /* private mode — best effort */
+              }
+            };
             try {
-              window.localStorage.setItem(
-                'nebula:active-commander:v1',
-                JSON.stringify({ name: entry.n, race: race.key, ts: Date.now() }),
-              );
-            } catch {
-              /* private mode — best effort */
+              await api.post(`/commanders/${entry.id}/activate`);
+              writeCache();
+              toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
+              onActivated?.();
+            } catch (err) {
+              writeCache();
+              // 401 / 4xx → fall back to optimistic UI in guest mode so the
+              // badge still feels consistent on the next reload; surface
+              // the translated message so the player knows it didn't sync.
+              const msg = err instanceof FetchError ? err.message : 'Aktif komutan ayarlanamadı';
+              toast.error(msg);
+            } finally {
+              setActivating(false);
             }
-            toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
           }}
         >
-          {locked ? '🔒 Kilidi Aç' : '⚔ Komutan Seç'}
+          {locked ? '🔒 Kilidi Aç' : isActive ? '★ Aktif Komutan' : activating ? 'Ayarlanıyor…' : '⚔ Komutan Seç'}
         </NDButton>
       </div>
     </div>

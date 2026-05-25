@@ -29,6 +29,8 @@ import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useG
 import { useGameResources } from '@/hooks/useGameResources';
 import { POP_MAX, POP_USED } from '@/lib/nd-mocks';
 import { useHudState } from '@/hooks/useHudState';
+import { gameServerApi } from '@/lib/game-server-api';
+import { FetchError } from '@/lib/api';
 
 const ROSTER_NAMES: Record<string, string> = {
   insan:   'Birim Envanteri',
@@ -52,6 +54,10 @@ type SortKey = 'tier' | 'count' | 'level';
 interface RosterUnit {
   id: string;
   name: string;
+  /** Backend `type` string (e.g. 'marine') — used to find a real PlayerUnit
+   *  to upgrade. `null` when the catalog row hasn't loaded yet OR the slot
+   *  is purely race-token-derived (i.e. no live config index). */
+  backendType: string | null;
   tier: number;
   level: number;
   count: number;
@@ -95,7 +101,7 @@ export default function RosterPage() {
   // signed in, real `count` values fill in from /api/units; for guests
   // the synthetic counts stay so the screen never looks empty.
   const { configs: backendUnits } = useUnitConfigs(race.key);
-  const { data: liveUnits } = useGameUnits();
+  const { data: liveUnits, refresh: refreshUnits } = useGameUnits();
   const units: RosterUnit[] = useMemo(
     () => buildRoster(race, backendUnits, liveUnits),
     [race, backendUnits, liveUnits],
@@ -353,6 +359,8 @@ export default function RosterPage() {
           <UnitDetailDrawer
             race={race}
             unit={selectedUnit}
+            liveUnits={liveUnits}
+            onUpgraded={refreshUnits}
             onClose={() => setSelectedId(null)}
           />
         )}
@@ -442,6 +450,7 @@ function buildRoster(
     return {
       id,
       name: u.n,
+      backendType: liveType ?? null,
       tier: live?.tier ?? u.t,
       level: Math.max(1, 10 - i * 2),
       count: baseCount,
@@ -562,15 +571,50 @@ function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
 interface UnitDetailDrawerProps {
   race: NDRace;
   unit: RosterUnit;
+  liveUnits: PlayerUnitDto[] | null;
+  onUpgraded: () => void;
   onClose: () => void;
 }
 
-function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
+function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDetailDrawerProps) {
   const cost = upgradeCost(unit);
+  const [upgrading, setUpgrading] = useState(false);
   const stateColor =
     unit.state === 'ready'   ? race.primary :
     unit.state === 'wounded' ? ND.warn      :
     ND.textDim;
+
+  // Pick the *first* alive live unit matching this catalog slot's backend
+  // type. The /inventory roster is keyed by race-flavoured names like
+  // `insan-Marine-0` which the upgrade endpoint won't accept — it needs a
+  // real PlayerUnit UUID. Falls back to undefined when no owned unit of
+  // that type exists; the Yükselt handler short-circuits with an error.
+  const liveTarget = unit.backendType && liveUnits
+    ? liveUnits.find((u) => u.isAlive && u.type.toLowerCase() === unit.backendType)
+    : undefined;
+
+  async function handleUpgrade() {
+    if (upgrading) return;
+    if (!liveTarget) {
+      toast.error('Önce o tür birim eğit');
+      return;
+    }
+    setUpgrading(true);
+    try {
+      const upgraded = await gameServerApi.post<PlayerUnitDto>(
+        `/v1/units/${liveTarget.id}/upgrade`,
+      );
+      const newLevel = (upgraded as PlayerUnitDto & { level?: number }).level
+        ?? unit.level + 1;
+      toast.success(`${unit.name} Lv ${newLevel}'e yükseltildi`);
+      onUpgraded();
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'Yükseltme başarısız';
+      toast.error(msg);
+    } finally {
+      setUpgrading(false);
+    }
+  }
 
   return (
     <section
@@ -664,14 +708,11 @@ function UnitDetailDrawer({ race, unit, onClose }: UnitDetailDrawerProps) {
           variant="outline"
           size="md"
           style={{ flex: 1 }}
-          onClick={() => {
-            // No per-unit upgrade endpoint yet; provide visible feedback so
-            // the cost preview at least reads as actionable.
-            toast.success(`${unit.name} Lv ${unit.level + 1}'e yükseltiliyor (-${cost})`);
-          }}
+          disabled={upgrading}
+          onClick={handleUpgrade}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            Yükselt
+            {upgrading ? 'Yükseltiliyor…' : 'Yükselt'}
             <span style={{ opacity: 0.8 }}>Lv {unit.level} → {unit.level + 1}</span>
             <span style={{ opacity: 0.6 }}>·</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>

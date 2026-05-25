@@ -11,11 +11,14 @@ import {
   Caption,
   Code,
   NDButton,
+  toast,
   useNDRace,
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { api, FetchError } from '@/lib/api';
+import { useChatChannel, type ChatChannelMessage } from '@/hooks/useChatChannel';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -589,9 +592,10 @@ export default function ChatPage() {
 
   /* Local optimistic messages per tab, persisted to localStorage so the
    * player's drafts survive navigate-away-and-back. Layered on top of the
-   * static mock arrays. Until `POST /api/v1/chat/{tab}` exists this lets
-   * the player at least see their typed messages appear in the stream.
-   * Keyed by tab so global drafts don't bleed into guild and vice versa. */
+   * static mock arrays + the live `/chat/:channel` server feed below.
+   * Drafts get filtered out of the render path once the server echoes the
+   * same message back (matched by content + 60s window) to avoid the
+   * "ghost duplicate" effect during the poll latency. */
   const [draftsByTab, setDraftsByTab] = useState<Record<ChatTab, ChatMessage[]>>(() => {
     if (typeof window === 'undefined') return { global: [], guild: [], dm: [] };
     try {
@@ -606,8 +610,46 @@ export default function ChatPage() {
       window.localStorage.setItem('nebula:chat:drafts:v1', JSON.stringify(draftsByTab));
     } catch { /* quota / private mode — silently OK */ }
   }, [draftsByTab]);
+
+  // Live /chat/:channel server feed for the active tab. The hook polls
+  // every 5s; we lift the channel only when the player is on a chattable
+  // tab (`global` / `guild`) — DM lives in its own conversation panel.
+  const liveChannel: 'global' | 'guild' | null =
+    activeTab === 'global' || activeTab === 'guild' ? activeTab : null;
+  const { data: liveChat, refresh: refreshChat } = useChatChannel(liveChannel);
+
+  // Convert backend rows → the ChatMessage shape the UI expects.
+  const serverMessages: ChatMessage[] = (liveChat?.messages ?? []).map((m: ChatChannelMessage) => {
+    // The stub `race` is whatever the JWT carried; map to a known key when
+    // it matches, otherwise fall back to insan so the bubble still renders.
+    const raceKey: NDRaceKey =
+      m.race === 'insan' || m.race === 'zerg' || m.race === 'otomat' ||
+      m.race === 'canavar' || m.race === 'seytan'
+        ? (m.race as NDRaceKey)
+        : 'insan';
+    return {
+      id: m.id,
+      type: activeTab === 'guild' ? 'guild' : 'player',
+      author: m.username,
+      race: raceKey,
+      content: m.content,
+      timestamp: new Date(m.timestamp).toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    } as ChatMessage;
+  });
+
   const baseMessages = activeTab === 'global' ? GLOBAL_MESSAGES : GUILD_MESSAGES;
-  const messages = [...baseMessages, ...(draftsByTab[activeTab] ?? [])];
+  const tabDrafts = draftsByTab[activeTab] ?? [];
+  // De-dup: drop a local draft once the server has echoed back a message
+  // with the same content — without this the optimistic line lingers next
+  // to the server-confirmed copy after the next 5s poll. Content match is
+  // a coarse but sufficient heuristic for the short 5s window.
+  const dedupedDrafts = tabDrafts.filter(
+    (d) => !serverMessages.some((s) => s.content === d.content),
+  );
+  const messages: ChatMessage[] = [...baseMessages, ...serverMessages, ...dedupedDrafts];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -621,20 +663,18 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [activeTab]);
 
-  function handleSend() {
+  async function handleSend() {
     const text = input.trim();
     if (!text) return;
-    // Optimistic local append: the chat backend doesn't exist yet, but the
-    // player should see their own message land in the stream. A unique id is
-    // generated client-side; the message is tagged `isOwn` so MessageBubble
-    // styles it with the player's race color.
+    // Optimistic local append: even with the live POST below, we want the
+    // player's bubble on screen instantly rather than waiting for the
+    // server round-trip + next 5s poll. The de-dup filter above drops the
+    // local copy once the server echoes back the same content.
     const optimistic: ChatMessage = {
       id: `local-${Date.now()}`,
       author: 'Sen',
       content: text,
       timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-      // ChatMessage.type accepts 'player'|'system'|'battle'|'guild'. Tab
-      // splitting happens via the draftsByTab map above, not the type.
       type: activeTab === 'guild' ? 'guild' : 'player',
       race: undefined,
       isOwn: true,
@@ -646,6 +686,21 @@ export default function ChatPage() {
     setInput('');
     setShowEmoji(false);
     setShowQuickReplies(false);
+
+    // Only global / guild have a backend channel for now (DM uses its own
+    // pseudo-conversation flow). Skip the POST silently when the user is
+    // on the DM tab — the optimistic line in their drafts stays put.
+    if (activeTab !== 'global' && activeTab !== 'guild') return;
+
+    try {
+      await api.post(`/chat/${activeTab}`, { content: text });
+      // Eagerly re-pull so the player sees their server-stamped copy
+      // without waiting for the next 5s poll tick.
+      refreshChat();
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'Mesaj gönderilemedi';
+      toast.error(msg);
+    }
   }
 
   const tabs: { id: ChatTab; label: string; icon: string; badge?: number }[] = [

@@ -17,10 +17,13 @@ import {
   Code,
   NDButton,
   ResIcon,
+  toast,
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
 import { useGameResources } from '@/hooks/useGameResources';
+import { api, FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -979,7 +982,8 @@ export default function ResearchPage() {
   });
   // Persist any state change as a flat {id, state, progress} list so we
   // don't write the entire static catalog (~30 nodes × ~10 fields) on
-  // every research click.
+  // every research click. localStorage is now a *same-session* fallback;
+  // the authoritative state comes from /tech/me at mount.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -993,6 +997,49 @@ export default function ResearchPage() {
       /* private mode — fall through */
     }
   }, [categories]);
+
+  // Merge backend state on mount. `/tech/me` returns either:
+  //   { techId: 'available' | 'researching' | 'completed' }            (stub)
+  //   { techId: { state, startedAt?, completesAt?, progress? } }       (richer)
+  // We support both shapes so the page survives a future backend
+  // tightening without a separate code path.
+  useEffect(() => {
+    if (!hasSession()) return;
+    let cancelled = false;
+    api
+      .get<Record<string, NodeState | { state: NodeState; progress?: number }>>('/tech/me')
+      .then((tech) => {
+        if (cancelled || !tech) return;
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            nodes: cat.nodes.map((n) => {
+              const hit = tech[n.id];
+              if (!hit) return n;
+              if (typeof hit === 'string') {
+                return { ...n, state: hit };
+              }
+              return {
+                ...n,
+                state: hit.state,
+                progress: typeof hit.progress === 'number' ? hit.progress : n.progress,
+              };
+            }),
+          })),
+        );
+      })
+      .catch((err) => {
+        // 401 (stale token) is silent — local cache survives. Other errors
+        // also fall through to the cached state since this is a refinement
+        // pass, not a load-bearing fetch.
+        if (err instanceof FetchError && err.status === 401) return;
+        // eslint-disable-next-line no-console
+        console.warn('research /tech/me failed', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   /* MERGE: kept the useGameResources poll active so the resource cache stays
    * warm for downstream screens; the header in this version no longer renders
    * resources directly (remote moved to a chip count). */
@@ -1018,29 +1065,104 @@ export default function ResearchPage() {
   }, []);
 
   const handleResearch = useCallback((id: string) => {
+    // Snapshot the pre-click state so we can roll back if the server
+    // refuses (e.g. duplicate research, insufficient resources later).
+    let previous: NodeState = 'available';
+    let previousProgress: number | undefined;
     setCategories((prev) =>
       prev.map((cat) => ({
         ...cat,
         nodes: cat.nodes.map((n) => {
-          if (n.id === id) return { ...n, state: 'researching' as NodeState, progress: 0 };
+          if (n.id === id) {
+            previous = n.state;
+            previousProgress = n.progress;
+            return { ...n, state: 'researching' as NodeState, progress: 0 };
+          }
           return n;
         }),
       })),
     );
     setSelectedNodeId(null);
+
+    if (!hasSession()) return;
+    api
+      .post<{ state?: NodeState; progress?: number }>(`/tech/${id}/research`)
+      .then((entry) => {
+        if (!entry) return;
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            nodes: cat.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    state: entry.state ?? 'researching',
+                    progress: typeof entry.progress === 'number' ? entry.progress : n.progress,
+                  }
+                : n,
+            ),
+          })),
+        );
+      })
+      .catch((err) => {
+        const msg = err instanceof FetchError ? err.message : 'Araştırma başlatılamadı';
+        toast.error(msg);
+        // Revert to previous state so the UI stays consistent with the server.
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            nodes: cat.nodes.map((n) =>
+              n.id === id ? { ...n, state: previous, progress: previousProgress } : n,
+            ),
+          })),
+        );
+      });
   }, []);
 
   const handleCancel = useCallback((id: string) => {
+    let previous: NodeState = 'researching';
+    let previousProgress: number | undefined;
     setCategories((prev) =>
       prev.map((cat) => ({
         ...cat,
         nodes: cat.nodes.map((n) => {
-          if (n.id === id) return { ...n, state: 'available' as NodeState, progress: undefined };
+          if (n.id === id) {
+            previous = n.state;
+            previousProgress = n.progress;
+            return { ...n, state: 'available' as NodeState, progress: undefined };
+          }
           return n;
         }),
       })),
     );
     setSelectedNodeId(null);
+
+    if (!hasSession()) return;
+    api
+      .post<{ state?: NodeState }>(`/tech/${id}/cancel`)
+      .then((entry) => {
+        if (!entry) return;
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            nodes: cat.nodes.map((n) =>
+              n.id === id ? { ...n, state: entry.state ?? 'available', progress: undefined } : n,
+            ),
+          })),
+        );
+      })
+      .catch((err) => {
+        const msg = err instanceof FetchError ? err.message : 'Araştırma iptal edilemedi';
+        toast.error(msg);
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            nodes: cat.nodes.map((n) =>
+              n.id === id ? { ...n, state: previous, progress: previousProgress } : n,
+            ),
+          })),
+        );
+      });
   }, []);
 
   const totalCompleted = useMemo(
@@ -1085,28 +1207,6 @@ export default function ResearchPage() {
             <H2 style={{ marginTop: 2 }}>TECH TREE</H2>
           </div>
           <Chip color={race.primary}>{totalCompleted}/{totalNodes}</Chip>
-        </div>
-
-        {/* Local-only notice — research progress lives in localStorage
-         *  until a /tech/{id}/research backend endpoint lands. Inform
-         *  the player so they don't expect cross-device sync. */}
-        <div
-          role="note"
-          style={{
-            margin: '0 16px 12px',
-            padding: '6px 10px',
-            border: `1px dashed ${ND.warn}55`,
-            borderRadius: 4,
-            background: `${ND.warn}11`,
-            fontFamily: ND.mono,
-            fontSize: 9.5,
-            letterSpacing: '0.04em',
-            color: ND.textDim,
-          }}
-        >
-          <strong style={{ color: ND.warn }}>BETA ·</strong>{' '}
-          Araştırma ilerlemen şu an sadece bu cihaza kaydediliyor —
-          sunucu senkronizasyonu yakında.
         </div>
 
         {/* Category tabs */}

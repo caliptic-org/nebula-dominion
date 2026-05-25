@@ -23,6 +23,8 @@ import {
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useGameResources } from '@/hooks/useGameResources';
+import { useActiveBuffs } from '@/hooks/useActiveBuffs';
+import { useBattleHistory, deriveBattleStats } from '@/hooks/useBattleHistory';
 
 type Tab = 'stats' | 'achievements' | 'history';
 
@@ -74,12 +76,16 @@ const POWER_BREAKDOWN = [
   { label: 'Birim',      value: 35 },
 ];
 
-// Empty by default — the buffs panel renders honest "no active buffs"
-// state instead of pretending every account has 4 timed buffs running.
-// Once a /buffs endpoint lands this is fed from there; until then a
-// player who's never used a /shop "Savaş Kalkanı" / "XP Katalizörü"
-// item sees the truthful empty state.
-const ACTIVE_BUFFS: { id: string; label: string; effect: string; remainingSec: number; totalSec: number }[] = [];
+/* Active buffs come from `GET /buffs/active` via useActiveBuffs(). When the
+ * player isn't signed in (or has nothing applied), the buffs panel falls
+ * back to its honest "no active buffs" state. */
+interface BuffViewModel {
+  id: string;
+  label: string;
+  effect: string;
+  remainingSec: number;
+  totalSec: number;
+}
 
 function fmt(n: number) {
   return new Intl.NumberFormat('tr-TR').format(n);
@@ -113,6 +119,38 @@ export default function ProfilePage() {
   const { profile: live } = useUserProfile();
   const { data: liveTier } = useBaseState();
   const { data: liveResources } = useGameResources();
+  // /buffs/active drives the active buffs panel; null while guest / loading.
+  const { data: liveBuffs } = useActiveBuffs();
+  // /battles/history → wins / losses / battles / bestStreak — derived once
+  // per fetch via deriveBattleStats. Zeros are honest defaults when no
+  // history exists yet.
+  const { data: liveHistory } = useBattleHistory();
+  const battleStats = useMemo(
+    () => deriveBattleStats(liveHistory?.entries ?? []),
+    [liveHistory],
+  );
+
+  // Map server buffs (label / effect / expiresAt) to the view-model the
+  // existing BuffRow expects. `remainingSec` is derived from the wall clock
+  // — the existing BuffRow recomputes the bar each render, so we don't
+  // need to tick a timer here.
+  const activeBuffs: BuffViewModel[] = useMemo(() => {
+    if (!liveBuffs) return [];
+    const now = Date.now();
+    return liveBuffs.map((b) => {
+      const remainingSec = Math.max(
+        0,
+        Math.floor((new Date(b.expiresAt).getTime() - now) / 1000),
+      );
+      return {
+        id: b.id,
+        label: b.label,
+        effect: b.effect,
+        remainingSec,
+        totalSec: b.totalSec,
+      };
+    });
+  }, [liveBuffs]);
 
   // Power is derived from live data when available: each resource tier
   // contributes a coarse weighted sum so the number reacts to gameplay
@@ -137,25 +175,24 @@ export default function ProfilePage() {
       capitalBase: race.capitalBase,
       level: liveTier?.tier?.currentLevel ?? live?.level ?? 1,
       power: livePower ?? 0,
-      // Per-account ranking / PvP stats need dedicated backend endpoints
-      // (/leaderboard/me, /pvp/stats, /battles/history). Until those
-      // land, default to zeros instead of literal "Rank #1247 / 384 wins
-      // / 97 losses" that's identical for every account. The UI below
-      // already handles 0/0 via the winRate guard and the empty stats
-      // panels render naturally.
+      // PvP ranking + guild contribution still lack backend endpoints
+      // (/pvp/stats, /guild/contributions). Until those land, default to
+      // zeros — the UI handles 0/0 via the winRate guard and the empty
+      // detail panels render naturally.
       globalRank: 0,
       pvpScore: 0,
       pvpRank: 0,
-      wins: 0,
-      losses: 0,
-      battles: 0,
-      bestStreak: 0,
+      // Wins / losses / battles / bestStreak now come from /battles/history.
+      wins: battleStats.wins,
+      losses: battleStats.losses,
+      battles: battleStats.battles,
+      bestStreak: battleStats.bestStreak,
       guildContrib: 0,
       xp: liveTier?.tier ? Number(liveTier.tier.xp) : live?.xp ?? 0,
       xpNext: liveTier?.tier ? Number(liveTier.tier.xpToNextLevel) : 1000,
       seasonPass: 0,
     }),
-    [race, live, liveTier, livePower],
+    [race, live, liveTier, livePower, battleStats],
   );
 
   // Guard against div-by-zero when the player has no battles yet —
@@ -312,10 +349,10 @@ export default function ProfilePage() {
             <Panel race={race}>
               <div style={panelHeader()}>
                 <Eyebrow color={race.primary}>AKTİF BUFFLAR</Eyebrow>
-                <Code>{ACTIVE_BUFFS.length}</Code>
+                <Code>{activeBuffs.length}</Code>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}>
-                {ACTIVE_BUFFS.length === 0 ? (
+                {activeBuffs.length === 0 ? (
                   <Caption style={{ textAlign: 'center', padding: '12px 8px', color: ND.textMute }}>
                     Aktif buff yok. Mağazadan{' '}
                     <Link href="/shop" style={{ color: race.primary, textDecoration: 'none' }}>
@@ -324,7 +361,7 @@ export default function ProfilePage() {
                     al, savaşta aktive et.
                   </Caption>
                 ) : (
-                  ACTIVE_BUFFS.map(b => <BuffRow key={b.id} buff={b} race={race} />)
+                  activeBuffs.map(b => <BuffRow key={b.id} buff={b} race={race} />)
                 )}
               </div>
             </Panel>
@@ -494,7 +531,7 @@ function DetailCell({ label, value, sub, race }: { label: string; value: string;
   );
 }
 
-function BuffRow({ buff, race }: { buff: typeof ACTIVE_BUFFS[number]; race: NDRace }) {
+function BuffRow({ buff, race }: { buff: BuffViewModel; race: NDRace }) {
   const pct = Math.max(0, Math.min(100, (buff.remainingSec / buff.totalSec) * 100));
   const urgent = pct < 20;
   return (

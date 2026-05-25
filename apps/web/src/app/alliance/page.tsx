@@ -26,6 +26,7 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { api, FetchError } from '@/lib/api';
 
 type Tab = 'genel' | 'savas' | 'uyeler' | 'haberler';
 
@@ -126,6 +127,26 @@ export default function AlliancePage() {
   const race = useNDRace();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('genel');
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+
+  async function handleJoin(a: { id: string; name: string }) {
+    if (joiningId) return;
+    setJoiningId(a.id);
+    try {
+      await api.post('/alliances/join', { allianceId: a.id });
+      toast.success(`${a.name} ittifakına katıldın`);
+      // Refresh profile-derived "hasAlliance" so the empty state disappears
+      // and the summary panels render with the new allianceTag on the very
+      // next render — router.refresh() re-runs server components which
+      // useUserProfile reads from. (No-op for client-only renders.)
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'İttifağa katılamadı';
+      toast.error(msg);
+    } finally {
+      setJoiningId(null);
+    }
+  }
   // Live profile — drives the "henüz bir ittifaka katılmadın" empty state
   // when the player has no allianceTag, and pulls the player's actual
   // guild tag/name into the header when they do. Member roster, wars,
@@ -257,13 +278,10 @@ export default function AlliancePage() {
                     <NDButton
                       race={race}
                       variant="outline"
-                      onClick={() =>
-                        toast.info(
-                          'İttifaka katılma akışı yakında — backend join endpoint sıraya alındı',
-                        )
-                      }
+                      disabled={joiningId === a.id}
+                      onClick={() => handleJoin({ id: a.id, name: a.name })}
                     >
-                      Katıl
+                      {joiningId === a.id ? 'Katılıyor…' : 'Katıl'}
                     </NDButton>
                   </div>
                 ))}

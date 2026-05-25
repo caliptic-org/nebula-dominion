@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getAccessToken, hasSession } from '@/lib/session';
 
 /* Live player-units roster from game-server's `/api/units` endpoint.
@@ -42,6 +42,10 @@ interface UseGameUnitsResult {
   loading: boolean;
   error: string | null;
   authenticated: boolean;
+  /** Force a fresh GET /api/units outside the poll cadence — used by the
+   *  /inventory upgrade flow so the player sees the bumped level instantly
+   *  instead of waiting up to 30s for the next tick. */
+  refresh: () => void;
 }
 
 const POLL_MS = 30_000;
@@ -51,6 +55,9 @@ export function useGameUnits(): UseGameUnitsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
+  const [bump, setBump] = useState(0);
+
+  const refresh = useCallback(() => setBump((n) => n + 1), []);
 
   useEffect(() => {
     if (!hasSession()) {
@@ -99,9 +106,9 @@ export function useGameUnits(): UseGameUnitsResult {
       cancelled = true;
       if (timer !== null) clearTimeout(timer);
     };
-  }, []);
+  }, [bump]);
 
-  return { data, loading, error, authenticated };
+  return { data, loading, error, authenticated, refresh };
 }
 
 /** Count units grouped by type. Useful when /inventory wants "5 marines,

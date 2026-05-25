@@ -24,7 +24,6 @@ import Image from 'next/image';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
-import { useBaseState } from '@/hooks/useBaseState';
 import { useHudState } from '@/hooks/useHudState';
 import { useGameBuildings, refreshBuildings } from '@/hooks/useGameBuildings';
 import { refreshGameResources } from '@/hooks/useGameResources';
@@ -81,12 +80,6 @@ function BuildMenuInner() {
   // when there's actually an in-flight construction (see effect below).
   const [, setNowTick] = useState(0);
 
-  // Live tier progress — same pipe /base uses. Drives the catalog tier level
-  // (HUD now sources from useHudState above). Falls back to mock when there's
-  // no JWT or the API errors.
-  const { data: live } = useBaseState();
-  const liveLevel = live?.tier?.currentLevel;
-
   // Live backend config: cost / build time / max-per-player numbers from
   // game-server's BUILDING_CONFIGS. Used to overlay real values on the
   // race-flavoured slots; if the fetch fails we keep the mock numbers.
@@ -94,10 +87,12 @@ function BuildMenuInner() {
   // Live owned-buildings roster. Drives the "already built — upgrade
   // instead" branch in handleStartBuild so the player can't accidentally
   // spawn N duplicate command centers by tapping "İnşa Başlat" twice.
+  // Also feeds real per-building levels into the catalog cards so the
+  // displayed "Lv N" chip matches what the detail page shows.
   const { data: liveBuildings } = useGameBuildings();
   const catalog = useMemo<BuildEntry[]>(
-    () => buildCatalog(race, backendTypes, liveLevel ?? null),
-    [race, backendTypes, liveLevel],
+    () => buildCatalog(race, backendTypes, liveBuildings ?? []),
+    [race, backendTypes, liveBuildings],
   );
   const lockedCount = catalog.filter((c) => c.locked).length;
 
@@ -625,20 +620,32 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
 /* Build the displayed catalog. We always show 6 race-flavoured slots from
  * `RACES[race].buildings` (the design is race-specific). When the backend
  * BUILDING_CONFIGS list is available we replace the synthesised cost/time
- * numbers with real data for the slot's mapped type. */
+ * numbers with real data for the slot's mapped type.
+ *
+ * `ownedBuildings` feeds real per-building levels so the "Lv N" chip
+ * on each catalog card matches the level shown on the detail page. */
 function buildCatalog(
   race: NDRace,
   backendTypes: BuildingTypeDto[],
-  liveTierLevel: number | null,
+  ownedBuildings: import('@/hooks/useGameBuildings').PlayerBuildingDto[],
 ): BuildEntry[] {
   // Index the backend table by type code so we can look up by mapped slug.
   const byType = new Map<string, BuildingTypeDto>();
   backendTypes.forEach((t) => byType.set(t.type, t));
 
+  // Index owned active/constructing buildings by type for O(1) level lookup.
+  const ownedByType = new Map<string, number>();
+  for (const ob of ownedBuildings) {
+    if (ob.status !== 'destroyed') ownedByType.set(ob.type, ob.level);
+  }
+
   return race.buildings.map((b, i) => {
     const mappedType = b.slug ? SLUG_TO_BACKEND_TYPE[b.slug] : undefined;
     const backend = mappedType ? byType.get(mappedType) : undefined;
     const base = (i + 1) * 220;
+    // Use the real owned-building level if the player has one; otherwise 0
+    // (the chip renders "YENİ" for 0 — see the JSX below the catalog list).
+    const ownedLevel = mappedType ? (ownedByType.get(mappedType) ?? 0) : 0;
     return {
       name: b.n,
       desc: b.t,
@@ -646,11 +653,7 @@ function buildCatalog(
       costA: backend?.cost.mineral ?? base,
       costB: backend?.cost.gas ?? Math.round(base * 0.35),
       durationSec: backend?.buildTimeSeconds ?? 90 + i * 60,
-      // i === 0 is the race's capital (headquarters). Tying its visible
-      // level to the player's tier level matches what /base's HUD shows
-      // and gives the screen one trustworthy number until per-building
-      // levels land server-side.
-      level: b.locked ? 0 : i === 0 ? liveTierLevel ?? 1 : 0,
+      level: b.locked ? 0 : ownedLevel,
       backendType: mappedType ?? backend?.type,
       assetPath: b.slug ? `/assets/buildings/${race.key}/${b.slug}.png` : undefined,
     };

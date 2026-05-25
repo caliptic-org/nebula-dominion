@@ -133,7 +133,8 @@ export default function RosterPage() {
       data-race={race.key}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        height: '100dvh',
+        overflow: 'hidden',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,
@@ -143,7 +144,7 @@ export default function RosterPage() {
     >
       <NebulaBg race={race} intensity={0.7} dim={0.65} />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Back strip */}
         <div style={{
           display: 'flex',

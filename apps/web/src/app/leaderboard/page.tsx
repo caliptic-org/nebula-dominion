@@ -222,7 +222,7 @@ export default function LeaderboardPage() {
   const list = entries.filter(e => e.rank > 3);
 
   return (
-    <Screen race={playerRace} style={{ minHeight: '100dvh' }}>
+    <Screen race={playerRace} style={{ height: '100dvh' }}>
       <PageHeader title="SIRALAMALAR" subtitle="Galaksi Rekabeti" race={playerRace} />
 
       {/* Period / countdown */}

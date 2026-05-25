@@ -207,7 +207,7 @@ export default function ProfilePage() {
   const totalPower = profile.power;
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh' }}>
+    <Screen race={race} style={{ height: '100dvh' }}>
       {/* Header */}
       <header
         style={{

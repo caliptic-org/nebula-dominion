@@ -141,7 +141,7 @@ export function SettingsClient() {
   }
 
   return (
-    <Screen race={race} style={{ minHeight: '100dvh' }}>
+    <Screen race={race} style={{ height: '100dvh' }}>
       <header
         style={{
           display: 'flex',

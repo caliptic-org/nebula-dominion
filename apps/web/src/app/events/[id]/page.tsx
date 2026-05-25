@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { notFound, useRouter } from 'next/navigation';
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
 import { CountdownTimer } from '@/components/events/CountdownTimer';
 import { EventBadge, type EventType } from '@/components/events/EventBadge';
 import { RewardTable, type Reward } from '@/components/events/RewardTable';
 import { sanitizeColor, sanitizeGradient, isValidEventSlug } from '@/lib/colorSanitizer';
-import { joinEventAction } from '../actions';
+import { getAccessToken } from '@/lib/session';
 import { toast } from '@/components/handoff/Toaster';
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
 
 /* ── Types & data ──────────────────────────────────────────────── */
 
@@ -277,33 +279,58 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
   );
 }
 
-/* ── Join form — wraps the Server Action for CSRF protection ─────── */
+/* ── Join button — direct API call with JWT ─────────────────────── */
 function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
   const [isPending, startTransition] = useTransition();
+  const [joined, setJoined] = useState(false);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function handleClick() {
     startTransition(async () => {
-      const fd = new FormData(e.currentTarget);
-      await joinEventAction(fd);
+      const token = getAccessToken();
+      if (!token) {
+        toast.error('Etkinliğe katılmak için giriş yapmalısın.');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/events/${encodeURIComponent(eventId)}/join`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 409) {
+          toast.info('Zaten bu etkinliğe katıldın.');
+          setJoined(true);
+          return;
+        }
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          toast.error(body || `Hata: HTTP ${res.status}`);
+          return;
+        }
+        setJoined(true);
+        toast.success('Etkinliğe katıldın! 🎉');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Bağlantı hatası');
+      }
     });
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input type="hidden" name="eventId" value={eventId} />
-      <button
-        type="submit"
-        disabled={isPending}
-        className="flex items-center gap-3 rounded-full font-black text-sm px-7 py-3.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-500"
-        style={{
-          background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-          color: 'var(--color-bg-pure)',
-          boxShadow: `0 0 40px ${color}55`,
-          transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
-        }}
-      >
-        {isPending ? 'İŞLENİYOR...' : 'ETKİNLİĞE KATIL'}
+    <button
+      type="button"
+      disabled={isPending || joined}
+      onClick={handleClick}
+      className="flex items-center gap-3 rounded-full font-black text-sm px-7 py-3.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-500"
+      style={{
+        background: joined
+          ? 'rgba(255,255,255,0.08)'
+          : `linear-gradient(135deg, ${color}, ${color}cc)`,
+        color: 'var(--color-bg-pure)',
+        boxShadow: joined ? 'none' : `0 0 40px ${color}55`,
+        transitionTimingFunction: 'cubic-bezier(0.32,0.72,0,1)',
+      }}
+    >
+      {isPending ? 'İŞLENİYOR...' : joined ? '✓ KATILINDI' : 'ETKİNLİĞE KATIL'}
+      {!joined && (
         <span
           className="w-7 h-7 rounded-full flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.2)' }}
@@ -311,8 +338,8 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
         >
           ↗
         </span>
-      </button>
-    </form>
+      )}
+    </button>
   );
 }
 

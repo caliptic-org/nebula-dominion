@@ -23,8 +23,15 @@
   {
     "route": "/base",
     "httpStatus": 200,
-    "consoleErrors": [],
-    "failedRequests": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "failedRequests": [
+      {
+        "url": "http://localhost:3000/assets/bases/insan/age-1.png",
+        "status": 404
+      }
+    ],
     "jsExceptions": []
   },
   {

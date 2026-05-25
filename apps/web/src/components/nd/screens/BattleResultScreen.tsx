@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -248,7 +248,7 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
                 letterSpacing: '0.04em',
               }}
             >
-              {data.stats.score.toLocaleString('tr-TR')}
+              {data.stats.score.toLocaleString()}
             </div>
           </div>
         </Panel>
@@ -466,7 +466,7 @@ function StatTile({
           letterSpacing: '0.04em',
         }}
       >
-        {typeof value === 'number' ? value.toLocaleString('tr-TR') : value}
+        {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
     </div>
   );

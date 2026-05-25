@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { SharedObjective } from '@/types/guild';
 
@@ -99,11 +99,11 @@ function ObjectiveCard({ objective }: ObjectiveCardProps) {
       <div className="objective-card__numbers">
         <span className="objective-card__progress">
           <span className="objective-card__current">
-            {objective.currentValue.toLocaleString('tr-TR')}
+            {objective.currentValue.toLocaleString()}
           </span>
           <span className="objective-card__target">
             {' '}
-            / {objective.targetValue.toLocaleString('tr-TR')} {objective.unit}
+            / {objective.targetValue.toLocaleString()} {objective.unit}
           </span>
         </span>
         <span className="objective-card__pct">%{Math.floor(pct)}</span>

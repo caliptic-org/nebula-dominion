@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 interface Resource {
   icon: string;
@@ -59,7 +59,7 @@ export function ResourceBar(props: ResourceBarProps) {
               {r.icon}
             </span>
             <span style={{ color: r.color ?? 'var(--color-text-primary)' }}>
-              {typeof r.value === 'number' ? r.value.toLocaleString('tr-TR') : r.value}
+              {typeof r.value === 'number' ? r.value.toLocaleString() : r.value}
             </span>
           </div>
         ))}

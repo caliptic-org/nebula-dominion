@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+﻿import clsx from 'clsx';
 
 type ProgressVariant = 'brand' | 'accent' | 'energy' | 'health' | 'xp' | 'danger' | 'custom';
 
@@ -83,7 +83,7 @@ export function ProgressBar({
                 letterSpacing: '0.05em',
               }}
             >
-              {value.toLocaleString('tr-TR')} / {max.toLocaleString('tr-TR')}
+              {value.toLocaleString()} / {max.toLocaleString()}
             </span>
           )}
         </div>

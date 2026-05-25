@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { GuildProfile, TIER_LABEL } from '@/types/guild';
@@ -66,7 +66,7 @@ export function GuildDashboard({ guildId }: GuildDashboardProps) {
             <span>•</span>
             <span>{TIER_LABEL[profile.tier]}</span>
             <span>•</span>
-            <span>Tier puan: {profile.tierScore.toLocaleString('tr-TR')}</span>
+            <span>Tier puan: {profile.tierScore.toLocaleString()}</span>
           </div>
         </div>
         <GuildBadge kind="tier" tier={profile.tier} />

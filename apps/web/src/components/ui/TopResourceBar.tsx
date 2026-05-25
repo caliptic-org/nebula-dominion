@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { ResourceIcon } from './ResourceIcon';
@@ -55,7 +55,7 @@ function ResourceCell({
     <div
       className="relative flex items-center gap-1.5 cursor-default select-none"
       title={label}
-      aria-label={`${label}: ${value.toLocaleString('tr-TR')}`}
+      aria-label={`${label}: ${value.toLocaleString()}`}
     >
       <span
         className="relative inline-flex items-center justify-center"
@@ -93,7 +93,7 @@ function ResourceCell({
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toLocaleString('tr-TR')}
+        {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toLocaleString()}
       </span>
 
       {floats.map((ft) => (

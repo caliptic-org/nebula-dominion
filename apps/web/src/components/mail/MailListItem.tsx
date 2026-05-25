@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Chip, ND, type NDRace } from '@/components/handoff'
@@ -201,7 +201,7 @@ export function MailListItem({
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {mail.rewards!.map((r, i) => (
                 <Chip key={i} color={ND.warn}>
-                  {r.icon} {r.amount.toLocaleString('tr-TR')}
+                  {r.icon} {r.amount.toLocaleString()}
                 </Chip>
               ))}
             </div>

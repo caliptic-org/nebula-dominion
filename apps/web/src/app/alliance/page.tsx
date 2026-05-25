@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAlliances } from '@/hooks/useAlliances';
 import {
@@ -112,7 +113,7 @@ const ALLIANCE_LOG = [
 ];
 
 function fmt(n: number) {
-  return new Intl.NumberFormat('tr-TR').format(n);
+  return new Intl.NumberFormat().format(n);
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
@@ -126,6 +127,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 export default function AlliancePage() {
   const race = useNDRace();
   const router = useRouter();
+  const tAlliance = useTranslations('alliance');
   const [tab, setTab] = useState<Tab>('genel');
   const [joiningId, setJoiningId] = useState<string | null>(null);
 
@@ -382,7 +384,7 @@ export default function AlliancePage() {
             <NDButton
               race={race}
               full
-              onClick={() => toast.info('Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil')}
+              onClick={() => toast.info(tAlliance('warSoonHint'))}
             >
               İttifak Savaşı Bildir
             </NDButton>
@@ -642,8 +644,8 @@ function MemberRow({ member }: { member: AllianceMember }) {
           <span>{member.role}</span>
         </div>
       </div>
-      <Code style={{ color: r.primary }}>{member.power.toLocaleString('tr-TR')}</Code>
-      <Code style={{ color: ND.textDim }}>+{member.contribution.toLocaleString('tr-TR')}</Code>
+      <Code style={{ color: r.primary }}>{member.power.toLocaleString()}</Code>
+      <Code style={{ color: ND.textDim }}>+{member.contribution.toLocaleString()}</Code>
     </div>
   );
 }

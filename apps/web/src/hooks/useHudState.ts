@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useTierProgress } from './useTierProgress';
 import { useGameResources } from './useGameResources';
@@ -32,7 +32,7 @@ function formatAmount(amount: number | undefined | null): string {
   if (amount === undefined || amount === null || !Number.isFinite(amount)) {
     return HUD_PLACEHOLDER;
   }
-  return Math.floor(amount).toLocaleString('tr-TR');
+  return Math.floor(amount).toLocaleString();
 }
 
 /**

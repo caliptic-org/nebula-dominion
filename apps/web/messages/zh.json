@@ -14,7 +14,12 @@
     "edit": "编辑",
     "yes": "是",
     "no": "否",
-    "skip": "跳过"
+    "skip": "跳过",
+    "loginRequired": "需要登录",
+    "comingSoon": "即将推出",
+    "unknownError": "未知错误",
+    "clipboardCopied": "链接已复制到剪贴板",
+    "clipboardDenied": "剪贴板访问被拒绝"
   },
   "auth": {
     "login": {
@@ -27,7 +32,8 @@
       "noAccount": "还没有账号?",
       "registerLink": "注册",
       "errorInvalid": "凭证无效。请重试。",
-      "errorGeneric": "登录失败。请重试。"
+      "errorGeneric": "登录失败。请重试。",
+      "forgotPasswordHint": "密码找回功能即将推出 — 请联系 support@nebula.com"
     },
     "register": {
       "title": "注册",
@@ -186,5 +192,33 @@
     "sessionExpired": "会话已过期。请重新登录。",
     "notFound": "未知星区",
     "notFoundDescription": "您寻找的坐标位于银河系未标记的区域。"
+  },
+  "events": {
+    "alreadyJoined": "你已经参加了这个活动。",
+    "joinSuccess": "你加入了活动！🎉",
+    "shareHint": "与朋友分享此活动",
+    "copyLink": "复制链接"
+  },
+  "alliance": {
+    "warSoonHint": "宣战功能即将推出 — 外交渠道尚未开放"
+  },
+  "missions": {
+    "alreadyClaimed": "该任务的奖励已经领取。"
+  },
+  "inventory": {
+    "trainFirst": "请先训练该类型单位"
+  },
+  "tutorial": {
+    "giftClaimed": "初始礼包已领取：+500矿物 · +25水晶 · +200XP",
+    "giftFailed": "礼包领取失败 — 请从/base页面继续"
+  },
+  "merge": {
+    "previewModeHint": "预览模式下无法合并 — 请先训练单位。"
+  },
+  "shop": {
+    "vipRewardClaimed": "每日VIP奖励已领取：+50水晶, +200XP",
+    "premiumActivated": "高级通行证已激活",
+    "rewardFailed": "奖励领取失败",
+    "premiumFailed": "高级购买失败"
   }
 }

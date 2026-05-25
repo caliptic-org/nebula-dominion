@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -308,8 +308,8 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
             </Eyebrow>
             <div style={{ fontFamily: ND.display, fontSize: 14, color: ND.text, marginTop: 2 }}>
               {projectedOutcome === 'victory'
-                ? `+${advantage.toLocaleString('tr-TR')} güç avantajı`
-                : `−${Math.abs(advantage).toLocaleString('tr-TR')} güç dezavantajı`}
+                ? `+${advantage.toLocaleString()} güç avantajı`
+                : `−${Math.abs(advantage).toLocaleString()} güç dezavantajı`}
             </div>
           </div>
         </Panel>
@@ -372,7 +372,7 @@ function PowerStat({
         {label}
       </div>
       <div style={{ fontFamily: ND.display, fontSize: 22, color, fontWeight: 700, marginTop: 2 }}>
-        {value.toLocaleString('tr-TR')}
+        {value.toLocaleString()}
       </div>
     </div>
   );

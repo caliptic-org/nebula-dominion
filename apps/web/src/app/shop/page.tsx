@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   ND,
   Sigil,
@@ -166,6 +167,8 @@ const TAB_KEYS: Tab[] = ['genel', 'vip', 'lonca', 'etkinlik', 'gecis'];
 function ShopPageInner() {
   const race = useNDRace();
   const router = useRouter();
+  const tCommon = useTranslations('common');
+  const tShop = useTranslations('shop');
   const searchParams = useSearchParams();
   const initialTab = (() => {
     const t = searchParams.get('tab');
@@ -215,8 +218,8 @@ function ShopPageInner() {
           <H2 style={{ marginTop: 2 }}>NEBULA MARKET</H2>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <ResPill kind="crystal" value={playerCurrency.gem.toLocaleString('tr-TR')} accent={race.primary} />
-          <ResPill kind="cred" value={playerCurrency.gold.toLocaleString('tr-TR')} accent={ND.warn} />
+          <ResPill kind="crystal" value={playerCurrency.gem.toLocaleString()} accent={race.primary} />
+          <ResPill kind="cred" value={playerCurrency.gold.toLocaleString()} accent={ND.warn} />
         </div>
       </header>
 
@@ -353,6 +356,7 @@ function pillStyle(on: boolean, race: NDRace): React.CSSProperties {
 }
 
 function ProductCard({ product, race, currency }: { product: ShopProduct; race: NDRace; currency: Currency }) {
+  const tCommon = useTranslations('common');
   const useGem = currency === 'gem' && product.gemPrice !== undefined;
   const price = useGem ? product.gemPrice : product.goldPrice;
   const originalPrice = useGem ? product.originalGemPrice : product.originalGoldPrice;
@@ -386,11 +390,11 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
           {price !== undefined ? (
             <>
               <div style={{ fontFamily: ND.display, fontSize: 16, color: race.primary }}>
-                {unitIcon} {price.toLocaleString('tr-TR')}
+                {unitIcon} {price.toLocaleString()}
               </div>
               {originalPrice !== undefined && (
                 <Code style={{ textDecoration: 'line-through', color: ND.textMute, fontSize: 10 }}>
-                  {unitIcon} {originalPrice.toLocaleString('tr-TR')}
+                  {unitIcon} {originalPrice.toLocaleString()}
                 </Code>
               )}
             </>
@@ -406,7 +410,7 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
           size="sm"
           onClick={async () => {
             if (!hasSession()) {
-              toast.error('Satın alma için giriş yapmalısın');
+              toast.error(tCommon('loginRequired'));
               return;
             }
             try {
@@ -448,6 +452,8 @@ function VipSection({
   playerLevel: number;
   playerXp: number;
 }) {
+  const tCommon = useTranslations('common');
+  const tShop = useTranslations('shop');
   const currentTier = VIP_TIERS.find(t => t.level === playerLevel) ?? VIP_TIERS[0];
   const nextTier = VIP_TIERS.find(t => t.level === playerLevel + 1);
   const progressPct = nextTier
@@ -480,7 +486,7 @@ function VipSection({
           <div style={{ flex: 1, minWidth: 0 }}>
             <Eyebrow color={race.primary}>SEN · {currentTier.label}</Eyebrow>
             <H3 style={{ marginTop: 2, color: ND.text }}>
-              {nextTier ? `${nextTier.label} için ${(nextTier.xp - playerXp).toLocaleString('tr-TR')} XP` : 'En yüksek seviye'}
+              {nextTier ? `${nextTier.label} için ${(nextTier.xp - playerXp).toLocaleString()} XP` : 'En yüksek seviye'}
             </H3>
             <div style={{ marginTop: 6 }}>
               <Bar value={progressPct} color={race.primary} />
@@ -503,14 +509,14 @@ function VipSection({
             race={race}
             onClick={async () => {
               if (!hasSession()) {
-                toast.error('Giriş yapmalısın');
+                toast.error(tCommon('loginRequired'));
                 return;
               }
               try {
                 await api.post('/vip/claim-daily', {});
-                toast.success('Günlük VIP ödülü alındı: +50 Kristal, +200 XP');
+                toast.success(tShop('vipRewardClaimed'));
               } catch (err) {
-                const msg = err instanceof FetchError ? err.message : 'Ödül alma başarısız';
+                const msg = err instanceof FetchError ? err.message : tShop('rewardFailed');
                 toast.error(msg);
               }
             }}
@@ -534,15 +540,15 @@ function VipSection({
               {p.tag && <Chip color={ND.warn}>{p.tag}</Chip>}
             </div>
             <Caption>{p.days} gün VIP üyelik</Caption>
-            <Caption style={{ fontSize: 10 }}>+{p.bonusGems.toLocaleString('tr-TR')} bonus kristal</Caption>
+            <Caption style={{ fontSize: 10 }}>+{p.bonusGems.toLocaleString()} bonus kristal</Caption>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-              <div style={{ fontFamily: ND.display, fontSize: 18, color: race.primary }}>💎 {p.gemPrice.toLocaleString('tr-TR')}</div>
+              <div style={{ fontFamily: ND.display, fontSize: 18, color: race.primary }}>💎 {p.gemPrice.toLocaleString()}</div>
               <NDButton
                 race={race}
                 size="sm"
                 onClick={async () => {
                   if (!hasSession()) {
-                    toast.error('Giriş yapmalısın');
+                    toast.error(tCommon('loginRequired'));
                     return;
                   }
                   try {
@@ -613,6 +619,8 @@ function VipSection({
 }
 
 function BattlePassSection({ race }: { race: NDRace }) {
+  const tCommon = useTranslations('common');
+  const tShop = useTranslations('shop');
   const playerLevel = 12;
   const totalLevels = 30;
   return (
@@ -691,14 +699,14 @@ function BattlePassSection({ race }: { race: NDRace }) {
         full
         onClick={async () => {
           if (!hasSession()) {
-            toast.error('Giriş yapmalısın');
+            toast.error(tCommon('loginRequired'));
             return;
           }
           try {
             await api.post('/shop/purchase', { sku: 'battle_pass_premium', currency: 'gem' });
-            toast.success('Premium Geçiş aktif edildi');
+            toast.success(tShop('premiumActivated'));
           } catch (err) {
-            const msg = err instanceof FetchError ? err.message : 'Premium satın alımı başarısız';
+            const msg = err instanceof FetchError ? err.message : tShop('premiumFailed');
             toast.error(msg);
           }
         }}

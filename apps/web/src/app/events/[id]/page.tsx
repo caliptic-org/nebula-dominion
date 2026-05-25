@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { notFound, useRouter } from 'next/navigation';
 import { useTransition, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { CountdownTimer } from '@/components/events/CountdownTimer';
 import { EventBadge, type EventType } from '@/components/events/EventBadge';
 import { RewardTable, type Reward } from '@/components/events/RewardTable';
@@ -271,7 +272,7 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
             className="font-display font-black text-sm shrink-0"
             style={{ color: entry.rank <= 3 ? (entry.rank === 1 ? 'var(--color-energy)' : entry.rank === 2 ? 'var(--color-rarity-silver)' : 'var(--color-rarity-bronze)') : 'var(--color-text-secondary)' }}
           >
-            {entry.score.toLocaleString("tr-TR")}
+            {entry.score.toLocaleString()}
           </span>
         </div>
       ))}
@@ -281,6 +282,8 @@ function Leaderboard({ entries, accentColor }: { entries: LeaderboardEntry[]; ac
 
 /* ── Join button — direct API call with JWT ─────────────────────── */
 function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
+  const tCommon = useTranslations('common');
+  const tEvents = useTranslations('events');
   const [isPending, startTransition] = useTransition();
   const [joined, setJoined] = useState(false);
 
@@ -288,7 +291,7 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
     startTransition(async () => {
       const token = getAccessToken();
       if (!token) {
-        toast.error('Etkinliğe katılmak için giriş yapmalısın.');
+        toast.error(tCommon('loginRequired'));
         return;
       }
       try {
@@ -297,7 +300,7 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.status === 409) {
-          toast.info('Zaten bu etkinliğe katıldın.');
+          toast.info(tEvents('alreadyJoined'));
           setJoined(true);
           return;
         }
@@ -307,7 +310,7 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
           return;
         }
         setJoined(true);
-        toast.success('Etkinliğe katıldın! 🎉');
+        toast.success(tEvents('joinSuccess'));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Bağlantı hatası');
       }
@@ -345,6 +348,9 @@ function JoinEventForm({ eventId, color }: { eventId: string; color: string }) {
 
 /* ── Page ────────────────────────────────────────────────────────── */
 export default function EventDetailPage({ params }: { params: { id: string } }) {
+  const tCommon = useTranslations('common');
+  const tEvents = useTranslations('events');
+
   // FIX: validate params.id before using as object key
   if (!isValidEventSlug(params.id)) notFound();
 
@@ -489,8 +495,8 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             <MangaPanel color={c} title="ETKİNLİK BİLGİSİ">
               <dl className="space-y-3 text-sm">
                 {[
-                  { label: 'Başlangıç', value: event.startDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) },
-                  { label: 'Bitiş',     value: event.endDate.toLocaleDateString('tr-TR',   { day: 'numeric', month: 'long', year: 'numeric' }) },
+                  { label: 'Başlangıç', value: event.startDate.toLocaleDateString(undefined,{ day: 'numeric', month: 'long', year: 'numeric' }) },
+                  { label: 'Bitiş',     value: event.endDate.toLocaleDateString(undefined,  { day: 'numeric', month: 'long', year: 'numeric' }) },
                   { label: 'Irk Kısıtı', value: event.raceLabel },
                   { label: 'Durum',    value: isActive ? 'Aktif' : isArchive ? 'Tamamlandı' : 'Yakında' },
                 ].map(({ label, value }) => (
@@ -506,7 +512,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               className="rounded-xl p-4 text-center"
               style={{ background: `${c}08`, border: `1px dashed ${c}25` }}
             >
-              <p className="text-[10px] text-text-muted mb-2">Bu etkinliği arkadaşlarınla paylaş</p>
+              <p className="text-[10px] text-text-muted mb-2">{tEvents('shareHint')}</p>
               <button
                 type="button"
                 className="text-xs font-bold px-4 py-2 rounded-full transition-all duration-300"
@@ -517,14 +523,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                   if (navigator.clipboard?.writeText) {
                     navigator.clipboard
                       .writeText(url)
-                      .then(() => toast.success('Etkinlik linki panoya kopyalandı'))
-                      .catch(() => toast.error('Pano erişimi reddedildi'));
+                      .then(() => toast.success(tCommon('clipboardCopied')))
+                      .catch(() => toast.error(tCommon('clipboardDenied')));
                   } else {
                     toast.info(url);
                   }
                 }}
               >
-                Linki Kopyala
+                {tEvents('copyLink')}
               </button>
             </div>
           </div>

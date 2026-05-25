@@ -88,7 +88,7 @@ interface BuffViewModel {
 }
 
 function fmt(n: number) {
-  return new Intl.NumberFormat('tr-TR').format(n);
+  return new Intl.NumberFormat().format(n);
 }
 
 function fmtDuration(sec: number) {

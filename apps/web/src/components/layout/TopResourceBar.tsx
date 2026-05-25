@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { ResourceIcon } from '@/components/ui/ResourceIcon';
@@ -85,7 +85,7 @@ function ResourceChip({ type, value }: { type: 'mineral' | 'gas' | 'energy'; val
   return (
     <div className={`resource-chip ${type === 'energy' ? 'energy-res' : type}`}>
       <ResourceIcon type={type} size={14} />
-      <span>{value.toLocaleString('tr-TR')}</span>
+      <span>{value.toLocaleString()}</span>
     </div>
   );
 }

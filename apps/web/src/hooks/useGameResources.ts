@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useReducer } from 'react';
 import { getAccessToken, hasSession } from '@/lib/session';
@@ -196,5 +196,5 @@ export function formatResource(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 10_000) return `${(n / 1000).toFixed(0)}K`;
-  return Number(n).toLocaleString('tr-TR');
+  return Number(n).toLocaleString();
 }

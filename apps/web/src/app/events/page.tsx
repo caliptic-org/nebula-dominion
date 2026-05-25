@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -450,7 +450,7 @@ function FeaturedBanner({ event }: { event: GameEvent }) {
                       letterSpacing: '0.02em',
                     }}
                   >
-                    {event.participants.toLocaleString('tr-TR')}
+                    {event.participants.toLocaleString()}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -599,7 +599,7 @@ function EventCard({ event }: { event: GameEvent }) {
             )}
             {isArchive && (
               <Caption>
-                {event.participants.toLocaleString('tr-TR')} katılımcı · {event.topPrize}
+                {event.participants.toLocaleString()} katılımcı · {event.topPrize}
               </Caption>
             )}
 
@@ -619,7 +619,7 @@ function EventCard({ event }: { event: GameEvent }) {
                 >
                   <span>Kapasite</span>
                   <span>
-                    {event.participants.toLocaleString('tr-TR')} / {event.maxParticipants?.toLocaleString('tr-TR')}
+                    {event.participants.toLocaleString()} / {event.maxParticipants?.toLocaleString()}
                   </span>
                 </div>
                 <div

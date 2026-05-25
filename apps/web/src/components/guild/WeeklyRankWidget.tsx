@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { GuildBadge } from './GuildBadge';
 
@@ -42,7 +42,7 @@ export function WeeklyRankWidget({
           <div className="stat-card">
             <p className="text-text-muted text-xs mb-1">Bu hafta katkı</p>
             <p className="font-display text-xl font-black text-text-primary">
-              {weeklyContribution.toLocaleString('tr-TR')}
+              {weeklyContribution.toLocaleString()}
               <span className="text-text-muted text-xs font-normal"> pts</span>
             </p>
           </div>

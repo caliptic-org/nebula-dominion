@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Bar,
   BottomNav,
@@ -90,6 +91,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 export default function RosterPage() {
   const race = useNDRace();
   const router = useRouter();
+  const tInventory = useTranslations('inventory');
   const hud = useHudState();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('tier');
@@ -173,7 +175,7 @@ export default function RosterPage() {
           <H3 style={{ color: ND.text }}>{ROSTER_NAMES[race.key] ?? 'Birim Envanteri'}</H3>
           <div style={{ flex: 1 }} />
           <Chip color={popRatio > 0.85 ? ND.warn : race.primary}>
-            {popUsed.toLocaleString('tr-TR')} / {popMax.toLocaleString('tr-TR')} POP
+            {popUsed.toLocaleString()} / {popMax.toLocaleString()} POP
           </Chip>
         </div>
 
@@ -578,6 +580,7 @@ interface UnitDetailDrawerProps {
 }
 
 function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDetailDrawerProps) {
+  const tInventory = useTranslations('inventory');
   const cost = upgradeCost(unit);
   const [upgrading, setUpgrading] = useState(false);
   const stateColor =
@@ -597,7 +600,7 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
   async function handleUpgrade() {
     if (upgrading) return;
     if (!liveTarget) {
-      toast.error('Önce o tür birim eğit');
+      toast.error(tInventory('trainFirst'));
       return;
     }
     setUpgrading(true);

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -947,7 +947,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
       >
         <div style={{ display: 'flex', gap: 8, maxWidth: 1240, margin: '0 auto', alignItems: 'center' }}>
           <span style={{ fontFamily: ND.mono, fontSize: 11, color: ND.textDim, letterSpacing: '0.08em' }}>
-            GÜÇ <span style={{ color: race.primary, fontWeight: 600 }}>{displayedPower.toLocaleString('tr-TR')}</span>
+            GÜÇ <span style={{ color: race.primary, fontWeight: 600 }}>{displayedPower.toLocaleString()}</span>
           </span>
           <div style={{ flex: 1 }} />
           <NDButton race={race} variant="ghost" size="md" onClick={handleReset}>SIFIRLA</NDButton>
@@ -1099,9 +1099,9 @@ function NDPowerReadout({
               lineHeight: 1,
             }}
           >
-            {power.toLocaleString('tr-TR')}
+            {power.toLocaleString()}
           </span>
-          <span style={{ fontFamily: ND.mono, fontSize: 11, color: ND.textDim }}>/ {max.toLocaleString('tr-TR')}</span>
+          <span style={{ fontFamily: ND.mono, fontSize: 11, color: ND.textDim }}>/ {max.toLocaleString()}</span>
         </div>
       </div>
 
@@ -1566,7 +1566,7 @@ function NDRosterRowUnit({
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{ fontFamily: ND.display, fontSize: 12, fontWeight: 700, color: r.primary, fontVariantNumeric: 'tabular-nums' }}>
-          {unit.power.toLocaleString('tr-TR')}
+          {unit.power.toLocaleString()}
         </div>
         <div style={{ fontFamily: ND.mono, fontSize: 8, color: ND.textMute, letterSpacing: '0.10em', textTransform: 'uppercase' }}>güç</div>
       </div>
@@ -1634,7 +1634,7 @@ function NDRosterRowCommander({
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{ fontFamily: ND.display, fontSize: 12, fontWeight: 700, color: r.primary, fontVariantNumeric: 'tabular-nums' }}>
-          {commander.power.toLocaleString('tr-TR')}
+          {commander.power.toLocaleString()}
         </div>
         <div style={{ fontFamily: ND.mono, fontSize: 8, color: ND.textMute, letterSpacing: '0.10em', textTransform: 'uppercase' }}>güç</div>
       </div>

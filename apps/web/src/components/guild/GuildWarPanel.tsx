@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import clsx from 'clsx';
 import { AllianceWar, AllianceWarStatus } from '@/types/guild';
@@ -128,7 +128,7 @@ function WarCard({ war, guildTag }: WarCardProps) {
                   winning ? 'war-card__score--lead' : 'war-card__score--trail'
                 )}
               >
-                {war.ourScore.toLocaleString('tr-TR')}
+                {war.ourScore.toLocaleString()}
               </span>
               <span className="war-card__vs">vs</span>
               <span
@@ -138,7 +138,7 @@ function WarCard({ war, guildTag }: WarCardProps) {
                 )}
                 style={{ color: oppColor }}
               >
-                {war.theirScore.toLocaleString('tr-TR')}
+                {war.theirScore.toLocaleString()}
               </span>
             </>
           )}

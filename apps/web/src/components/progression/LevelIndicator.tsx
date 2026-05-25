@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import '@/styles/progression.css';
 import clsx from 'clsx';
@@ -30,7 +30,7 @@ export function LevelIndicator({ progress }: LevelIndicatorProps) {
         />
         {!isMaxLevel && (
           <span className="xp-label">
-            Sonraki seviye: {((xpToNextLevel ?? 0) - currentXp).toLocaleString('tr-TR')} XP
+            Sonraki seviye: {((xpToNextLevel ?? 0) - currentXp).toLocaleString()} XP
           </span>
         )}
       </div>

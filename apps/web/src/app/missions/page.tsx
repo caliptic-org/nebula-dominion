@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   ND,
   Sigil,
@@ -146,6 +147,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 export default function MissionsPage() {
   const race = useNDRace();
   const router = useRouter();
+  const tMissions = useTranslations('missions');
   const [tab, setTab] = useState<Tab>('story');
   const resetCountdown = useDailyCountdown();
 
@@ -292,6 +294,7 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
   const completed = mission.state === 'completed';
   const diffColor = mission.difficulty ? DIFFICULTY_COLOR[mission.difficulty] : ND.textDim;
   const router = useRouter();
+  const tMissions = useTranslations('missions');
 
   // "Devam" button routes to the screen the player needs to use to progress
   // this mission. We pick a sensible destination by mission category since
@@ -323,7 +326,7 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
     };
 
     const totalReward = mission.rewards
-      .map((r) => `${r.amount.toLocaleString('tr-TR')} ${r.label}`)
+      .map((r) => `${r.amount.toLocaleString()} ${r.label}`)
       .join(' · ');
 
     // Backend daily mission ids come through questToMission as `daily-q1`,
@@ -343,7 +346,7 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
         const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
         const claimed = raw ? (JSON.parse(raw) as string[]) : [];
         if (claimed.includes(mission.id)) {
-          toast.info('Bu görevin ödülü zaten alınmış.');
+          toast.info(tMissions('alreadyClaimed'));
           return;
         }
       } catch { /* ignore */ }
@@ -360,7 +363,7 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
       }>(`/daily/quests/${backendQuestId}/claim`);
       writeCache();
       if (res.alreadyClaimed) {
-        toast.info('Bu görevin ödülü zaten alınmış.');
+        toast.info(tMissions('alreadyClaimed'));
         return;
       }
       // Broadcast wallet refresh so the HUD pill repolls immediately rather
@@ -423,7 +426,7 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 8, justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {mission.rewards.map(r => (
-                <Chip key={r.label} color={race.primary}>+{r.amount.toLocaleString('tr-TR')} {r.label}</Chip>
+                <Chip key={r.label} color={race.primary}>+{r.amount.toLocaleString()} {r.label}</Chip>
               ))}
             </div>
             {completed && (

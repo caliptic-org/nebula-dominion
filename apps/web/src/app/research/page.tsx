@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
@@ -630,8 +630,8 @@ function DetailPanel({ node, nodes, race, onClose, onResearch, onCancel }: Detai
                 <Eyebrow color={race.primary}>MALİYET</Eyebrow>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 }}>
                   {[
-                    { label: 'Mineral', value: node.cost.minerals.toLocaleString('tr-TR'), color: race.primary, icon: 'min' as const },
-                    { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString('tr-TR') : '—', color: ND.ok, icon: 'energy' as const },
+                    { label: 'Mineral', value: node.cost.minerals.toLocaleString(), color: race.primary, icon: 'min' as const },
+                    { label: 'Gaz', value: node.cost.gas > 0 ? node.cost.gas.toLocaleString() : '—', color: ND.ok, icon: 'energy' as const },
                     { label: 'Süre', value: formatTime(node.cost.timeSec), color: ND.warn, icon: 'sci' as const },
                   ].map((c) => (
                     <div

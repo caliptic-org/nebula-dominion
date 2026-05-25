@@ -364,7 +364,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() =>
-                toast.info('Şifre kurtarma yakında — şimdilik destek@nebula.com ile iletişime geç')
+                toast.info(t('forgotPasswordHint'))
               }
               style={{
                 all: 'unset',

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Bar,
   BottomNav,
@@ -83,6 +84,7 @@ function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
 export default function MergePage() {
   const race = useNDRace();
   const router = useRouter();
+  const tMerge = useTranslations('merge');
   const hud = useHudState();
   const [selected, setSelected] = useState<number[]>([]);
   const [sourceTier, setSourceTier] = useState(3);
@@ -146,7 +148,7 @@ export default function MergePage() {
   async function performMerge() {
     if (!canMerge) return;
     if (isDemoMode) {
-      toast.info('Önizleme modunda gerçek birleştirme yapılamaz — önce birim eğit.');
+      toast.info(tMerge('previewModeHint'));
       return;
     }
     // Optimistic: clear local selection immediately for snappy feel, then

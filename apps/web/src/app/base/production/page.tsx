@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -989,7 +989,7 @@ function EmptySlot({ race, index }: { race: NDRace; index: number }) {
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
 function buildUnits(race: NDRace, backend: UnitConfigDto[]): UnitDef[] {
-  const fmt = (n: number) => n.toLocaleString('tr-TR');
+  const fmt = (n: number) => n.toLocaleString();
   return race.units.slice(0, 5).map((u, i) => {
     const live = backend[i];
     return {
@@ -1044,7 +1044,7 @@ function formatDuration(sec: number): string {
 }
 
 function formatNumber(n: number): string {
-  return n.toLocaleString('tr-TR');
+  return n.toLocaleString();
 }
 
 function toNum(s: string): number {

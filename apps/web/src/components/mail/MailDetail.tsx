@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Caption, Chip, Eyebrow, NDButton, Panel, ND, type NDRace } from '@/components/handoff'
@@ -357,7 +357,7 @@ function RewardCard({ reward, index, claimed, animating }: RewardCardProps) {
           letterSpacing: '0.04em',
         }}
       >
-        {reward.amount.toLocaleString('tr-TR')}
+        {reward.amount.toLocaleString()}
       </span>
       <span
         style={{

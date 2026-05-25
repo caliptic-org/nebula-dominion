@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   ScrTutorialAttack,
   ScrTutorialBuild,
@@ -61,6 +62,7 @@ function TutorialFlow() {
   const router = useRouter();
   const params = useSearchParams();
   const race = useNDRace();
+  const tTutorial = useTranslations('tutorial');
   const { markTutorialCompleted, markIntroSeen } = useOnboarding();
 
   const step = useMemo(() => {
@@ -100,14 +102,14 @@ function TutorialFlow() {
       if (hasSession()) {
         try {
           await gameServerApi.post('/players/me/tutorial-complete');
-          toast.success('Başlangıç hediyesi alındı: +500 mineral · +25 kristal · +200 XP');
+          toast.success(tTutorial('giftClaimed'));
           refreshGameResources();
         } catch (err) {
           // "Already redeemed" is the most common path — silently swallow.
           // Other errors get a small toast so the player isn't blocked from
           // landing on /base.
           if (err instanceof FetchError && err.status !== 400) {
-            toast.info('Hediye verilemedi — /base sayfasından devam edebilirsin');
+            toast.info(tTutorial('giftFailed'));
           }
         }
       }

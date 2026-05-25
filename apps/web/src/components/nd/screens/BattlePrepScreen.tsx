@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState, useCallback, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -436,7 +436,7 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
                 alignSelf: 'center',
               }}
             >
-              GÜÇ <span style={{ color: race.primary, fontWeight: 600 }}>{totalPower.toLocaleString('tr-TR')}</span>
+              GÜÇ <span style={{ color: race.primary, fontWeight: 600 }}>{totalPower.toLocaleString()}</span>
             </span>
           </div>
         </Panel>
@@ -525,7 +525,7 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
                 {liveFormation.name}
               </strong>
               <Code style={{ color: race.primary }}>
-                {liveFormation.power.toLocaleString('tr-TR')} GÜÇ
+                {liveFormation.power.toLocaleString()} GÜÇ
               </Code>
             </div>
             <Caption style={{ fontSize: 10, marginTop: 2 }}>

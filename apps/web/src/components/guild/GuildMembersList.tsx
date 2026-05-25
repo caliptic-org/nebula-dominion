@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import clsx from 'clsx';
 import { GuildMember } from '@/types/guild';
@@ -66,10 +66,10 @@ export function GuildMembersList({ members }: GuildMembersListProps) {
             </span>
             <div>
               <p className="member-row__contrib">
-                {m.contributionPts.toLocaleString('tr-TR')}
+                {m.contributionPts.toLocaleString()}
               </p>
               <p className="member-row__sub text-right">
-                +{m.weeklyContribution.toLocaleString('tr-TR')} bu hafta
+                +{m.weeklyContribution.toLocaleString()} bu hafta
               </p>
             </div>
           </li>

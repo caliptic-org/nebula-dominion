@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -171,10 +171,10 @@ export default function LeaderboardPage() {
   const { data: liveMe } = useLeaderboardMe();
   const fmtScore = (n: number, cat: Category) =>
     cat === 'pvp'
-      ? `${n.toLocaleString('tr-TR')} Puan`
+      ? `${n.toLocaleString()} Puan`
       : n >= 1_000_000
         ? `${(n / 1_000_000).toFixed(2)}M`
-        : n.toLocaleString('tr-TR');
+        : n.toLocaleString();
   const liveAsEntries: Entry[] | null = live
     ? live.entries.map((e: LeaderboardEntry) => ({
         rank: e.rank,
@@ -192,7 +192,7 @@ export default function LeaderboardPage() {
   // until cross-player ranking lands.
   const liveScore = liveMe?.score ?? liveProfile?.xp ?? liveProfile?.level ?? 0;
   const scoreLabel = liveScore > 0
-    ? (category === 'pvp' ? `${liveScore.toLocaleString('tr-TR')} Puan` : fmtScore(liveScore, category))
+    ? (category === 'pvp' ? `${liveScore.toLocaleString()} Puan` : fmtScore(liveScore, category))
     : '— · sıralama yakında';
   const me: Entry = {
     rank: liveMe?.rank ?? 0,

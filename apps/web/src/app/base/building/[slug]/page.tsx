@@ -100,7 +100,7 @@ interface PageProps {
 
 function fmt(n: number | undefined): string {
   if (n === undefined || !Number.isFinite(n)) return '—';
-  return Number(n).toLocaleString('tr-TR');
+  return Number(n).toLocaleString();
 }
 
 function fmtDuration(sec: number | undefined): string {
@@ -419,7 +419,7 @@ function Inner({ slug }: { slug: string }) {
               <Eyebrow color={race.primary}>YÜKSELTME</Eyebrow>
               <Caption style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55 }}>
                 {owned
-                  ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(1.5, owned.level)).toLocaleString('tr-TR')} ${race.resourceA.name} + ${Math.round(costB * Math.pow(1.5, owned.level)).toLocaleString('tr-TR')} ${race.resourceB.name} ile yükseltebilirsin.`
+                  ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceA.name} + ${Math.round(costB * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceB.name} ile yükseltebilirsin.`
                   : 'Bu slot henüz inşa edilmemiş. Önce yapımı başlat, sonra seviyeleri buradan görürsün.'}
               </Caption>
               <div style={{ marginTop: 12 }}>

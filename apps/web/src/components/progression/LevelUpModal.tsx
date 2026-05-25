@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import '@/styles/progression.css';
 import { LevelUpPayload, UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
@@ -25,7 +25,7 @@ export function LevelUpModal({ payload, onClose }: LevelUpModalProps) {
         {(rewards.gold || rewards.gems || rewards.title || rewards.badge) && (
           <div className="level-up-rewards">
             {rewards.gold && (
-              <span className="reward-chip gold">+{rewards.gold.toLocaleString('tr-TR')} Altın</span>
+              <span className="reward-chip gold">+{rewards.gold.toLocaleString()} Altın</span>
             )}
             {rewards.gems && (
               <span className="reward-chip gems">+{rewards.gems} Gem</span>

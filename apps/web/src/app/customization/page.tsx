@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -1023,7 +1023,7 @@ export default function CustomizationPage() {
               <Chip color={race.primary}>KOZMETİK</Chip>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ResPill kind="crystal" value={balance === null ? '—' : balance.toLocaleString('tr-TR')} accent={ND.warn} />
+              <ResPill kind="crystal" value={balance === null ? '—' : balance.toLocaleString()} accent={ND.warn} />
               <Sigil race={race} size={20} />
             </div>
           </header>

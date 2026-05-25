@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import '@/styles/progression.css';
 import clsx from 'clsx';
@@ -40,11 +40,11 @@ export function XpProgressBar({ currentXp, xpToNext, progressPercent, tier, isMa
         />
       </div>
       <div className="xp-bar-labels">
-        <span>{currentXp.toLocaleString('tr-TR')} XP</span>
+        <span>{currentXp.toLocaleString()} XP</span>
         {isMaxLevel ? (
           <span>MAX SEVİYE</span>
         ) : (
-          <span>{xpToNext?.toLocaleString('tr-TR')} XP gerekli</span>
+          <span>{xpToNext?.toLocaleString()} XP gerekli</span>
         )}
       </div>
     </div>

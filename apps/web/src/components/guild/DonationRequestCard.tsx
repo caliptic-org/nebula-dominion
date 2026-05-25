@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import clsx from 'clsx'
@@ -82,7 +82,7 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
             {request.requesterName}{isOwn && ' (Sen)'}
           </h3>
           <p className="text-text-secondary text-xs">
-            <span className="font-mono tabular-nums">{request.amount.toLocaleString('tr-TR')}</span>{' '}
+            <span className="font-mono tabular-nums">{request.amount.toLocaleString()}</span>{' '}
             {resourceLabel(request.resource)} talep ediyor
           </p>
         </div>
@@ -116,8 +116,8 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
           />
         </div>
         <div className="flex justify-between text-[10px] text-text-muted font-mono mt-1 tabular-nums">
-          <span>{fulfilled.toLocaleString('tr-TR')} karşılandı</span>
-          <span>{remaining.toLocaleString('tr-TR')} kalan</span>
+          <span>{fulfilled.toLocaleString()} karşılandı</span>
+          <span>{remaining.toLocaleString()} kalan</span>
         </div>
       </div>
 
@@ -167,7 +167,7 @@ export function DonationRequestCard({ request, isOwn, cooldownUntil, donatesRema
             className="form-input text-sm"
           />
           <p className="text-[11px] text-text-muted">
-            {pendingAmount.toLocaleString('tr-TR')} {resourceLabel(request.resource)} → {request.requesterName}
+            {pendingAmount.toLocaleString()} {resourceLabel(request.resource)} → {request.requesterName}
           </p>
           {error && (
             <p className="text-[11px] text-status-danger" role="alert">

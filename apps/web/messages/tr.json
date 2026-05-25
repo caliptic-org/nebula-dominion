@@ -14,7 +14,12 @@
     "edit": "Düzenle",
     "yes": "Evet",
     "no": "Hayır",
-    "skip": "Atla"
+    "skip": "Atla",
+    "loginRequired": "Giriş yapmalısın",
+    "comingSoon": "Yakında",
+    "unknownError": "Bilinmeyen hata",
+    "clipboardCopied": "Link panoya kopyalandı",
+    "clipboardDenied": "Pano erişimi reddedildi"
   },
   "auth": {
     "login": {
@@ -27,7 +32,8 @@
       "noAccount": "Henüz hesabın yok mu?",
       "registerLink": "Kaydol",
       "errorInvalid": "Geçersiz bilgiler. Tekrar dene.",
-      "errorGeneric": "Giriş başarısız. Tekrar dene."
+      "errorGeneric": "Giriş başarısız. Tekrar dene.",
+      "forgotPasswordHint": "Şifre kurtarma yakında — şimdilik destek@nebula.com ile iletişime geç"
     },
     "register": {
       "title": "Kayıt Ol",
@@ -186,5 +192,33 @@
     "sessionExpired": "Oturumun sona erdi. Tekrar giriş yap.",
     "notFound": "Bilinmeyen Sektör",
     "notFoundDescription": "Aradığın koordinat galaksinin haritalanmamış bölgesinde."
+  },
+  "events": {
+    "alreadyJoined": "Zaten bu etkinliğe katıldın.",
+    "joinSuccess": "Etkinliğe katıldın! 🎉",
+    "shareHint": "Bu etkinliği arkadaşlarınla paylaş",
+    "copyLink": "Linki Kopyala"
+  },
+  "alliance": {
+    "warSoonHint": "Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil"
+  },
+  "missions": {
+    "alreadyClaimed": "Bu görevin ödülü zaten alınmış."
+  },
+  "inventory": {
+    "trainFirst": "Önce o tür birim eğit"
+  },
+  "tutorial": {
+    "giftClaimed": "Başlangıç hediyesi alındı: +500 mineral · +25 kristal · +200 XP",
+    "giftFailed": "Hediye verilemedi — /base sayfasından devam edebilirsin"
+  },
+  "merge": {
+    "previewModeHint": "Önizleme modunda gerçek birleştirme yapılamaz — önce birim eğit."
+  },
+  "shop": {
+    "vipRewardClaimed": "Günlük VIP ödülü alındı: +50 Kristal, +200 XP",
+    "premiumActivated": "Premium Geçiş aktif edildi",
+    "rewardFailed": "Ödül alma başarısız",
+    "premiumFailed": "Premium satın alımı başarısız"
   }
 }

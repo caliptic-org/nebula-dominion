@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
@@ -231,7 +231,7 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
             }}
             aria-label="Üs durumu (canlı)"
           >
-            ◆ {liveBase.name} · Sv.{liveBase.level} · {liveBase.power.toLocaleString('tr-TR')} GÜÇ
+            ◆ {liveBase.name} · Sv.{liveBase.level} · {liveBase.power.toLocaleString()} GÜÇ
           </div>
         )}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -880,7 +880,7 @@ function NodeDetailPanel({
           gap: 6,
         }}
       >
-        <Stat label="Güç" value={node.power.toLocaleString('tr-TR')} accent={c} />
+        <Stat label="Güç" value={node.power.toLocaleString()} accent={c} />
         <Stat label="Seviye" value={node.level} accent={c} />
         <Stat label="Sektör" value="S-9" accent={ND.textDim} />
       </div>

@@ -14,7 +14,12 @@
     "edit": "Edit",
     "yes": "Yes",
     "no": "No",
-    "skip": "Skip"
+    "skip": "Skip",
+    "loginRequired": "Login required",
+    "comingSoon": "Coming soon",
+    "unknownError": "Unknown error",
+    "clipboardCopied": "Link copied to clipboard",
+    "clipboardDenied": "Clipboard access denied"
   },
   "auth": {
     "login": {
@@ -27,7 +32,8 @@
       "noAccount": "No account yet?",
       "registerLink": "Sign up",
       "errorInvalid": "Invalid credentials. Try again.",
-      "errorGeneric": "Login failed. Try again."
+      "errorGeneric": "Login failed. Try again.",
+      "forgotPasswordHint": "Password recovery coming soon — contact support@nebula.com for now"
     },
     "register": {
       "title": "Sign Up",
@@ -186,5 +192,33 @@
     "sessionExpired": "Your session expired. Please log in again.",
     "notFound": "Unknown sector",
     "notFoundDescription": "The coordinates you sought are in an unmapped region of the galaxy."
+  },
+  "events": {
+    "alreadyJoined": "You've already joined this event.",
+    "joinSuccess": "You joined the event! 🎉",
+    "shareHint": "Share this event with friends",
+    "copyLink": "Copy Link"
+  },
+  "alliance": {
+    "warSoonHint": "War declaration coming soon — diplomatic channels not yet open"
+  },
+  "missions": {
+    "alreadyClaimed": "This mission's reward has already been claimed."
+  },
+  "inventory": {
+    "trainFirst": "Train that unit type first"
+  },
+  "tutorial": {
+    "giftClaimed": "Starter gift received: +500 mineral · +25 crystal · +200 XP",
+    "giftFailed": "Gift failed — continue from /base"
+  },
+  "merge": {
+    "previewModeHint": "Can't merge in preview mode — train units first."
+  },
+  "shop": {
+    "vipRewardClaimed": "Daily VIP reward claimed: +50 Crystal, +200 XP",
+    "premiumActivated": "Premium Pass activated",
+    "rewardFailed": "Reward claim failed",
+    "premiumFailed": "Premium purchase failed"
   }
 }

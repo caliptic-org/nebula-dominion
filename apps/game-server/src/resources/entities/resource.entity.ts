@@ -16,13 +16,21 @@ export class Resource {
   @Index()
   playerId: string;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 100 })
+  /* Starter grants — sized to comfortably afford the first 4 buildings:
+   *   mineral_extractor (50/0/20) + gas_refinery (75/0/30) +
+   *   solar_plant (60/20/0) + barracks (150/50/40)
+   *   = 335 mineral / 70 gas / 90 energy required.
+   * The buffer leaves room for a second extractor + a tier-1 unit train.
+   * Was previously 100/50/100 which trapped new players who needed
+   * 150 mineral + 50 gas to even build a barracks — chicken-and-egg
+   * since nothing trickles passively before the first building lands. */
+  @Column({ type: 'numeric', precision: 12, scale: 4, default: 500 })
   mineral: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 50 })
+  @Column({ type: 'numeric', precision: 12, scale: 4, default: 200 })
   gas: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 100 })
+  @Column({ type: 'numeric', precision: 12, scale: 4, default: 250 })
   energy: number;
 
   @Column({ type: 'numeric', precision: 12, scale: 4, default: 0 })

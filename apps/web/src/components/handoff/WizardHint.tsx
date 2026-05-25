@@ -16,53 +16,70 @@ import { ND } from './nd-tokens';
  * other page where you want first-time guidance — the hook caches its
  * derivation per render cycle so multiple mounts are cheap.
  *
- * Two states:
- *   - collapsed: 1-line chip "🎯 Sonraki Adım: <title> →" (default)
- *   - expanded: chip + description paragraph + CTA + dismiss/hide buttons
+ * Three states:
+ *   - icon (default): a small ✦ pulse in the bottom-right (~40px) so the
+ *     hint is discoverable without dominating the /base view.  The pulse
+ *     animation calls attention to it without being aggressive.
+ *   - chip (on hover or first focus): expands to "Sonraki Adım: <title> →"
+ *   - panel (on click): full description + CTA + dismiss/hide buttons
  */
 export function WizardHint() {
   const race = useNDRace();
   const router = useRouter();
   const { step, route, dismissStep, dismissAll, hiddenForever } = useWizardStep();
-  const [expanded, setExpanded] = useState(false);
+  // `panelOpen` = full panel with description + CTA.  Hover-derived chip
+  // state lives in CSS via :hover so it doesn't fight with focus management.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   // Nothing to show — wizard either finished or user opted out.
   if (!step || !route || hiddenForever) return null;
 
   const accent = race.primary;
+  // Chip mode = hovered OR panelOpen (so the chip stays visible behind
+  // the panel while it's expanded).
+  const showChip = hovered || panelOpen;
 
   return (
     <div
       role="complementary"
       aria-label="Sonraki adım rehberi"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: 'fixed',
         right: 12,
-        // Sits above the bottom nav (which is ~64px tall) with a little gap.
         bottom: 80,
         zIndex: 50,
-        maxWidth: expanded ? 320 : 280,
+        // Width grows from icon (40px) → chip (~260px) → panel (320px).
+        // The transition makes the discovery feel intentional rather
+        // than jarring.
+        width: panelOpen ? 320 : showChip ? 260 : 40,
         background: 'rgba(8, 12, 26, 0.92)',
         border: `1px solid ${accent}66`,
-        borderRadius: 8,
+        borderRadius: showChip ? 8 : 20,
         boxShadow: `0 0 18px -4px ${race.glow}aa, inset 0 1px 0 rgba(255,255,255,0.04)`,
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         overflow: 'hidden',
-        transition: 'max-width 180ms ease',
+        transition: 'width 220ms ease, border-radius 220ms ease',
       }}
     >
-      {/* Header row — always visible, click toggles expand */}
+      {/* Header row — always visible, click toggles panel */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
+        onClick={() => setPanelOpen((v) => !v)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
+        aria-expanded={panelOpen}
+        aria-label={showChip ? undefined : `Sonraki adım: ${step.title}`}
+        title={showChip ? undefined : step.title}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 8,
           width: '100%',
-          padding: '8px 12px',
+          padding: showChip ? '8px 12px' : '8px',
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
@@ -76,50 +93,60 @@ export function WizardHint() {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 22,
-            height: 22,
+            width: 24,
+            height: 24,
+            flexShrink: 0,
             borderRadius: 4,
             background: `${accent}33`,
             color: accent,
-            fontSize: 12,
+            fontSize: 13,
+            // Soft pulse to advertise interactivity when collapsed; freezes
+            // once the player engages so the panel doesn't shimmer.
+            animation: showChip ? 'none' : 'nd-wizard-pulse 2200ms ease-in-out infinite',
           }}
         >
           ✦
         </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontFamily: ND.mono,
-              fontSize: 8,
-              letterSpacing: '0.18em',
-              color: accent,
-              textTransform: 'uppercase',
-              lineHeight: 1,
-            }}
-          >
-            Sonraki Adım
-          </div>
-          <div
-            style={{
-              fontFamily: ND.display,
-              fontSize: 12,
-              color: ND.text,
-              marginTop: 2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {step.title}
-          </div>
-        </div>
-        <span aria-hidden style={{ color: ND.textDim, fontFamily: ND.mono, fontSize: 14 }}>
-          {expanded ? '▾' : '▸'}
-        </span>
+        {/* Text only renders in chip/panel mode — kept mounted but width-
+         *  collapsed so the icon doesn't shift when the chip opens. */}
+        {showChip && (
+          <>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: ND.mono,
+                  fontSize: 8,
+                  letterSpacing: '0.18em',
+                  color: accent,
+                  textTransform: 'uppercase',
+                  lineHeight: 1,
+                }}
+              >
+                Sonraki Adım
+              </div>
+              <div
+                style={{
+                  fontFamily: ND.display,
+                  fontSize: 12,
+                  color: ND.text,
+                  marginTop: 2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {step.title}
+              </div>
+            </div>
+            <span aria-hidden style={{ color: ND.textDim, fontFamily: ND.mono, fontSize: 14 }}>
+              {panelOpen ? '▾' : '▸'}
+            </span>
+          </>
+        )}
       </button>
 
       {/* Expanded body — description + actions */}
-      {expanded && (
+      {panelOpen && (
         <div
           style={{
             borderTop: `1px solid ${ND.border}`,
@@ -145,7 +172,7 @@ export function WizardHint() {
             <button
               type="button"
               onClick={() => {
-                setExpanded(false);
+                setPanelOpen(false);
                 router.push(route);
               }}
               style={{
@@ -169,7 +196,7 @@ export function WizardHint() {
               type="button"
               onClick={() => {
                 dismissStep(step.id);
-                setExpanded(false);
+                setPanelOpen(false);
               }}
               title="Bu adımı geç"
               style={{
@@ -207,6 +234,11 @@ export function WizardHint() {
           </button>
         </div>
       )}
+
+      {/* Pulse keyframes — scoped via <style> so the component remains
+       *  self-contained. Lives once at the root since style+keyframes are
+       *  process-wide; mounting twice is fine (browser dedupes the rule). */}
+      <style>{`@keyframes nd-wizard-pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.12); opacity: 0.85 } }`}</style>
     </div>
   );
 }

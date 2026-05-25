@@ -75,6 +75,11 @@ function BuildMenuInner() {
   const hud = useHudState();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  // 1-second ticker used by the construction-countdown rendering. Bound to
+  // a useState/useEffect pair so React re-renders the build button every
+  // second while a building is mid-construction. The ticker only mounts
+  // when there's actually an in-flight construction (see effect below).
+  const [, setNowTick] = useState(0);
 
   // Live tier progress — same pipe /base uses. Drives the catalog tier level
   // (HUD now sources from useHudState above). Falls back to mock when there's
@@ -119,6 +124,42 @@ function BuildMenuInner() {
   }, [focusSlug, race]);
 
   const selected = catalog.find((c) => c.name === selectedName) ?? catalog[0];
+
+  // If the player already has an in-flight construction of the selected
+  // building type, pull the row so the CTA can render a live countdown
+  // ("İNŞA · 0:42") instead of generic "İNŞA BAŞLAT". The button stays
+  // disabled while constructing — most building types have maxPerPlayer
+  // === 1 and the backend rejects a second POST while one is pending.
+  const selectedConstructing = useMemo(() => {
+    if (!liveBuildings || !selected?.backendType) return null;
+    return (
+      liveBuildings.find(
+        (b) =>
+          b.type === selected.backendType &&
+          b.status === 'constructing' &&
+          b.constructionCompleteAt,
+      ) ?? null
+    );
+  }, [liveBuildings, selected]);
+
+  // 1-second ticker only while a countdown is showing — prevents wasted
+  // re-renders on the catalog when nothing is constructing.
+  useEffect(() => {
+    if (!selectedConstructing) return;
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [selectedConstructing]);
+
+  // MM:SS remaining until completion. Clamps to 0 so a finished-but-not-
+  // yet-polled row reads "0:00" instead of negative seconds.
+  function fmtRemaining(completeAt: string | null): string {
+    if (!completeAt) return '0:00';
+    const ms = new Date(completeAt).getTime() - Date.now();
+    const sec = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
 
   const [busy, setBusy] = useState(false);
   async function handleStartBuild() {
@@ -350,14 +391,18 @@ function BuildMenuInner() {
                 race={race}
                 size="md"
                 style={{ flex: 2 }}
-                disabled={(selected?.locked ?? false) || busy}
+                disabled={
+                  (selected?.locked ?? false) || busy || !!selectedConstructing
+                }
                 onClick={handleStartBuild}
               >
-                {busy
-                  ? 'GÖNDERİLİYOR…'
-                  : selected
-                    ? `${lex.actionVerb} BAŞLAT · ${selected.name}`
-                    : `${lex.actionVerb} BAŞLAT`}
+                {selectedConstructing
+                  ? `İNŞA · ${fmtRemaining(selectedConstructing.constructionCompleteAt)}`
+                  : busy
+                    ? 'GÖNDERİLİYOR…'
+                    : selected
+                      ? `${lex.actionVerb} BAŞLAT · ${selected.name}`
+                      : `${lex.actionVerb} BAŞLAT`}
               </NDButton>
             </div>
           </div>

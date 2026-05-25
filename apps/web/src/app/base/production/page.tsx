@@ -335,7 +335,13 @@ export default function ProductionPage() {
       data-race={race.key}
       style={{
         position: 'relative',
-        minHeight: '100dvh',
+        // Was `minHeight: 100dvh` which let the outer grow taller than the
+        // viewport when the unit-list flex: 1 expanded — and the bottom
+        // CTA + BottomNav ended up below the fold. `height: 100dvh` plus
+        // `overflow: hidden` locks the column to the viewport so the
+        // unit-list scrolls internally and the CTA/BottomNav stay visible.
+        height: '100dvh',
+        overflow: 'hidden',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,
@@ -345,7 +351,7 @@ export default function ProductionPage() {
     >
       <NebulaBg race={race} intensity={0.7} dim={0.6} />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Back strip */}
         <div style={{
           display: 'flex',
@@ -592,12 +598,14 @@ export default function ProductionPage() {
           })}
         </div>
 
-        {/* Bottom CTA */}
+        {/* Bottom CTA — flexShrink: 0 keeps it visible even when the
+          *  parent column gets squeezed on short viewports. */}
         <div style={{
           padding: '10px 14px',
           background: 'rgba(8,10,16,0.92)',
           borderTop: `1px solid ${ND.border}`,
           backdropFilter: 'blur(12px)',
+          flexShrink: 0,
         }}>
           <NDButton
             race={race}

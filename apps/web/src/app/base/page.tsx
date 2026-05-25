@@ -29,8 +29,9 @@ import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useBaseState } from '@/hooks/useBaseState';
-import { useGameBuildings, indexBuildingsByType } from '@/hooks/useGameBuildings';
+import { useGameBuildings, indexBuildingsByType, type PlayerBuildingDto } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
+import type { NDRaceLex } from '@/components/handoff/race-lex';
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base: '/base',
@@ -351,100 +352,24 @@ export default function BaseHomePage() {
             />
           </div>
 
-          {/* selected building card bottom */}
-          <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
-            <Panel race={race} glow style={{ padding: 10 }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div
-                  aria-hidden
-                  style={{
-                    width: 64,
-                    height: 64,
-                    flexShrink: 0,
-                    background: `linear-gradient(180deg, ${race.primary}22, transparent)`,
-                    border: `1px dashed ${race.primary}66`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Sigil race={race} size={36} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <H3 style={{ color: ND.text, fontSize: 12 }}>
-                      {focusedBuilding.n.toUpperCase()}
-                    </H3>
-                    {/* When the player owns this slot, replace the static
-                     *  KİLİTLİ/AKTİF chip with the live status from
-                     *  /api/buildings (constructing / active / destroyed).
-                     *  Includes the real level so "Lv N" is visible. */}
-                    <Chip
-                      color={
-                        focusedBuilding.locked
-                          ? ND.textMute
-                          : focusedLiveBuilding?.status === 'constructing'
-                            ? ND.warn
-                            : race.primary
-                      }
-                    >
-                      {focusedBuilding.locked
-                        ? 'KİLİTLİ'
-                        : focusedLiveBuilding
-                          ? focusedLiveBuilding.status === 'constructing'
-                            ? 'İNŞA EDİLİYOR'
-                            : `AKTİF · Lv ${focusedLiveBuilding.level}`
-                          : 'YAPILMAMIŞ'}
-                    </Chip>
-                  </div>
-                  <Caption style={{ fontSize: 11, marginTop: 2 }}>
-                    {focusedBuilding.locked ? focusedBuilding.t : race.capitalDescription}
-                  </Caption>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    {/* İnşa Et → catalog (full build list, pre-focused). */}
-                    <Link
-                      href={`/base/build${
-                        focusedBuilding.slug ? `?focus=${focusedBuilding.slug}` : ''
-                      }`}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <NDButton race={race} variant="outline" size="sm">
-                        {lex.actionVerb}
-                      </NDButton>
-                    </Link>
-                    {/* DETAY → single-building detail page (image, stats,
-                     *  tabs, upgrade actions). Falls back to /base/build
-                     *  when the slot has no slug (locked / placeholder). */}
-                    <Link
-                      href={
-                        focusedBuilding.slug
-                          ? `/base/building/${focusedBuilding.slug}`
-                          : '/base/build'
-                      }
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <NDButton race={race} variant="ghost" size="sm">
-                        DETAY
-                      </NDButton>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              {/* Building selector strip — bottom of card */}
-              <BuildingSelector
-                race={race}
-                focusedIdx={focusedIdx}
-                onSelect={setFocusedIdx}
-              />
-            </Panel>
-          </div>
+          {/* Selected-building card.  Has two states:
+            *   - collapsed (default): mini chip in bottom-left ~160px wide,
+            *     showing the building sigil + name. Keeps the iso field
+            *     fully visible.
+            *   - expanded (hover OR tap): full card with status chip,
+            *     description, İNŞA / DETAY buttons, and the building
+            *     selector strip.
+            *   The hover trigger uses pointer events so touch devices
+            *     promote to tap-to-toggle naturally — `cardOpen` state
+            *     stays true after tap and clears on second tap. */}
+          <BuildingCard
+            race={race}
+            lex={lex}
+            focusedBuilding={focusedBuilding}
+            focusedLiveBuilding={focusedLiveBuilding}
+            focusedIdx={focusedIdx}
+            setFocusedIdx={setFocusedIdx}
+          />
         </div>
 
         <BottomNav
@@ -516,6 +441,240 @@ function BuildingSelector({ race, focusedIdx, onSelect }: BuildingSelectorProps)
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/* ── Building card with collapse-on-mouseout behavior ──────────────────── */
+
+interface BuildingCardProps {
+  race: NDRace;
+  lex: NDRaceLex;
+  focusedBuilding: NDRace['buildings'][number];
+  focusedLiveBuilding: PlayerBuildingDto | null;
+  focusedIdx: number;
+  setFocusedIdx: (idx: number) => void;
+}
+
+/**
+ * Two-state focused-building card:
+ *
+ *   - collapsed (default): a ~180px chip in the bottom-left showing only
+ *     the building sigil + name + tiny status dot.  Keeps the iso field
+ *     fully visible behind it so the player can navigate the map
+ *     without the card eating half the screen.
+ *
+ *   - expanded (on hover OR tap): the original full card with status
+ *     chip, description, İNŞA / DETAY buttons, and the building selector
+ *     strip below.
+ *
+ * Hover-based via pointer events; touch devices promote to tap-to-toggle
+ * naturally — `expanded` state stays true after a tap and clears on a
+ * second tap or when the player taps outside the card.
+ */
+function BuildingCard({
+  race,
+  lex,
+  focusedBuilding,
+  focusedLiveBuilding,
+  focusedIdx,
+  setFocusedIdx,
+}: BuildingCardProps) {
+  const [hovered, setHovered] = useState(false);
+  const [tapToggled, setTapToggled] = useState(false);
+  const expanded = hovered || tapToggled;
+
+  const statusColor = focusedBuilding.locked
+    ? ND.textMute
+    : focusedLiveBuilding?.status === 'constructing'
+      ? ND.warn
+      : race.primary;
+
+  const statusLabel = focusedBuilding.locked
+    ? 'KİLİTLİ'
+    : focusedLiveBuilding
+      ? focusedLiveBuilding.status === 'constructing'
+        ? 'İNŞA EDİLİYOR'
+        : `AKTİF · Lv ${focusedLiveBuilding.level}`
+      : 'YAPILMAMIŞ';
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 12,
+        // In collapsed mode we anchor to the LEFT only (auto-width chip).
+        // In expanded mode we stretch full-width as before so the existing
+        // two-column layout has room to breathe.
+        left: 12,
+        right: expanded ? 12 : 'auto',
+        transition: 'right 220ms ease',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {expanded ? (
+        <Panel race={race} glow style={{ padding: 10 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div
+              aria-hidden
+              style={{
+                width: 64,
+                height: 64,
+                flexShrink: 0,
+                background: `linear-gradient(180deg, ${race.primary}22, transparent)`,
+                border: `1px dashed ${race.primary}66`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Sigil race={race} size={36} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <H3 style={{ color: ND.text, fontSize: 12 }}>
+                  {focusedBuilding.n.toUpperCase()}
+                </H3>
+                <Chip color={statusColor}>{statusLabel}</Chip>
+              </div>
+              <Caption style={{ fontSize: 11, marginTop: 2 }}>
+                {focusedBuilding.locked ? focusedBuilding.t : race.capitalDescription}
+              </Caption>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <Link
+                  href={`/base/build${
+                    focusedBuilding.slug ? `?focus=${focusedBuilding.slug}` : ''
+                  }`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <NDButton race={race} variant="outline" size="sm">
+                    {lex.actionVerb}
+                  </NDButton>
+                </Link>
+                <Link
+                  href={
+                    focusedBuilding.slug
+                      ? `/base/building/${focusedBuilding.slug}`
+                      : '/base/build'
+                  }
+                  style={{ textDecoration: 'none' }}
+                >
+                  <NDButton race={race} variant="ghost" size="sm">
+                    DETAY
+                  </NDButton>
+                </Link>
+                {/* Explicit collapse button so tap-to-expand users have a
+                 *  clear way back to the compact view. Hover users can
+                 *  just move the cursor away. */}
+                <button
+                  type="button"
+                  aria-label="Kartı küçült"
+                  onClick={() => {
+                    setTapToggled(false);
+                    setHovered(false);
+                  }}
+                  style={{
+                    marginLeft: 'auto',
+                    background: 'transparent',
+                    border: `1px solid ${ND.border}`,
+                    color: ND.textDim,
+                    fontFamily: ND.mono,
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    borderRadius: 3,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+          <BuildingSelector
+            race={race}
+            focusedIdx={focusedIdx}
+            onSelect={setFocusedIdx}
+          />
+        </Panel>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setTapToggled(true)}
+          aria-label={`${focusedBuilding.n} kartını aç`}
+          title={statusLabel}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px 8px 8px',
+            background: 'rgba(8, 12, 26, 0.78)',
+            border: `1px solid ${race.primary}66`,
+            borderRadius: 8,
+            boxShadow: `0 0 14px -4px ${race.glow}99`,
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+            color: ND.text,
+            fontFamily: ND.display,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              background: `${race.primary}22`,
+              border: `1px dashed ${race.primary}66`,
+              flexShrink: 0,
+            }}
+          >
+            <Sigil race={race} size={18} />
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              lineHeight: 1.1,
+              maxWidth: 140,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 140,
+              }}
+            >
+              {focusedBuilding.n}
+            </span>
+            <span
+              style={{
+                fontFamily: ND.mono,
+                fontSize: 8,
+                letterSpacing: '0.12em',
+                color: statusColor,
+                marginTop: 2,
+              }}
+            >
+              ● {statusLabel}
+            </span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }

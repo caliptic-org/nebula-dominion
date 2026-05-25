@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Caption,
   Chip,
@@ -114,6 +115,7 @@ function RaceCard({ race, selected, onSelect }: RaceCardProps) {
 }
 
 export function RaceSelectClient() {
+  const t = useTranslations('races');
   const router = useRouter();
   const { committed, commit } = useRaceCommitment();
   const [selectedKey, setSelectedKey] = useState<NDRaceKey>(
@@ -210,9 +212,9 @@ export function RaceSelectClient() {
           <Eyebrow color={selected.primary} style={{ marginBottom: 6 }}>
             I. KOZMİK YANKI / İLK AŞAMA
           </Eyebrow>
-          <H2 style={{ color: ND.text }}>IRKINI SEÇ</H2>
+          <H2 style={{ color: ND.text }}>{t('selectTitle')}</H2>
           <Caption style={{ marginTop: 6, color: ND.textDim }}>
-            Bu seçim kalıcıdır. Beş yorum, beş yol.
+            {t('selectSubtitle')}
           </Caption>
         </header>
 

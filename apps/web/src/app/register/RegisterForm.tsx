@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, ReactNode, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Caption,
   Eyebrow,
@@ -76,6 +77,7 @@ type FieldName = 'username' | 'email' | 'password' | 'confirmPassword';
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 export function RegisterForm() {
+  const t = useTranslations('auth.register');
   const race = useNDRace('insan');
   const copy = COPY[race.key];
   const fields = FIELD_DEFS[race.key];
@@ -111,7 +113,7 @@ export function RegisterForm() {
         if (v.password.length < 8) return 'Şifre en az 8 karakter olmalı';
         return null;
       case 'confirmPassword':
-        if (v.password !== v.confirmPassword) return 'Şifreler eşleşmiyor';
+        if (v.password !== v.confirmPassword) return t('errorMismatch');
         return null;
     }
   }
@@ -195,7 +197,7 @@ export function RegisterForm() {
           } else if (msg.includes('username') || msg.includes('kullanıcı')) {
             setFieldErrors((errs) => ({
               ...errs,
-              username: 'Bu kullanıcı adı zaten alınmış',
+              username: t('errorTaken'),
             }));
           } else {
             // Server replied 409 without specifying which field — show on
@@ -204,13 +206,13 @@ export function RegisterForm() {
           }
           return;
         }
-        throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
+        throw new Error(data.message ?? t('errorGeneric'));
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
       router.push('/race-select');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
+      setError(err instanceof Error ? err.message : t('errorGeneric'));
     } finally {
       setIsLoading(false);
     }
@@ -380,7 +382,7 @@ export function RegisterForm() {
             href="/login"
             style={{ color: race.primary, fontFamily: ND.display, textDecoration: 'none', letterSpacing: '0.08em' }}
           >
-            Giriş yap →
+            {t('loginLink')} →
           </Link>
         </Caption>
       </div>

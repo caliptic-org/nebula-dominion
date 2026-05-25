@@ -3,6 +3,7 @@
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import {
   ND,
   Sigil,
@@ -63,11 +64,7 @@ const GRAPHICS_OPTIONS: { value: GraphicsQuality; label: string; hint: string }[
 
 const LANGUAGE_OPTIONS: { value: Language; label: string; hint?: string; disabled?: boolean }[] = [
   { value: 'tr', label: 'Türkçe' },
-  // EN locale is gated until next-intl wiring (Faz 5.2-5.4) lands.  The
-  // option used to toggle persistence-only and the UI stayed Turkish —
-  // toggling appeared to do nothing.  Mark as disabled + "yakında" so the
-  // expectation matches reality. Re-enable once string extraction ships.
-  { value: 'en', label: 'English', hint: 'yakında', disabled: true },
+  { value: 'en', label: 'English' },
 ];
 
 function loadSettings(): SettingsState {
@@ -96,6 +93,8 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 };
 
 export function SettingsClient() {
+  const t = useTranslations('settings');
+  const currentLocale = useLocale();
   const race = useNDRace();
   const router = useRouter();
   const { tweaks, setTweak, reset: resetTweaks } = useNDTweaks();
@@ -114,8 +113,8 @@ export function SettingsClient() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       setSavedFlash(true);
-      const t = setTimeout(() => setSavedFlash(false), 1800);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setSavedFlash(false), 1800);
+      return () => clearTimeout(timer);
     } catch {
       /* storage unavailable */
     }
@@ -140,6 +139,12 @@ export function SettingsClient() {
     }
   }
 
+  function switchLocale(lang: Language) {
+    setSettings(s => ({ ...s, language: lang }));
+    document.cookie = `NEXT_LOCALE=${lang}; path=/; max-age=31536000`;
+    router.refresh();
+  }
+
   return (
     <Screen race={race} style={{ height: '100dvh' }}>
       <header
@@ -156,7 +161,7 @@ export function SettingsClient() {
         <Sigil race={race} size={28} glow />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Eyebrow color={race.primary}>SİSTEM</Eyebrow>
-          <H2 style={{ marginTop: 2 }}>AYARLAR</H2>
+          <H2 style={{ marginTop: 2 }}>{t('title')}</H2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {savedFlash && <Chip color={ND.ok}>KAYDEDİLDİ</Chip>}
@@ -168,6 +173,14 @@ export function SettingsClient() {
       <nav role="tablist" aria-label="Bölümler" style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '12px 16px 0' }}>
         {SECTIONS.map(s => {
           const on = activeSection === s.id;
+          const sectionLabel: Record<SectionId, string> = {
+            tweaks: s.label,
+            audio: t('audio'),
+            graphics: t('graphics'),
+            language: t('language'),
+            notifications: t('notifications'),
+            account: t('account'),
+          };
           return (
             <button
               key={s.id}
@@ -177,7 +190,7 @@ export function SettingsClient() {
               onClick={() => scrollToSection(s.id)}
               style={pillStyle(on, race)}
             >
-              {s.label}
+              {sectionLabel[s.id]}
             </button>
           );
         })}
@@ -217,7 +230,7 @@ export function SettingsClient() {
         </Section>
 
         {/* Audio */}
-        <Section id="audio" title="Ses" hint="Müzik, ses efektleri ve seviye" race={race}>
+        <Section id="audio" title={t('audio')} hint="Müzik, ses efektleri ve seviye" race={race}>
           <Toggle
             label="Sessiz Mod"
             description="Tüm sesleri kapatır."
@@ -232,7 +245,7 @@ export function SettingsClient() {
         </Section>
 
         {/* Graphics */}
-        <Section id="graphics" title="Grafik" hint="Performans ve görsel kalite" race={race}>
+        <Section id="graphics" title={t('graphics')} hint="Performans ve görsel kalite" race={race}>
           <SegmentChoice
             options={GRAPHICS_OPTIONS}
             value={settings.graphics.quality}
@@ -242,17 +255,17 @@ export function SettingsClient() {
         </Section>
 
         {/* Language */}
-        <Section id="language" title="Dil" hint="Arayüz dili" race={race}>
+        <Section id="language" title={t('language')} hint={t('languageHint')} race={race}>
           <SegmentChoice
             options={LANGUAGE_OPTIONS}
-            value={settings.language}
-            onChange={lang => setSettings(s => ({ ...s, language: lang }))}
+            value={currentLocale as Language}
+            onChange={switchLocale}
             race={race}
           />
         </Section>
 
         {/* Notifications */}
-        <Section id="notifications" title="Bildirimler" hint="Uyarı tercihleri" race={race}>
+        <Section id="notifications" title={t('notifications')} hint="Uyarı tercihleri" race={race}>
           <Toggle label="Push Bildirim"   description="Tarayıcı push bildirimi al."   value={settings.notifications.push}        onChange={v => patchNotifications({ push: v })} race={race} />
           <Divider race={race} />
           <Toggle label="Bildirim Sesi"   description="Yeni bildirimde kısa ses çal." value={settings.notifications.sound}        onChange={v => patchNotifications({ sound: v })} race={race} disabled={!settings.notifications.push} />
@@ -261,7 +274,7 @@ export function SettingsClient() {
         </Section>
 
         {/* Account */}
-        <Section id="account" title="Hesap" hint="Profil bilgileri ve oturum" race={race}>
+        <Section id="account" title={t('account')} hint="Profil bilgileri ve oturum" race={race}>
           <AccountSection race={race} />
         </Section>
 

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Caption,
   Code,
@@ -70,6 +71,8 @@ function buildScenes(race: NDRace): string[] {
 }
 
 export function RaceConfirmClient() {
+  const t = useTranslations('races');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const search = useSearchParams();
   const queryRace = search.get('race');
@@ -267,10 +270,10 @@ export function RaceConfirmClient() {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <NDButton race={race} variant="ghost" size="md" onClick={finish} style={{ flex: 1 }}>
-            ATLA
+            {tCommon('skip')}
           </NDButton>
           <NDButton race={race} size="md" onClick={next} style={{ flex: 2 }}>
-            {isFinalScene ? FINISH_CTA[resolvedKey] : 'DEVAM ›'}
+            {isFinalScene ? FINISH_CTA[resolvedKey] : `${t('confirmContinue')} ›`}
           </NDButton>
         </div>
       </main>

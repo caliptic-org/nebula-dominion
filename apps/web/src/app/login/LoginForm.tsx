@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Caption,
   Code,
@@ -122,6 +123,7 @@ function CornerHUD({ race }: { race: NDRace }) {
 }
 
 export function LoginForm() {
+  const t = useTranslations('auth.login');
   const race = useNDRace('insan');
   const copy = LOGIN_COPY[race.key];
   const router = useRouter();
@@ -162,7 +164,7 @@ export function LoginForm() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(data.message ?? 'Giriş başarısız. Tekrar dene.');
+        throw new Error(data.message ?? t('errorGeneric'));
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
@@ -178,7 +180,7 @@ export function LoginForm() {
         router.push(dest);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
+      setError(err instanceof Error ? err.message : t('errorGeneric'));
     } finally {
       setIsLoading(false);
     }

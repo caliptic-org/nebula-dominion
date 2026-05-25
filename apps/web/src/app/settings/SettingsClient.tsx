@@ -61,9 +61,13 @@ const GRAPHICS_OPTIONS: { value: GraphicsQuality; label: string; hint: string }[
   { value: 'high', label: 'Yüksek', hint: 'Görsel' },
 ];
 
-const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
+const LANGUAGE_OPTIONS: { value: Language; label: string; hint?: string; disabled?: boolean }[] = [
   { value: 'tr', label: 'Türkçe' },
-  { value: 'en', label: 'English' },
+  // EN locale is gated until next-intl wiring (Faz 5.2-5.4) lands.  The
+  // option used to toggle persistence-only and the UI stayed Turkish —
+  // toggling appeared to do nothing.  Mark as disabled + "yakında" so the
+  // expectation matches reality. Re-enable once string extraction ships.
+  { value: 'en', label: 'English', hint: 'yakında', disabled: true },
 ];
 
 function loadSettings(): SettingsState {
@@ -418,18 +422,22 @@ function Slider({ label, value, onChange, disabled, race }: { label: string; val
   );
 }
 
-interface SegmentOption<T extends string> { value: T; label: string; hint?: string }
+interface SegmentOption<T extends string> { value: T; label: string; hint?: string; disabled?: boolean }
 
 function SegmentChoice<T extends string>({ options, value, onChange, race }: { options: SegmentOption<T>[]; value: T; onChange: (v: T) => void; race: NDRace }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: 6 }}>
       {options.map(o => {
         const on = o.value === value;
+        const off = !!o.disabled;
         return (
           <button
             key={o.value}
             type="button"
-            onClick={() => onChange(o.value)}
+            disabled={off}
+            onClick={() => { if (!off) onChange(o.value); }}
+            aria-disabled={off}
+            title={off && o.hint ? o.hint : undefined}
             style={{
               padding: '10px 8px',
               fontFamily: ND.display,
@@ -438,9 +446,10 @@ function SegmentChoice<T extends string>({ options, value, onChange, race }: { o
               textTransform: 'uppercase',
               background: on ? `linear-gradient(180deg, ${race.primary}28, ${race.primary}10)` : 'transparent',
               border: `1px solid ${on ? race.primary : ND.border}`,
-              color: on ? race.primary : ND.textDim,
+              color: off ? ND.textDim : (on ? race.primary : ND.textDim),
               borderRadius: 3,
-              cursor: 'pointer',
+              cursor: off ? 'not-allowed' : 'pointer',
+              opacity: off ? 0.55 : 1,
               boxShadow: on ? `0 0 12px -4px ${race.glow}` : 'none',
             }}
           >

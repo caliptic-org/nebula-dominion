@@ -21,7 +21,7 @@ import {
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
-import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { formatResource, useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
 import { useTrainingQueue, type TrainingQueueDto } from '@/hooks/useTrainingQueue';
@@ -280,6 +280,9 @@ export default function ProductionPage() {
         // replaces our optimistic stub with the real id + completesAt
         // so subsequent ticks stay in sync with server time.
         refreshQueue();
+        // Server debited the wallet — broadcast so HUD repolls immediately
+        // rather than waiting for the 5s poll tick.
+        refreshGameResources();
       } catch (err) {
         const msg = err instanceof FetchError ? err.message : 'Eğitim reddedildi';
         toast.error(msg);

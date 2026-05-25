@@ -26,6 +26,7 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useHudState } from '@/hooks/useHudState';
+import { refreshGameResources } from '@/hooks/useGameResources';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
@@ -143,6 +144,10 @@ function BuildMenuInner() {
       const positionY = Math.floor(Math.random() * 8);
       await gameServerApi.post('/buildings', { type, positionX, positionY });
       toast.success(`${selected.name} inşaatı başlatıldı (${selected.durationSec}s)`);
+      // Wallet just got debited server-side — broadcast so every mounted
+      // useGameResources (HUD pill, /base summary, etc.) repolls instead
+      // of waiting for the 5s poll tick.
+      refreshGameResources();
     } catch (err) {
       const message =
         err instanceof FetchError

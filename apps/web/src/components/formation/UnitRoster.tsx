@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import clsx from 'clsx';
 import { SlotUnit, SlotCommander, RACE_COLORS, CLASS_ICONS, RaceKey } from './types';
@@ -99,7 +100,24 @@ export function UnitRoster({
       <div className="flex-1 overflow-y-auto min-h-0 pr-1 space-y-1.5">
         {mode === 'units' ? (
           filteredUnits.length === 0 ? (
-            <p className="text-text-muted font-body text-xs text-center py-4">Tüm birimler yerleştirildi</p>
+            // Differentiate "you own nothing" from "you've placed everything"
+            // — a fresh account with zero units used to see "Tüm birimler
+            // yerleştirildi" ("all units placed"), which is technically true
+            // when N=0 but reads as a lie because they never placed anything.
+            units.length === 0 ? (
+              <div className="text-center py-6 space-y-2">
+                <p className="text-text-muted font-body text-xs">Henüz hiç birimin yok.</p>
+                <Link
+                  href="/base/production"
+                  className="inline-block px-3 py-1.5 rounded text-[10px] font-display uppercase tracking-wider"
+                  style={{ background: 'var(--color-brand)', color: 'var(--color-text-inverse)' }}
+                >
+                  Birim Üret →
+                </Link>
+              </div>
+            ) : (
+              <p className="text-text-muted font-body text-xs text-center py-4">Tüm birimler yerleştirildi</p>
+            )
           ) : (
             filteredUnits.map((u) => (
               <UnitRosterRow
@@ -112,7 +130,20 @@ export function UnitRoster({
           )
         ) : (
           filteredCmds.length === 0 ? (
-            <p className="text-text-muted font-body text-xs text-center py-4">Tüm komutanlar yerleştirildi</p>
+            commanders.length === 0 ? (
+              <div className="text-center py-6 space-y-2">
+                <p className="text-text-muted font-body text-xs">Henüz aktif komutanın yok.</p>
+                <Link
+                  href="/commanders"
+                  className="inline-block px-3 py-1.5 rounded text-[10px] font-display uppercase tracking-wider"
+                  style={{ background: 'var(--color-brand)', color: 'var(--color-text-inverse)' }}
+                >
+                  Komutan Seç →
+                </Link>
+              </div>
+            ) : (
+              <p className="text-text-muted font-body text-xs text-center py-4">Tüm komutanlar yerleştirildi</p>
+            )
           ) : (
             filteredCmds.map((c) => (
               <CommanderRosterRow

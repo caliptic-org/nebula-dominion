@@ -23,6 +23,7 @@ import {
 } from '@/components/handoff';
 import { useMissions, type Quest } from '@/hooks/useMissions';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { refreshGameResources } from '@/hooks/useGameResources';
 import { toast } from '@/components/handoff/Toaster';
 import { api, FetchError } from '@/lib/api';
 
@@ -362,6 +363,11 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
         toast.info('Bu görevin ödülü zaten alınmış.');
         return;
       }
+      // Broadcast wallet refresh so the HUD pill repolls immediately rather
+      // than waiting for the next 5s tick. Even on the "defensive" branch
+      // we fire it — if the server changed wallet state silently the HUD
+      // catches up; if it didn't, a no-op refetch is harmless.
+      refreshGameResources();
       if (res.claimed) {
         toast.success(`Ödül alındı: ${totalReward}`);
         return;

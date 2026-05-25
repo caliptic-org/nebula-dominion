@@ -48,6 +48,17 @@ interface UseGameResourcesResult {
 
 const POLL_MS = 5000;
 
+/** Cross-tree refresh signal — any component (e.g. a mission-claim button
+ *  in a different render branch from the HUD) can call this to force every
+ *  mounted useGameResources to refetch immediately. Avoids waiting for the
+ *  5s poll after a wallet-changing action. SSR-safe — falls back to a no-op
+ *  before the window object exists. */
+export const WALLET_REFETCH_EVENT = 'nebula:wallet:refetch';
+export function refreshGameResources(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(WALLET_REFETCH_EVENT));
+}
+
 export function useGameResources(): UseGameResourcesResult {
   const [data, setData] = useState<ResourceSnapshotDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +76,7 @@ export function useGameResources(): UseGameResourcesResult {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    async function fetchOnce() {
+    async function fetchOnce(opts: { rearm?: boolean } = { rearm: true }) {
       const token = getAccessToken();
       if (!token) {
         if (!cancelled) {
@@ -91,19 +102,36 @@ export function useGameResources(): UseGameResourcesResult {
           setError(err instanceof Error ? err.message : String(err));
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && opts.rearm !== false) {
           setLoading(false);
           // Re-arm the poll AFTER each completion so a slow response doesn't
           // pile up overlapping requests.
-          timer = setTimeout(fetchOnce, POLL_MS);
+          timer = setTimeout(() => fetchOnce({ rearm: true }), POLL_MS);
+        } else if (!cancelled) {
+          setLoading(false);
         }
       }
     }
 
-    fetchOnce();
+    fetchOnce({ rearm: true });
+
+    // Event-driven refetch — any module that mutates the wallet (mission
+    // claim, building construction, unit train) can `refreshGameResources()`
+    // and every mounted instance picks it up without a 5s wait. The current
+    // poll timer stays running so cancellation semantics don't change.
+    const handler = () => {
+      void fetchOnce({ rearm: false });
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(WALLET_REFETCH_EVENT, handler);
+    }
+
     return () => {
       cancelled = true;
       if (timer !== null) clearTimeout(timer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(WALLET_REFETCH_EVENT, handler);
+      }
     };
   }, []);
 

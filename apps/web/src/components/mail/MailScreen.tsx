@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Caption,
@@ -20,6 +20,7 @@ import { MailListItem } from './MailListItem'
 import { MailDetail } from './MailDetail'
 import { BulkActionBar } from './BulkActionBar'
 import { MailEmptyState } from './MailEmptyState'
+import { hasSession } from '@/lib/session'
 
 type FilterKey = 'all' | 'unread' | MailType
 
@@ -34,7 +35,17 @@ const FILTERS: { key: FilterKey; label: string; icon: string }[] = [
 
 export function MailScreen() {
   const race = useNDRace()
-  const [mails, setMails] = useState<Mail[]>(DEMO_MAILS)
+  // Empty default — SSR-safe (hasSession is window-gated).  We swap in
+  // DEMO_MAILS only for true guests after hydration so logged-in players
+  // see an honest empty inbox until the live /mail endpoint lands. Without
+  // this every fresh account opened the inbox to find 6 fake messages
+  // including a guild-mail they had no guild for, and a "Hepsi" claim
+  // button granting rewards that never reached the wallet — a major
+  // trust-break in the first ~5 minutes.
+  const [mails, setMails] = useState<Mail[]>([])
+  useEffect(() => {
+    if (!hasSession()) setMails(DEMO_MAILS)
+  }, [])
   const [activeMail, setActiveMail] = useState<Mail | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
   const [selectMode, setSelectMode] = useState(false)

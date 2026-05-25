@@ -200,7 +200,11 @@
     "copyLink": "Copy Link"
   },
   "alliance": {
-    "warSoonHint": "War declaration coming soon — diplomatic channels not yet open"
+    "warSoonHint": "War declaration coming soon — diplomatic channels not yet open",
+    "strategyRoomSoon": "{tag} strategy room coming soon"
+  },
+  "commanders": {
+    "slotSoon": "{label} slot — inventory coming soon"
   },
   "missions": {
     "alreadyClaimed": "This mission's reward has already been claimed."

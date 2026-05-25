@@ -200,7 +200,11 @@
     "copyLink": "Linki Kopyala"
   },
   "alliance": {
-    "warSoonHint": "Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil"
+    "warSoonHint": "Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil",
+    "strategyRoomSoon": "{tag} strateji odası yakında"
+  },
+  "commanders": {
+    "slotSoon": "{label} slotu — envanter yakında açılacak"
   },
   "missions": {
     "alreadyClaimed": "Bu görevin ödülü zaten alınmış."

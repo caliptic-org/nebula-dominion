@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { COMMANDERS, RACE_THEMES, Commander, RaceTheme } from '../data';
 import { SLOT_META, SLOT_ORDER } from '@/types/equipment';
 import { toast } from '@/components/handoff/Toaster';
@@ -610,6 +611,7 @@ function EquipmentPanel({
   theme: RaceTheme;
   locked: boolean;
 }) {
+  const tCommanders = useTranslations('commanders');
   return (
     <div className="space-y-4">
       <div
@@ -642,7 +644,7 @@ function EquipmentPanel({
                   // Equipment picker doesn't exist yet — surface a toast so
                   // the tap is at least felt. Once /equipment/inventory lands
                   // we open a drawer with available items for this slot.
-                  toast.info(`${meta.label} slotu — envanter yakında açılacak`);
+                  toast.info(tCommanders('slotSoon', { label: meta.label }));
                 }}
                 className="relative flex flex-col items-center justify-center gap-1.5 rounded-xl border transition-all duration-200 group"
                 style={{

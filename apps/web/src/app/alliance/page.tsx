@@ -540,6 +540,7 @@ function ObjectiveRow({ objective, race }: { objective: Objective; race: NDRace 
 }
 
 function WarCard({ war, myRace }: { war: WarEntry; myRace: NDRace }) {
+  const tAlliance = useTranslations('alliance');
   const opp = RACES[war.opponentRace];
   const statusColor =
     war.status === 'active' ? ND.warn :
@@ -598,7 +599,7 @@ function WarCard({ war, myRace }: { war: WarEntry; myRace: NDRace }) {
           <NDButton
             race={myRace}
             variant="outline"
-            onClick={() => toast.info(`${war.opponentTag} strateji odası yakında`)}
+            onClick={() => toast.info(tAlliance('strategyRoomSoon', { tag: war.opponentTag }))}
           >
             Strateji
           </NDButton>

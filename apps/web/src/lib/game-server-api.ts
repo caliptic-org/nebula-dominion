@@ -1,5 +1,5 @@
 import { getAccessToken } from './session';
-import { FetchError } from './api';
+import { FetchError, maybeRedirectToLogin } from './api';
 import { translateBackendError } from './translate-backend-error';
 
 /* Game-server HTTP client.
@@ -44,6 +44,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (!res.ok) {
+    // 401 with a sent token = expired/invalid session.  Game-server polls
+    // (useGameResources, useGameBuildings, useTrainingQueue) fire on a 5-30s
+    // cadence so an expired token would spam silent 401s; route to /login
+    // once via the shared guard in api.ts.
+    if (res.status === 401 && token) {
+      maybeRedirectToLogin();
+    }
     const data = await res.json().catch(() => ({}));
     // NestJS returns either {message: "..."} or {message: ["...", "..."]}
     // — flatten then translate to Turkish so toast.error(err.message)

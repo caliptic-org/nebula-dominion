@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
 import {
   Caption,
   Code,
@@ -125,6 +125,12 @@ export function LoginForm() {
   const race = useNDRace('insan');
   const copy = LOGIN_COPY[race.key];
   const router = useRouter();
+  const search = useSearchParams();
+  // ?reason=expired comes from the 401 auto-redirect in lib/api.ts.  Show a
+  // friendly banner so the user understands why they were bounced here
+  // instead of suspecting a bug. ?next=<path> is preserved across login.
+  const reason = search?.get('reason');
+  const next = search?.get('next');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
@@ -133,6 +139,16 @@ export function LoginForm() {
   // browser restart logs the user out. Default ON because the test
   // accounts get rolled over often during dev.
   const [remember, setRemember] = useState(true);
+
+  // Surface the expired-session reason as a non-error info banner once on
+  // mount. Using state (not the error slot) so a subsequent failed login
+  // attempt can still surface its own error without losing context.
+  const [sessionInfo, setSessionInfo] = useState<string | null>(null);
+  useEffect(() => {
+    if (reason === 'expired') {
+      setSessionInfo('Oturumun süresi doldu — lütfen tekrar giriş yap.');
+    }
+  }, [reason]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -151,8 +167,16 @@ export function LoginForm() {
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
       Analytics.login('password');
-      const dest = await resolvePostLoginRoute();
-      router.push(dest);
+      // Honor ?next=<path> from the 401 auto-redirect — restores the
+      // player to where they were before the session expired. Guard against
+      // open-redirect by only accepting same-origin paths (must start with
+      // a single slash and not "//" which would be protocol-relative).
+      if (next && /^\/[^/]/.test(next)) {
+        router.push(next);
+      } else {
+        const dest = await resolvePostLoginRoute();
+        router.push(dest);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
@@ -217,6 +241,23 @@ export function LoginForm() {
         <Caption style={{ marginBottom: 24 }}>{copy.sub}</Caption>
 
         <form onSubmit={handleSubmit} noValidate aria-label="Giriş formu" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {sessionInfo && !error && (
+            <div
+              role="status"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 4,
+                fontFamily: ND.mono,
+                fontSize: 12,
+                background: `color-mix(in oklch, ${race.primary}, transparent 86%)`,
+                border: `1px solid color-mix(in oklch, ${race.primary}, transparent 62%)`,
+                color: race.primary,
+                clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)',
+              }}
+            >
+              {sessionInfo}
+            </div>
+          )}
           {error && (
             <div
               role="alert"

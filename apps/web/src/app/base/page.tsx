@@ -163,6 +163,33 @@ export default function BaseHomePage() {
     }
   }, [safeAge]);
 
+  /* Level-up readiness toast: when xpPercent hits 100, the player can
+   * advance via /tier-up but nothing in the world tells them so — /tier-up
+   * is only reachable from the burger-menu drawer. Without this nudge, a
+   * new player grinds past the cap, sees their XP bar stuck at 100%, and
+   * concludes the game is bugged or progression is gated by something
+   * invisible.  Persists the last level shown so the toast doesn't re-fire
+   * every visit at the same level. */
+  const [levelUpToast, setLevelUpToast] = useState<{ level: number } | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (hud.xpPercent < 100) return;
+    const key = 'nebula:levelup:last-shown-level:v1';
+    let lastShown = 0;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) lastShown = Number(raw);
+    } catch { /* ignore */ }
+    if (hud.level > lastShown) {
+      setLevelUpToast({ level: hud.level });
+      try {
+        window.localStorage.setItem(key, String(hud.level));
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [hud.xpPercent, hud.level]);
+
   return (
     <div data-race={race.key} style={{ position: 'relative', height: '100dvh' }}>
       {/* Era-specific backdrop becomes a top horizon/sky band (NebulaBg's
@@ -216,6 +243,39 @@ export default function BaseHomePage() {
             aria-label="Yeni hikaye bölümü açıldı"
           >
             ✦ YENİ ÇAĞ {storyToast.age} HİKAYE BÖLÜMÜ AÇILDI · DOKUN ›
+          </Link>
+        )}
+
+        {/* Level-up readiness toast: shown when xp bar hits 100%.  Stacks
+            below storyToast (top: 130) when both fire on the same visit so
+            neither covers the other. Click → /tier-up where the actual
+            level-up flow lives. */}
+        {levelUpToast && (
+          <Link
+            href="/tier-up"
+            onClick={() => setLevelUpToast(null)}
+            style={{
+              position: 'absolute',
+              top: storyToast ? 130 : 90,
+              left: 12,
+              right: 12,
+              padding: '10px 14px',
+              background: `linear-gradient(90deg, ${race.glow}33, ${race.primary}22)`,
+              border: `1px solid ${race.primary}`,
+              boxShadow: `0 0 14px -2px ${race.glow}`,
+              color: ND.text,
+              fontFamily: ND.display,
+              fontSize: 12,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              textDecoration: 'none',
+              zIndex: 5,
+              animation: 'nd-slide-up 600ms ease-out',
+            }}
+            aria-label="Çağ atlama hazır"
+          >
+            ◆ ÇAĞ ATLAMA HAZIR · LV {levelUpToast.level} → {levelUpToast.level + 1} · DOKUN ›
           </Link>
         )}
 

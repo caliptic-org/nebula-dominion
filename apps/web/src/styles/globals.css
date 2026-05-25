@@ -995,6 +995,14 @@ body::after {
   animation: shimmer 3s ease-in-out infinite;
 }
 
+/* Shimmer slide — slides a gradient across a fixed-size element (e.g. progress bars).
+ * Used by UnitProductionQueue timer bar overlay; element supplies its own gradient
+ * background and background-size, this keyframe only animates the position. */
+@keyframes shimmer-slide {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
 /* Pulse glow — for selected/active elements */
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 8px var(--color-race-glow); }

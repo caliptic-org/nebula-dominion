@@ -72,6 +72,9 @@ const COPY: Record<NDRaceKey, {
   seytan:  { eyebrow: 'YENİ PAKT YAZIMI',         title: 'PAKTI MÜHÜRLE',      cta: 'MÜHÜRLE',          back: 'Zaten pakt yazdın mı?',           policy: <>Pakt şartlarını kabul ettim. <strong style={{ color: 'var(--nd-race)' }}>Her güç bir borçtur.</strong></> },
 };
 
+type FieldName = 'username' | 'email' | 'password' | 'confirmPassword';
+type FieldErrors = Partial<Record<FieldName, string>>;
+
 export function RegisterForm() {
   const race = useNDRace('insan');
   const copy = COPY[race.key];
@@ -86,22 +89,87 @@ export function RegisterForm() {
     password: '',
     confirmPassword: '',
   });
+  // Per-field errors shown directly under each input.  Used to be one
+  // banner at the top — three round-trips to fix a typo'd email + short
+  // password + already-registered conflict.  Now each field surfaces its
+  // own error onBlur (and confirmPassword onChange so it lights up the
+  // instant the player breaks the match).
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Tracks which fields have been blurred-or-attempted so errors don't
+  // show on a fresh form. Submit attempt marks all fields as touched.
+  const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
 
-  function validate() {
-    if (values.username.length < 3) return 'Kullanıcı adı en az 3 karakter olmalı';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return 'Geçerli bir e-posta gir';
-    if (values.password.length < 8) return 'Şifre en az 8 karakter olmalı';
-    if (values.password !== values.confirmPassword) return 'Şifreler eşleşmiyor';
-    if (!accepted) return 'Pakt şartlarını kabul etmelisin';
-    return null;
+  function fieldError(name: FieldName, v = values): string | null {
+    switch (name) {
+      case 'username':
+        if (v.username.length < 3) return 'Kullanıcı adı en az 3 karakter olmalı';
+        return null;
+      case 'email':
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return 'Geçerli bir e-posta gir';
+        return null;
+      case 'password':
+        if (v.password.length < 8) return 'Şifre en az 8 karakter olmalı';
+        return null;
+      case 'confirmPassword':
+        if (v.password !== v.confirmPassword) return 'Şifreler eşleşmiyor';
+        return null;
+    }
+  }
+
+  function validateAll(v = values): FieldErrors {
+    const errs: FieldErrors = {};
+    (['username', 'email', 'password', 'confirmPassword'] as const).forEach((name) => {
+      const err = fieldError(name, v);
+      if (err) errs[name] = err;
+    });
+    return errs;
+  }
+
+  function setField(name: FieldName, val: string) {
+    setValues((v) => {
+      const next = { ...v, [name]: val };
+      // Re-validate confirmPassword whenever password OR confirmPassword
+      // changes so the match-state updates live without waiting for blur.
+      if (name === 'password' || name === 'confirmPassword') {
+        setFieldErrors((errs) => {
+          const cpErr = fieldError('confirmPassword', next);
+          const out = { ...errs };
+          if (cpErr) out.confirmPassword = cpErr;
+          else delete out.confirmPassword;
+          // Same for the password field itself when typing.
+          if (name === 'password') {
+            const pwErr = fieldError('password', next);
+            if (pwErr) out.password = pwErr;
+            else if (touched.password) delete out.password;
+          }
+          return out;
+        });
+      }
+      return next;
+    });
+  }
+
+  function handleBlur(name: FieldName) {
+    setTouched((t) => ({ ...t, [name]: true }));
+    setFieldErrors((errs) => {
+      const err = fieldError(name);
+      const out = { ...errs };
+      if (err) out[name] = err;
+      else delete out[name];
+      return out;
+    });
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    const v = validate();
-    if (v) {
-      setError(v);
+    // Mark every field touched so any miss gets surfaced.
+    setTouched({ username: true, email: true, password: true, confirmPassword: true });
+    const errs = validateAll();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    if (!accepted) {
+      setError('Pakt şartlarını kabul etmelisin');
       return;
     }
     setIsLoading(true);
@@ -117,6 +185,25 @@ export function RegisterForm() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string };
+        // 409 = duplicate username/email. Surface as a field error so the
+        // player knows exactly which field to fix (and that "Giriş yap"
+        // is probably the next move) instead of a vague top banner.
+        if (res.status === 409) {
+          const msg = data.message?.toLowerCase() ?? '';
+          if (msg.includes('email') || msg.includes('e-posta') || msg.includes('e-mail')) {
+            setFieldErrors((errs) => ({ ...errs, email: 'Bu e-posta zaten kayıtlı — giriş yap' }));
+          } else if (msg.includes('username') || msg.includes('kullanıcı')) {
+            setFieldErrors((errs) => ({
+              ...errs,
+              username: 'Bu kullanıcı adı zaten alınmış',
+            }));
+          } else {
+            // Server replied 409 without specifying which field — show on
+            // email by default since that's the more common collision.
+            setFieldErrors((errs) => ({ ...errs, email: 'Bu hesap zaten kayıtlı' }));
+          }
+          return;
+        }
         throw new Error(data.message ?? 'Kayıt başarısız. Tekrar dene.');
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
@@ -200,27 +287,52 @@ export function RegisterForm() {
             </div>
           )}
 
-          {fields.map((f) => (
-            <div key={f.name}>
-              <Eyebrow style={{ marginBottom: 6 }}>{f.label}</Eyebrow>
-              <label className="nd-field" htmlFor={`reg-${f.name}`}>
-                <input
-                  id={`reg-${f.name}`}
-                  name={f.name}
-                  type={f.type}
-                  className="nd-input"
-                  placeholder={f.placeholder}
-                  autoComplete={f.autoComplete}
-                  required
-                  minLength={f.minLength}
-                  value={values[f.name]}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                  disabled={isLoading}
-                  aria-label={f.label}
-                />
-              </label>
-            </div>
-          ))}
+          {fields.map((f) => {
+            const fe = touched[f.name] ? fieldErrors[f.name] : undefined;
+            return (
+              <div key={f.name}>
+                <Eyebrow style={{ marginBottom: 6 }}>{f.label}</Eyebrow>
+                <label
+                  className="nd-field"
+                  htmlFor={`reg-${f.name}`}
+                  style={fe ? { borderColor: ND.danger, boxShadow: `0 0 0 1px ${ND.danger}55` } : undefined}
+                >
+                  <input
+                    id={`reg-${f.name}`}
+                    name={f.name}
+                    type={f.type}
+                    className="nd-input"
+                    placeholder={f.placeholder}
+                    autoComplete={f.autoComplete}
+                    required
+                    minLength={f.minLength}
+                    value={values[f.name]}
+                    onChange={(e) => setField(f.name, e.target.value)}
+                    onBlur={() => handleBlur(f.name)}
+                    disabled={isLoading}
+                    aria-label={f.label}
+                    aria-invalid={fe ? 'true' : undefined}
+                    aria-describedby={fe ? `reg-${f.name}-err` : undefined}
+                  />
+                </label>
+                {fe && (
+                  <div
+                    id={`reg-${f.name}-err`}
+                    role="alert"
+                    style={{
+                      marginTop: 4,
+                      color: ND.danger,
+                      fontFamily: ND.mono,
+                      fontSize: 10,
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    {fe}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <Panel race={race} style={{ marginTop: 6, padding: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <button

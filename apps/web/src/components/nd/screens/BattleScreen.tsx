@@ -467,26 +467,47 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
           enemy={enemy}
           onContinue={async () => {
             // Record the battle on the backend before navigating so the
-            // /profile Geçmiş tab + /battles/history endpoint pick it up.
-            // The simulation runs client-side (POST /battles starts a new
-            // server-side state machine independently), but for history
-            // purposes a single POST with the actual outcome is enough.
+            // /profile Geçmiş tab + /battles/history endpoint pick it up,
+            // AND so /battle-result shows real reward numbers instead of
+            // the mock makeMockData() table.  We pass the client-side
+            // simulation outcome via `outcome` — the stub immediately
+            // resolves the battle with proper rewards (gold/gems/xp).
             //
-            // Fire-and-forget — we don't want a network hiccup to block
-            // the navigation. The history-entry is best-effort.
+            // Stashes the response in sessionStorage so /battle-result can
+            // read it without another network round-trip; clears the key
+            // after read so a back-button revisit doesn't show stale data.
             if (hasSession()) {
               try {
-                await api.post('/battles', {
+                const battle = await api.post<{
+                  id: string;
+                  status: 'won' | 'lost' | 'in-progress' | 'pending';
+                  rewards: { gold: number; gems: number; xp: number };
+                }>('/battles', {
                   attackerRace: race.key,
                   defenderRace: enemy.key,
+                  outcome: state.status === 'victory' ? 'won' : 'lost',
                 });
-                // Battle rewards (XP, gold) typically debit/credit the
-                // wallet on completion — broadcast so the HUD picks it up.
+                if (typeof window !== 'undefined') {
+                  try {
+                    window.sessionStorage.setItem(
+                      'nebula:last-battle-result:v1',
+                      JSON.stringify({
+                        id: battle.id,
+                        rewards: battle.rewards,
+                        status: battle.status,
+                        savedAt: Date.now(),
+                      }),
+                    );
+                  } catch {
+                    /* private mode — best effort */
+                  }
+                }
+                // Battle rewards (XP, gold) typically credit the wallet on
+                // completion — broadcast so the HUD picks it up.
                 refreshGameResources();
               } catch (err) {
-                // Silent fail — the history-entry is non-critical to the
-                // post-battle UX. Worst case the player sees the result
-                // screen without /profile.Geçmiş updating, same as before.
+                // Silent fail — /battle-result will fall back to mock
+                // values, matching the old behaviour.
                 if (err instanceof FetchError) {
                   console.warn('battle history record failed:', err.message);
                 }

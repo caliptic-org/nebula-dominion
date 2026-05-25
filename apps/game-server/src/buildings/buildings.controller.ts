@@ -45,6 +45,15 @@ export class BuildingsController {
     return this.buildings.startConstruction(userId, dto);
   }
 
+  @Post(':id/upgrade')
+  @HttpCode(HttpStatus.OK)
+  async upgradeBuilding(
+    @CurrentUser() userId: string,
+    @Param('id', ParseUUIDPipe) buildingId: string,
+  ) {
+    return this.buildings.upgradeBuilding(userId, buildingId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async destroyBuilding(

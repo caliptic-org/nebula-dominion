@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BattleResultScreen, type BattleResultData, type BattleOutcome } from '@/components/nd/screens';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
@@ -11,6 +11,33 @@ const ND_RACE_KEYS: readonly NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar'
 
 function isNDRaceKey(value: string | null): value is NDRaceKey {
   return value != null && (ND_RACE_KEYS as readonly string[]).includes(value);
+}
+
+interface StashedResult {
+  id: string;
+  rewards: { gold: number; gems: number; xp: number };
+  status: string;
+  savedAt: number;
+}
+
+/** Reads + clears the sessionStorage stash written by BattleScreen.onContinue.
+ * Returns null when there is no fresh stash (older than 5 minutes counts as
+ * stale to avoid a back-button revisit showing the same numbers twice). */
+function readBattleStash(): StashedResult | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem('nebula:last-battle-result:v1');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StashedResult;
+    if (!parsed?.rewards) return null;
+    const ageMs = Date.now() - (parsed.savedAt ?? 0);
+    if (ageMs > 5 * 60 * 1000) return null;
+    // One-shot — clear so a back-button re-entry doesn't show stale rewards.
+    window.sessionStorage.removeItem('nebula:last-battle-result:v1');
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function makeMockData(outcome: BattleOutcome, raceKey: NDRaceKey): BattleResultData {
@@ -54,6 +81,15 @@ function Inner() {
   const outcome: BattleOutcome = params.get('outcome') === 'defeat' ? 'defeat' : 'victory';
   const { race, setRace } = useRaceTheme();
 
+  // Read the sessionStorage stash once on mount.  null when player navigates
+  // here directly without going through /battle (e.g. a deep-link from a
+  // dev page), in which case we fall back to the legacy mock numbers so the
+  // screen layout still demos.
+  const [stash, setStash] = useState<StashedResult | null>(null);
+  useEffect(() => {
+    setStash(readBattleStash());
+  }, []);
+
   useEffect(() => {
     if (!raceParam) return;
     const wanted = (Object.values(Race) as Race[]).find(
@@ -64,7 +100,27 @@ function Inner() {
 
   const forced = isNDRaceKey(raceParam) ? raceParam : undefined;
   const effectiveRace = forced ?? (RACE_DESCRIPTIONS[race].dataRace as NDRaceKey);
-  const data = makeMockData(outcome, effectiveRace);
+  const data = useMemo<BattleResultData>(() => {
+    const mock = makeMockData(outcome, effectiveRace);
+    if (!stash) return mock;
+    // Merge real reward numbers in, keep mock stats/MVP since the stub
+    // doesn't expose damage/kills yet. resourceA == gold (race-agnostic in
+    // backend terms), resourceB stays at mock (no gas equivalent), crystal
+    // == gems. xpGained from backend.
+    return {
+      ...mock,
+      rewards: {
+        ...mock.rewards,
+        resourceA: stash.rewards.gold,
+        crystal: stash.rewards.gems,
+        xpGained: stash.rewards.xp,
+        xpAfter: mock.rewards.xpBefore + stash.rewards.xp,
+        // levelUp logic: same as mock, since the stub doesn't track level.
+        levelUp: outcome === 'victory' && stash.rewards.xp > 200,
+      },
+    };
+  }, [stash, outcome, effectiveRace]);
+
   return <BattleResultScreen data={data} forcedRace={forced} />;
 }
 

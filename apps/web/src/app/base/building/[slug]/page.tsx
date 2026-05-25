@@ -47,7 +47,7 @@ import {
   raceLex,
 } from '@/components/handoff';
 import { useBaseState } from '@/hooks/useBaseState';
-import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { formatResource, useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings, indexBuildingsByType } from '@/hooks/useGameBuildings';
 import { useBuildingTypes } from '@/hooks/useBuildingTypes';
 import { gameServerApi } from '@/lib/game-server-api';
@@ -157,6 +157,11 @@ function Inner({ slug }: { slug: string }) {
 
   const [activeTab, setActiveTab] = useState<'genel' | 'yetenekler' | 'yukselt'>('genel');
   const [busy, setBusy] = useState(false);
+  // Tracks the building currently being upgraded so the button can disable
+  // mid-flight without a separate global busy flag — multiple buildings
+  // wouldn't collide here today, but the per-id pattern keeps future
+  // bulk-upgrade flows from disabling unrelated buttons.
+  const [upgradingId, setUpgradingId] = useState<string | null>(null);
 
   async function handleBuild() {
     if (busy || tokenBuilding?.locked) return;
@@ -400,7 +405,7 @@ function Inner({ slug }: { slug: string }) {
               <Eyebrow color={race.primary}>YÜKSELTME</Eyebrow>
               <Caption style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55 }}>
                 {owned
-                  ? `Mevcut seviye: ${owned.level}. Yükseltme oranı arka uçta henüz tanımlı değil — sıradaki seviyeyi ${Math.round(costA * 1.5).toLocaleString('tr-TR')} ${race.resourceA.name} + ${Math.round(costB * 1.5).toLocaleString('tr-TR')} ${race.resourceB.name} + ${fmtDuration(Math.round(buildSec * 1.4))} ile tahmin ediyoruz.`
+                  ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(1.5, owned.level)).toLocaleString('tr-TR')} ${race.resourceA.name} + ${Math.round(costB * Math.pow(1.5, owned.level)).toLocaleString('tr-TR')} ${race.resourceB.name} ile yükseltebilirsin.`
                   : 'Bu slot henüz inşa edilmemiş. Önce yapımı başlat, sonra seviyeleri buradan görürsün.'}
               </Caption>
               <div style={{ marginTop: 12 }}>
@@ -408,16 +413,45 @@ function Inner({ slug }: { slug: string }) {
                   race={race}
                   size="md"
                   full
-                  disabled={!owned || tokenBuilding.locked}
-                  onClick={() =>
-                    toast.info(
-                      owned
-                        ? `${tokenBuilding.n} Lv ${owned.level + 1}'e yükseltiliyor (arka uç yakında)`
-                        : 'Önce yapıyı inşa et',
-                    )
-                  }
+                  disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id}
+                  onClick={async () => {
+                    if (!owned) {
+                      toast.info('Önce yapıyı inşa et');
+                      return;
+                    }
+                    if (!hasSession()) {
+                      toast.error('Yükseltme için giriş yapmalısın');
+                      return;
+                    }
+                    setUpgradingId(owned.id);
+                    try {
+                      // POST /api/buildings/:id/upgrade — game-server scales
+                      // cost 1.5× per existing level and bumps the row.
+                      // Production rates are recalculated server-side so
+                      // the wallet trickle picks up the new tier within
+                      // one tick. Wallet refresh fires immediately so the
+                      // HUD pill doesn't lag the visible level bump.
+                      await gameServerApi.post(`/buildings/${owned.id}/upgrade`);
+                      toast.success(`${tokenBuilding.n} Lv ${owned.level + 1}'e yükseltildi`);
+                      refreshGameResources();
+                    } catch (err) {
+                      const msg =
+                        err instanceof FetchError
+                          ? err.message
+                          : err instanceof Error
+                            ? err.message
+                            : 'Yükseltme başarısız';
+                      toast.error(msg);
+                    } finally {
+                      setUpgradingId(null);
+                    }
+                  }}
                 >
-                  {owned ? `Lv ${owned.level + 1}'e YÜKSELT` : 'YÜKSELTME KİLİTLİ'}
+                  {upgradingId === owned?.id
+                    ? 'YÜKSELTİLİYOR…'
+                    : owned
+                      ? `Lv ${owned.level + 1}'e YÜKSELT`
+                      : 'YÜKSELTME KİLİTLİ'}
                 </NDButton>
               </div>
             </Panel>

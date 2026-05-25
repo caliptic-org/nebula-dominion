@@ -41,10 +41,14 @@ function rand(seed: number): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-function newBattle(attacker: RaceKey, defender: RaceKey): BattleState {
+function newBattle(
+  attacker: RaceKey,
+  defender: RaceKey,
+  options: { forceOutcome?: 'won' | 'lost' } = {},
+): BattleState {
   const id = `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
   const winProb = 50 + Math.floor(rand(id.length) * 30); // 50–80
-  return {
+  const base: BattleState = {
     id,
     attackerRace: attacker,
     defenderRace: defender,
@@ -56,6 +60,23 @@ function newBattle(attacker: RaceKey, defender: RaceKey): BattleState {
     rewards: { gold: 0, gems: 0, xp: 0 },
     createdAt: new Date().toISOString(),
   };
+  // Frontend can call POST /battles with { outcome: 'won' | 'lost' } to
+  // skip the 8-turn simulation and get an immediately-resolved battle with
+  // proper rewards. Used by BattleScreen.onContinue after the client-side
+  // animation finishes — the simulation already determined the outcome
+  // visually, so the backend just needs to log it + grant rewards.
+  if (options.forceOutcome === 'won') {
+    base.status = 'won';
+    base.rewards = { gold: 1500 + Math.floor(rand(id.length * 7) * 1000), gems: 50, xp: 320 };
+    base.turnsElapsed = base.maxTurns;
+    base.log.push({ turn: base.maxTurns, text: 'Düşman filosu yok edildi. Zafer.' });
+  } else if (options.forceOutcome === 'lost') {
+    base.status = 'lost';
+    base.rewards = { gold: 250, gems: 0, xp: 80 };
+    base.turnsElapsed = base.maxTurns;
+    base.log.push({ turn: base.maxTurns, text: 'Filomuz geri çekildi. Yenilgi kabul edildi.' });
+  }
+  return base;
 }
 
 function advance(state: BattleState): BattleState {
@@ -94,8 +115,29 @@ function advance(state: BattleState): BattleState {
 export class BattlesStubController {
   @Post()
   @ApiOperation({ summary: 'Start a new battle (stub)' })
-  start(@Body() body: { attackerRace?: RaceKey; defenderRace?: RaceKey }) {
-    const battle = newBattle(body?.attackerRace ?? 'insan', body?.defenderRace ?? 'zerg');
+  start(
+    @Body()
+    body: {
+      attackerRace?: RaceKey;
+      defenderRace?: RaceKey;
+      /** Optional — when set, the battle is immediately resolved with the
+       *  matching rewards instead of starting in 'in-progress'.  Used by
+       *  the frontend BattleScreen after its client-side animation
+       *  finishes so /battle-result can show real numbers. */
+      outcome?: 'won' | 'lost' | 'victory' | 'defeat';
+    },
+  ) {
+    const forceOutcome =
+      body?.outcome === 'won' || body?.outcome === 'victory'
+        ? 'won'
+        : body?.outcome === 'lost' || body?.outcome === 'defeat'
+          ? 'lost'
+          : undefined;
+    const battle = newBattle(
+      body?.attackerRace ?? 'insan',
+      body?.defenderRace ?? 'zerg',
+      { forceOutcome },
+    );
     BATTLES.set(battle.id, battle);
     return battle;
   }

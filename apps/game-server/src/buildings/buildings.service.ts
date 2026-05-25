@@ -85,6 +85,59 @@ export class BuildingsService {
     return this.buildingRepo.find({ where: { playerId, status: BuildingStatus.ACTIVE } });
   }
 
+  /**
+   * Upgrade an existing building by 1 level. Cost scales 1.5× per level on
+   * top of the base cost (matches the estimate the /base/building/[slug]
+   * detail page already shows). Recalculates production rates so the bump
+   * shows up in the wallet pill within one tick.
+   *
+   * Throws:
+   *   - NotFound when no building / not the player's
+   *   - BadRequest when the building isn't ACTIVE (must be built first)
+   *   - BadRequest on insufficient resources
+   */
+  async upgradeBuilding(playerId: string, buildingId: string): Promise<Building> {
+    const building = await this.buildingRepo.findOne({ where: { id: buildingId, playerId } });
+    if (!building) {
+      throw new NotFoundException(`Building ${buildingId} not found for player ${playerId}.`);
+    }
+    if (building.status !== BuildingStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Building ${buildingId} is ${building.status} — must be ACTIVE before upgrading.`,
+      );
+    }
+
+    const baseCfg = BUILDING_CONFIGS[building.type];
+    const scale = Math.pow(1.5, building.level); // cost at level L → L+1
+    const upgradeCost = {
+      mineral: Math.round(baseCfg.cost.mineral * scale),
+      gas: Math.round(baseCfg.cost.gas * scale),
+      energy: Math.round(baseCfg.cost.energy * scale),
+    };
+
+    const canAfford = await this.resources.canAfford(playerId, upgradeCost);
+    if (!canAfford) {
+      throw new BadRequestException(
+        `Insufficient resources. Required: ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E`,
+      );
+    }
+
+    await this.resources.deduct(playerId, upgradeCost);
+
+    building.level += 1;
+    await this.buildingRepo.save(building);
+
+    this.logger.log(
+      `Player ${playerId} upgraded ${building.type} (${buildingId}) to level ${building.level}.`,
+    );
+
+    // Re-derive per-tick production — most building types scale output
+    // with level so the wallet trickle should bump immediately.
+    await this.recalculateProductionRates(playerId);
+
+    return building;
+  }
+
   async destroyBuilding(playerId: string, buildingId: string): Promise<void> {
     const building = await this.buildingRepo.findOne({ where: { id: buildingId, playerId } });
     if (!building) {

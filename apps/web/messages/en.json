@@ -62,7 +62,28 @@
       "crystal": "Crystal"
     },
     "tierMax": "MAX",
-    "tierProgress": "{current} / {max} → AGE {next}"
+    "tierProgress": "{current} / {max} → AGE {next}",
+    "resPopover": {
+      "close": "Close",
+      "howToLabel": "HOW TO EARN",
+      "buildAction": "build or upgrade — more buildings = more production per tick.",
+      "buildCtaLink": "Build {name} →",
+      "openCatalog": "Open Building Catalog →",
+      "aboutSuffix": "info"
+    },
+    "resA": {
+      "description": "Your base's primary resource. The core cost for construction and unit training.",
+      "howTo": "Build your primary resource building — auto-produces each tick. More buildings = faster production."
+    },
+    "resB": {
+      "description": "Secondary resource required for advanced units and research.",
+      "howTo": "Build an extractor + gain passive production over time. Also earned from boss kills and raid drops."
+    },
+    "crystal": {
+      "title": "Energy",
+      "description": "Consumed by unit production and special abilities. High-tier units drain it quickly.",
+      "howTo": "Build a reactor/energy building. Drains fast with active shields + buffs — watch your storage."
+    }
   },
   "nav": {
     "base": "Base",
@@ -84,9 +105,19 @@
     "title": "Base",
     "buildingActive": "ACTIVE",
     "buildingLocked": "LOCKED",
+    "buildingConstructing": "CONSTRUCTING",
+    "buildingUnbuilt": "UNBUILT",
+    "buildingActiveLevel": "ACTIVE · Lv {level}",
     "detailButton": "Details",
     "productionDone": "production complete",
-    "statusOk": "All systems nominal"
+    "productionComplete": "DONE",
+    "statusOk": "All systems nominal",
+    "storyChapterUnlocked": "✦ NEW AGE {age} STORY CHAPTER UNLOCKED · TAP ›",
+    "storyChapterAriaLabel": "New story chapter unlocked",
+    "levelUpReady": "◆ AGE UP READY · LV {from} → {to} · TAP ›",
+    "levelUpAriaLabel": "Age-up ready",
+    "buildingSelectorAriaLabel": "Building selector",
+    "collapseCardAriaLabel": "Collapse card"
   },
   "build": {
     "title": "Build Catalog",
@@ -96,7 +127,22 @@
     "compareButton": "Compare",
     "costLabel": "Cost",
     "timeLabel": "Time",
-    "queueLabel": "Queue"
+    "queueLabel": "Queue",
+    "noResults": "No items in this filter.",
+    "allTab": "ALL",
+    "chipLocked": "LOCK",
+    "chipNew": "NEW",
+    "start": "START",
+    "startWithName": "START · {name}",
+    "constructing": "BUILDING · {time}",
+    "sending": "SENDING…",
+    "toastLocked": "This building is still locked",
+    "toastLoginRequired": "Login required to start construction",
+    "toastNoMapping": "No backend mapping for {name} — coming soon",
+    "toastAlreadyBuilt": "{name} already built — opening upgrade page",
+    "toastStarted": "{name} construction started ({duration}s)",
+    "toastRejected": "Construction rejected: {message}",
+    "toastUnknownError": "Unknown error"
   },
   "tutorial": {
     "skip": "Skip Tutorial",

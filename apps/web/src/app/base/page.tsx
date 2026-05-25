@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   Bar,
   BaseFieldStatusChip,
@@ -85,6 +86,7 @@ const QUICK_ACTION_ROUTES: Record<string, string> = {
 export default function BaseHomePage() {
   const race = useNDRace();
   const router = useRouter();
+  const t = useTranslations('base');
   const lex = raceLex(race.key);
   const hud = useHudState();
   const [focusedIdx, setFocusedIdx] = useState(1);
@@ -255,9 +257,9 @@ export default function BaseHomePage() {
               zIndex: 5,
               animation: 'nd-slide-up 600ms ease-out',
             }}
-            aria-label="Yeni hikaye bölümü açıldı"
+            aria-label={t('storyChapterAriaLabel')}
           >
-            ✦ YENİ ÇAĞ {storyToast.age} HİKAYE BÖLÜMÜ AÇILDI · DOKUN ›
+            {t('storyChapterUnlocked', { age: storyToast.age })}
           </Link>
         )}
 
@@ -288,9 +290,9 @@ export default function BaseHomePage() {
               zIndex: 5,
               animation: 'nd-slide-up 600ms ease-out',
             }}
-            aria-label="Çağ atlama hazır"
+            aria-label={t('levelUpAriaLabel')}
           >
-            ◆ ÇAĞ ATLAMA HAZIR · LV {levelUpToast.level} → {levelUpToast.level + 1} · DOKUN ›
+            {t('levelUpReady', { from: levelUpToast.level, to: levelUpToast.level + 1 })}
           </Link>
         )}
 
@@ -333,7 +335,7 @@ export default function BaseHomePage() {
               width: 178,
             }}
           >
-            <Code style={{ color: race.primary }}>{lex.productionVerb} TAMAM</Code>
+            <Code style={{ color: race.primary }}>{lex.productionVerb} {t('productionComplete')}</Code>
             <div
               style={{
                 fontFamily: ND.display,
@@ -379,6 +381,7 @@ export default function BaseHomePage() {
           <BuildingCard
             race={race}
             lex={lex}
+            t={t}
             focusedBuilding={focusedBuilding}
             focusedLiveBuilding={focusedLiveBuilding}
             focusedIdx={focusedIdx}
@@ -428,10 +431,11 @@ interface BuildingSelectorProps {
 }
 
 function BuildingSelector({ race, focusedIdx, onSelect }: BuildingSelectorProps) {
+  const tBase = useTranslations('base');
   return (
     <div
       role="tablist"
-      aria-label="Yapı seçici"
+      aria-label={tBase('buildingSelectorAriaLabel')}
       style={{
         marginTop: 10,
         paddingTop: 8,
@@ -483,6 +487,7 @@ function BuildingSelector({ race, focusedIdx, onSelect }: BuildingSelectorProps)
 interface BuildingCardProps {
   race: NDRace;
   lex: NDRaceLex;
+  t: ReturnType<typeof useTranslations>;
   focusedBuilding: NDRace['buildings'][number];
   focusedLiveBuilding: PlayerBuildingDto | null;
   focusedIdx: number;
@@ -508,6 +513,7 @@ interface BuildingCardProps {
 function BuildingCard({
   race,
   lex,
+  t,
   focusedBuilding,
   focusedLiveBuilding,
   focusedIdx,
@@ -524,12 +530,12 @@ function BuildingCard({
       : race.primary;
 
   const statusLabel = focusedBuilding.locked
-    ? 'KİLİTLİ'
+    ? t('buildingLocked')
     : focusedLiveBuilding
       ? focusedLiveBuilding.status === 'constructing'
-        ? 'İNŞA EDİLİYOR'
-        : `AKTİF · Lv ${focusedLiveBuilding.level}`
-      : 'YAPILMAMIŞ';
+        ? t('buildingConstructing')
+        : t('buildingActiveLevel', { level: focusedLiveBuilding.level })
+      : t('buildingUnbuilt');
 
   return (
     <div
@@ -601,7 +607,7 @@ function BuildingCard({
                   style={{ textDecoration: 'none' }}
                 >
                   <NDButton race={race} variant="ghost" size="sm">
-                    DETAY
+                    {t('detailButton').toUpperCase()}
                   </NDButton>
                 </Link>
                 {/* Explicit collapse button so tap-to-expand users have a
@@ -609,7 +615,7 @@ function BuildingCard({
                  *  just move the cursor away. */}
                 <button
                   type="button"
-                  aria-label="Kartı küçült"
+                  aria-label={t('collapseCardAriaLabel')}
                   onClick={() => {
                     setTapToggled(false);
                     setHovered(false);

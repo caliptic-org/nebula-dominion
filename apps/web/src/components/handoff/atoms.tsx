@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { ND, type NDRace, type NDResIconKind } from './nd-tokens';
 import { NebulaBg } from './Sigil';
 
@@ -534,25 +535,25 @@ interface ResInfo {
   howTo: string;
 }
 
-function resInfoFor(slot: ResSlot, race: NDRace): ResInfo {
+function resInfoFor(slot: ResSlot, race: NDRace, t: ReturnType<typeof useTranslations>): ResInfo {
   if (slot === 'A') {
     return {
       title: race.resourceA.name,
-      description: `Üssünün birincil kaynağı. Yapı inşaatı ve birim eğitiminin temel maliyeti.`,
-      howTo: `Üssünde ana kaynak binası inşa et — her tick'te otomatik üretilir. Daha fazla bina = daha hızlı üretim.`,
+      description: t('resA.description'),
+      howTo: t('resA.howTo'),
     };
   }
   if (slot === 'B') {
     return {
       title: race.resourceB.name,
-      description: `İleri seviye birimler ve araştırmalar için gerekli ikincil kaynak.`,
-      howTo: `Çekim binası inşa et + zamanla pasif üretim al. Boss ve raid drop'larından da kazanılır.`,
+      description: t('resB.description'),
+      howTo: t('resB.howTo'),
     };
   }
   return {
-    title: 'Enerji',
-    description: `Birim üretimi ve özel yetenekler için tüketilir. Yüksek seviye birimler daha fazla harcar.`,
-    howTo: `Reaktör/enerji binası inşa et. Aktif kalkan + buff kullanırken hızla biter — depoyu izle.`,
+    title: t('crystal.title'),
+    description: t('crystal.description'),
+    howTo: t('crystal.howTo'),
   };
 }
 
@@ -573,6 +574,7 @@ export function HUD({
   // Single-slot popover: tap a pill to open, tap again or outside to close.
   // Lives in HUD so all three pills share one open-state (only one popover
   // visible at a time keeps the top-bar from getting cluttered).
+  const t = useTranslations('hud');
   const [openSlot, setOpenSlot] = useState<ResSlot | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -669,9 +671,10 @@ export function HUD({
 
       {openSlot && (
         <ResInfoPopover
-          info={resInfoFor(openSlot, race)}
+          info={resInfoFor(openSlot, race, t)}
           race={race}
           slot={openSlot}
+          t={t}
           perTick={
             openSlot === 'A' ? resAPerTick
             : openSlot === 'B' ? resBPerTick
@@ -700,6 +703,7 @@ function ResInfoPopover({
   currentValue,
   cap,
   onClose,
+  t,
 }: {
   info: ResInfo;
   race: NDRace;
@@ -708,6 +712,7 @@ function ResInfoPopover({
   currentValue?: string;
   cap?: number;
   onClose: () => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   const isCrystal = slot === 'crystal';
   const accent = isCrystal ? 'oklch(0.82 0.16 80)' : race.primary;
@@ -731,7 +736,7 @@ function ResInfoPopover({
     <div
       id="hud-res-popover"
       role="dialog"
-      aria-label={`${info.title} hakkında`}
+      aria-label={`${info.title} ${t('resPopover.aboutSuffix')}`}
       style={{
         position: 'absolute',
         // Anchor to the right edge of the HUD — same edge as the pill
@@ -782,7 +787,7 @@ function ResInfoPopover({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Kapat"
+          aria-label={t('resPopover.close')}
           style={{
             all: 'unset',
             cursor: 'pointer',
@@ -864,13 +869,12 @@ function ResInfoPopover({
             marginBottom: 2,
           }}
         >
-          NASIL KAZANIRSIN
+          {t('resPopover.howToLabel')}
         </span>
         {focusBuilding ? (
           <>
             <strong style={{ color: accent }}>{focusBuilding.n}</strong>{' '}
-            inşa et veya seviye atla — bina sayısı arttıkça tick başına
-            üretim artar.
+            {t('resPopover.buildAction')}
           </>
         ) : (
           info.howTo
@@ -894,7 +898,9 @@ function ResInfoPopover({
           boxShadow: `0 0 10px -3px ${accent}99`,
         }}
       >
-        {focusBuilding?.n ? `${focusBuilding.n} İnşa Et →` : 'Yapı Kataloğunu Aç →'}
+        {focusBuilding?.n
+          ? t('resPopover.buildCtaLink', { name: focusBuilding.n })
+          : t('resPopover.openCatalog')}
       </a>
     </div>
   );
@@ -911,12 +917,13 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
+  const tNav = useTranslations('nav');
   const items: { key: BottomNavKey; label: string }[] = [
-    { key: 'base',   label: 'Üs' },
-    { key: 'galaxy', label: 'Galaksi' },
-    { key: 'cmd',    label: 'Komutan' },
-    { key: 'story',  label: 'Hikaye' },
-    { key: 'more',   label: 'Daha' },
+    { key: 'base',   label: tNav('base') },
+    { key: 'galaxy', label: tNav('galaxy') },
+    { key: 'cmd',    label: tNav('commanders') },
+    { key: 'story',  label: tNav('story') },
+    { key: 'more',   label: tNav('more') },
   ];
   const ico = (k: BottomNavKey, c: string) => {
     const s = 18, sw = 1.5;

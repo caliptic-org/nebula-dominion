@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   BaseField,
   BottomNav,
@@ -68,6 +69,7 @@ export default function BuildMenuPage() {
 function BuildMenuInner() {
   const race = useNDRace();
   const router = useRouter();
+  const t = useTranslations('build');
   const lex = raceLex(race.key);
   const params = useSearchParams();
   const focusSlug = params.get('focus');
@@ -160,11 +162,11 @@ function BuildMenuInner() {
   async function handleStartBuild() {
     if (!selected || busy) return;
     if (selected.locked) {
-      toast.error('Bu yapı henüz kilitli');
+      toast.error(t('toastLocked'));
       return;
     }
     if (!hasSession()) {
-      toast.error('Giriş yapmadan inşaat başlatılamaz');
+      toast.error(t('toastLoginRequired'));
       return;
     }
     const type = selected.backendType;
@@ -173,7 +175,7 @@ function BuildMenuInner() {
       // exposes 16 generic types; if the matched slot lacks a backendType,
       // we can't safely fire POST /buildings. Fall back to a clear toast
       // until the slug↔type mapping is added (gap #75).
-      toast.info(`${selected.name} için arka uç eşlemesi yok — yakında`);
+      toast.info(t('toastNoMapping', { name: selected.name }));
       return;
     }
     // Already-built guard. The capital starter has a `COMMAND_CENTER` row
@@ -191,7 +193,7 @@ function BuildMenuInner() {
       const slug =
         race.buildings.find((b) => b.n === selected.name)?.slug ??
         selected.name.toLowerCase().replace(/\s+/g, '-');
-      toast.info(`${selected.name} zaten inşa edilmiş — yükseltme sayfası açılıyor`);
+      toast.info(t('toastAlreadyBuilt', { name: selected.name }));
       router.push(`/base/building/${slug}?id=${existing.id}`);
       return;
     }
@@ -215,7 +217,7 @@ function BuildMenuInner() {
     try {
       const { x: positionX, y: positionY } = pickFreeTile();
       await gameServerApi.post('/buildings', { type, positionX, positionY });
-      toast.success(`${selected.name} inşaatı başlatıldı (${selected.durationSec}s)`);
+      toast.success(t('toastStarted', { name: selected.name, duration: selected.durationSec }));
       // Wallet debited + buildings list changed — broadcast both so every
       // mounted consumer repolls immediately without waiting for the tick.
       refreshGameResources();
@@ -223,10 +225,10 @@ function BuildMenuInner() {
     } catch (err) {
       const message =
         err instanceof FetchError
-          ? `İnşaat reddedildi: ${err.message}`
+          ? t('toastRejected', { message: err.message })
           : err instanceof Error
           ? err.message
-          : 'Bilinmeyen hata';
+          : t('toastUnknownError');
       toast.error(message);
     } finally {
       setBusy(false);
@@ -362,7 +364,7 @@ function BuildMenuInner() {
             </div>
             {visibleCatalog.length === 0 && (
               <Caption style={{ textAlign: 'center', padding: 16 }}>
-                Bu filtrede kayıt yok.
+                {t('noResults')}
               </Caption>
             )}
 
@@ -380,7 +382,7 @@ function BuildMenuInner() {
                 disabled={activeTab === 0}
                 onClick={() => setActiveTab(0)}
               >
-                TÜMÜ
+                {t('allTab')}
               </NDButton>
               <NDButton
                 race={race}
@@ -392,12 +394,12 @@ function BuildMenuInner() {
                 onClick={handleStartBuild}
               >
                 {selectedConstructing
-                  ? `İNŞA · ${fmtRemaining(selectedConstructing.constructionCompleteAt)}`
+                  ? t('constructing', { time: fmtRemaining(selectedConstructing.constructionCompleteAt) })
                   : busy
-                    ? 'GÖNDERİLİYOR…'
+                    ? t('sending')
                     : selected
-                      ? `${lex.actionVerb} BAŞLAT · ${selected.name}`
-                      : `${lex.actionVerb} BAŞLAT`}
+                      ? `${lex.actionVerb} ${t('startWithName', { name: selected.name })}`
+                      : `${lex.actionVerb} ${t('start')}`}
               </NDButton>
             </div>
           </div>
@@ -423,6 +425,7 @@ interface BuildingCardProps {
 }
 
 function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
+  const tBuild = useTranslations('build');
   // Asset placeholder: many of the 30 ComfyUI building renders take ~5 min
   // each, so during a fresh sweep some PNGs won't exist yet on disk. Track
   // image-load failures locally and fall back to the original SVG silhouette
@@ -527,13 +530,13 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
         >
           <H3 style={{ color: ND.text, fontSize: 10 }}>{entry.name}</H3>
           {entry.locked ? (
-            <Chip>KİLİT</Chip>
+            <Chip>{tBuild('chipLocked')}</Chip>
           ) : entry.level > 0 ? (
             <Chip color={race.primary}>Lv {entry.level}</Chip>
           ) : (
             // No backend-known level for this slot yet → don't lie with "Lv 0".
             // Player can build/upgrade from here; the chip says so plainly.
-            <Chip>YENİ</Chip>
+            <Chip>{tBuild('chipNew')}</Chip>
           )}
         </div>
 

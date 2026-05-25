@@ -62,7 +62,28 @@
       "crystal": "Kristal"
     },
     "tierMax": "MAKS",
-    "tierProgress": "{current} / {max} → ÇAĞ {next}"
+    "tierProgress": "{current} / {max} → ÇAĞ {next}",
+    "resPopover": {
+      "close": "Kapat",
+      "howToLabel": "NASIL KAZANIRSIN",
+      "buildAction": "inşa et veya seviye atla — bina sayısı arttıkça tick başına üretim artar.",
+      "buildCtaLink": "{name} İnşa Et →",
+      "openCatalog": "Yapı Kataloğunu Aç →",
+      "aboutSuffix": "hakkında"
+    },
+    "resA": {
+      "description": "Üssünün birincil kaynağı. Yapı inşaatı ve birim eğitiminin temel maliyeti.",
+      "howTo": "Üssünde ana kaynak binası inşa et — her tick'te otomatik üretilir. Daha fazla bina = daha hızlı üretim."
+    },
+    "resB": {
+      "description": "İleri seviye birimler ve araştırmalar için gerekli ikincil kaynak.",
+      "howTo": "Çekim binası inşa et + zamanla pasif üretim al. Boss ve raid drop'larından da kazanılır."
+    },
+    "crystal": {
+      "title": "Enerji",
+      "description": "Birim üretimi ve özel yetenekler için tüketilir. Yüksek seviye birimler daha fazla harcar.",
+      "howTo": "Reaktör/enerji binası inşa et. Aktif kalkan + buff kullanırken hızla biter — depoyu izle."
+    }
   },
   "nav": {
     "base": "Üs",
@@ -84,9 +105,19 @@
     "title": "Üs",
     "buildingActive": "AKTİF",
     "buildingLocked": "KİLİTLİ",
+    "buildingConstructing": "İNŞA EDİLİYOR",
+    "buildingUnbuilt": "YAPILMAMIŞ",
+    "buildingActiveLevel": "AKTİF · Lv {level}",
     "detailButton": "Detay",
     "productionDone": "üretim tamam",
-    "statusOk": "Tüm sistemler nominal"
+    "productionComplete": "TAMAM",
+    "statusOk": "Tüm sistemler nominal",
+    "storyChapterUnlocked": "✦ YENİ ÇAĞ {age} HİKAYE BÖLÜMÜ AÇILDI · DOKUN ›",
+    "storyChapterAriaLabel": "Yeni hikaye bölümü açıldı",
+    "levelUpReady": "◆ ÇAĞ ATLAMA HAZIR · LV {from} → {to} · DOKUN ›",
+    "levelUpAriaLabel": "Çağ atlama hazır",
+    "buildingSelectorAriaLabel": "Yapı seçici",
+    "collapseCardAriaLabel": "Kartı küçült"
   },
   "build": {
     "title": "Yapı Kataloğu",
@@ -96,7 +127,22 @@
     "compareButton": "Kıyasla",
     "costLabel": "Maliyet",
     "timeLabel": "Süre",
-    "queueLabel": "Sıra"
+    "queueLabel": "Sıra",
+    "noResults": "Bu filtrede kayıt yok.",
+    "allTab": "TÜMÜ",
+    "chipLocked": "KİLİT",
+    "chipNew": "YENİ",
+    "start": "BAŞLAT",
+    "startWithName": "BAŞLAT · {name}",
+    "constructing": "İNŞA · {time}",
+    "sending": "GÖNDERİLİYOR…",
+    "toastLocked": "Bu yapı henüz kilitli",
+    "toastLoginRequired": "Giriş yapmadan inşaat başlatılamaz",
+    "toastNoMapping": "{name} için arka uç eşlemesi yok — yakında",
+    "toastAlreadyBuilt": "{name} zaten inşa edilmiş — yükseltme sayfası açılıyor",
+    "toastStarted": "{name} inşaatı başlatıldı ({duration}s)",
+    "toastRejected": "İnşaat reddedildi: {message}",
+    "toastUnknownError": "Bilinmeyen hata"
   },
   "tutorial": {
     "skip": "Eğitimi Atla",

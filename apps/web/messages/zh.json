@@ -62,7 +62,28 @@
       "crystal": "水晶"
     },
     "tierMax": "最高",
-    "tierProgress": "{current} / {max} → 时代 {next}"
+    "tierProgress": "{current} / {max} → 时代 {next}",
+    "resPopover": {
+      "close": "关闭",
+      "howToLabel": "如何获取",
+      "buildAction": "建造或升级 — 建筑越多，每tick产量越高。",
+      "buildCtaLink": "建造 {name} →",
+      "openCatalog": "打开建筑目录 →",
+      "aboutSuffix": "信息"
+    },
+    "resA": {
+      "description": "基地的主要资源，建设和训练单位的基础消耗。",
+      "howTo": "建造主要资源建筑 — 每tick自动生产。建筑越多=生产越快。"
+    },
+    "resB": {
+      "description": "高级单位和研究所需的二级资源。",
+      "howTo": "建造提取机+随时间获得被动产量。也可从Boss击杀和突袭掉落中获取。"
+    },
+    "crystal": {
+      "title": "能量",
+      "description": "单位生产和特殊能力消耗。高级单位消耗更快。",
+      "howTo": "建造反应堆/能量建筑。使用护盾+增益时消耗加速 — 注意库存。"
+    }
   },
   "nav": {
     "base": "基地",
@@ -84,9 +105,19 @@
     "title": "基地",
     "buildingActive": "运行中",
     "buildingLocked": "已锁定",
+    "buildingConstructing": "建造中",
+    "buildingUnbuilt": "未建造",
+    "buildingActiveLevel": "运行中 · Lv {level}",
     "detailButton": "详情",
     "productionDone": "生产完成",
-    "statusOk": "所有系统正常"
+    "productionComplete": "完成",
+    "statusOk": "所有系统正常",
+    "storyChapterUnlocked": "✦ 新时代 {age} 故事章节解锁 · 点击 ›",
+    "storyChapterAriaLabel": "新故事章节解锁",
+    "levelUpReady": "◆ 时代晋升就绪 · LV {from} → {to} · 点击 ›",
+    "levelUpAriaLabel": "时代晋升就绪",
+    "buildingSelectorAriaLabel": "建筑选择器",
+    "collapseCardAriaLabel": "收起卡片"
   },
   "build": {
     "title": "建造目录",
@@ -96,7 +127,22 @@
     "compareButton": "对比",
     "costLabel": "成本",
     "timeLabel": "时间",
-    "queueLabel": "队列"
+    "queueLabel": "队列",
+    "noResults": "此过滤器下无记录。",
+    "allTab": "全部",
+    "chipLocked": "锁定",
+    "chipNew": "新建",
+    "start": "开始",
+    "startWithName": "开始 · {name}",
+    "constructing": "建造中 · {time}",
+    "sending": "发送中…",
+    "toastLocked": "此建筑尚未解锁",
+    "toastLoginRequired": "需要登录才能开始建造",
+    "toastNoMapping": "{name} 暂无后端映射 — 即将推出",
+    "toastAlreadyBuilt": "{name} 已建造 — 正在打开升级页面",
+    "toastStarted": "{name} 建造已开始（{duration}秒）",
+    "toastRejected": "建造被拒绝：{message}",
+    "toastUnknownError": "未知错误"
   },
   "tutorial": {
     "skip": "跳过教程",

@@ -194,14 +194,93 @@ jobs:
             APP_VERSION="${{ steps.meta.outputs.version }}" \
             -n "$NAMESPACE" || true
 
+      # ── Rollout helper (DRY) ──────────────────────────────────────────────
+      # Earlier the 3 deploy steps just ran `oc rollout status …`; when the
+      # rollout timed out the step exited 1 with NO diagnostic info, so the
+      # GitHub Actions log showed only "error: timed out waiting for the
+      # condition" — useless for triage.  Run 26379612897 hit that with
+      # game-server stuck mid-rollout for 5 minutes and gave us nothing.
+      # The shared function below dumps pod state, recent events, and the
+      # last 200 log lines of any non-Running pod when the rollout fails,
+      # then re-raises the failure so the job still surfaces red.
+      #
+      # Timeout bumped from 300s → 600s because game-server's first boot
+      # after a fresh image runs DB schema validation + the resource-tick
+      # cron's first wake — both add ~10-30s and can push the readiness
+      # probe past 5 minutes on a cold cluster.
+      - name: Define rollout helpers
+        run: |
+          # Source-into-env idiom: write a script file and `source` it from
+          # subsequent steps.  GitHub Actions bash steps are independent
+          # shells, so we can't define a function once and reuse it; the
+          # helper has to live on disk.
+          cat > /tmp/rollout-helpers.sh <<'BASH'
+          set -euo pipefail
+
+          # rollout_with_diag <deployment-name>
+          rollout_with_diag() {
+            local dep="$1"
+            local ns="${NAMESPACE}"
+            echo "→ Waiting on rollout for ${dep} (10-minute timeout)…"
+            if oc rollout status deployment/"${dep}" -n "${ns}" --timeout=600s; then
+              echo "✅ ${dep} rolled out"
+              return 0
+            fi
+            local exit_code=$?
+            echo ""
+            echo "❌ Rollout for ${dep} FAILED — collecting diagnostics."
+            echo ""
+            echo "─── Deployment status ──────────────────────────────────"
+            oc get deployment/"${dep}" -n "${ns}" -o wide || true
+            echo ""
+            echo "─── Pods (full label match) ────────────────────────────"
+            oc get pods -n "${ns}" -l app="${dep}" -o wide || true
+            echo ""
+            echo "─── Recent events (last 25, namespace-wide) ────────────"
+            oc get events -n "${ns}" --sort-by=.lastTimestamp \
+              -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MSG:.message \
+              | tail -25 || true
+            echo ""
+            echo "─── Describe non-Ready pods ────────────────────────────"
+            local bad_pods
+            bad_pods=$(oc get pods -n "${ns}" -l app="${dep}" \
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' \
+              | awk '$2!="Running"{print $1}' || true)
+            if [ -n "${bad_pods:-}" ]; then
+              for p in $bad_pods; do
+                echo "── describe pod/${p} ──"
+                oc describe pod/"${p}" -n "${ns}" | tail -60 || true
+                echo ""
+                echo "── logs pod/${p} (last 200) ──"
+                oc logs pod/"${p}" -n "${ns}" --tail=200 --all-containers=true 2>&1 || true
+                echo ""
+              done
+            else
+              # Race: pods all Running but probe still failing.  Tail
+              # logs of every replica anyway — they ran SOMETHING.
+              for p in $(oc get pods -n "${ns}" -l app="${dep}" -o name); do
+                echo "── logs ${p} (last 200) ──"
+                oc logs "${p}" -n "${ns}" --tail=200 --all-containers=true 2>&1 || true
+                echo ""
+              done
+            fi
+            echo ""
+            echo "─── End diagnostics — failing job ─────────────────────"
+            return "${exit_code}"
+          }
+
+          export -f rollout_with_diag
+          BASH
+
       # ── Deploy api ─────────────────────────────────────────────────────────
       - name: Deploy api
         run: |
+          source /tmp/rollout-helpers.sh
           if oc get deployment nebula-api -n "$NAMESPACE" &>/dev/null; then
             oc set image deployment/nebula-api \
               api="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}" \
               -n "$NAMESPACE"
-            oc rollout status deployment/nebula-api -n "$NAMESPACE" --timeout=300s
+            rollout_with_diag nebula-api
           else
             echo "Deployment nebula-api not found — run terraform apply first (initial install)"
             exit 1
@@ -210,11 +289,12 @@ jobs:
       # ── Deploy game-server ─────────────────────────────────────────────────
       - name: Deploy game-server
         run: |
+          source /tmp/rollout-helpers.sh
           if oc get deployment nebula-game-server -n "$NAMESPACE" &>/dev/null; then
             oc set image deployment/nebula-game-server \
               game-server="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}" \
               -n "$NAMESPACE"
-            oc rollout status deployment/nebula-game-server -n "$NAMESPACE" --timeout=300s
+            rollout_with_diag nebula-game-server
           else
             echo "Deployment nebula-game-server not found — run terraform apply first (initial install)"
             exit 1
@@ -223,11 +303,12 @@ jobs:
       # ── Deploy web ─────────────────────────────────────────────────────────
       - name: Deploy web
         run: |
+          source /tmp/rollout-helpers.sh
           if oc get deployment nebula-web -n "$NAMESPACE" &>/dev/null; then
             oc set image deployment/nebula-web \
               web="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}" \
               -n "$NAMESPACE"
-            oc rollout status deployment/nebula-web -n "$NAMESPACE" --timeout=300s
+            rollout_with_diag nebula-web
           else
             echo "Deployment nebula-web not found — run terraform apply first (initial install)"
             exit 1

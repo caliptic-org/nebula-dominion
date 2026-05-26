@@ -117,11 +117,11 @@ function fmt(n: number) {
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 export default function AlliancePage() {
@@ -452,8 +452,8 @@ export default function AlliancePage() {
 
       <BottomNav
         race={race}
-        active="more"
-        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+        active="alliance"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
       />
     </Screen>
   );

@@ -100,8 +100,20 @@ export async function fetchCosmetics(): Promise<CosmeticItem[]> {
     await delay(350);
     return getMockInventory().map((c) => ({ ...c }));
   }
-  const data = await call<CosmeticDTO[]>('/api/v1/cosmetics');
-  return data.map(dtoToItem);
+  try {
+    const data = await call<CosmeticDTO[]>('/api/v1/cosmetics');
+    return data.map(dtoToItem);
+  } catch (err) {
+    // Backend endpoint not yet implemented (returns 404 Cannot GET …) — fall
+    // back to the demo inventory so /customization renders something instead
+    // of a fatal "Cannot GET" toast. Once the real /api/v1/cosmetics ships,
+    // this branch becomes dead code automatically because `call` won't throw.
+    const msg = err instanceof Error ? err.message : '';
+    if (/cannot\s+get|404|not\s+found|httpError|Failed to fetch/i.test(msg)) {
+      return getMockInventory().map((c) => ({ ...c }));
+    }
+    throw err;
+  }
 }
 
 export async function fetchBalance(): Promise<number> {
@@ -109,8 +121,18 @@ export async function fetchBalance(): Promise<number> {
     await delay(250);
     return mockBalance;
   }
-  const data = await call<BalanceDTO>('/api/v1/user/balance');
-  return data.gems;
+  try {
+    const data = await call<BalanceDTO>('/api/v1/user/balance');
+    return data.gems;
+  } catch (err) {
+    // Same fallback story as fetchCosmetics — surface the demo balance so
+    // the page doesn't error out on a missing endpoint.
+    const msg = err instanceof Error ? err.message : '';
+    if (/cannot\s+get|404|not\s+found|httpError|Failed to fetch/i.test(msg)) {
+      return mockBalance;
+    }
+    throw err;
+  }
 }
 
 export async function equipCosmetic(id: string): Promise<CosmeticItem> {

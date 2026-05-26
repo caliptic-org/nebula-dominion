@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
-  Bar,
   BaseFieldStatusChip,
-  BaseVitalsWidget,
   BottomNav,
   Caption,
   Chip,
@@ -33,17 +31,18 @@ import { useBaseState } from '@/hooks/useBaseState';
 import { useGameBuildings, indexBuildingsByType, type PlayerBuildingDto } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
 import { useBaseProductionQueue } from '@/hooks/useBaseProductionQueue';
+import { refreshGameResources } from '@/hooks/useGameResources';
 import type { NDRaceLex } from '@/components/handoff/race-lex';
 import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
 import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
 
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 /* Race → /base backdrop, using each race's CAPITAL building (slot 0 of
@@ -222,6 +221,7 @@ export default function BaseHomePage() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
+          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
           resAPerTick={hud.resAPerTick}
           resBPerTick={hud.resBPerTick}
           crystalPerTick={hud.crystalPerTick}
@@ -312,53 +312,8 @@ export default function BaseHomePage() {
             <BaseFieldStatusChip race={race} label={lex.statusOk} />
           </div>
 
-          {/* vitals widget top-right */}
-          <div style={{ position: 'absolute', top: 12, right: 12 }}>
-            <BaseVitalsWidget race={race} />
-          </div>
-
-          {/* production-complete toast */}
-          <Panel
-            race={race}
-            glow
-            style={{
-              position: 'absolute',
-              top: 76,
-              right: 12,
-              padding: '8px 10px',
-              // Fixed width (not max) so the panel renders the same size
-              // regardless of unit-name length — shrink-to-fit was making
-              // it 95px and the "Sniper" text crammed against the right
-              // viewport edge. 178px sits flush with the vitals widget
-              // above and the quick-actions stack beneath without
-              // overlapping the iso buildings.
-              width: 178,
-            }}
-          >
-            <Code style={{ color: race.primary }}>{lex.productionVerb} {t('productionComplete')}</Code>
-            <div
-              style={{
-                fontFamily: ND.display,
-                fontSize: 12,
-                color: ND.text,
-                marginTop: 2,
-                letterSpacing: '0.04em',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              ×4 {race.units[1]?.n ?? race.units[0].n}
-            </div>
-            <div style={{ marginTop: 6 }}>
-              <Bar value={100} color={race.primary} height={2} />
-            </div>
-          </Panel>
-
-          {/* quick actions mid-right — each race's keys route via the
-            * QUICK_ACTION_ROUTES table at the top of the file. Unknown keys
-            * are no-ops; add them to the table when new actions land. */}
-          <div style={{ position: 'absolute', right: 10, top: '32%' }}>
+          {/* quick actions mid-right + TOPLA collect button */}
+          <div style={{ position: 'absolute', right: 10, top: '32%', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <RaceQuickActions
               race={race}
               onAction={(key) => {
@@ -366,6 +321,10 @@ export default function BaseHomePage() {
                 if (route) router.push(route);
               }}
             />
+            {/* Resource collect — polls the latest wallet values from the backend.
+              * Resources accumulate passively per tick; this button makes the
+              * current total visible immediately. Disabled for 3s after each tap. */}
+            <CollectButton race={race} />
           </div>
 
           {/* Selected-building card.  Has two states:
@@ -715,5 +674,59 @@ function BuildingCard({
         </button>
       )}
     </div>
+  );
+}
+
+/* ── CollectButton — one-tap resource refresh ───────────────────────────── */
+// Resources accumulate passively from buildings each tick. Tapping TOPLA
+// polls the backend wallet immediately so the player sees the latest total.
+function CollectButton({ race }: { race: NDRace }) {
+  const [cooling, setCooling] = useState(false);
+
+  const handle = () => {
+    if (cooling) return;
+    refreshGameResources();
+    setCooling(true);
+    window.setTimeout(() => setCooling(false), 3000);
+  };
+
+  const shape = {
+    clipPath: 'none',
+    borderRadius: 4,
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={cooling}
+      aria-label="Kaynakları topla"
+      style={{
+        all: 'unset',
+        width: 56,
+        height: 44,
+        padding: '4px 0',
+        background: cooling ? 'rgba(8,12,26,0.45)' : 'rgba(8,12,26,0.78)',
+        border: `1px solid ${cooling ? race.primary + '33' : race.primary + '77'}`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+        color: cooling ? race.primary + '66' : race.primary,
+        cursor: cooling ? 'default' : 'pointer',
+        transition: 'opacity 200ms',
+        ...shape,
+      }}
+    >
+      {/* coin / collect icon */}
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 5v6M6 7l2-2 2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span style={{ fontFamily: ND.display, fontSize: 9, letterSpacing: '0.10em' }}>
+        {cooling ? '···' : 'TOPLA'}
+      </span>
+    </button>
   );
 }

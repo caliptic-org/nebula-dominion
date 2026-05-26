@@ -16,6 +16,7 @@ import {
   useNDRace,
 } from '@/components/handoff';
 import { setTokens } from '@/lib/session';
+import { translateBackendError } from '@/lib/translate-backend-error';
 
 interface FieldDef {
   label: string;
@@ -186,12 +187,15 @@ export function RegisterForm() {
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        // Flatten class-validator's array form so the rest of the branch
+        // can pattern-match a string.
+        const rawMsg = Array.isArray(data.message) ? data.message.join(' · ') : data.message ?? '';
         // 409 = duplicate username/email. Surface as a field error so the
         // player knows exactly which field to fix (and that "Giriş yap"
         // is probably the next move) instead of a vague top banner.
         if (res.status === 409) {
-          const msg = data.message?.toLowerCase() ?? '';
+          const msg = rawMsg.toLowerCase();
           if (msg.includes('email') || msg.includes('e-posta') || msg.includes('e-mail')) {
             setFieldErrors((errs) => ({ ...errs, email: 'Bu e-posta zaten kayıtlı — giriş yap' }));
           } else if (msg.includes('username') || msg.includes('kullanıcı')) {
@@ -206,7 +210,7 @@ export function RegisterForm() {
           }
           return;
         }
-        throw new Error(data.message ?? t('errorGeneric'));
+        throw new Error(translateBackendError(rawMsg || t('errorGeneric')));
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });

@@ -101,11 +101,11 @@ function fmtDuration(sec: number) {
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 export default function ProfilePage() {
@@ -463,8 +463,8 @@ export default function ProfilePage() {
 
       <BottomNav
         race={race}
-        active="more"
-        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+        active={null}
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
       />
     </Screen>
   );
@@ -586,6 +586,28 @@ function BuffRow({ buff, race }: { buff: BuffViewModel; race: NDRace }) {
   );
 }
 
+/** Pretty-print a battle timestamp. Falls back to the raw string when not
+ *  parseable so we never silently swallow diagnostics. Backend returns ISO
+ *  (2026-05-26T10:28:56.011Z), so a default toLocaleString() chops it down
+ *  to a readable "26.05.2026 13:28" depending on locale. */
+function formatBattleWhen(when: string): string {
+  if (!when) return '';
+  // Already-formatted strings (mock data) pass through unchanged.
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(when)) return when;
+  try {
+    const d = new Date(when);
+    if (Number.isNaN(d.getTime())) return when;
+    return d.toLocaleString('tr-TR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return when;
+  }
+}
+
 function HistoryRow({ entry, race }: { entry: HistoryEntry; race: NDRace }) {
   const color = entry.result === 'win' ? ND.ok : ND.danger;
   return (
@@ -607,7 +629,7 @@ function HistoryRow({ entry, race }: { entry: HistoryEntry; race: NDRace }) {
         <div style={{ fontFamily: ND.display, fontSize: 12, color: ND.text }}>
           vs {entry.opponent}
         </div>
-        <Caption style={{ fontSize: 10 }}>{entry.when}</Caption>
+        <Caption style={{ fontSize: 10 }}>{formatBattleWhen(entry.when)}</Caption>
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontFamily: ND.mono, fontSize: 12, color }}>

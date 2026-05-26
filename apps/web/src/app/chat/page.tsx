@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
+  BottomNav,
   RACES,
   ND,
   Screen,
@@ -16,7 +18,6 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
-import { BottomNav } from '@/components/ui/BottomNav';
 import { api, FetchError } from '@/lib/api';
 import { useChatChannel, type ChatChannelMessage } from '@/hooks/useChatChannel';
 
@@ -579,8 +580,17 @@ function DMListItem({ conv, onClick }: { conv: DMConversation; onClick: () => vo
 
 /* ── Main Component ────────────────────────────────────────────────────── */
 
+const CHAT_NAV_ROUTES: Record<string, string> = {
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
+};
+
 export default function ChatPage() {
   const race = useNDRace();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ChatTab>('global');
   const [input, setInput] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
@@ -1219,9 +1229,11 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div style={{ paddingTop: 8, flexShrink: 0 }}>
-        <BottomNav />
-      </div>
+      <BottomNav
+        race={race}
+        active={null}
+        onChange={(key) => router.push(CHAT_NAV_ROUTES[key] ?? '/base')}
+      />
     </Screen>
   );
 }

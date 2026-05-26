@@ -49,11 +49,11 @@ interface BuildEntry {
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 export default function BuildMenuPage() {
@@ -245,6 +245,7 @@ function BuildMenuInner() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
+          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
         />
 
         <div
@@ -582,6 +583,7 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // Insan — sleek military sci-fi
   komuta_ussu:        'command_center',
   reaktor_modulu:     'solar_plant',       // power generator
+  yakit_rafinerisi:   'gas_refinery',      // gas/Yakıt — added so insan players actually accrue Yakıt (was 0)
   kisla:              'barracks',          // unit training
   bilim_akademisi:    'academy',           // advanced research
   subspace_anteni:    'shield_generator',  // long-range defense
@@ -598,6 +600,7 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // Otomat — cybernetic
   sonsuzluk_cekirdegi:'command_center',
   veri_kaynagi:       'solar_plant',       // data/power core
+  hesap_havuzu:       'gas_refinery',      // gas/Hesap — added so otomat players actually accrue Hesap (was 0)
   montaj_hatti:       'nano_forge',        // assembly line
   mantik_matrisi:     'cyber_core',        // logic matrix
   cihaz_hazinesi:     'quantum_reactor',   // device storage

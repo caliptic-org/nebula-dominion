@@ -17,6 +17,7 @@ import {
   useNDRace,
 } from '@/components/handoff';
 import { setTokens } from '@/lib/session';
+import { translateBackendError } from '@/lib/translate-backend-error';
 import { raceApi, syncRaceCommitmentFromBackend } from '@/lib/race-api';
 import { Analytics } from '@/lib/analytics';
 import { toast } from '@/components/handoff/Toaster';
@@ -163,8 +164,14 @@ export function LoginForm() {
         body: JSON.stringify(values),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(data.message ?? t('errorGeneric'));
+        const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        // NestJS class-validator returns message as either a string or
+        // string[]. Flatten and pipe through translateBackendError so the
+        // toast/inline error reads in Turkish instead of "identifier must
+        // be longer than or equal to 1 characters".
+        const raw = data.message;
+        const flat = Array.isArray(raw) ? raw.join(' · ') : raw ?? t('errorGeneric');
+        throw new Error(translateBackendError(flat));
       }
       const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
       setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });

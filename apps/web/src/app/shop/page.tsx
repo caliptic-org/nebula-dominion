@@ -144,11 +144,11 @@ function useCountdown(secs: number) {
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 // /vip route redirects here with ?tab=vip. Honour the param so the player
@@ -301,8 +301,8 @@ function ShopPageInner() {
 
       <BottomNav
         race={race}
-        active="more"
-        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+        active="shop"
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
       />
     </Screen>
   );

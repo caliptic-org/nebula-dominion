@@ -137,11 +137,11 @@ function questToMission(q: Quest): Mission {
 }
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 export default function MissionsPage() {
@@ -250,8 +250,8 @@ export default function MissionsPage() {
 
       <BottomNav
         race={race}
-        active="more"
-        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/settings')}
+        active={null}
+        onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
       />
     </Screen>
   );

@@ -82,8 +82,8 @@
       "howTo": "Build your primary resource building — auto-produces each tick. More buildings = faster production."
     },
     "resB": {
-      "description": "Secondary resource required for advanced units and research.",
-      "howTo": "Build an extractor + gain passive production over time. Also earned from boss kills and raid drops."
+      "description": "Secondary gas/fuel resource required for advanced units and structures.",
+      "howTo": "Build a gas refinery / extractor + gain passive production over time. Also earned from boss kills and raid drops."
     },
     "crystal": {
       "title": "Energy",

@@ -82,8 +82,8 @@
       "howTo": "Üssünde ana kaynak binası inşa et — her tick'te otomatik üretilir. Daha fazla bina = daha hızlı üretim."
     },
     "resB": {
-      "description": "İleri seviye birimler ve araştırmalar için gerekli ikincil kaynak.",
-      "howTo": "Çekim binası inşa et + zamanla pasif üretim al. Boss ve raid drop'larından da kazanılır."
+      "description": "İleri seviye birim ve gelişmiş yapılar için gerekli ikincil kaynak. Gaz/yakıt tipindedir.",
+      "howTo": "Gaz rafinerisi / çekim binası inşa et + zamanla pasif üretim al. Boss ve raid drop'larından da kazanılır."
     },
     "crystal": {
       "title": "Enerji",

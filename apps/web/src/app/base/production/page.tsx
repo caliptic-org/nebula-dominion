@@ -60,7 +60,12 @@ const SWIPE_CANCEL_PX = 80;
 const SWIPE_THRESHOLD_PX = 56;
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
+  // (Legacy keys kept below for any callers not yet migrated.)
   galaxy: '/map',
   cmd: '/commanders',
   story: '/story-gallery',
@@ -129,6 +134,11 @@ export default function ProductionPage() {
   const { data: liveQueue, refresh: refreshQueue } = useTrainingQueue();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [flashId, setFlashId] = useState<string | null>(null);
+
+  // Collapsible queue panel — mirrors BuildingCard hover+tap pattern from /base
+  const [queueHovered, setQueueHovered] = useState(false);
+  const [queueTapToggled, setQueueTapToggled] = useState(false);
+  const queueExpanded = queueHovered || queueTapToggled;
 
   // Hydrate the local queue every time the server-side queue advances.
   // Maps backend rows → QueueItem by computing remainingSec from
@@ -212,7 +222,16 @@ export default function ProductionPage() {
     return Math.min(1, (h.totalSec - h.remainingSec) / h.totalSec);
   }, [queue]);
 
-  const selectedUnit = units[selected];
+  // Filter units by active tab: T1→tab0, T2→tab1, T3→tab2, T4+→tab3
+  // Carry origIdx so handleAdd can still look up backendUnits[origIdx].
+  const visibleUnits = useMemo(() => {
+    const tabCount = (TABS[race.key] ?? TABS.insan).length;
+    return units
+      .map((u, i) => ({ ...u, origIdx: i }))
+      .filter(u => Math.min(tabCount - 1, Math.max(0, u.tier - 1)) === tab);
+  }, [units, tab, race.key]);
+
+  const selectedUnit = visibleUnits[selected];
   const canAfford =
     selectedUnit !== undefined &&
     resA >= toNum(selectedUnit.costA) * count &&
@@ -235,7 +254,7 @@ export default function ProductionPage() {
     // the optimistic local queue if the player isn't authed or the
     // backend can't accept the train order — that keeps the demo
     // playable without a fully-wired training pipeline.
-    const backendCfg = backendUnits[selected];
+    const backendCfg = backendUnits[(selectedUnit as typeof selectedUnit & { origIdx?: number })?.origIdx ?? selected];
     const unitType = backendCfg?.type;
     const reqBuilding = (backendCfg as { requiredBuilding?: string } | undefined)?.requiredBuilding;
     const trainingBuilding =
@@ -392,76 +411,156 @@ export default function ProductionPage() {
           resA={resources ? formatResource(resources.mineral) : formatNumber(resA)}
           resB={resources ? formatResource(resources.gas) : formatNumber(resB)}
           crystal={resources ? formatResource(resources.energy) : String(crystal)}
+          science={resources ? formatResource(resources.science) : undefined}
         />
 
-        {/* Production flow — capped so the unit library always gets space */}
-        <div style={{ padding: '12px 14px 0', flexShrink: 0, maxHeight: '42dvh', overflowY: 'auto' }}>
-          <Panel race={race} style={{ padding: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Eyebrow color={race.primary}>ŞU AN ÜRETİLİYOR</Eyebrow>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Code style={{ color: ND.textDim }}>{slotsUsed > 0 ? `KALAN ${formatDuration(totalRemainingSec)}` : 'KUYRUK BOŞ'}</Code>
+        {/* Queue module — fixed bottom-left, collapses to chip like base building cards */}
+        <div
+          style={{
+            position: 'fixed',
+            // 60px BottomNav + 90px CTA + 12px gap ≈ 162px
+            bottom: 162,
+            left: 12,
+            right: queueExpanded ? 12 : 'auto',
+            zIndex: 40,
+            transition: 'right 220ms ease',
+          }}
+          onMouseEnter={() => setQueueHovered(true)}
+          onMouseLeave={() => setQueueHovered(false)}
+        >
+          {queueExpanded ? (
+            /* ── Expanded panel ── */
+            <Panel race={race} glow style={{ padding: 12, maxHeight: '42dvh', overflowY: 'auto', backdropFilter: 'blur(14px)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Eyebrow color={race.primary}>ŞU AN ÜRETİLİYOR</Eyebrow>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Code style={{ color: ND.textDim }}>{slotsUsed > 0 ? `KALAN ${formatDuration(totalRemainingSec)}` : 'KUYRUK BOŞ'}</Code>
+                  {/* Minimize button */}
+                  <button
+                    type="button"
+                    aria-label="Küçült"
+                    onClick={() => { setQueueTapToggled(false); setQueueHovered(false); }}
+                    style={{
+                      all: 'unset',
+                      cursor: 'pointer',
+                      fontFamily: ND.display,
+                      fontSize: 16,
+                      color: ND.textDim,
+                      lineHeight: 1,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {queue.length === 0 ? (
-                <Caption style={{ padding: '8px 0' }}>
-                  Kuyruk boş. Aşağıdan birim seç ve üretime ekle.
-                </Caption>
-              ) : null}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {queue.length === 0 ? (
+                  <Caption style={{ padding: '8px 0' }}>
+                    Kuyruk boş. Aşağıdan birim seç ve üretime ekle.
+                  </Caption>
+                ) : null}
 
-              {queue.map((q, i) => (
-                <QueueRow
-                  key={q.id}
-                  race={race}
-                  item={q}
-                  index={i}
-                  isHead={i === 0}
-                  headProgress={i === 0 ? headProgress : 0}
-                  flash={flashId === q.id}
-                  affordableSpeedUp={crystal >= q.speedUpCost}
-                  onSpeedUp={() => handleSpeedUp(q.id)}
-                  onCancel={() => handleCancel(q.id)}
-                />
-              ))}
+                {queue.map((q, i) => (
+                  <QueueRow
+                    key={q.id}
+                    race={race}
+                    item={q}
+                    index={i}
+                    isHead={i === 0}
+                    headProgress={i === 0 ? headProgress : 0}
+                    flash={flashId === q.id}
+                    affordableSpeedUp={crystal >= q.speedUpCost}
+                    onSpeedUp={() => handleSpeedUp(q.id)}
+                    onCancel={() => handleCancel(q.id)}
+                  />
+                ))}
 
-              {/* Empty slots */}
-              {Array.from({ length: Math.max(0, SLOT_TOTAL - queue.length) }).map((_, i) => (
-                <EmptySlot key={`empty-${i}`} race={race} index={queue.length + i} />
-              ))}
-            </div>
+                {/* Empty slots */}
+                {Array.from({ length: Math.max(0, SLOT_TOTAL - queue.length) }).map((_, i) => (
+                  <EmptySlot key={`empty-${i}`} race={race} index={queue.length + i} />
+                ))}
+              </div>
 
-            {/* Queue-level actions */}
-            {queue.length > 0 && (
-              <div style={{
-                display: 'flex',
+              {/* Queue-level actions */}
+              {queue.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  gap: 8,
+                  marginTop: 10,
+                  paddingTop: 10,
+                  borderTop: `1px dashed ${ND.border}`,
+                }}>
+                  <NDButton
+                    race={race}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSpeedAll}
+                    disabled={crystal < totalCrystalToSpeedAll}
+                    icon={<ResIcon kind="crystal" size={12} color={race.primary} />}
+                  >
+                    TÜMÜNÜ HIZLANDIR · {totalCrystalToSpeedAll}
+                  </NDButton>
+                  <NDButton
+                    race={race}
+                    variant="danger"
+                    size="sm"
+                    onClick={handleClearAll}
+                  >
+                    BOŞALT
+                  </NDButton>
+                </div>
+              )}
+            </Panel>
+          ) : (
+            /* ── Collapsed chip ── */
+            <button
+              type="button"
+              aria-label="Üretim kuyruğunu aç"
+              onClick={() => setQueueTapToggled(true)}
+              style={{
+                all: 'unset',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
                 gap: 8,
-                marginTop: 10,
-                paddingTop: 10,
-                borderTop: `1px dashed ${ND.border}`,
-              }}>
-                <NDButton
-                  race={race}
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSpeedAll}
-                  disabled={crystal < totalCrystalToSpeedAll}
-                  icon={<ResIcon kind="crystal" size={12} color={race.primary} />}
-                >
-                  TÜMÜNÜ HIZLANDIR · {totalCrystalToSpeedAll}
-                </NDButton>
-                <NDButton
-                  race={race}
-                  variant="danger"
-                  size="sm"
-                  onClick={handleClearAll}
-                >
-                  BOŞALT
-                </NDButton>
-              </div>
-            )}
-          </Panel>
+                padding: '8px 12px',
+                background: 'rgba(8,10,16,0.92)',
+                border: `1px solid ${queue.length > 0 ? `${race.primary}88` : ND.border}`,
+                borderRadius: 8,
+                backdropFilter: 'blur(12px)',
+                fontFamily: ND.display,
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: ND.textDim,
+                boxShadow: queue.length > 0 ? `0 0 12px ${race.glow}44` : 'none',
+              }}
+            >
+              <Sigil race={race} size={14} />
+              <span style={{ color: ND.text }}>
+                {queue.length > 0 ? queue[0].unitName : 'KUYRUK BOŞ'}
+              </span>
+              {queue.length > 1 && (
+                <span style={{ color: race.primary, fontSize: 9, letterSpacing: 0 }}>
+                  +{queue.length - 1}
+                </span>
+              )}
+              <span
+                aria-hidden
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: queue.length > 0 ? race.primary : ND.border,
+                  boxShadow: queue.length > 0 ? `0 0 6px ${race.glow}` : 'none',
+                  flexShrink: 0,
+                }}
+              />
+            </button>
+          )}
         </div>
 
         {/* Library section — takes all remaining flex space so unit list can scroll */}
@@ -470,7 +569,7 @@ export default function ProductionPage() {
         {/* Library label + tabs */}
         <div style={{ padding: '14px 14px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <Eyebrow color={race.primary}>BİRİM KÜTÜPHANESİ</Eyebrow>
-          <Code>{units.length} BİRİM</Code>
+          <Code>{visibleUnits.length} BİRİM</Code>
         </div>
         <div style={{ padding: '8px 14px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
@@ -480,7 +579,7 @@ export default function ProductionPage() {
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setTab(i)}
+                  onClick={() => { setTab(i); setSelected(0); }}
                   aria-pressed={on}
                   style={{
                     all: 'unset',
@@ -509,7 +608,12 @@ export default function ProductionPage() {
 
         {/* Unit list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {units.map((u, i) => {
+          {visibleUnits.length === 0 && (
+            <Caption style={{ padding: '16px 0', textAlign: 'center' }}>
+              Bu kategoride birim yok.
+            </Caption>
+          )}
+          {visibleUnits.map((u, i) => {
             const on = i === selected;
             return (
               <div

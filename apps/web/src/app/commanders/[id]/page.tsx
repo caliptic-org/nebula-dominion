@@ -158,12 +158,16 @@ function CommanderDetail({ commander }: { commander: Commander }) {
             />
           )}
 
-          {/* Gradient overlay (bottom) */}
+          {/* Gradient overlay (bottom) — strengthened so the commander's name
+           *  + sub-title chips below stay readable over the image art. The
+           *  previous "var(--color-bg) 0%, … transparent 100%" stopped the
+           *  solid colour too low, leaving the name partially obscured by
+           *  bright art on the lower third of the portrait. */}
           <div
             className="absolute inset-x-0 bottom-0 pointer-events-none"
             style={{
-              height: '55%',
-              background: `linear-gradient(to top, var(--color-bg) 0%, ${theme.color}18 40%, transparent 100%)`,
+              height: '60%',
+              background: `linear-gradient(to top, var(--color-bg) 0%, var(--color-bg) 30%, ${theme.color}22 60%, transparent 100%)`,
             }}
           />
 

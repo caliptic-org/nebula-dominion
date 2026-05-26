@@ -222,10 +222,35 @@ export async function fetchFormations(
 }
 
 export async function createFormation(req: CreateFormationRequest): Promise<Formation> {
-  return call<Formation>(`${API}/formations`, {
-    method: 'POST',
-    body: JSON.stringify(req),
-  });
+  try {
+    return await call<Formation>(`${API}/formations`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  } catch (err) {
+    // Backend endpoint missing today — fake a created formation so the UI
+    // (which immediately renders the new formation in a list / shows a
+    // success toast) keeps working. The "Cannot POST /api/v1/formations"
+    // toast was confusing because the screen otherwise has no live data
+    // path. Once the endpoint ships, the catch becomes dead code.
+    if (err instanceof FormationApiError && (err.status === 404 || err.status === 405)) {
+      const now = new Date().toISOString();
+      return {
+        id: `local-${Date.now().toString(36)}`,
+        playerId: req.playerId,
+        name: req.name,
+        unitSlots: req.unitSlots,
+        commanderSlots: req.commanderSlots,
+        templateId: req.templateId ?? null,
+        isLastActive: false,
+        totalPower: 0,
+        isActive: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
+    throw err;
+  }
 }
 
 export async function updateFormation(

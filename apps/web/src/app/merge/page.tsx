@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -68,11 +68,11 @@ const SLOT_COUNT = 3;
 const COST_B = 200;
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
 };
 
 function riskColor(label: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK') {
@@ -129,7 +129,12 @@ export default function MergePage() {
   // hard-gate canMerge so a click can't POST fake demo-* ids and get rejected
   // with a confusing toast.
   const isDemoMode = livePool.length === 0;
-  const authenticated = hasSession();
+  // Read auth status only after mount to avoid a server vs client text
+  // mismatch — `hasSession()` reads localStorage, so SSR always says false
+  // while the client reads the real token. The demo-mode banner copy
+  // branches on this, so the difference triggers a React hydration warning.
+  const [authenticated, setAuthenticated] = useState(false);
+  useEffect(() => { setAuthenticated(hasSession()); }, []);
   // Authoritative `canMerge` comes from backend when present; client estimate
   // is used only while waiting on the network round-trip. Demo mode never
   // allows merge — the button shows "Önce birim eğit" instead.
@@ -225,6 +230,7 @@ export default function MergePage() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
+          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
         />
 
         {/* Hint */}

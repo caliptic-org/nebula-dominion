@@ -32,12 +32,6 @@ on:
       - 'deploy/nginx/**'
       - '.github/workflows/deploy-nginx.yml'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Only run `nginx -t`, don't reload (for safe testing)"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -101,20 +95,13 @@ jobs:
           fi
 
       - name: Install (sudo) + nginx -t + reload
-        if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
           # install.sh root sudo gerektiriyor.  Runner host'ta yukarıdaki
           # NOPASSWD sudoers kuralı varsa direkt geçer.
           sudo bash deploy/nginx/install.sh
 
-      - name: Dry-run note
-        if: ${{ inputs.dry_run }}
-        run: |
-          echo "Dry-run requested — syntax validated but bastion not touched."
-
       - name: Post-deploy smoke test
-        if: ${{ !inputs.dry_run }}
         # Doğru vhost'lar canlı mı?  Bastion'da localhost'a kendi Host
         # header'ı ile vur — Cloudflare tunnel'a hiç dokunma.
         run: |
@@ -139,5 +126,5 @@ jobs:
         run: |
           echo "### nginx config deployed :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "- **Files:** \`/etc/nginx/conf.d/{nebula-dominion,00-nebula-maps}.conf\`"  >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode:** ${{ inputs.dry_run && 'dry-run (syntax only)' || 'applied + reloaded' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** applied + reloaded" >> $GITHUB_STEP_SUMMARY
           echo "- **Hosts:** nebula.caliptic.com · api-nebula.caliptic.com · game-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY

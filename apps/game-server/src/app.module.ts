@@ -21,6 +21,7 @@ import { EconomyModule } from './economy/economy.module';
 import { GuildsModule } from './guilds/guilds.module';
 import { UnitsModule } from './units/units.module';
 import { GalaxyMapModule } from './map/galaxy-map.module';
+import { QuestProgressModule } from './quest-progress/quest-progress.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { GalaxyMapModule } from './map/galaxy-map.module';
     GuildsModule,
     UnitsModule,
     GalaxyMapModule,
+    QuestProgressModule,
   ],
 })
 export class AppModule {}

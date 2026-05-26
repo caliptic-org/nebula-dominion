@@ -32,6 +32,7 @@ import { MetaModule } from './meta/meta.module';
 import { MapModule } from '../../../backend/src/map/map.module';
 import { ConversionsModule } from './modules/conversions/conversions.module';
 import { FormationsModule } from './modules/formations/formations.module';
+import { QuestProgressModule } from './modules/quest-progress/quest-progress.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { FormationsModule } from './modules/formations/formations.module';
     MapModule,
     ConversionsModule,
     FormationsModule,
+    QuestProgressModule,
   ],
 })
 export class AppModule {}

@@ -10,6 +10,7 @@ import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
 import { MergeService } from './merge/merge.service';
+import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 const GRID_WIDTH = 8;
@@ -61,6 +62,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly progression: ProgressionService,
     private readonly mergeService: MergeService,
+    private readonly questProgress: QuestProgressNotifier,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
   }
@@ -473,6 +475,17 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
       this.progression.awardXp({ userId: winnerId, source: XpSource.BATTLE_WIN, referenceId: room.id }),
       this.progression.awardXp({ userId: loserId, source: XpSource.BATTLE_LOSS, referenceId: room.id }),
     ]).catch((err) => this.logger.error(`Failed to award battle XP: ${err.message}`));
+
+    // QUEST PROGRESS HOOK — battle.won
+    // Bump the winner's `battles_won` counter on the api missions side.
+    // Idempotency key is the matchId so a finishGame retry (e.g. resume
+    // after a websocket reconnect) doesn't double-count. Bots are filtered
+    // out by the notifier so a player vs bot win still credits the human.
+    this.questProgress.notify(
+      winnerId,
+      'battles_won',
+      `battle:${room.id}`,
+    );
 
     return { success: true, room, events };
   }

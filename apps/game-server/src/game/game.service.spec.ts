@@ -153,6 +153,7 @@ function buildService(): {
     configMock as ConfigService,
     progressionMock as any,
     mergeServiceMock as any,
+    { notify: jest.fn() } as any,
   );
 
   // Provide a way to set the current room for a test
@@ -517,6 +518,7 @@ describe('GameService — PvE bot anti-cheat bypass', () => {
       { get: jest.fn().mockImplementation((_k: string, def: any) => def) } as any,
       { awardXp: jest.fn().mockResolvedValue(undefined) } as any,
       { findRecipe: jest.fn().mockReturnValue(null), merge: jest.fn(), mutate: jest.fn().mockReturnValue(null), getAvailableMutationsForUnit: jest.fn().mockReturnValue([]) } as any,
+      { notify: jest.fn() } as any,
     );
 
     const botId = 'bot:test-bot-id';

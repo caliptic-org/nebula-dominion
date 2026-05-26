@@ -29,19 +29,19 @@ import { notFound, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   Bar,
-  BottomNav,
   Caption,
   Chip,
   Code,
+  DetailLayout,
   Eyebrow,
   H2,
-  H3,
   HUD,
   ND,
   NDButton,
   Panel,
   ResIcon,
-  Screen,
+  ScreenFooter,
+  ScreenHeader,
   Sigil,
   toast,
   useNDRace,
@@ -64,6 +64,9 @@ import { hasSession } from '@/lib/session';
 const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   komuta_ussu:        'command_center',
   reaktor_modulu:     'solar_plant',
+  // gas/Yakıt source for insan — paired with the new slot in nd-tokens.ts
+  // so insan players can actually accrue Yakıt instead of staying at 0.
+  yakit_rafinerisi:   'gas_refinery',
   kisla:              'barracks',
   bilim_akademisi:    'academy',
   subspace_anteni:    'shield_generator',
@@ -76,6 +79,8 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   subspace_damari:    'gas_refinery',
   sonsuzluk_cekirdegi:'command_center',
   veri_kaynagi:       'solar_plant',
+  // gas/Hesap source for otomat — same rationale as yakit_rafinerisi.
+  hesap_havuzu:       'gas_refinery',
   montaj_hatti:       'nano_forge',
   mantik_matrisi:     'cyber_core',
   cihaz_hazinesi:     'quantum_reactor',
@@ -212,58 +217,58 @@ function Inner({ slug }: { slug: string }) {
       : 'YAPILMAMIŞ';
 
   return (
-    <div data-race={race.key} style={{ position: 'relative', height: '100dvh', overflow: 'hidden' }}>
-      <Screen race={race} dim={0.5} style={{ height: '100dvh' }}>
-        <HUD
-          race={race}
-          level={liveLevel ?? 9}
-          levelName={liveTierName ?? 'Metropol'}
-          resA={resA}
-          resB={resB}
-          crystal={resCrystal}
-        />
-
-        {/* Header */}
-        <div
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '10px 14px',
-            background: 'rgba(8,10,16,0.55)',
-            borderBottom: `1px solid ${race.primary}33`,
-          }}
-        >
-          <Link
-            href="/base"
-            style={{
-              fontFamily: ND.display,
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              color: ND.textDim,
-              textDecoration: 'none',
-              textTransform: 'uppercase',
-            }}
-          >
-            ← Ana Üs
+    <DetailLayout
+      race={race}
+      bgDim={0.5}
+      mainStyle={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 14px' }}
+      header={
+        <>
+          <HUD
+            race={race}
+            level={liveLevel ?? 9}
+            levelName={liveTierName ?? 'Metropol'}
+            resA={resA}
+            resB={resB}
+            crystal={resCrystal}
+            science={resources ? formatResource(resources.science) : undefined}
+          />
+          <ScreenHeader
+            onBack={() => router.push('/base')}
+            backLabel="Ana Üs"
+            eyebrow={lex.catalogName}
+            title={tokenBuilding.n}
+            right={
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Sigil race={race} size={16} />
+                <Code style={{ color: race.primary }}>SLOT {slotIndex + 1}/6</Code>
+              </div>
+            }
+          />
+        </>
+      }
+      footer={
+        <ScreenFooter>
+          <Link href="/base/production" style={{ textDecoration: 'none' }}>
+            <NDButton race={race} variant="ghost" size="md">EĞİT</NDButton>
           </Link>
-          <div style={{ width: 1, height: 14, background: ND.border }} aria-hidden />
-          <Sigil race={race} size={20} />
-          <Code style={{ color: race.primary }}>{tokenBuilding.n}</Code>
-        </div>
-
-        {/* Scrollable body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '14px 14px 120px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
+          <NDButton
+            race={race}
+            size="md"
+            full
+            disabled={(tokenBuilding.locked ?? false) || busy}
+            onClick={handleBuild}
+          >
+            {busy
+              ? 'GÖNDERİLİYOR…'
+              : owned
+                ? `${lex.actionVerb} BAŞLAT · Lv ${owned.level + 1}`
+                : `${lex.actionVerb} BAŞLAT`}
+          </NDButton>
+        </ScreenFooter>
+      }
+    >
+      {/* Scrollable body */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Hero image + identity */}
           <Panel race={race} glow style={{ padding: 14, display: 'flex', gap: 14 }}>
             <div
@@ -470,47 +475,8 @@ function Inner({ slug }: { slug: string }) {
               </div>
             </Panel>
           )}
-        </div>
-
-        {/* Bottom CTAs */}
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: '12px 14px calc(12px + env(safe-area-inset-bottom, 0px))',
-            background: 'linear-gradient(180deg, rgba(6,8,15,0) 0%, rgba(6,8,15,0.94) 30%, rgba(6,8,15,0.98) 100%)',
-            backdropFilter: 'blur(10px)',
-            borderTop: `1px solid ${race.primary}33`,
-            display: 'flex',
-            gap: 8,
-            zIndex: 10,
-          }}
-        >
-          <Link href="/base/production" style={{ textDecoration: 'none' }}>
-            <NDButton race={race} variant="ghost" size="md">
-              EĞİT
-            </NDButton>
-          </Link>
-          <NDButton
-            race={race}
-            size="md"
-            full
-            disabled={(tokenBuilding.locked ?? false) || busy}
-            onClick={handleBuild}
-          >
-            {busy
-              ? 'GÖNDERİLİYOR…'
-              : owned
-                ? `${lex.actionVerb} BAŞLAT · Lv ${owned.level + 1}`
-                : `${lex.actionVerb} BAŞLAT`}
-          </NDButton>
-        </div>
-
-        <BottomNav race={race} active="base" />
-      </Screen>
-    </div>
+      </div>
+    </DetailLayout>
   );
 }
 

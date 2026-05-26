@@ -201,7 +201,8 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
         fontFamily: ND.body,
         position: 'relative',
         overflow: 'hidden',
-        paddingBottom: 100,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Backdrop race={race} enemy={enemy} />
@@ -314,12 +315,17 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
         style={{
           position: 'relative',
           zIndex: 5,
+          flex: 1,
+          overflowY: 'auto',
           padding: 14,
+          paddingBottom: 90,
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
           maxWidth: 720,
           margin: '0 auto',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {/* Formation grid */}
@@ -568,10 +574,9 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
 
       <footer
         style={{
-          position: 'fixed',
-          insetInline: 0,
-          bottom: 0,
-          zIndex: 20,
+          position: 'relative',
+          zIndex: 10,
+          flexShrink: 0,
           padding: 12,
           background: 'linear-gradient(0deg, rgba(6,8,15,0.96), rgba(6,8,15,0.55))',
           borderTop: `1px solid ${ND.border}`,

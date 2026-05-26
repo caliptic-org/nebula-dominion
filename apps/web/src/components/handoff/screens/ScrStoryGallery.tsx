@@ -117,6 +117,7 @@ export function ScrStoryGallery({ playerRaceKey, unlocks }: ScrStoryGalleryProps
       style={{
         position: 'relative',
         height: '100dvh',
+        overflow: 'hidden',
         background: ND.bg,
         color: ND.text,
         fontFamily: ND.body,
@@ -124,7 +125,7 @@ export function ScrStoryGallery({ playerRaceKey, unlocks }: ScrStoryGalleryProps
     >
       <NebulaBg race={playerRace} intensity={0.75} dim={0.85} />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <header
           style={{
             position: 'sticky',

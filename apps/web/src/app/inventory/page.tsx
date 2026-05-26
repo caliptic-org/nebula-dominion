@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -10,7 +10,6 @@ import {
   Caption,
   Chip,
   Code,
-  Eyebrow,
   H3,
   HUD,
   ND,
@@ -24,7 +23,7 @@ import {
   toast,
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
-import type { NDRace } from '@/components/handoff/nd-tokens';
+import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useGameUnits';
 import { useGameResources } from '@/hooks/useGameResources';
@@ -33,31 +32,84 @@ import { useHudState } from '@/hooks/useHudState';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 
+/* ─── Race-specific copy ────────────────────────────────────────────────── */
+
 const ROSTER_NAMES: Record<string, string> = {
-  insan:   'Birim Envanteri',
-  zerg:    'Sürü Vücudu',
-  otomat:  'Birim Kataloğu',
-  canavar: 'Av Topluluğu',
-  seytan:  'Bağlı Ruhlar',
+  insan:   'TUGAY ENVANTERİ',
+  zerg:    'SÜRÜ TABLOSU',
+  otomat:  'BİRİM REGİSTRİ',
+  canavar: 'SÜRÜ KAYDI',
+  seytan:  'MAHKEME SİCİLİ',
 };
 
+/** Left button label — race-specific merge / promotion verb */
 const MERGE_VERB: Record<string, string> = {
-  insan:   'Birleştir',
-  zerg:    'Mutate',
-  otomat:  'Derle',
-  canavar: 'Yut',
-  seytan:  'Bağla',
+  insan:   'TERFİ',
+  zerg:    'EVRİMLE',
+  otomat:  'BİRLEŞTİR',
+  canavar: 'YE',
+  seytan:  'MÜHÜRLE',
 };
+
+const BOTTOM_NAV_ROUTES: Record<string, string> = {
+  base:     '/base',
+  map:      '/map',
+  battle:   '/battle',
+  alliance: '/alliance',
+  shop:     '/shop',
+};
+
+/* ─── Unit silhouette SVG — abstract race glyph (28×28 vb) ─────────────── */
+
+function UnitSilhouette({ race }: { race: NDRace }) {
+  const c = race.primary;
+  switch (race.key as NDRaceKey) {
+    case 'zerg':
+      return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <ellipse cx="14" cy="15" rx="9" ry="8" stroke={c} strokeWidth="1.2" />
+          <circle cx="10" cy="11" r="2" fill={c} opacity="0.6" />
+          <circle cx="18" cy="11" r="2" fill={c} opacity="0.6" />
+        </svg>
+      );
+    case 'otomat':
+      return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect x="6" y="6" width="16" height="16" stroke={c} strokeWidth="1.2" />
+          <rect x="10" y="10" width="8" height="8" fill={c} opacity="0.4" />
+        </svg>
+      );
+    case 'canavar':
+      return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M7 21 C10 14 18 14 21 21" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M7 7 C10 14 18 14 21 7" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      );
+    case 'seytan':
+      return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M14 5 L23 22 H5 Z" fill={c} opacity="0.35" stroke={c} strokeWidth="1.2" />
+          <circle cx="14" cy="17" r="3" fill={c} opacity="0.7" />
+        </svg>
+      );
+    default: /* insan */
+      return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect x="10" y="4" width="8" height="8" rx="1" stroke={c} strokeWidth="1.2" />
+          <path d="M7 22 L7 14 Q14 11 21 14 L21 22" stroke={c} strokeWidth="1.2" strokeLinecap="round" fill="none" />
+        </svg>
+      );
+  }
+}
+
+/* ─── Types ─────────────────────────────────────────────────────────────── */
 
 type UnitState = 'ready' | 'fleet' | 'wounded';
-type SortKey = 'tier' | 'count' | 'level';
 
 interface RosterUnit {
   id: string;
   name: string;
-  /** Backend `type` string (e.g. 'marine') — used to find a real PlayerUnit
-   *  to upgrade. `null` when the catalog row hasn't loaded yet OR the slot
-   *  is purely race-token-derived (i.e. no live config index). */
   backendType: string | null;
   tier: number;
   level: number;
@@ -68,40 +120,22 @@ interface RosterUnit {
   spd: number;
 }
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'tier',  label: 'Tier'  },
-  { key: 'count', label: 'Adet'  },
-  { key: 'level', label: 'Sevye' },
-];
-
 const STATE_LABEL: Record<UnitState, string> = {
   ready:   'HAZIR',
   wounded: 'YARALI',
   fleet:   'FİLODA',
 };
 
-const BOTTOM_NAV_ROUTES: Record<string, string> = {
-  base: '/base',
-  galaxy: '/map',
-  cmd: '/commanders',
-  story: '/story-gallery',
-  more: '/settings',
-};
+/* ─── Page ──────────────────────────────────────────────────────────────── */
 
 export default function RosterPage() {
-  const race = useNDRace();
-  const router = useRouter();
+  const race    = useNDRace();
+  const router  = useRouter();
   const tInventory = useTranslations('inventory');
-  const hud = useHudState();
+  const hud     = useHudState();
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('tier');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Backend stats overlay: ATK / DEF / SPD numbers come from the game-server
-  // unit catalog (race-spesifik). Count / level / state stay synthesized
-  // Per-player live roster (was previously mock-only). Once the user is
-  // signed in, real `count` values fill in from /api/units; for guests
-  // the synthetic counts stay so the screen never looks empty.
   const { configs: backendUnits } = useUnitConfigs(race.key);
   const { data: liveUnits, refresh: refreshUnits } = useGameUnits();
   const units: RosterUnit[] = useMemo(
@@ -109,26 +143,26 @@ export default function RosterPage() {
     [race, backendUnits, liveUnits],
   );
 
+  /* Tier-filtered list, sorted by tier then count */
   const visible = useMemo(() => {
     const filtered = tierFilter === 'all' ? units : units.filter((u) => u.tier === tierFilter);
-    return [...filtered].sort((a, b) => {
-      if (sortKey === 'tier')  return a.tier - b.tier  || b.count - a.count;
-      if (sortKey === 'count') return b.count - a.count;
-      return b.level - a.level;
-    });
-  }, [units, tierFilter, sortKey]);
+    return [...filtered].sort((a, b) => a.tier - b.tier || b.count - a.count);
+  }, [units, tierFilter]);
 
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === selectedId) ?? null,
     [units, selectedId],
   );
 
-  // Use live population from /buildings/resources when authed. Falls back to
-  // the static demo values so guests still see a populated meter.
+  /* Population */
   const { data: liveRes } = useGameResources();
-  const popUsed = liveRes ? liveRes.population : POP_USED;
-  const popMax = liveRes && liveRes.populationCap > 0 ? liveRes.populationCap : POP_MAX;
+  const popUsed  = liveRes ? liveRes.population : POP_USED;
+  const popMax   = liveRes && liveRes.populationCap > 0 ? liveRes.populationCap : POP_MAX;
   const popRatio = popMax > 0 ? popUsed / popMax : 0;
+
+  /* Pad to 12 cells (3×4) with empty slots so grid always looks full */
+  const GRID_CELLS = 12;
+  const emptyCount = Math.max(0, GRID_CELLS - visible.length);
 
   return (
     <div
@@ -147,38 +181,8 @@ export default function RosterPage() {
       <NebulaBg race={race} intensity={0.7} dim={0.65} />
 
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* Back strip */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '10px 14px',
-          background: 'rgba(8,10,16,0.92)',
-          borderBottom: `1px solid ${ND.border}`,
-          backdropFilter: 'blur(12px)',
-        }}>
-          <Link
-            href="/base"
-            style={{
-              fontFamily: ND.display,
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              color: ND.textDim,
-              textDecoration: 'none',
-              textTransform: 'uppercase',
-            }}
-          >
-            ← Ana Üs
-          </Link>
-          <div style={{ width: 1, height: 14, background: ND.border }} aria-hidden />
-          <Sigil race={race} size={16} />
-          <H3 style={{ color: ND.text }}>{ROSTER_NAMES[race.key] ?? 'Birim Envanteri'}</H3>
-          <div style={{ flex: 1 }} />
-          <Chip color={popRatio > 0.85 ? ND.warn : race.primary}>
-            {popUsed.toLocaleString()} / {popMax.toLocaleString()} POP
-          </Chip>
-        </div>
 
+        {/* HUD */}
         <HUD
           race={race}
           level={hud.level}
@@ -186,38 +190,49 @@ export default function RosterPage() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
+          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
         />
 
-        {/* Tier filter strip — race-shaped buttons with RaceTierBadge */}
-        <div style={{ padding: '12px 14px 0' }}>
+        {/* Title row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '12px 14px 0',
+        }}>
+          <H3 style={{ color: ND.text, flex: 1 }}>
+            {ROSTER_NAMES[race.key] ?? 'TUGAY ENVANTERİ'}
+          </H3>
+          <Code style={{
+            color: popRatio > 0.85 ? ND.warn : race.primary,
+            fontSize: 11,
+            letterSpacing: '0.04em',
+          }}>
+            {popUsed.toLocaleString()} / {popMax.toLocaleString()} POP
+          </Code>
+        </div>
+
+        {/* Tier filter strip */}
+        <div style={{ padding: '8px 14px 0' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {(['all', 1, 2, 3, 4, 5] as const).map((t) => {
-              const on = t === tierFilter;
-              const tierCount = typeof t === 'number'
-                ? units.filter((u) => u.tier === t).length
-                : units.length;
-              const locked = typeof t === 'number' && tierCount === 0;
+              const on     = t === tierFilter;
+              const locked = typeof t === 'number' && units.filter((u) => u.tier === t).length === 0;
               return (
                 <button
                   key={String(t)}
                   type="button"
                   onClick={() => setTierFilter(t)}
                   aria-pressed={on}
-                  aria-label={
-                    t === 'all'
-                      ? `Tüm tier'ları göster (${tierCount} birim)`
-                      : `Tier ${t}${locked ? ' (kilitli)' : ''} · ${tierCount} birim`
-                  }
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
                     flex: 1,
-                    minHeight: 32,
-                    padding: '5px 0',
+                    minHeight: 28,
+                    padding: '4px 0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 5,
+                    gap: 3,
                     fontFamily: ND.display,
                     fontSize: 10,
                     letterSpacing: '0.10em',
@@ -225,7 +240,7 @@ export default function RosterPage() {
                     background: on ? race.primary : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${on ? race.primary : ND.border}`,
                     fontWeight: on ? 700 : 500,
-                    boxShadow: on ? `0 0 10px ${race.glow}44` : 'none',
+                    boxShadow: on ? `0 0 8px ${race.glow}44` : 'none',
                     ...raceShape(race.key, 'tab'),
                   }}
                 >
@@ -233,8 +248,8 @@ export default function RosterPage() {
                     <span>TÜM</span>
                   ) : (
                     <>
-                      <RaceTierBadge race={race} tier={t} size={16} locked={locked} active={on} />
-                      <span>T{t}</span>
+                      <RaceTierBadge race={race} tier={t} size={13} locked={locked} active={on} />
+                      <span style={{ fontSize: 9 }}>T{t}</span>
                     </>
                   )}
                 </button>
@@ -243,80 +258,29 @@ export default function RosterPage() {
           </div>
         </div>
 
-        {/* Sort row */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 14px 0',
-          }}
-        >
-          <Eyebrow color={ND.textMute}>SIRALA</Eyebrow>
-          <div style={{ display: 'flex', gap: 4 }} role="radiogroup" aria-label="Sıralama">
-            {SORT_OPTIONS.map((opt) => {
-              const on = opt.key === sortKey;
-              return (
-                <button
-                  key={opt.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => setSortKey(opt.key)}
-                  style={{
-                    all: 'unset',
-                    cursor: 'pointer',
-                    padding: '4px 10px',
-                    fontFamily: ND.mono,
-                    fontSize: 10,
-                    letterSpacing: '0.10em',
-                    textTransform: 'uppercase',
-                    color: on ? race.primary : ND.textDim,
-                    background: on ? `${race.primary}1A` : 'transparent',
-                    border: `1px solid ${on ? race.primary + '55' : ND.border}`,
-                    borderRadius: 3,
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ flex: 1 }} />
-          <Code style={{ color: ND.textMute }}>{visible.length} birim</Code>
-        </div>
+        {/* Unit grid */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px 4px' }}>
 
-        {/* Roster grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
-          {/* Honest empty state — when the authenticated player owns
-           *  ZERO units across all roster slots, the cards render as
-           *  ×0 ×0 ×0 ×0 ×0 which looks broken. Show a one-shot CTA
-           *  to /base/production instead so the player knows where to
-           *  go to train their first batch. */}
+          {/* Honest empty state */}
           {liveUnits != null && units.every((u) => u.count === 0) && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: 14,
-                border: `1px dashed ${race.primary}55`,
-                borderRadius: 6,
-                background: `${race.primary}0a`,
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: 28, opacity: 0.7 }} aria-hidden>⚙</div>
+            <div style={{
+              marginBottom: 10,
+              padding: 14,
+              border: `1px dashed ${race.primary}55`,
+              borderRadius: 6,
+              background: `${race.primary}0a`,
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 26, opacity: 0.7 }} aria-hidden>⚙</div>
               <H3 style={{ color: ND.text, marginTop: 4 }}>Henüz birim eğitmedin</H3>
-              <Caption style={{ marginTop: 4 }}>
-                Üretim sayfasından ilk birimini eğitim kuyruğuna ekle.
-              </Caption>
+              <Caption style={{ marginTop: 4 }}>Üretim sayfasından ilk birimini kuyruğa ekle.</Caption>
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-                <NDButton race={race} onClick={() => router.push('/base/production')}>
-                  Üretime Git
-                </NDButton>
+                <NDButton race={race} onClick={() => router.push('/base/production')}>Üretime Git</NDButton>
               </div>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 }}>
             {visible.map((u) => (
               <RosterCard
                 key={u.id}
@@ -326,38 +290,25 @@ export default function RosterPage() {
                 onClick={() => setSelectedId((cur) => (cur === u.id ? null : u.id))}
               />
             ))}
+            {/* Empty placeholder cells */}
+            {Array.from({ length: emptyCount }).map((_, i) => (
+              <EmptySlot key={`empty-${i}`} />
+            ))}
           </div>
 
-          {visible.length === 0 && (
-            <div
-              style={{
-                position: 'relative',
-                textAlign: 'center',
-                padding: '56px 0',
-                minHeight: 200,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.15 }} aria-hidden>
-                <Sigil race={race} size={128} />
+          {visible.length === 0 && !liveUnits?.length && (
+            <div style={{ textAlign: 'center', padding: '48px 0' }}>
+              <div style={{ opacity: 0.12, display: 'inline-block' }} aria-hidden>
+                <Sigil race={race} size={96} />
               </div>
-              <Caption style={{ position: 'relative', zIndex: 1 }}>
+              <Caption style={{ display: 'block', marginTop: 8 }}>
                 Bu tier ile uyumlu birim yok.
               </Caption>
             </div>
           )}
-
-          <Eyebrow style={{ marginTop: 18, marginBottom: 6 }}>STATÜ</Eyebrow>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Chip color={race.primary}>HAZIR · {units.filter(u => u.state === 'ready').length}</Chip>
-            <Chip color={ND.warn}>YARALI · {units.filter(u => u.state === 'wounded').length}</Chip>
-            <Chip color={ND.textDim}>FİLODA · {units.filter(u => u.state === 'fleet').length}</Chip>
-          </div>
         </div>
 
-        {/* Detail drawer (visible when a unit is selected) */}
+        {/* Unit detail drawer */}
         {selectedUnit && (
           <UnitDetailDrawer
             race={race}
@@ -371,7 +322,7 @@ export default function RosterPage() {
         {/* Bottom action bar */}
         {!selectedUnit && (
           <div style={{
-            padding: '10px 14px',
+            padding: '8px 14px',
             background: 'rgba(8,10,16,0.92)',
             borderTop: `1px solid ${ND.border}`,
             backdropFilter: 'blur(12px)',
@@ -380,7 +331,7 @@ export default function RosterPage() {
           }}>
             <Link href="/merge" style={{ flex: 1, textDecoration: 'none' }}>
               <NDButton race={race} variant="ghost" size="md" full>
-                {MERGE_VERB[race.key] ?? 'Birleştir'}
+                {MERGE_VERB[race.key] ?? 'TERFİ'}
               </NDButton>
             </Link>
             <Link href="/formation" style={{ flex: 1, textDecoration: 'none' }}>
@@ -399,91 +350,42 @@ export default function RosterPage() {
   );
 }
 
-/* ─── Roster building & stat derivation ────────────────────────────────── */
+/* ─── Empty slot ────────────────────────────────────────────────────────── */
 
-function hash(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
+function EmptySlot() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        aspectRatio: '1',
+        border: `1px dashed ${ND.border}`,
+        background: 'rgba(10,14,28,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...({} as object), // satisfy TS
+      }}
+    >
+      <span style={{
+        fontFamily: ND.mono,
+        fontSize: 10,
+        color: ND.textMute,
+        opacity: 0.55,
+      }}>—</span>
+    </div>
+  );
 }
 
-function clamp(n: number, min = 0, max = 100): number {
-  return Math.max(min, Math.min(max, n));
-}
-
-function buildRoster(
-  race: NDRace,
-  backend: UnitConfigDto[],
-  liveUnits: PlayerUnitDto[] | null,
-): RosterUnit[] {
-  const states: UnitState[] = ['ready', 'fleet', 'wounded'];
-  // When the player has live owned units, key the count map by lowercase
-  // backend type so the synthetic catalog can swap in real numbers. Race
-  // tokens carry race-flavoured names but the catalog index aligns with
-  // the backend config order, which is keyed by `type`.
-  const liveByType = liveUnits ? groupUnitsByType(liveUnits) : null;
-
-  return race.units.map((u, i) => {
-    const id = `${race.key}-${u.n}-${i}`;
-    const seed = hash(id);
-    const live = backend[i];
-    const liveType = (live?.type as string | undefined)?.toLowerCase();
-    const realCount = liveType && liveByType ? (liveByType.get(liveType)?.length ?? 0) : 0;
-    // When live roster is populated AND has this unit type, prefer the
-    // real count. Otherwise fall back to the mock count so the screen
-    // never looks empty for unauthenticated visitors.
-    // Guest (liveUnits === null) → 0 instead of the legacy 86/42/26
-    // mock counts; honest empty roster beats pretending the visitor
-    // owns 86 marines. Authed-but-empty → 0 (already correct).
-    // Authed-with-units → real count from groupUnitsByType.
-    const baseCount = realCount;
-    // Backend stats are absolute (hp/attack/defense/speed); scale to the
-    // 0-100 display the roster card uses so the bars stay legible.
-    const atk = live?.attack != null
-      ? clamp(Math.round((live.attack as number) * 2))
-      : clamp(u.t * 14 + (seed % 9) + 8);
-    const def = live?.defense != null
-      ? clamp(Math.round((live.defense as number) * 2.5))
-      : clamp(u.t * 11 + ((seed >> 3) % 8) + 6);
-    const spd = live?.speed != null
-      ? clamp(Math.round((live.speed as number) * 14))
-      : clamp(94 - u.t * 12 + ((seed >> 6) % 10));
-    return {
-      id,
-      name: u.n,
-      backendType: liveType ?? null,
-      tier: live?.tier ?? u.t,
-      level: Math.max(1, 10 - i * 2),
-      count: baseCount,
-      state: realCount > 0 ? 'ready' : states[i % states.length],
-      atk,
-      def,
-      spd,
-    };
-  });
-}
-
-function upgradeCost(unit: RosterUnit): number {
-  return unit.level * unit.tier * 50;
-}
-
-/* ─── Roster card ──────────────────────────────────────────────────────── */
+/* ─── Roster card ───────────────────────────────────────────────────────── */
 
 interface RosterCardProps {
-  race: NDRace;
-  unit: RosterUnit;
+  race:     NDRace;
+  unit:     RosterUnit;
   selected: boolean;
-  onClick: () => void;
+  onClick:  () => void;
 }
 
 function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
-  const stateColor =
-    unit.state === 'ready'   ? race.primary :
-    unit.state === 'wounded' ? ND.warn      :
-    ND.textDim;
-
   return (
     <button
       type="button"
@@ -492,129 +394,101 @@ function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
       aria-label={`${unit.name}, Tier ${unit.tier}, ${STATE_LABEL[unit.state]}, ${unit.count} adet`}
       style={{ all: 'unset', cursor: 'pointer', display: 'block' }}
     >
-      <Panel
-        race={race}
-        glow={selected}
-        style={{
-          padding: 8,
-          border: selected ? `1px solid ${race.primary}` : `1px solid ${ND.border}`,
-        }}
-      >
-        <div
-          aria-hidden
-          style={{
-            width: '100%',
-            aspectRatio: '1',
-            background: `linear-gradient(180deg, ${race.primary}1f, transparent)`,
-            border: `1px dashed ${race.primary}55`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-          }}
-        >
-          <Sigil race={race} size={28} />
-          <span
-            style={{
-              position: 'absolute',
-              top: 4,
-              left: 4,
-              fontFamily: ND.mono,
-              fontSize: 8,
-              color: race.primary,
-              background: 'rgba(8,12,26,0.7)',
-              padding: '2px 4px',
-              border: `1px solid ${race.primary}55`,
-              letterSpacing: '0.08em',
-            }}
-          >
-            T{unit.tier}
-          </span>
-          <span
-            style={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              background: stateColor,
-              boxShadow: `0 0 4px ${stateColor}`,
-            }}
-            aria-label={unit.state}
-          />
+      <div style={{
+        aspectRatio: '1',
+        padding: 5,
+        background: `rgba(18,24,42,${selected ? '0.92' : '0.78'})`,
+        border: `1px solid ${selected ? race.primary : race.primary + '44'}`,
+        boxShadow: selected ? `0 0 12px ${race.glow}55` : 'none',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        ...raceShape(race.key, 'card'),
+      }}>
+        {/* Tier badge — absolute top-left */}
+        <div style={{ position: 'absolute', top: 3, left: 3, zIndex: 2 }}>
+          <RaceTierBadge race={race} tier={unit.tier} size={16} active />
         </div>
-        <div style={{ marginTop: 6 }}>
-          <div
-            style={{
-              fontFamily: ND.display,
-              fontSize: 10,
-              letterSpacing: '0.06em',
-              color: ND.text,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              textTransform: 'uppercase',
-            }}
-          >
-            {unit.name}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-            <Code style={{ color: race.primary, fontSize: 10 }}>×{unit.count}</Code>
-            <Code style={{ fontSize: 10 }}>Lv {unit.level}</Code>
-          </div>
+
+        {/* Count — absolute top-right */}
+        <span style={{
+          position: 'absolute',
+          top: 4,
+          right: 4,
+          fontFamily: ND.mono,
+          fontSize: 9,
+          color: race.primary,
+          zIndex: 2,
+        }}>×{unit.count}</span>
+
+        {/* Silhouette area — diagonal hatch + centered glyph */}
+        <div style={{
+          flex: 1,
+          marginTop: 20,
+          marginBottom: 3,
+          background: `repeating-linear-gradient(135deg, ${race.primary}0e 0 5px, transparent 5px 10px)`,
+          border: `1px dashed ${race.primary}44`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <UnitSilhouette race={race} />
         </div>
-      </Panel>
+
+        {/* Unit name */}
+        <div style={{
+          fontFamily: ND.mono,
+          fontSize: 8,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: ND.text,
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {unit.name}
+        </div>
+      </div>
     </button>
   );
 }
 
-/* ─── Unit detail drawer (stat viewer + actions) ───────────────────────── */
+/* ─── Unit detail drawer ────────────────────────────────────────────────── */
 
 interface UnitDetailDrawerProps {
-  race: NDRace;
-  unit: RosterUnit;
-  liveUnits: PlayerUnitDto[] | null;
+  race:       NDRace;
+  unit:       RosterUnit;
+  liveUnits:  PlayerUnitDto[] | null;
   onUpgraded: () => void;
-  onClose: () => void;
+  onClose:    () => void;
 }
 
 function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDetailDrawerProps) {
   const tInventory = useTranslations('inventory');
   const cost = upgradeCost(unit);
   const [upgrading, setUpgrading] = useState(false);
+
   const stateColor =
     unit.state === 'ready'   ? race.primary :
     unit.state === 'wounded' ? ND.warn      :
     ND.textDim;
 
-  // Pick the *first* alive live unit matching this catalog slot's backend
-  // type. The /inventory roster is keyed by race-flavoured names like
-  // `insan-Marine-0` which the upgrade endpoint won't accept — it needs a
-  // real PlayerUnit UUID. Falls back to undefined when no owned unit of
-  // that type exists; the Yükselt handler short-circuits with an error.
   const liveTarget = unit.backendType && liveUnits
     ? liveUnits.find((u) => u.isAlive && u.type.toLowerCase() === unit.backendType)
     : undefined;
 
   async function handleUpgrade() {
     if (upgrading) return;
-    if (!liveTarget) {
-      toast.error(tInventory('trainFirst'));
-      return;
-    }
+    if (!liveTarget) { toast.error(tInventory('trainFirst')); return; }
     setUpgrading(true);
     try {
-      const upgraded = await gameServerApi.post<PlayerUnitDto>(
-        `/v1/units/${liveTarget.id}/upgrade`,
-      );
-      const newLevel = (upgraded as PlayerUnitDto & { level?: number }).level
-        ?? unit.level + 1;
+      const upgraded = await gameServerApi.post<PlayerUnitDto>(`/v1/units/${liveTarget.id}/upgrade`);
+      const newLevel = (upgraded as PlayerUnitDto & { level?: number }).level ?? unit.level + 1;
       toast.success(`${unit.name} Lv ${newLevel}'e yükseltildi`);
       onUpgraded();
     } catch (err) {
-      const msg = err instanceof FetchError ? err.message : 'Yükseltme başarısız';
-      toast.error(msg);
+      toast.error(err instanceof FetchError ? err.message : 'Yükseltme başarısız');
     } finally {
       setUpgrading(false);
     }
@@ -639,33 +513,29 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 26,
-            height: 26,
-            background: `${race.primary}22`,
-            border: `1px solid ${race.primary}66`,
-            borderRadius: 3,
-          }}
-        >
-          <Sigil race={race} size={16} />
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 40,
+          height: 40,
+          background: `repeating-linear-gradient(135deg, ${race.primary}0e 0 6px, transparent 6px 12px)`,
+          border: `1px solid ${race.primary}66`,
+          flexShrink: 0,
+        }}>
+          <UnitSilhouette race={race} />
         </span>
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              fontFamily: ND.display,
-              fontSize: 13,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: ND.text,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: ND.display,
+            fontSize: 13,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: ND.text,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
             {unit.name}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
@@ -693,9 +563,7 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
             fontFamily: ND.mono,
             fontSize: 14,
           }}
-        >
-          ×
-        </button>
+        >×</button>
       </div>
 
       {/* Stat bars */}
@@ -726,11 +594,68 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
           </span>
         </NDButton>
         <Link href={`/battle-prep?unit=${encodeURIComponent(unit.id)}`} style={{ flex: 1, textDecoration: 'none' }}>
-          <NDButton race={race} size="md" full>
-            Savaşa Gönder
-          </NDButton>
+          <NDButton race={race} size="md" full>Savaşa Gönder</NDButton>
         </Link>
       </div>
     </section>
   );
+}
+
+/* ─── Helpers ───────────────────────────────────────────────────────────── */
+
+function hash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function clamp(n: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function upgradeCost(unit: RosterUnit): number {
+  return unit.level * unit.tier * 50;
+}
+
+function buildRoster(
+  race: NDRace,
+  backend: UnitConfigDto[],
+  liveUnits: PlayerUnitDto[] | null,
+): RosterUnit[] {
+  const states: UnitState[] = ['ready', 'fleet', 'wounded'];
+  const liveByType = liveUnits ? groupUnitsByType(liveUnits) : null;
+
+  return race.units.map((u, i) => {
+    const id       = `${race.key}-${u.n}-${i}`;
+    const seed     = hash(id);
+    const live     = backend[i];
+    const liveType = (live?.type as string | undefined)?.toLowerCase();
+    const realCount = liveType && liveByType ? (liveByType.get(liveType)?.length ?? 0) : 0;
+
+    const atk = live?.attack  != null ? clamp(Math.round((live.attack  as number) * 2))   : clamp(u.t * 14 + (seed % 9) + 8);
+    const def = live?.defense != null ? clamp(Math.round((live.defense as number) * 2.5)) : clamp(u.t * 11 + ((seed >> 3) % 8) + 6);
+    const spd = live?.speed   != null ? clamp(Math.round((live.speed   as number) * 14))  : clamp(94 - u.t * 12 + ((seed >> 6) % 10));
+
+    // Prefer the real per-unit level from the player's first owned copy of
+    // this slot. Falls back to the synthetic level only when the slot is
+    // empty so the UI still has a stable preview number. (Old code always
+    // synthesized `Math.max(1, 10 - i*2)` which mismatched the live API.)
+    const liveSampleLevel =
+      liveType && liveByType
+        ? (liveByType.get(liveType)?.[0] as unknown as { level?: number } | undefined)?.level
+        : undefined;
+
+    return {
+      id,
+      name:        u.n,
+      backendType: liveType ?? null,
+      tier:        live?.tier ?? u.t,
+      level:       liveSampleLevel ?? Math.max(1, 10 - i * 2),
+      count:       realCount,
+      state:       realCount > 0 ? 'ready' : states[i % states.length],
+      atk,
+      def,
+      spd,
+    };
+  });
 }

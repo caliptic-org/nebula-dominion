@@ -37,11 +37,19 @@ interface Combatant {
   hp: number;
   maxHp: number;
   attackCooldown: number;
+  /** Total damage this combatant has dealt — used to pick the MVP and to
+   *  surface real "damage dealt" + "kills" numbers on /battle-result. */
+  damageDealt: number;
+  /** Number of enemies finished off (their hp fell to 0 from a hit by us). */
+  kills: number;
 }
 
 interface Projectile {
   id: string;
   side: 'us' | 'them';
+  /** Combatant id that fired this projectile — used to attribute damage and
+   *  kills back to the shooter on /battle-result (MVP selection). */
+  shooterId: string;
   x: number;
   y: number;
   vx: number;
@@ -83,6 +91,8 @@ function spawnSide(race: NDRace, side: 'us' | 'them', flip: boolean): Combatant[
     hp: 50 + u.t * 24,
     maxHp: 50 + u.t * 24,
     attackCooldown: 0.6 + Math.random() * 0.6,
+    damageDealt: 0,
+    kills: 0,
   }));
 }
 
@@ -146,6 +156,7 @@ function tick(state: SimState, dt: number): SimState {
         newProj.push({
           id: nextId(),
           side: c.side,
+          shooterId: c.id,
           x: c.x,
           y: c.y,
           vx: (dx / Math.max(0.01, dist)) * 0.55,
@@ -168,6 +179,12 @@ function tick(state: SimState, dt: number): SimState {
     .map((d) => ({ ...d, ttl: d.ttl - dt }))
     .filter((d) => d.ttl > 0);
 
+  // Shooter lookup over the post-update combatant pool — same array the
+  // projectile was spawned from, so the id always resolves.  Attribution
+  // mutates the shooter's `damageDealt` / `kills` in place so the final
+  // state at end-of-battle carries the real numbers /battle-result needs.
+  const shooterPool = proj => (proj.side === 'us' ? ours.units : theirs.units);
+
   const apply = (proj: Projectile) => {
     const candidates = proj.side === 'us' ? theirs.units : ours.units;
     for (const enemy of candidates) {
@@ -175,7 +192,19 @@ function tick(state: SimState, dt: number): SimState {
       const dy = enemy.y - proj.y;
       if (dx * dx + dy * dy < 0.0035) {
         const dmg = 8 + Math.floor(Math.random() * 14) + (proj.side === 'us' ? 2 : 0);
+        const hpBefore = enemy.hp;
         enemy.hp = Math.max(0, enemy.hp - dmg);
+        const actualDmg = hpBefore - enemy.hp;
+
+        // Attribute damage + (kills, if this hit dropped them to zero) to
+        // the shooter so the MVP/score logic on /battle-result reflects
+        // who actually carried the team.
+        const shooter = shooterPool(proj).find((u) => u.id === proj.shooterId);
+        if (shooter) {
+          shooter.damageDealt += actualDmg;
+          if (hpBefore > 0 && enemy.hp === 0) shooter.kills += 1;
+        }
+
         damage.push({
           id: nextId(),
           x: enemy.x,
@@ -476,12 +505,58 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
             // Stashes the response in sessionStorage so /battle-result can
             // read it without another network round-trip; clears the key
             // after read so a back-button revisit doesn't show stale data.
+
+            // Real simulation stats — collected per-tick inside the sim
+            // and rolled up here so /battle-result can drop the mock
+            // makeMockData() numbers and show what actually happened.
+            const unitsKilled  = state.theirs.filter((u) => u.hp <= 0).length;
+            const unitsLost    = state.ours.filter((u) => u.hp <= 0).length;
+            const damageDealt  = state.ours.reduce((s, u) => s + u.damageDealt, 0);
+            const damageTaken  = state.theirs.reduce((s, u) => s + u.damageDealt, 0);
+            const durationSeconds = Math.round(state.elapsed);
+            // Score: kill weight scaled by tier + survival bonus.  Mirrors
+            // the rough shape of the mock numbers (~18k victory / ~4k loss)
+            // so existing UX assumptions stay intact.
+            const survivalBonus = state.ours.filter((u) => u.hp > 0)
+              .reduce((s, u) => s + u.tier * 200, 0);
+            const score = unitsKilled * 800 + damageDealt * 50 + survivalBonus;
+
+            // MVP = our unit with the most damage dealt; if no one fired
+            // (very short fight) fall back to the highest-tier survivor.
+            const ourSorted = [...state.ours].sort(
+              (a, b) => b.damageDealt - a.damageDealt || b.tier - a.tier,
+            );
+            const mvpUnit = ourSorted[0];
+            const realStats = {
+              unitsKilled,
+              unitsLost,
+              damageDealt,
+              damageTaken,
+              durationSeconds,
+              score,
+            };
+            const realMvp = mvpUnit
+              ? {
+                  name:        mvpUnit.name,
+                  tier:        mvpUnit.tier,
+                  kills:       mvpUnit.kills,
+                  damageDealt: mvpUnit.damageDealt,
+                }
+              : null;
+
             if (hasSession()) {
               try {
                 const battle = await api.post<{
                   id: string;
                   status: 'won' | 'lost' | 'in-progress' | 'pending';
-                  rewards: { gold: number; gems: number; xp: number };
+                  rewards: {
+                    gold: number;
+                    gems: number;
+                    xp: number;
+                    mineral?: number;
+                    gas?: number;
+                    science?: number;
+                  };
                 }>('/battles', {
                   attackerRace: race.key,
                   defenderRace: enemy.key,
@@ -495,6 +570,11 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                         id: battle.id,
                         rewards: battle.rewards,
                         status: battle.status,
+                        // Real simulation stats — drives /battle-result tiles
+                        // (kills / losses / damage / score / duration) instead
+                        // of the legacy mock numbers.
+                        stats: realStats,
+                        mvp: realMvp,
                         savedAt: Date.now(),
                       }),
                     );
@@ -502,8 +582,51 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                     /* private mode — best effort */
                   }
                 }
-                // Battle rewards (XP, gold) typically credit the wallet on
-                // completion — broadcast so the HUD picks it up.
+                // Credit mineral + gas + science to the player's wallet on
+                // the game-server so resources persist between sessions.
+                // Logs the grant intent + result so users can see in DevTools
+                // whether the wallet write succeeded — silent failures here
+                // are the #1 reason science feels "stuck" after a battle.
+                try {
+                  const GAME_SERVER =
+                    (process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:4001')
+                      .replace(/\/+$/, '');
+                  const { getAccessToken } = await import('@/lib/session');
+                  const token = getAccessToken();
+                  if (token) {
+                    const grantBody = {
+                      mineral: battle.rewards.mineral ?? 0,
+                      gas:     battle.rewards.gas     ?? 0,
+                      science: battle.rewards.science ?? 0,
+                      xp:      battle.rewards.xp      ?? 0,
+                    };
+                    // eslint-disable-next-line no-console
+                    console.log('[battle] granting wallet:', grantBody, '→', GAME_SERVER);
+                    const r = await fetch(`${GAME_SERVER}/api/buildings/resources/battle-reward`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify(grantBody),
+                    });
+                    // eslint-disable-next-line no-console
+                    console.log('[battle] grant response status:', r.status);
+                    if (!r.ok) {
+                      const text = await r.text().catch(() => '');
+                      // eslint-disable-next-line no-console
+                      console.warn('[battle] grant failed:', r.status, text);
+                    }
+                  } else {
+                    // eslint-disable-next-line no-console
+                    console.warn('[battle] no access token — grant skipped');
+                  }
+                } catch (err) {
+                  // eslint-disable-next-line no-console
+                  console.error('[battle] grant exception:', err);
+                  /* swallow so navigation still happens */
+                }
+                // Broadcast so the HUD picks up the new wallet totals.
                 refreshGameResources();
               } catch (err) {
                 // Silent fail — /battle-result will fall back to mock

@@ -36,6 +36,8 @@ export interface BattleResultRewards {
   resourceA: number;
   resourceB: number;
   crystal: number;
+  /** Science (◈) — accumulates across battles into the player's research wallet */
+  science?: number;
   xpGained: number;
   xpBefore: number;
   xpAfter: number;
@@ -125,18 +127,29 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
         fontFamily: ND.body,
         position: 'relative',
         overflow: 'hidden',
-        paddingBottom: 120,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Backdrop race={race} outcome={data.outcome} />
 
+      {/* Scrollable result body — height-bound flex child so the sticky
+       *  action bar below stays pinned while stats/MVP/XP/rewards scroll.
+       *  Earlier this <main> had no overflow rule, so the parent's
+       *  `overflow:hidden` clipped everything past the viewport (mineral
+       *  pills, MVP card, XP bar were all unreachable). */}
       <main
         style={{
           position: 'relative',
           zIndex: 5,
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
           maxWidth: 520,
           margin: '0 auto',
-          padding: 14,
+          width: '100%',
+          padding: '14px 14px 24px',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
@@ -260,6 +273,29 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
             <ResPill kind={race.resourceA.icon} value={`+${fmt(data.rewards.resourceA)}`} accent={race.primary} />
             <ResPill kind={race.resourceB.icon} value={`+${fmt(data.rewards.resourceB)}`} accent={race.primary} />
             <ResPill kind="crystal" value={`+${data.rewards.crystal}`} accent="oklch(0.82 0.16 80)" />
+            {data.rewards.science != null && data.rewards.science > 0 && (
+              /* Science pill — uses the inline ◈ glyph since ResPill doesn't ship a
+               * science icon kind.  Rendered identical to the others so the row
+               * stays visually consistent with the rest of the wallet pills. */
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  background: 'rgba(8,12,26,0.7)',
+                  border: '1px solid oklch(0.80 0.18 260 / 0.55)',
+                  borderRadius: 3,
+                  fontFamily: ND.mono,
+                  fontSize: 11,
+                  color: 'oklch(0.80 0.18 260)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                <span aria-hidden style={{ fontSize: 13 }}>◈</span>
+                +{data.rewards.science}
+              </span>
+            )}
           </div>
         </Panel>
 
@@ -400,14 +436,17 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
         </Panel>
       </main>
 
+      {/* Action bar — flex child (no fixed positioning) so it sits below
+       *  the scrolling <main> instead of floating over it.  Earlier the
+       *  fixed footer overlapped the last reward chip when the page
+       *  didn't scroll, hiding ◈ science. */}
       <footer
         style={{
-          position: 'fixed',
-          insetInline: 0,
-          bottom: 0,
+          position: 'relative',
           zIndex: 20,
-          padding: 12,
-          background: 'linear-gradient(0deg, rgba(6,8,15,0.96), rgba(6,8,15,0.55))',
+          flexShrink: 0,
+          padding: '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+          background: 'rgba(6,8,15,0.96)',
           borderTop: `1px solid ${ND.border}`,
           backdropFilter: 'blur(10px)',
         }}

@@ -14,6 +14,9 @@ import {
   Panel,
   NDButton,
   Bar,
+  DetailLayout,
+  ScreenFooter,
+  ScreenHeader,
   useNDRace,
   type NDRace,
   type NDRaceKey,
@@ -73,17 +76,18 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
   );
 
   // Merge live data on top of the static node so the visual layout stays
-  // intact when /target/:id arrives mid-render. The galaxy node graph uses
-  // `label` for the display name; mapping live `name` → `label` lets the
-  // existing UI read one field across both sources.
-  const node = useMemo(
-    () => ({
-      ...staticNode,
-      label: liveTarget?.name ?? staticNode.label,
-      level: liveTarget?.level ?? staticNode.level,
-    }),
-    [staticNode, liveTarget],
-  );
+  // intact when /target/:id arrives mid-render. The static galaxy map
+  // (galaxy-data.ts) owns the lore-friendly names ("Helix", "Sigma-X"),
+  // while the backend stub today returns synthetic placeholders ("N1",
+  // "CORE-12") that vary per node id. Prefer the static label so the
+  // map-click → target-page flow stays consistent. Only fall back to the
+  // live name when the static seed has no entry for this id (synthetic
+  // /target/foo deep-links during dev).
+  const node = useMemo(() => ({
+    ...staticNode,
+    label: staticNode.label || liveTarget?.name || staticNode.id,
+    level: liveTarget?.level ?? staticNode.level,
+  }), [staticNode, liveTarget]);
 
   const defenders = useMemo(() => defenderRoster(enemy, node.level), [enemy, node.level]);
   // If the backend supplied a power number, use it directly — it already
@@ -114,75 +118,57 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
   const projectedOutcome: 'victory' | 'defeat' = winProbability >= 50 ? 'victory' : 'defeat';
 
   return (
-    <div
-      data-race={race.key}
-      style={{
-        height: '100dvh',
-        background: ND.bgDeep,
-        color: ND.text,
-        fontFamily: ND.body,
-        position: 'relative',
-        overflow: 'hidden',
+    <DetailLayout
+      race={race}
+      bgDim={0.5}
+      mainStyle={{
         display: 'flex',
         flexDirection: 'column',
+        gap: 12,
+        padding: 14,
+        maxWidth: 520,
+        margin: '0 auto',
+        width: '100%',
       }}
-    >
-      <Backdrop race={race} enemy={enemy} />
-
-      {/* Header */}
-      <header
-        style={{
-          position: 'relative',
-          zIndex: 5,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '12px 14px',
-          borderBottom: `1px solid ${ND.border}`,
-          background: 'linear-gradient(180deg, rgba(6,8,15,0.92), rgba(6,8,15,0.40))',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Geri"
-          style={{
-            all: 'unset',
-            cursor: 'pointer',
-            width: 32,
-            height: 32,
-            border: `1px solid ${ND.border}`,
-            color: ND.textDim,
-            fontFamily: ND.display,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            clipPath: 'polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px)',
-          }}
-        >
-          ‹
-        </button>
-        <div>
-          <Eyebrow>{race.allianceTag} İSTİHBARAT · HEDEF DOSYASI</Eyebrow>
-          <H3 style={{ color: enemy.primary, textShadow: `0 0 12px ${enemy.glow}55` }}>
-            {node.label}
-          </H3>
+      header={
+        <div style={{ position: 'relative' }}>
+          <Backdrop race={race} enemy={enemy} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <ScreenHeader
+              eyebrow={`${race.allianceTag} İSTİHBARAT · HEDEF DOSYASI`}
+              title={
+                <span style={{ color: enemy.primary, textShadow: `0 0 12px ${enemy.glow}55` }}>
+                  {node.label}
+                </span>
+              }
+            />
+          </div>
         </div>
-      </header>
-
-      <main
+      }
+      footer={
+        <ScreenFooter>
+          <NDButton
+            race={race}
+            variant="primary"
+            size="lg"
+            full
+            onClick={() =>
+              router.push(`/battle-prep?target=${node.id}&race=${race.key}&outcome=${projectedOutcome}`)
+            }
+          >
+            SAVAŞA HAZIRLAN
+          </NDButton>
+          <NDButton race={race} variant="ghost" size="lg" onClick={() => router.push(`/map?race=${race.key}`)}>
+            HARİTA
+          </NDButton>
+        </ScreenFooter>
+      }
+    >
+      <div
         style={{
-          position: 'relative',
-          zIndex: 5,
-          flex: 1,
-          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          padding: 14,
-          paddingBottom: 120,
-          maxWidth: 520,
-          margin: '0 auto',
         }}
       >
         {/* Enemy faction card */}
@@ -313,40 +299,8 @@ export function TargetDetailScreen({ nodeId, forcedRace, liveTarget }: Props) {
             </div>
           </div>
         </Panel>
-      </main>
-
-      {/* Sticky action bar */}
-      <footer
-        style={{
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 20,
-          padding: 14,
-          background: 'linear-gradient(0deg, rgba(6,8,15,0.96), rgba(6,8,15,0.55))',
-          borderTop: `1px solid ${ND.border}`,
-          backdropFilter: `blur(${'10px'})`,
-        }}
-      >
-        <div style={{ display: 'flex', gap: 8, maxWidth: 520, margin: '0 auto' }}>
-          <NDButton
-            race={race}
-            variant="primary"
-            size="lg"
-            full
-            onClick={() =>
-              router.push(`/battle-prep?target=${node.id}&race=${race.key}&outcome=${projectedOutcome}`)
-            }
-          >
-            SAVAŞA HAZIRLAN
-          </NDButton>
-          <NDButton race={race} variant="ghost" size="lg" onClick={() => router.push(`/map?race=${race.key}`)}>
-            HARİTA
-          </NDButton>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </DetailLayout>
   );
 }
 

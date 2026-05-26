@@ -15,7 +15,33 @@ function isNDRaceKey(value: string | null): value is NDRaceKey {
 
 interface StashedResult {
   id: string;
-  rewards: { gold: number; gems: number; xp: number };
+  rewards: {
+    gold: number;
+    gems: number;
+    xp: number;
+    mineral?: number;
+    gas?: number;
+    /** Science (◈) — bilim puanı, savaş başına ~15–35 (zafer) / ~3 (yenilgi) */
+    science?: number;
+  };
+  /** Real simulation stats — written by BattleScreen.onContinue alongside
+   *  the backend rewards.  Optional because deep-linking to /battle-result
+   *  without going through /battle leaves these undefined. */
+  stats?: {
+    unitsKilled:     number;
+    unitsLost:       number;
+    damageDealt:     number;
+    damageTaken:     number;
+    durationSeconds: number;
+    score:           number;
+  };
+  /** Best-performing player unit by total damage dealt. */
+  mvp?: {
+    name:        string;
+    tier:        number;
+    kills:       number;
+    damageDealt: number;
+  } | null;
   status: string;
   savedAt: number;
 }
@@ -58,6 +84,10 @@ function makeMockData(outcome: BattleOutcome, raceKey: NDRaceKey): BattleResultD
       resourceA: isV ? 3200 : 800,
       resourceB: isV ? 1400 : 350,
       crystal: isV ? 6 : 1,
+      // Science reward — granted by /api/buildings/resources/battle-reward
+      // on victory. Mocked here so the demo result screen also shows the
+      // ◈ chip and players understand the science economy from day one.
+      science: isV ? 18 : 4,
       xpGained: isV ? 4800 : 1200,
       xpBefore: 12400,
       xpAfter: isV ? 17200 : 13600,
@@ -107,12 +137,22 @@ function Inner() {
     // doesn't expose damage/kills yet. resourceA == gold (race-agnostic in
     // backend terms), resourceB stays at mock (no gas equivalent), crystal
     // == gems. xpGained from backend.
+    // Use real simulation stats when present; fall back to mock numbers
+    // for direct deep-links (no /battle round-trip).  MVP same pattern —
+    // when the sim ran we know exactly who carried the team.
     return {
       ...mock,
+      stats: stash.stats ?? mock.stats,
+      mvp: stash.mvp ?? mock.mvp,
       rewards: {
         ...mock.rewards,
-        resourceA: stash.rewards.gold,
+        // mineral → resourceA (primary mineral currency)
+        resourceA: stash.rewards.mineral ?? stash.rewards.gold,
+        // gas → resourceB
+        resourceB: stash.rewards.gas ?? mock.rewards.resourceB,
         crystal: stash.rewards.gems,
+        // science → research wallet currency (◈), shown beside the resource pills
+        science: stash.rewards.science ?? 0,
         xpGained: stash.rewards.xp,
         xpAfter: mock.rewards.xpBefore + stash.rewards.xp,
         // levelUp logic: same as mock, since the stub doesn't track level.

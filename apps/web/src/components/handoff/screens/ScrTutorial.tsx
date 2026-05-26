@@ -119,6 +119,26 @@ function TutorialCard({
         bottom: 28,
       }}
     >
+      {/* Step counter — rendered OUTSIDE the clipped NotchSurface so the
+       *  top: -10 chip isn't clipped by the surface's clipPath. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: -10,
+          right: 12,
+          background: c,
+          color: '#0A0E1A',
+          padding: '2px 8px',
+          fontFamily: ND.display,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.10em',
+          zIndex: 2,
+        }}
+      >
+        ADIM {step} / {TUT_TOTAL}
+      </div>
       <NotchSurface
         notch={12}
         borderColor={`${c}88`}
@@ -128,26 +148,6 @@ function TutorialCard({
         padding={14}
         style={{ display: 'block', position: 'relative' }}
       >
-        {/* Step counter top-right */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            top: -10,
-            right: 12,
-            background: c,
-            color: '#0A0E1A',
-            padding: '2px 8px',
-            fontFamily: ND.display,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.10em',
-            zIndex: 1,
-          }}
-        >
-          ADIM {step} / {TUT_TOTAL}
-        </div>
-
         <Eyebrow style={{ color: c, marginBottom: 4 }}>{accent}</Eyebrow>
         <H3 style={{ color: ND.text, fontSize: 14, letterSpacing: '0.04em' }}>{title}</H3>
         <Caption style={{ color: ND.textDim, marginTop: 6, fontSize: 12, lineHeight: 1.5 }}>

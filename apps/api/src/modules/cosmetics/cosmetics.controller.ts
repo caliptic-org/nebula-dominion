@@ -22,7 +22,10 @@ import { CosmeticsService } from './cosmetics.service';
 @ApiTags('Cosmetics')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/cosmetics')
+// Global prefix `api/v1` is added by main.ts. Earlier this was
+// `api/cosmetics`, which under the prefix produced /api/v1/api/cosmetics
+// and the frontend (calling /api/v1/cosmetics) saw "Cannot GET".
+@Controller('cosmetics')
 export class CosmeticsController {
   constructor(private readonly cosmeticsService: CosmeticsService) {}
 

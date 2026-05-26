@@ -6,7 +6,10 @@ import { CosmeticsService } from './cosmetics.service';
 @ApiTags('User')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/user')
+// Global prefix `api/v1` is added by main.ts. Earlier this was
+// `api/user`, which under the prefix produced /api/v1/api/user/balance
+// and the frontend (calling /api/v1/user/balance) saw "Cannot GET".
+@Controller('user')
 export class UserBalanceController {
   constructor(private readonly cosmeticsService: CosmeticsService) {}
 

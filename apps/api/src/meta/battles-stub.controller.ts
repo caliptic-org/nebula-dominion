@@ -27,7 +27,7 @@ interface BattleState {
   /** 0–100 prediction of victory at the current turn. */
   winProb: number;
   log: { turn: number; text: string }[];
-  rewards: { gold: number; gems: number; xp: number };
+  rewards: { gold: number; gems: number; xp: number; mineral: number; gas: number; science: number };
   createdAt: string;
 }
 
@@ -57,7 +57,7 @@ function newBattle(
     maxTurns: 8,
     winProb,
     log: [{ turn: 0, text: 'Filolar konuşlandı. İlk dalga geliyor.' }],
-    rewards: { gold: 0, gems: 0, xp: 0 },
+    rewards: { gold: 0, gems: 0, xp: 0, mineral: 0, gas: 0, science: 0 },
     createdAt: new Date().toISOString(),
   };
   // Frontend can call POST /battles with { outcome: 'won' | 'lost' } to
@@ -67,12 +67,20 @@ function newBattle(
   // visually, so the backend just needs to log it + grant rewards.
   if (options.forceOutcome === 'won') {
     base.status = 'won';
-    base.rewards = { gold: 1500 + Math.floor(rand(id.length * 7) * 1000), gems: 50, xp: 320 };
+    const r = rand(id.length * 7);
+    base.rewards = {
+      gold: 1500 + Math.floor(r * 1000),
+      gems: 50,
+      xp: 320,
+      mineral: 400 + Math.floor(r * 600),
+      gas: 120 + Math.floor(r * 200),
+      science: 15 + Math.floor(r * 20),
+    };
     base.turnsElapsed = base.maxTurns;
     base.log.push({ turn: base.maxTurns, text: 'Düşman filosu yok edildi. Zafer.' });
   } else if (options.forceOutcome === 'lost') {
     base.status = 'lost';
-    base.rewards = { gold: 250, gems: 0, xp: 80 };
+    base.rewards = { gold: 250, gems: 0, xp: 80, mineral: 60, gas: 20, science: 3 };
     base.turnsElapsed = base.maxTurns;
     base.log.push({ turn: base.maxTurns, text: 'Filomuz geri çekildi. Yenilgi kabul edildi.' });
   }
@@ -86,11 +94,18 @@ function advance(state: BattleState): BattleState {
   if (state.turnsElapsed >= state.maxTurns) {
     if (state.winProb >= 60) {
       state.status = 'won';
-      state.rewards = { gold: 1500 + Math.floor(roll * 1000), gems: 50, xp: 320 };
+      state.rewards = {
+        gold: 1500 + Math.floor(roll * 1000),
+        gems: 50,
+        xp: 320,
+        mineral: 400 + Math.floor(roll * 600),
+        gas: 120 + Math.floor(roll * 200),
+        science: 15 + Math.floor(roll * 20),
+      };
       state.log.push({ turn: state.turnsElapsed, text: 'Düşman filosu yok edildi. Zafer.' });
     } else {
       state.status = 'lost';
-      state.rewards = { gold: 250, gems: 0, xp: 80 };
+      state.rewards = { gold: 250, gems: 0, xp: 80, mineral: 60, gas: 20, science: 3 };
       state.log.push({ turn: state.turnsElapsed, text: 'Filomuz geri çekildi. Yenilgi kabul edildi.' });
     }
   } else {

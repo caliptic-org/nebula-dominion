@@ -7,7 +7,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Shop')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/shop')
+// Global prefix `api/v1` is added by main.ts — the @Controller path must
+// be relative to that. Earlier the prefix was duplicated here, so all
+// shop endpoints were served at /api/v1/api/v1/shop/... and the frontend
+// (which hits /api/v1/shop/...) saw "Cannot POST /api/v1/shop/purchase".
+@Controller('shop')
 export class ShopController {
   constructor(private readonly shopService: ShopService) {}
 

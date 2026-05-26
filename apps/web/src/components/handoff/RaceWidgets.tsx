@@ -81,10 +81,28 @@ interface RaceQuickActionsProps {
   onAction?: (key: string) => void;
 }
 
+/* Shared right-rail chip spec.  Used by RaceQuickActions, ShortcutButtons
+ * AND the TOPLA collect button on /base — keeps the three floating
+ * button stacks pixel-aligned (same width/height/padding/gap/font).
+ * If you nudge a value here, the others inherit it automatically.
+ *
+ * Sized at ~75% of the original 56×44 chip (the prior 60% pass was too
+ * tight — the user reported icons + labels crowding the box).
+ */
+export const RAIL_CHIP_SIZE = {
+  width: 42,
+  height: 33,
+  padding: '3px 0',
+  gap: 2,
+  iconSize: 12,
+  fontSize: 8,
+  stackGap: 5,
+} as const;
+
 export function RaceQuickActions({ race, onAction }: RaceQuickActionsProps) {
   const lex = raceLex(race.key);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: RAIL_CHIP_SIZE.stackGap }}>
       {lex.quickActions.map((a) => {
         const shape = raceShape(race.key, 'card');
         return (
@@ -96,27 +114,24 @@ export function RaceQuickActions({ race, onAction }: RaceQuickActionsProps) {
             title={a.label}
             style={{
               all: 'unset',
-              // Sized at ~60% of the original 56×44 chip (~40% smaller),
-              // matching the design brief.  Icon + label stay legible at
-              // the smaller font (8px) thanks to mono geometry and the
-              // race-tinted border carrying the affordance.
-              width: 34,
-              height: 26,
-              padding: '2px 0',
+              width: RAIL_CHIP_SIZE.width,
+              height: RAIL_CHIP_SIZE.height,
+              padding: RAIL_CHIP_SIZE.padding,
               background: 'rgba(8,12,26,0.78)',
               border: `1px solid ${race.primary}77`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 1,
+              gap: RAIL_CHIP_SIZE.gap,
               color: race.primary,
               cursor: 'pointer',
+              boxSizing: 'border-box',
               ...shape,
             }}
           >
-            <RaceActionIcon kind={a.icon} color={race.primary} size={10} />
-            <span style={{ fontFamily: ND.display, fontSize: 7, letterSpacing: '0.08em', lineHeight: 1 }}>
+            <RaceActionIcon kind={a.icon} color={race.primary} size={RAIL_CHIP_SIZE.iconSize} />
+            <span style={{ fontFamily: ND.display, fontSize: RAIL_CHIP_SIZE.fontSize, letterSpacing: '0.08em', lineHeight: 1 }}>
               {a.label}
             </span>
           </button>

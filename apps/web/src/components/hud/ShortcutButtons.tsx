@@ -2,7 +2,7 @@
 
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { useNDRace } from '@/components/handoff/useNDRace';
-import { raceShape } from '@/components/handoff';
+import { raceShape, RAIL_CHIP_SIZE } from '@/components/handoff';
 
 interface ShortcutButtonsProps {
   unreadMessages?: number;
@@ -70,7 +70,9 @@ export function ShortcutButtons({
         zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
+        // Same stack gap as RaceQuickActions on the other side so both
+        // columns read as a single design system.
+        gap: RAIL_CHIP_SIZE.stackGap,
       }}
       role="toolbar"
       aria-label="Hızlı erişim kısayolları"
@@ -85,32 +87,32 @@ export function ShortcutButtons({
           style={{
             all: 'unset',
             position: 'relative',
-            // Same 34×26 footprint as the RaceQuickActions chips on the
-            // other side of the screen.  Keeps the two floating columns
-            // visually paired instead of one looking like a glass pill
-            // from a different design language.
-            width: 34,
-            height: 26,
-            padding: '2px 0',
+            // Shared chip dimensions — sourced from RAIL_CHIP_SIZE so the
+            // sohbet / görev column stays pixel-aligned with the
+            // RaceQuickActions column and the TOPLA collect button.
+            width: RAIL_CHIP_SIZE.width,
+            height: RAIL_CHIP_SIZE.height,
+            padding: RAIL_CHIP_SIZE.padding,
             background: 'rgba(8,12,26,0.78)',
             border: `1px solid ${raceColor}77`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 1,
+            gap: RAIL_CHIP_SIZE.gap,
             color: raceColor,
             cursor: 'pointer',
+            boxSizing: 'border-box',
             ...shape,
           }}
         >
-          <span aria-hidden style={{ fontSize: 11, lineHeight: 1 }}>
+          <span aria-hidden style={{ fontSize: RAIL_CHIP_SIZE.iconSize + 2, lineHeight: 1 }}>
             {btn.glyph}
           </span>
           <span
             style={{
               fontFamily: 'var(--font-nd-display), system-ui',
-              fontSize: 7,
+              fontSize: RAIL_CHIP_SIZE.fontSize,
               letterSpacing: '0.08em',
               lineHeight: 1,
             }}

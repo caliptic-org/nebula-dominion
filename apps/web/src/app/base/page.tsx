@@ -17,6 +17,7 @@ import {
   ND,
   NDButton,
   Panel,
+  RAIL_CHIP_SIZE,
   RaceQuickActions,
   Screen,
   Sigil,
@@ -701,30 +702,35 @@ function CollectButton({ race }: { race: NDRace }) {
       onClick={handle}
       disabled={cooling}
       aria-label="Kaynakları topla"
+      title="Kaynakları topla"
       style={{
         all: 'unset',
-        width: 56,
-        height: 44,
-        padding: '4px 0',
+        // Shared chip dimensions — see RAIL_CHIP_SIZE in RaceWidgets.tsx.
+        // Keeps TOPLA aligned with RaceQuickActions above + the
+        // ShortcutButtons (Sohbet / Görev) column on the opposite side.
+        width: RAIL_CHIP_SIZE.width,
+        height: RAIL_CHIP_SIZE.height,
+        padding: RAIL_CHIP_SIZE.padding,
         background: cooling ? 'rgba(8,12,26,0.45)' : 'rgba(8,12,26,0.78)',
         border: `1px solid ${cooling ? race.primary + '33' : race.primary + '77'}`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 2,
+        gap: RAIL_CHIP_SIZE.gap,
         color: cooling ? race.primary + '66' : race.primary,
         cursor: cooling ? 'default' : 'pointer',
         transition: 'opacity 200ms',
+        boxSizing: 'border-box',
         ...shape,
       }}
     >
       {/* coin / collect icon */}
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <svg width={RAIL_CHIP_SIZE.iconSize} height={RAIL_CHIP_SIZE.iconSize} viewBox="0 0 16 16" fill="none" aria-hidden>
         <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
         <path d="M8 5v6M6 7l2-2 2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span style={{ fontFamily: ND.display, fontSize: 9, letterSpacing: '0.10em' }}>
+      <span style={{ fontFamily: ND.display, fontSize: RAIL_CHIP_SIZE.fontSize, letterSpacing: '0.08em', lineHeight: 1 }}>
         {cooling ? '···' : 'TOPLA'}
       </span>
     </button>

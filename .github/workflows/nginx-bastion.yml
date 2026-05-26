@@ -30,7 +30,7 @@ on:
     branches: [main]
     paths:
       - 'deploy/nginx/**'
-      - '.github/workflows/deploy-nginx.yml'
+      - '.github/workflows/nginx-bastion.yml'
   workflow_dispatch:
 
 permissions:

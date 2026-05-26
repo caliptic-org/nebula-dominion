@@ -208,11 +208,50 @@ export class UIScene extends Phaser.Scene {
   }
 
   private refreshTeamHp() {
-    // TODO: wire up team HP overlay; currently no-op
+    // Summarise both teams' total HP into a single line under the turn
+    // counter. Lightweight overlay — heavier per-unit bars live on the
+    // battlefield sprites themselves.  GameRoom keeps players keyed by id
+    // with their unit roster nested under PlayerState.
+    if (!this.unitInfoText) return;
+    const myId = this.socket.myUserId;
+    let myHp = 0, myMax = 0, enemyHp = 0, enemyMax = 0;
+    for (const [playerId, player] of Object.entries(this.room.players ?? {})) {
+      const mine = playerId === myId;
+      for (const u of player.units ?? []) {
+        if (mine) { myHp += u.hp; myMax += u.maxHp; }
+        else      { enemyHp += u.hp; enemyMax += u.maxHp; }
+      }
+    }
+    const fmt = (hp: number, max: number) => max > 0 ? `${hp}/${max}` : '—';
+    this.unitInfoText.setText(`HP  Siz ${fmt(myHp, myMax)}  ·  Rakip ${fmt(enemyHp, enemyMax)}`);
   }
 
-  private flashSpeedLines(_fromX: number, _fromY: number, _toX: number, _toY: number) {
-    // TODO: implement speed lines effect
+  private flashSpeedLines(fromX: number, fromY: number, toX: number, toY: number) {
+    // Quick motion streak rendered between the unit's origin and target
+    // tile.  Fades out across 240ms and self-destructs so we don't leak
+    // Graphics objects each turn.
+    const lines = this.add.graphics();
+    lines.lineStyle(2, 0xffffff, 0.85);
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const ux = dx / len, uy = dy / len;
+    // perpendicular offset for a 3-line streak
+    const px = -uy, py = ux;
+    for (let i = -1; i <= 1; i++) {
+      const ox = px * i * 4;
+      const oy = py * i * 4;
+      lines.beginPath();
+      lines.moveTo(fromX + ox, fromY + oy);
+      lines.lineTo(toX + ox,   toY + oy);
+      lines.strokePath();
+    }
+    this.tweens.add({
+      targets:  lines,
+      alpha:    0,
+      duration: 240,
+      onComplete: () => lines.destroy(),
+    });
   }
 
   private showNotif(text: string) {

@@ -136,4 +136,49 @@ export class MergeController {
     if (!tree) throw new NotFoundException(`No mutation tree found for unit type: ${unitType}`);
     return { unitType, mutations: tree };
   }
+
+  /**
+   * GET /units/merge/preview
+   * Stateless preview of a merge attempt.  Mirrors the formula previously
+   * baked into the frontend useMergePreview hook (BASE_SUCCESS table), but
+   * served from the backend so the client cannot tamper with the projected
+   * success rate.  No JWT required — the formula leaks nothing.
+   *
+   * Query params:
+   *   sourceTier      — current unit tier (1..5)
+   *   selectedCount   — units the player has earmarked
+   *   slotCount       — recipe slot count (typically 2..4)
+   *
+   * Returns:
+   *   promotedTier, successRate, projectedRate, canMerge, riskLabel
+   */
+  @Get('merge/preview')
+  getMergePreview(
+    @Query('sourceTier')    sourceTier?:    string,
+    @Query('selectedCount') selectedCount?: string,
+    @Query('slotCount')     slotCount?:     string,
+  ): {
+    promotedTier:  number;
+    successRate:   number;
+    projectedRate: number;
+    canMerge:      boolean;
+    riskLabel:     'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK';
+  } {
+    // Defensive parsing — defaults match the frontend's deterministic
+    // placeholder so an empty query string still returns sane numbers.
+    const tier     = Math.max(1, Math.min(5, Number(sourceTier)    || 2));
+    const selected = Math.max(0,            Number(selectedCount)  || 0);
+    const slots    = Math.max(1,            Number(slotCount)      || 2);
+
+    const BASE: Record<number, number> = { 2: 92, 3: 78, 4: 55 };
+    const successRate   = BASE[tier] ?? 60;
+    const promotedTier  = Math.min(5, tier + 1);
+    const slotProgress  = selected / slots;
+    const projectedRate = Math.round(successRate * slotProgress);
+    const canMerge      = selected === slots;
+    const riskLabel: 'GÜVENLİ' | 'RİSKLİ' | 'KRİTİK' =
+      successRate >= 80 ? 'GÜVENLİ' : successRate >= 60 ? 'RİSKLİ' : 'KRİTİK';
+
+    return { promotedTier, successRate, projectedRate, canMerge, riskLabel };
+  }
 }

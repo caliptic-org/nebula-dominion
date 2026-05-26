@@ -102,14 +102,17 @@ export async function fetchCosmetics(): Promise<CosmeticItem[]> {
   }
   try {
     const data = await call<CosmeticDTO[]>('/api/v1/cosmetics');
+    // Backend is live (CosmeticsController + CosmeticsService), but the
+    // catalog table (`cosmetic_items`) ships with no seeded rows.  An empty
+    // response is the "no items unlocked yet" state — return [] honestly
+    // instead of papering it over with DEMO_COSMETICS.
     return data.map(dtoToItem);
   } catch (err) {
-    // Backend endpoint not yet implemented (returns 404 Cannot GET …) — fall
-    // back to the demo inventory so /customization renders something instead
-    // of a fatal "Cannot GET" toast. Once the real /api/v1/cosmetics ships,
-    // this branch becomes dead code automatically because `call` won't throw.
+    // Network errors or transient 5xx — keep the demo inventory as a graceful
+    // fallback so the page renders SOMETHING for offline users. A real 401
+    // (expired session) bubbles up to call-site for redirect handling.
     const msg = err instanceof Error ? err.message : '';
-    if (/cannot\s+get|404|not\s+found|httpError|Failed to fetch/i.test(msg)) {
+    if (/Failed to fetch|NetworkError|503|504/i.test(msg)) {
       return getMockInventory().map((c) => ({ ...c }));
     }
     throw err;
@@ -125,10 +128,9 @@ export async function fetchBalance(): Promise<number> {
     const data = await call<BalanceDTO>('/api/v1/user/balance');
     return data.gems;
   } catch (err) {
-    // Same fallback story as fetchCosmetics — surface the demo balance so
-    // the page doesn't error out on a missing endpoint.
+    // Same network-failure-only fallback as fetchCosmetics.
     const msg = err instanceof Error ? err.message : '';
-    if (/cannot\s+get|404|not\s+found|httpError|Failed to fetch/i.test(msg)) {
+    if (/Failed to fetch|NetworkError|503|504/i.test(msg)) {
       return mockBalance;
     }
     throw err;

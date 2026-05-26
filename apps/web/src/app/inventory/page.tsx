@@ -579,8 +579,8 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
           race={race}
           variant="outline"
           size="md"
-          style={{ flex: 1 }}
-          disabled={upgrading}
+          style={{ flex: 1, opacity: !liveTarget ? 0.55 : 1 }}
+          disabled={upgrading || !liveTarget}
           onClick={handleUpgrade}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -593,10 +593,28 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
             </span>
           </span>
         </NDButton>
-        <Link href={`/battle-prep?unit=${encodeURIComponent(unit.id)}`} style={{ flex: 1, textDecoration: 'none' }}>
-          <NDButton race={race} size="md" full>Savaşa Gönder</NDButton>
-        </Link>
+        {liveTarget ? (
+          <Link href={`/battle-prep?unit=${encodeURIComponent(unit.id)}`} style={{ flex: 1, textDecoration: 'none' }}>
+            <NDButton race={race} size="md" full>Savaşa Gönder</NDButton>
+          </Link>
+        ) : (
+          <Link href="/base/production" style={{ flex: 1, textDecoration: 'none' }}>
+            <NDButton race={race} size="md" full>Barakaya Git</NDButton>
+          </Link>
+        )}
       </div>
+      {!liveTarget && (
+        <div style={{
+          fontSize: 10,
+          color: ND.textDim,
+          fontFamily: ND.mono,
+          letterSpacing: '0.04em',
+          textAlign: 'center',
+          opacity: 0.85,
+        }}>
+          {tInventory('notTrainedHint')}
+        </div>
+      )}
     </section>
   );
 }

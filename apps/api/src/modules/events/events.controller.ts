@@ -24,7 +24,11 @@ import { LeaderboardQueryDto } from './dto/leaderboard-query.dto';
 import { EventStatus } from './entities/event.entity';
 
 @ApiTags('Events')
-@Controller('api/events')
+// Global prefix `api/v1` is added by main.ts.  Earlier this was `api/events`
+// which under the prefix produced /api/v1/api/events and the frontend
+// (calling /api/v1/events/:id/join) saw "Cannot POST". Same fix pattern we
+// applied to cosmetics + user-balance controllers.
+@Controller('events')
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 

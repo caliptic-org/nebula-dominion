@@ -1,32 +1,48 @@
 'use client';
 
 import { useRaceTheme } from '@/hooks/useRaceTheme';
-import clsx from 'clsx';
+import { useNDRace } from '@/components/handoff/useNDRace';
+import { raceShape } from '@/components/handoff';
 
 interface ShortcutButtonsProps {
   unreadMessages?: number;
   activeMissions?: number;
+  /** Retained for API compatibility; the inventory shortcut was removed
+   *  (the right-rail RaceQuickActions already exposes TUGAY → /inventory
+   *  and the two were duplicating each other). */
   inventoryStatus?: 'normal' | 'full' | 'critical';
   onChatClick?: () => void;
   onMissionsClick?: () => void;
   onInventoryClick?: () => void;
 }
 
+/* Top-right floating chat + missions shortcuts.
+ *
+ * Visual contract mirrors `RaceQuickActions` (right-rail vertical chip
+ * stack on /base) — same 34×26 race-tinted box with a tiny icon + label
+ * stack.  Earlier this was a glass pill with 40×40 emoji buttons that
+ * read as a separate UI layer; aligning the chip shape keeps the two
+ * floating columns visually related.
+ *
+ * Inventory button removed — `RaceQuickActions` ships TUGAY → /inventory,
+ * so the third shortcut here was a duplicate target and the column was
+ * crowding the top-right corner with redundant affordance.
+ */
 export function ShortcutButtons({
   unreadMessages = 3,
   activeMissions = 2,
-  inventoryStatus = 'normal',
   onChatClick,
   onMissionsClick,
-  onInventoryClick,
 }: ShortcutButtonsProps) {
-  const { raceColor, raceGlow, raceDim } = useRaceTheme();
+  const race = useNDRace();
+  const { raceColor, raceGlow } = useRaceTheme();
+  const shape = raceShape(race.key, 'card');
 
   const buttons = [
     {
       id: 'chat',
-      icon: '💬',
-      label: 'Sohbet',
+      glyph: '✉',
+      label: 'SOHBET',
       badge: unreadMessages > 0 ? (unreadMessages > 99 ? '99+' : String(unreadMessages)) : null,
       badgeColor: '#ff3355',
       badgeShadow: 'rgba(255,51,85,0.6)',
@@ -35,119 +51,102 @@ export function ShortcutButtons({
     },
     {
       id: 'missions',
-      icon: '🎯',
-      label: 'Görevler',
+      glyph: '◎',
+      label: 'GÖREV',
       badge: activeMissions > 0 ? String(activeMissions) : null,
       badgeColor: raceColor,
       badgeShadow: raceGlow,
       badgePulse: false,
       onClick: onMissionsClick,
     },
-    {
-      id: 'inventory',
-      icon: '📦',
-      label: 'Envanter',
-      badge: inventoryStatus !== 'normal' ? (inventoryStatus === 'critical' ? '!' : '↑') : null,
-      badgeColor: inventoryStatus === 'critical' ? '#ff3355' : '#ffaa22',
-      badgeShadow: inventoryStatus === 'critical' ? 'rgba(255,51,85,0.6)' : 'rgba(255,170,34,0.5)',
-      badgePulse: inventoryStatus === 'critical',
-      onClick: onInventoryClick,
-    },
   ];
 
   return (
     <div
-      className="fixed right-3 z-40 flex flex-col gap-2"
-      style={{ top: '4.5rem' }}
+      style={{
+        position: 'fixed',
+        right: 12,
+        top: '4.5rem',
+        zIndex: 40,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
       role="toolbar"
       aria-label="Hızlı erişim kısayolları"
     >
-      {/* Outer shell — double-bezel glass pill */}
-      <div
-        className="flex flex-col items-center gap-1.5 p-1.5 rounded-2xl"
-        style={{
-          background: 'rgba(8,10,16,0.90)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
-        }}
-      >
-        {buttons.map((btn, i) => (
-          <button
-            key={btn.id}
-            onClick={btn.onClick}
-            title={btn.label}
-            aria-label={`${btn.label}${btn.badge ? ` (${btn.badge})` : ''}`}
-            className="group relative w-10 h-10 rounded-xl flex items-center justify-center
-                       transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
-                       hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-2"
+      {buttons.map((btn) => (
+        <button
+          key={btn.id}
+          type="button"
+          onClick={btn.onClick}
+          title={btn.label}
+          aria-label={`${btn.label}${btn.badge ? ` (${btn.badge})` : ''}`}
+          style={{
+            all: 'unset',
+            position: 'relative',
+            // Same 34×26 footprint as the RaceQuickActions chips on the
+            // other side of the screen.  Keeps the two floating columns
+            // visually paired instead of one looking like a glass pill
+            // from a different design language.
+            width: 34,
+            height: 26,
+            padding: '2px 0',
+            background: 'rgba(8,12,26,0.78)',
+            border: `1px solid ${raceColor}77`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            color: raceColor,
+            cursor: 'pointer',
+            ...shape,
+          }}
+        >
+          <span aria-hidden style={{ fontSize: 11, lineHeight: 1 }}>
+            {btn.glyph}
+          </span>
+          <span
             style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              animationDelay: `${i * 80}ms`,
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.background = `${raceColor}18`;
-              el.style.borderColor = `${raceColor}40`;
-              el.style.boxShadow = `0 0 16px ${raceGlow}, inset 0 1px 0 rgba(255,255,255,0.08)`;
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.background = 'rgba(255,255,255,0.04)';
-              el.style.borderColor = 'rgba(255,255,255,0.06)';
-              el.style.boxShadow = 'none';
+              fontFamily: 'var(--font-nd-display), system-ui',
+              fontSize: 7,
+              letterSpacing: '0.08em',
+              lineHeight: 1,
             }}
           >
-            {/* Icon */}
+            {btn.label}
+          </span>
+
+          {btn.badge && (
             <span
-              className="text-base leading-none pointer-events-none select-none
-                         transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
-                         group-hover:scale-110"
               aria-hidden
+              style={{
+                position: 'absolute',
+                top: -5,
+                right: -5,
+                minWidth: 12,
+                height: 12,
+                padding: '0 2px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 999,
+                background: btn.badgeColor,
+                boxShadow: `0 0 6px ${btn.badgeShadow}`,
+                color: '#fff',
+                fontFamily: 'var(--font-nd-display), system-ui',
+                fontSize: 7,
+                fontWeight: 900,
+                lineHeight: 1,
+                animation: btn.badgePulse ? 'pulse 2s ease-in-out infinite' : undefined,
+              }}
             >
-              {btn.icon}
+              {btn.badge}
             </span>
-
-            {/* Badge overlay */}
-            {btn.badge && (
-              <span
-                className={clsx(
-                  'absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-[3px]',
-                  'flex items-center justify-center rounded-full',
-                  'font-display font-black text-[8px] leading-none text-white',
-                  btn.badgePulse && 'animate-pulse',
-                )}
-                style={{
-                  background: btn.badgeColor,
-                  boxShadow: `0 0 8px ${btn.badgeShadow}`,
-                }}
-                aria-hidden
-              >
-                {btn.badge}
-              </span>
-            )}
-          </button>
-        ))}
-
-        {/* Divider */}
-        <div
-          className="w-5 h-px"
-          style={{ background: 'rgba(255,255,255,0.06)' }}
-          aria-hidden
-        />
-
-        {/* Race status dot */}
-        <div
-          className="w-2 h-2 rounded-full animate-pulse"
-          style={{
-            background: raceColor,
-            boxShadow: `0 0 8px ${raceGlow}`,
-          }}
-          title="Irk aktif"
-          aria-hidden
-        />
-      </div>
+          )}
+        </button>
+      ))}
     </div>
   );
 }

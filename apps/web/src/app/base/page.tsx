@@ -358,10 +358,8 @@ export default function BaseHomePage() {
         <ShortcutButtons
           unreadMessages={3}
           activeMissions={2}
-          inventoryStatus="full"
           onChatClick={() => router.push('/chat')}
           onMissionsClick={() => router.push('/missions')}
-          onInventoryClick={() => router.push('/inventory')}
         />
         {/* Pass the live queue array; the component returns null when empty,
           * so the overlay disappears automatically when nothing is in

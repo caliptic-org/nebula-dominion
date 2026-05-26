@@ -84,7 +84,7 @@ interface RaceQuickActionsProps {
 export function RaceQuickActions({ race, onAction }: RaceQuickActionsProps) {
   const lex = raceLex(race.key);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {lex.quickActions.map((a) => {
         const shape = raceShape(race.key, 'card');
         return (
@@ -93,25 +93,30 @@ export function RaceQuickActions({ race, onAction }: RaceQuickActionsProps) {
             type="button"
             onClick={() => onAction?.(a.key)}
             aria-label={a.label}
+            title={a.label}
             style={{
               all: 'unset',
-              width: 56,
-              height: 44,
-              padding: '4px 0',
+              // Sized at ~60% of the original 56×44 chip (~40% smaller),
+              // matching the design brief.  Icon + label stay legible at
+              // the smaller font (8px) thanks to mono geometry and the
+              // race-tinted border carrying the affordance.
+              width: 34,
+              height: 26,
+              padding: '2px 0',
               background: 'rgba(8,12,26,0.78)',
               border: `1px solid ${race.primary}77`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 2,
+              gap: 1,
               color: race.primary,
               cursor: 'pointer',
               ...shape,
             }}
           >
-            <RaceActionIcon kind={a.icon} color={race.primary} size={16} />
-            <span style={{ fontFamily: ND.display, fontSize: 9, letterSpacing: '0.10em' }}>
+            <RaceActionIcon kind={a.icon} color={race.primary} size={10} />
+            <span style={{ fontFamily: ND.display, fontSize: 7, letterSpacing: '0.08em', lineHeight: 1 }}>
               {a.label}
             </span>
           </button>

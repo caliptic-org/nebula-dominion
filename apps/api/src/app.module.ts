@@ -23,6 +23,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { StoryModule } from './modules/story/story.module';
 import { TierModule } from './modules/tier/tier.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { DailyEngagementModule } from './modules/daily-engagement/daily-engagement.module';
 import { HealthModule } from './health/health.module';
 import { AllianceModule } from './modules/alliance/alliance.module';
 import { VipModule } from './modules/vip/vip.module';
@@ -56,6 +57,7 @@ import { FormationsModule } from './modules/formations/formations.module';
     StoryModule,
     TierModule,
     OnboardingModule,
+    DailyEngagementModule,
     HealthModule,
     AllianceModule,
     VipModule,

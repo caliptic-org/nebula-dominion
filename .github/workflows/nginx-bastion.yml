@@ -25,12 +25,21 @@ jobs:
           fetch-depth: 1
 
       - name: Pre-flight syntax check
+        # `nginx -t` actually opens declared log files (not just parse the
+        # syntax), so the access_log /var/log/nginx/* directives in the
+        # vhost config fail with EACCES when this step runs as the
+        # non-root runner user.  Rewrite the log paths into TMP_DIR for
+        # the pre-flight check only — the live install on bastion runs
+        # via sudo and keeps the original paths.
         run: |
           set -euo pipefail
           TMP_DIR="$(mktemp -d)"
-          mkdir -p "$TMP_DIR/conf.d"
+          mkdir -p "$TMP_DIR/conf.d" "$TMP_DIR/logs"
           cp deploy/nginx/nebula-dominion.conf "$TMP_DIR/conf.d/"
           cp deploy/nginx/00-nebula-maps.conf  "$TMP_DIR/conf.d/"
+          # Redirect every "/var/log/nginx/" → "$TMP_DIR/logs/" so the
+          # writability test succeeds without touching the real log dir.
+          sed -i "s|/var/log/nginx/|$TMP_DIR/logs/|g" "$TMP_DIR/conf.d/"*.conf
           cat > "$TMP_DIR/nginx.conf" <<EOF
           worker_processes 1;
           error_log $TMP_DIR/error.log warn;

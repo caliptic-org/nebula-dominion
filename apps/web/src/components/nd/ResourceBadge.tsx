@@ -26,6 +26,10 @@ export function ResIcon({ kind, size = 14, color = 'currentColor' }: ResIconProp
     crystal: <polygon points="8,1 13,6 10,15 6,15 3,6" fill="none" stroke={color} strokeWidth="1.4" />,
     energy:  <path d="M9 1 L 4 9 L 8 9 L 6 15 L 12 7 L 8 7 Z" fill="none" stroke={color} strokeWidth="1.4" />,
     pop:     <g><circle cx="8" cy="5" r="2.5" fill="none" stroke={color} strokeWidth="1.4" /><path d="M3 14 Q 8 9, 13 14" fill="none" stroke={color} strokeWidth="1.4" /></g>,
+    // Science (◈) — matches the glyph in atoms.tsx ResIcon so any consumer
+    // of this badge can render `kind="science"` without diverging from
+    // the HUD's diamond + center-dot symbol.
+    science: <g><polygon points="8,1 15,8 8,15 1,8" fill="none" stroke={color} strokeWidth="1.4" /><circle cx="8" cy="8" r="1.6" fill={color} /></g>,
   };
 
   return (

@@ -1,123 +1,106 @@
-<!-- v1: initial drop-in deploy via self-hosted bastion runner -->
-# Nebula Dominion — bastion nginx config
+<!-- v2: rewrite to match the existing bastion ocp-proxy.conf shape -->
+# Nebula Dominion — bastion nginx vhost
 
-Drop-in nginx reverse proxy config for the **Caliptic bastion VM** that
-sits between the Cloudflare tunnel and the OpenShift cluster.
+Mirrors the layout of `/etc/nginx/sites-available/ocp-proxy.conf` already
+deployed on the bastion VM — sites-available + sites-enabled symlink,
+`listen 443 ssl`, Let's Encrypt cert, SNI-based proxying through the
+shared `ocp_ingress` upstream (defined in ocp-proxy.conf, NOT
+redefined here).
 
-## Why this exists
+## Why not conf.d/
 
-The bastion runs **one shared nginx** that proxies traffic for multiple
-projects (Caliptic, Nebula, etc.).  Previously the project deploy script
-overwrote `/etc/nginx/nginx.conf` wholesale, which stomped on every other
-project's config the next time anything reloaded.  This module isolates
-Nebula's reverse-proxy entries into their own files under
-`/etc/nginx/conf.d/`, leaving the shared `nginx.conf` untouched.
-
-## Files
-
-| File | What it does |
-|---|---|
-| `nebula-dominion.conf` | 3 server blocks (web / api / game-server) + 3 upstreams. The whole Nebula footprint. |
-| `00-nebula-maps.conf` | The `$connection_upgrade` map for socket.io WebSockets. Optional — only install if stock nginx.conf doesn't already define it. |
-| `install.sh` | Idempotent installer — copies the files, runs `nginx -t`, reloads. |
+The first revision drop-shipped into `/etc/nginx/conf.d/` (Red-Hat
+style).  The bastion is Debian-style — `sites-available` + a symlink
+into `sites-enabled` is the existing pattern.  Mixing both means a
+listen-80 nebula vhost ends up shadowing the listen-443 ocp-proxy
+vhost on the same hostname, breaking redirects.  `install.sh` deletes
+the legacy `conf.d/` files on first run so you can re-deploy without
+touching the bastion manually.
 
 ## Install
 
-### Otomatik (önerilen) — GitHub Actions
+### Automatic — GitHub Actions
+Push to `main` with any change under `deploy/nginx/**`; the
+`Deploy Nginx Config` workflow runs `install.sh` on the bastion
+self-hosted runner.  Manual trigger via Actions → "Run workflow".
 
-`deploy/nginx/**` altında bir değişiklik `main`'e push edilirse
-`.github/workflows/deploy-nginx.yml` workflow'u **bastion'daki
-self-hosted runner üzerinde** çalışır ve config'i otomatik kurar.
-Manuel tetikleme: repo → Actions → "Deploy Nginx Config (bastion)" →
-Run workflow.  `dry_run: true` ile sadece `nginx -t` çalıştırılır,
-bastion'a dokunulmaz (güvenli ön kontrol).
-
-### Manuel (acil durum)
-
+### Manual
 ```bash
-# Bastion VM'sinde
+ssh bastion
 git -C ~/nebula-dominion pull
 sudo bash ~/nebula-dominion/deploy/nginx/install.sh
 ```
 
-Her iki yol da aynı `install.sh`'ı kullanır:
+`install.sh` is idempotent:
 
-1. `$connection_upgrade` map'i başka yerde tanımlı mı kontrol eder.
-   - **Tanımlıysa**: sadece `nebula-dominion.conf`'u copy'ler (stock'ı
-     ikiye katlamaz, "duplicate map directive" hatasından kaçınır).
-   - **Tanımlı değilse**: `00-nebula-maps.conf`'u da koyar.
-2. `nginx -t` (syntax check). Başarısızsa abort eder — nginx reload edilmez.
-3. `systemctl reload nginx` — zero-downtime reload.
+1. Removes any leftover `/etc/nginx/conf.d/{nebula-dominion,00-nebula-maps}.conf`
+   from the old revision (no manual cleanup needed).
+2. Copies `nebula-dominion.conf` to `/etc/nginx/sites-available/`.
+3. Symlinks it into `/etc/nginx/sites-enabled/`.
+4. `nginx -t` — aborts before reload if anything is broken.
+5. `systemctl reload nginx` — zero-downtime.
 
-### Self-hosted runner sudo izni
+## Cloudflare tunnel
 
-Runner kullanıcısının (genellikle `gh-runner` veya `actions`) **sudoers
-kuralı** olmalı.  `/etc/sudoers.d/nebula-nginx-deploy` dosyasına:
+The bastion sits behind a Cloudflare tunnel.  The Service field for each
+Nebula public hostname must point at **the bastion's :443**, identical
+to how `ocp.caliptic.com` / `app.caliptic.com` are configured:
 
-```sudoers
-# Allow GitHub Actions runner to install Nebula's nginx config + reload.
-# Scope: only the install.sh script and its direct effects.  Other sudo
-# powers are NOT granted.
+| Public Hostname | Service |
+|---|---|
+| `nebula.caliptic.com` | `https://<BASTION_IP>:443` |
+| `api-nebula.caliptic.com` | `https://<BASTION_IP>:443` |
+| `game-nebula.caliptic.com` | `https://<BASTION_IP>:443` |
+
+> ⚠ `https://10.10.10.50:443` (OCP API IP) is **wrong** — that target
+> sends traffic into OCP HAProxy, which only knows the route hostnames
+> like `nebula-web-nebula-prod.apps.ocp-sno.caliptic.com` and redirects
+> the unknown public Host to the console.
+
+## SSL certificate
+
+The vhost reuses `/etc/letsencrypt/live/caliptic-bastion/{fullchain,privkey}.pem`
+— the same cert ocp-proxy.conf uses.  It must already have SANs for the
+three Nebula hostnames.  Renewal (or initial SAN addition) is outside
+this repo's scope — handle it with certbot on the bastion.
+
+## Self-hosted runner sudoers
+
+`/etc/sudoers.d/nebula-nginx-deploy`:
+
+```
 gh-runner ALL=(root) NOPASSWD: /usr/bin/bash /home/gh-runner/_work/nebula-dominion/nebula-dominion/deploy/nginx/install.sh
 gh-runner ALL=(root) NOPASSWD: /usr/sbin/nginx -t
 gh-runner ALL=(root) NOPASSWD: /bin/systemctl reload nginx
 ```
 
-> `gh-runner` ve repo path'i kendi kurulumunuza göre değiştirin —
-> `whoami` + `pwd` ile runner'ın gerçek user + working dir'ini bulun.
+Replace `gh-runner` and the `_work` path with your runner's username
+and clone location.
+
+## Smoke test
+
+After deploy:
+
+```bash
+# Inside bastion — exercise the local listener directly
+curl -sk --resolve "nebula.caliptic.com:443:127.0.0.1" \
+     https://nebula.caliptic.com/ | head
+
+# From your laptop — exercise the full Cloudflare → tunnel → bastion path
+curl -sI https://nebula.caliptic.com/
+```
+
+`2xx`, `3xx` (Next.js redirects to `/base`), `401` (api auth) all
+count as healthy.  `5xx` → OCP route or upstream pod is unhealthy.
+Tunnel routing problem → you'll see a redirect to `ocp.caliptic.com`
+(the OCP console catch-all).
 
 ## Uninstall
 
 ```bash
-sudo rm /etc/nginx/conf.d/nebula-dominion.conf
-sudo rm -f /etc/nginx/conf.d/00-nebula-maps.conf
+sudo rm /etc/nginx/sites-enabled/nebula-dominion.conf
+sudo rm /etc/nginx/sites-available/nebula-dominion.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The bastion's other projects are unaffected — the only thing removed is
-Nebula's own reverse-proxy entries.
-
-## Sanity checks
-
-```bash
-# Verify the 3 vhosts are accepting connections
-curl -sI -H 'Host: nebula.caliptic.com'     http://localhost/        | head -1
-curl -sI -H 'Host: api-nebula.caliptic.com' http://localhost/        | head -1
-curl -sI -H 'Host: game-nebula.caliptic.com' http://localhost/socket.io/ | head -1
-```
-
-Each should return `HTTP/1.1 200` (or a redirect from the upstream — not
-`502 Bad Gateway` or `404`).
-
-## Wildcard cert / TLS notes
-
-- Cloudflare tunnel terminates the public TLS for `*.caliptic.com`.
-- Bastion nginx listens on HTTP (port 80) — internal network, fronted by
-  the tunnel, so plaintext between CF and nginx is acceptable.
-- nginx → OpenShift HAProxy is HTTPS using the cluster's `*.apps.ocp-sno`
-  wildcard cert.  `proxy_ssl_verify off` because the cert is self-signed
-  from the bastion's perspective (no public CA chain).
-
-## File-isolation guarantees
-
-Every directive in `nebula-dominion.conf` is scoped:
-
-- **Server blocks** use explicit `server_name nebula.caliptic.com` /
-  `api-nebula.caliptic.com` / `game-nebula.caliptic.com`. No `default_server`
-  flag, no catch-all `_`. Other projects' hostnames pass through untouched.
-- **Upstreams** prefixed `nebula_*` so they don't shadow another project's
-  `upstream web { ... }` block.
-- **Log files** under `/var/log/nginx/nebula-*.log` — easy to grep, rotate,
-  or wipe without touching other apps' logs.
-
-## Updating
-
-Edit `nebula-dominion.conf` in this repo, commit + push, then on bastion:
-
-```bash
-git -C ~/nebula-dominion pull
-sudo bash ~/nebula-dominion/deploy/nginx/install.sh   # re-runs nginx -t + reload
-```
-
-The installer always overwrites Nebula's two files — but **only** those two.
-Anything else under `/etc/nginx/` is untouched.
+`ocp-proxy.conf` and any other project's vhost are untouched.

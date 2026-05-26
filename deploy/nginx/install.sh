@@ -1,68 +1,79 @@
 #!/usr/bin/env bash
-# Idempotent installer for the bastion nginx config.
+# Idempotent installer for Nebula's bastion nginx vhost.
 #
-# Run on the bastion VM as root (sudo).  Copies Nebula's drop-in config to
-# /etc/nginx/conf.d/, validates with `nginx -t`, and reloads — without
-# touching the shared nginx.conf or any other project's files.
+# Drops `nebula-dominion.conf` into /etc/nginx/sites-available/ and links
+# it into sites-enabled/ — mirrors how ocp-proxy.conf is shipped, so the
+# whole bastion stays on one pattern (Debian-style sites-* layout, NOT
+# the conf.d/ drop-in style we used in the first revision).
 #
-# Re-run safely any time the source files change.
+# Re-run safely after every push; reload is zero-downtime.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NGINX_CONF_DIR="${NGINX_CONF_DIR:-/etc/nginx/conf.d}"
+NGINX_SITES_AVAILABLE="${NGINX_SITES_AVAILABLE:-/etc/nginx/sites-available}"
+NGINX_SITES_ENABLED="${NGINX_SITES_ENABLED:-/etc/nginx/sites-enabled}"
+NGINX_CONF_D="${NGINX_CONF_D:-/etc/nginx/conf.d}"
 
 if [[ $EUID -ne 0 ]]; then
-  echo "This script needs to write to ${NGINX_CONF_DIR}. Re-run with sudo." >&2
+  echo "Re-run with sudo." >&2
   exit 1
 fi
+[[ -d "$NGINX_SITES_AVAILABLE" ]] || { echo "Missing $NGINX_SITES_AVAILABLE (is this a sites-* nginx?)" >&2; exit 1; }
+[[ -d "$NGINX_SITES_ENABLED"   ]] || { echo "Missing $NGINX_SITES_ENABLED" >&2; exit 1; }
 
-if [[ ! -d "$NGINX_CONF_DIR" ]]; then
-  echo "Expected ${NGINX_CONF_DIR} to exist (is nginx installed?)." >&2
-  exit 1
-fi
+echo "==> Installing nebula-dominion nginx vhost"
 
-echo "==> Installing Nebula nginx config to ${NGINX_CONF_DIR}/"
+# 1. Clean up the OLD revision's conf.d/ drops if they exist.  The first
+#    install pass mistakenly used /etc/nginx/conf.d/ instead of
+#    sites-available; leaving those files around would either duplicate
+#    server_name entries (nginx warns + uses the first) or, worse, the
+#    old listen-80-only config would shadow this new 443-ssl one.
+for stale in "${NGINX_CONF_D}/nebula-dominion.conf" \
+             "${NGINX_CONF_D}/00-nebula-maps.conf"; do
+  if [[ -f "$stale" ]]; then
+    echo "  - removing stale ${stale}"
+    rm -f "$stale"
+  fi
+done
 
-# 1. Decide whether the connection_upgrade map already exists somewhere.
-# Excluding any nebula-* file so we don't trip over our own previous install.
-existing_map_hit="$(grep -RH 'connection_upgrade' /etc/nginx/ 2>/dev/null \
-                   | grep -v '/nebula-' \
-                   | grep -v '/00-nebula-maps.conf' \
-                   || true)"
+# 2. Copy the canonical config into sites-available.
+install -m 0644 "${SCRIPT_DIR}/nebula-dominion.conf" \
+                "${NGINX_SITES_AVAILABLE}/nebula-dominion.conf"
+echo "  - wrote ${NGINX_SITES_AVAILABLE}/nebula-dominion.conf"
 
-if [[ -n "$existing_map_hit" ]]; then
-  echo "  - \$connection_upgrade already defined elsewhere — skipping 00-nebula-maps.conf."
-  echo "    (hit: $(echo "$existing_map_hit" | head -1))"
-  rm -f "${NGINX_CONF_DIR}/00-nebula-maps.conf"
+# 3. Symlink into sites-enabled (only if missing or pointing elsewhere).
+target="${NGINX_SITES_AVAILABLE}/nebula-dominion.conf"
+link="${NGINX_SITES_ENABLED}/nebula-dominion.conf"
+if [[ -L "$link" && "$(readlink -f "$link")" == "$target" ]]; then
+  echo "  - symlink already in place"
 else
-  echo "  - installing 00-nebula-maps.conf (provides \$connection_upgrade map)."
-  install -m 0644 "${SCRIPT_DIR}/00-nebula-maps.conf" "${NGINX_CONF_DIR}/00-nebula-maps.conf"
+  ln -sf "$target" "$link"
+  echo "  - linked ${link} -> ${target}"
 fi
 
-# 2. Always install the main vhost file.
-echo "  - installing nebula-dominion.conf"
-install -m 0644 "${SCRIPT_DIR}/nebula-dominion.conf" "${NGINX_CONF_DIR}/nebula-dominion.conf"
-
-# 3. Validate the whole nginx config — fail fast if our edits broke it.
-echo "==> Running nginx -t"
+# 4. Validate the entire nginx config — sites-enabled/* is part of it.
+echo "==> nginx -t"
 if ! nginx -t; then
-  echo "" >&2
-  echo "nginx config test FAILED. The new file is in place but nginx is NOT reloaded." >&2
-  echo "Either fix the error and re-run, or remove the new files:" >&2
-  echo "  sudo rm ${NGINX_CONF_DIR}/nebula-dominion.conf ${NGINX_CONF_DIR}/00-nebula-maps.conf" >&2
+  echo ""
+  echo "Config test FAILED — vhost is in place but nginx NOT reloaded." >&2
+  echo "Revert with:" >&2
+  echo "  sudo rm ${link}" >&2
+  echo "  sudo rm ${NGINX_SITES_AVAILABLE}/nebula-dominion.conf" >&2
+  echo "  sudo nginx -t && sudo systemctl reload nginx" >&2
   exit 1
 fi
 
-# 4. Reload — drains existing connections gracefully.
-echo "==> Reloading nginx"
+# 5. Graceful reload — drains existing connections.
+echo "==> systemctl reload nginx"
 systemctl reload nginx
 
 echo ""
-echo "Done. Nebula vhosts are live:"
-echo "  - nebula.caliptic.com       (web)"
-echo "  - api-nebula.caliptic.com   (api)"
-echo "  - game-nebula.caliptic.com  (game-server, WS-enabled)"
+echo "Done.  Nebula vhosts live on bastion:"
+echo "  - https://nebula.caliptic.com"
+echo "  - https://api-nebula.caliptic.com"
+echo "  - https://game-nebula.caliptic.com"
 echo ""
-echo "Smoke check:"
-echo "  curl -sI -H 'Host: nebula.caliptic.com' http://localhost/ | head -1"
+echo "Cloudflare tunnel Service field for all three should be:"
+echo "  https://<BASTION_IP>:443"
+echo "(same shape as ocp.caliptic.com / app.caliptic.com)"

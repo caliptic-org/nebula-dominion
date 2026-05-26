@@ -2,8 +2,7 @@ name: Deploy Nginx Config
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'deploy/nginx/**'
       - '.github/workflows/nginx-bastion.yml'
@@ -14,38 +13,48 @@ permissions:
 
 jobs:
   deploy:
-    name: Install Nebula nginx config on bastion
+    name: Install nebula-dominion nginx vhost on bastion
     runs-on: [self-hosted, bastion]
     timeout-minutes: 5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Pre-flight syntax check
-        # `nginx -t` actually opens declared log files (not just parse the
-        # syntax), so the access_log /var/log/nginx/* directives in the
-        # vhost config fail with EACCES when this step runs as the
-        # non-root runner user.  Rewrite the log paths into TMP_DIR for
-        # the pre-flight check only — the live install on bastion runs
-        # via sudo and keeps the original paths.
+        # `nginx -t` actually opens declared log files AND binds the listen
+        # sockets AND reads the ssl_certificate paths.  None of that flies
+        # for a non-root runner that doesn't have the Let's Encrypt cert,
+        # can't write into /var/log/nginx/, and can't grab :443.  Rewrite
+        # the copied conf into an unprivileged shape just for the syntax
+        # check; the real install on bastion runs as root and keeps the
+        # original directives untouched.
         run: |
           set -euo pipefail
           TMP_DIR="$(mktemp -d)"
           mkdir -p "$TMP_DIR/conf.d" "$TMP_DIR/logs"
           cp deploy/nginx/nebula-dominion.conf "$TMP_DIR/conf.d/"
-          cp deploy/nginx/00-nebula-maps.conf  "$TMP_DIR/conf.d/"
-          # Redirect every "/var/log/nginx/" → "$TMP_DIR/logs/" so the
-          # writability test succeeds without touching the real log dir.
-          sed -i "s|/var/log/nginx/|$TMP_DIR/logs/|g" "$TMP_DIR/conf.d/"*.conf
-          # Rewrite the privileged listen 80 directives to an unprivileged
-          # high port — `nginx -t` actually attempts to bind() the
-          # declared sockets, and non-root runners can't grab :80.  The
-          # bastion install path keeps the original `listen 80` because
-          # it runs via sudo.
-          sed -i 's|listen 80;|listen 18080;|g; s|listen \[::\]:80;|listen [::]:18080;|g' "$TMP_DIR/conf.d/"*.conf
+
+          conf="$TMP_DIR/conf.d/nebula-dominion.conf"
+
+          # Strip ssl_* directives entirely (cert path doesn't exist here).
+          sed -i '/ssl_certificate\b/d; /ssl_certificate_key\b/d; /ssl_protocols\b/d; /ssl_ciphers\b/d' "$conf"
+          # Demote 443 ssl → 18443 (plain HTTP) so the runner can bind.
+          sed -i 's|listen 443 ssl;|listen 18443;|g' "$conf"
+          # Demote :80 redirect listener too.
+          sed -i 's|listen 80;|listen 18080;|g' "$conf"
+          # Stub upstream — the real ocp_ingress lives in ocp-proxy.conf
+          # which isn't checked out here, so the test must own one.
+          echo 'upstream ocp_ingress { server 127.0.0.1:1; }' > "$TMP_DIR/conf.d/_stub.conf"
+          # Stub the connection_upgrade map ocp-proxy.conf normally provides.
+          cat >> "$TMP_DIR/conf.d/_stub.conf" <<'EOF'
+          map $http_upgrade $connection_upgrade {
+              default upgrade;
+              ''      close;
+          }
+          EOF
+
           cat > "$TMP_DIR/nginx.conf" <<EOF
           worker_processes 1;
           error_log $TMP_DIR/error.log warn;
@@ -57,22 +66,25 @@ jobs:
           EOF
           nginx -t -c "$TMP_DIR/nginx.conf" -p "$TMP_DIR"
 
-      - name: Install + reload nginx
-        run: |
-          sudo bash deploy/nginx/install.sh
+      - name: Install + reload
+        run: sudo bash deploy/nginx/install.sh
 
-      - name: Smoke test vhosts
+      - name: Smoke test (bastion-local)
+        # Probe via Host header against 127.0.0.1:443 so we exercise the
+        # real ssl listener that just got installed.  -k tolerates the
+        # self-signed cert path inside the cluster (Cloudflare is what
+        # presents the public-trusted cert).
         run: |
           for host in nebula.caliptic.com api-nebula.caliptic.com game-nebula.caliptic.com; do
-            STATUS=$(curl -sI -o /dev/null -w "%{http_code}" \
-                          -H "Host: ${host}" \
-                          --max-time 5 \
-                          http://127.0.0.1/ || echo "000")
-            echo "Host: ${host} -> HTTP ${STATUS}"
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                          --resolve "${host}:443:127.0.0.1" \
+                          --max-time 8 \
+                          "https://${host}/" || echo "000")
+            echo "${host} -> HTTP ${STATUS}"
             case "$STATUS" in
               2*|3*|401|404|405) echo "  vhost OK" ;;
-              502|503|504)       echo "  upstream unhealthy"; exit 1 ;;
-              000|"")            echo "  nginx not responding"; exit 1 ;;
+              502|503|504)       echo "  upstream unhealthy (OCP route down?)"; exit 1 ;;
+              000|"")            echo "  nginx unreachable"; exit 1 ;;
               *)                 echo "  unexpected ${STATUS} - continuing" ;;
             esac
           done

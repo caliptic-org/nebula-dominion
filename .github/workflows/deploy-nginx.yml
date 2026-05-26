@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           # Sığ checkout yeter — install.sh + 2 conf dosyası, başka
           # dosyaya ihtiyaç yok.

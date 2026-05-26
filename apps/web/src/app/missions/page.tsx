@@ -22,7 +22,7 @@ import {
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
-import { useMissions, type Quest } from '@/hooks/useMissions';
+import { useMissionClaims, useMissions, type Quest } from '@/hooks/useMissions';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { refreshGameResources } from '@/hooks/useGameResources';
 import { toast } from '@/components/handoff/Toaster';
@@ -155,6 +155,11 @@ export default function MissionsPage() {
   // 'daily-*' entries when the player isn't signed in or the fetch fails.
   const { profile } = useUserProfile();
   const { data: liveDaily } = useMissions(profile?.id ?? null);
+  // Persisted claims set for story / weekly / achievement / daily — the
+  // canonical "have I already claimed this?" check that survives reload
+  // and is enforced server-side. Falls back to {} for guests / older
+  // deploys without the DailyEngagementModule mounted.
+  const { claimed: persistedClaims, markClaimedLocally } = useMissionClaims();
   const dailyMissions: Mission[] =
     liveDaily && liveDaily.quests.length > 0
       ? liveDaily.quests.map(questToMission)
@@ -238,7 +243,15 @@ export default function MissionsPage() {
 
         {/* Mission list / achievements grid */}
         {tab !== 'achievement' &&
-          visible.map(m => <MissionCard key={m.id} mission={m} race={race} />)}
+          visible.map(m => (
+            <MissionCard
+              key={m.id}
+              mission={m}
+              race={race}
+              persistedClaims={persistedClaims}
+              onClaimed={markClaimedLocally}
+            />
+          ))}
         {tab === 'achievement' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {ACHIEVEMENTS.map(a => (
@@ -289,9 +302,20 @@ function tabStyle(on: boolean, race: NDRace): React.CSSProperties {
   };
 }
 
-function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
+function MissionCard({
+  mission,
+  race,
+  persistedClaims,
+  onClaimed,
+}: {
+  mission: Mission;
+  race: NDRace;
+  persistedClaims: Set<string>;
+  onClaimed: (missionId: string) => void;
+}) {
   const locked = mission.state === 'locked';
-  const completed = mission.state === 'completed';
+  const serverClaimed = persistedClaims.has(mission.id);
+  const completed = mission.state === 'completed' || serverClaimed;
   const diffColor = mission.difficulty ? DIFFICULTY_COLOR[mission.difficulty] : ND.textDim;
   const router = useRouter();
   const tMissions = useTranslations('missions');
@@ -329,80 +353,75 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
       .map((r) => `${r.amount.toLocaleString()} ${r.label}`)
       .join(' · ');
 
+    // Map the UI's free-form reward labels (Turkish: "Kaynak", "Kristal",
+    // "XP", "Enerji", "Rozet") onto the api's canonical { gold, gems, xp }
+    // shape.  "Kaynak" / "Enerji" → gold (mineral on game-server),
+    // "Kristal" / "Rozet" → gems (science on game-server), "XP" → xp.
+    // Anything we don't recognise is dropped so the validator doesn't
+    // see surprise fields.
+    const rewardPayload: { gold?: number; gems?: number; xp?: number } = {};
+    for (const r of mission.rewards) {
+      const label = r.label.trim().toLowerCase();
+      if (label === 'kaynak' || label === 'enerji' || label === 'gold' || label === 'mineral') {
+        rewardPayload.gold = (rewardPayload.gold ?? 0) + r.amount;
+      } else if (label === 'kristal' || label === 'rozet' || label === 'gems' || label === 'kristaller') {
+        rewardPayload.gems = (rewardPayload.gems ?? 0) + r.amount;
+      } else if (label === 'xp') {
+        rewardPayload.xp = (rewardPayload.xp ?? 0) + r.amount;
+      }
+    }
+
     // Backend daily mission ids come through questToMission as `daily-q1`,
     // `daily-q2`, … (q-prefixed). Static placeholder mission ids in this
-    // file are `daily-1`, `daily-2`, … (digit-prefixed) and have no
-    // backend counterpart, so we only call the POST for the q-prefixed
-    // variant. Non-daily missions don't have a backend yet either.
+    // file are `daily-1`, `daily-2`, … (digit-prefixed) and route through
+    // the canonical /daily-engagement endpoint like every other category.
+    // The q-prefixed variant ALSO touches /daily/quests so the daily-quest
+    // progress tracker (the per-day stub) stays in sync.
     const isDaily = mission.category === 'daily';
     const backendQuestId =
       isDaily && /^daily-q[0-9]+$/.test(mission.id)
         ? mission.id.slice('daily-'.length)
         : null;
 
-    if (!backendQuestId) {
-      // Story / weekly / achievement: legacy local-only flow.
-      try {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
-        const claimed = raw ? (JSON.parse(raw) as string[]) : [];
-        if (claimed.includes(mission.id)) {
-          toast.info(tMissions('alreadyClaimed'));
-          return;
-        }
-      } catch { /* ignore */ }
-      writeCache();
-      toast.success(`Ödül alındı: ${totalReward}`);
-      return;
-    }
-
     try {
+      // Canonical persistence + wallet fan-out for story / weekly /
+      // achievement / daily.  The /daily-engagement endpoint INSERTs a
+      // (userId, missionId) row (idempotent via UNIQUE) and forwards the
+      // reward to game-server's battle-reward so the HUD wallet updates
+      // in the same round-trip.  Older deploys without the module
+      // mounted return 404, which we let bubble down to the toast.
       const res = await api.post<{
         claimed: boolean;
-        alreadyClaimed?: boolean;
-        rewards?: { gold?: number; gems?: number; xp?: number };
-      }>(`/daily/quests/${backendQuestId}/claim`);
+        alreadyClaimed: boolean;
+        rewards: { gold?: number; gems?: number; xp?: number };
+        walletCredited: boolean;
+      }>('/daily-engagement/claim', {
+        missionId: mission.id,
+        missionType: mission.category,
+        reward: rewardPayload,
+      });
+
+      // If this is also a stub daily quest, mirror the claim into the
+      // legacy /daily/quests tracker so its `claimed` flag matches.
+      if (backendQuestId) {
+        try {
+          await api.post(`/daily/quests/${backendQuestId}/claim`);
+        } catch {
+          /* swallow — the canonical claim already succeeded. */
+        }
+      }
+
       writeCache();
+      onClaimed(mission.id);
+
       if (res.alreadyClaimed) {
         toast.info(tMissions('alreadyClaimed'));
         return;
       }
 
-      // Credit the reward to the player's wallet on game-server.  Earlier
-      // we only fired `refreshGameResources()`, but the api missions stub
-      // doesn't touch the player_resources table — so the HUD repolled
-      // and saw unchanged values, making the "claim" feel cosmetic.
-      // Now we POST the reward to game-server's battle-reward endpoint
-      // (same path BattleScreen uses) so gold → mineral, gems → science,
-      // xp → xp land in the wallet for real.
-      const r = res.rewards ?? {};
-      if (r.gold || r.gems || r.xp) {
-        try {
-          const GAME_SERVER =
-            (process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:4001')
-              .replace(/\/+$/, '');
-          const { getAccessToken } = await import('@/lib/session');
-          const token = getAccessToken();
-          if (token) {
-            await fetch(`${GAME_SERVER}/api/buildings/resources/battle-reward`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                mineral: r.gold  ?? 0, // legacy field name from /battles
-                science: r.gems  ?? 0, // gems map to ◈ on the wallet
-                xp:      r.xp    ?? 0,
-              }),
-            });
-          }
-        } catch {
-          /* swallow — wallet refresh below still fires; if grant fails
-           * the next poll will reflect the real state. */
-        }
-      }
-      // Broadcast wallet refresh so the HUD pill repolls immediately
-      // rather than waiting for the next 5s tick.
+      // Wallet was already credited inside the api during the POST
+      // (api → game-server fan-out). Just broadcast a HUD refresh so
+      // the pill repolls without waiting for its 5s tick.
       refreshGameResources();
       if (res.claimed) {
         toast.success(`Ödül alındı: ${totalReward}`);
@@ -462,10 +481,13 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
                 <Chip key={r.label} color={race.primary}>+{r.amount.toLocaleString()} {r.label}</Chip>
               ))}
             </div>
-            {completed && (
+            {completed && !serverClaimed && (
               <NDButton race={race} size="sm" onClick={handleClaim}>
                 Ödülü Al
               </NDButton>
+            )}
+            {serverClaimed && (
+              <Chip color={ND.ok}>ÖDÜL ALINDI</Chip>
             )}
             {mission.state === 'active' && (
               <NDButton

@@ -1,11 +1,12 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAlliances } from '@/hooks/useAlliances';
+import { useAllianceWars, type AllianceWarDto } from '@/hooks/useAllianceWars';
 import {
   RACES,
   ND,
@@ -73,30 +74,13 @@ const MEMBERS: AllianceMember[] = [
   { id: 'm7', name: 'Lyra',            role: 'Üye',    race: 'zerg',    power:  55_200, contribution:  4_980, online: false },
 ];
 
-const WARS: WarEntry[] = [
-  {
-    id: 'w1',
-    opponent: 'Kovan Bilinci',
-    opponentTag: 'KVN',
-    opponentRace: 'zerg',
-    ours: 4_220,
-    theirs: 3_980,
-    endsIn: '2g 4s',
-    status: 'active',
-    slots: { filled: 18, total: 24 },
-  },
-  {
-    id: 'w2',
-    opponent: 'Karanlık Mahkeme',
-    opponentTag: 'MHK',
-    opponentRace: 'seytan',
-    ours: 0,
-    theirs: 0,
-    endsIn: '6s',
-    status: 'preparing',
-    slots: { filled: 6, total: 24 },
-  },
-];
+// Race fallback used when projecting backend wars into the WarCard shape.
+// The /alliance-wars/:id endpoint only knows the opponent's id+tag+name —
+// race ownership lives on the user, not the alliance, so for MVP we
+// stamp every backend-projected opponent with 'insan' (neutral). Once the
+// alliance entity gains a "primary race" column the projector picks that
+// up instead.
+const FALLBACK_RACE: NDRaceKey = 'insan';
 
 const OBJECTIVES: Objective[] = [
   { id: 'o1', title: 'Sektör Fethi',       current: 9,  target: 12, unit: 'sektör',   contributors: 11, reward: '+25 İttifak Tier Puanı' },
@@ -127,9 +111,10 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 export default function AlliancePage() {
   const race = useNDRace();
   const router = useRouter();
-  const tAlliance = useTranslations('alliance');
   const [tab, setTab] = useState<Tab>('genel');
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [warModalOpen, setWarModalOpen] = useState(false);
+  const [declaringWarOn, setDeclaringWarOn] = useState<string | null>(null);
 
   async function handleJoin(a: { id: string; name: string }) {
     if (joiningId) return;
@@ -161,6 +146,80 @@ export default function AlliancePage() {
   // empty state so the player can scroll real options instead of clicking
   // a "yakında" button that goes nowhere.
   const { alliances: discoverableAlliances, loading: alliancesLoading } = useAlliances();
+
+  // Resolve the player's own alliance id from the public list using their
+  // profile tag. There's no dedicated "my alliance" public endpoint yet, so
+  // for MVP we match `profile.allianceTag` against the discovery list — the
+  // tag is unique. Once a /me/alliance endpoint lands, swap this for a
+  // direct lookup so guildless players aren't forced through the list call.
+  const myAllianceId = useMemo(() => {
+    if (!profile?.allianceTag) return null;
+    const own = discoverableAlliances.find((a) => a.tag === profile.allianceTag);
+    return own?.id ?? null;
+  }, [profile?.allianceTag, discoverableAlliances]);
+
+  // Real wars list for the player's alliance. Falls back to [] for guests
+  // and guildless players; the empty-state banner already handles those.
+  const { wars: backendWars, loading: warsLoading, refresh: refreshWars } = useAllianceWars(myAllianceId);
+  // Project backend AllianceWarDto rows into the WarEntry shape WarCard
+  // expects. Status mapping: declared→preparing, active→active,
+  // ended+winner-mine→won, ended+winner-other→lost. Scores come straight
+  // from the DB columns; the "endsIn" + slot info is placeholder until
+  // matchmaking lands (post-MVP).
+  const projectedWars: WarEntry[] = useMemo(() => {
+    return backendWars.map((w) => {
+      const iAmAttacker = w.attackerId === myAllianceId;
+      const opp = iAmAttacker ? w.defender : w.attacker;
+      const ours = iAmAttacker ? w.attackerScore : w.defenderScore;
+      const theirs = iAmAttacker ? w.defenderScore : w.attackerScore;
+      let status: WarEntry['status'];
+      if (w.status === 'declared' || w.status === 'truce') status = 'preparing';
+      else if (w.status === 'active') status = 'active';
+      else if (w.winnerId && w.winnerId === myAllianceId) status = 'won';
+      else status = 'lost';
+      return {
+        id: w.id,
+        opponent: opp?.name ?? 'Bilinmeyen',
+        opponentTag: opp?.tag ?? '???',
+        opponentRace: FALLBACK_RACE,
+        ours,
+        theirs,
+        endsIn: w.endsAt ? '—' : (w.status === 'declared' ? 'Hazırlık' : '—'),
+        status,
+        slots: { filled: 0, total: 24 },
+      };
+    });
+  }, [backendWars, myAllianceId]);
+
+  // Eligible declaration targets — every public alliance that isn't the
+  // player's own and isn't already in an active/declared war with them.
+  const warTargets = useMemo(() => {
+    if (!myAllianceId) return [];
+    const blocked = new Set(
+      backendWars
+        .filter((w) => w.status === 'declared' || w.status === 'active')
+        .map((w) => (w.attackerId === myAllianceId ? w.defenderId : w.attackerId)),
+    );
+    return discoverableAlliances.filter(
+      (a) => a.id !== myAllianceId && !blocked.has(a.id),
+    );
+  }, [discoverableAlliances, myAllianceId, backendWars]);
+
+  async function handleDeclareWar(target: { id: string; name: string; tag: string }) {
+    if (declaringWarOn) return;
+    setDeclaringWarOn(target.id);
+    try {
+      await api.post('/alliance-wars', { targetAllianceId: target.id });
+      toast.success(`[${target.tag}] ${target.name} ittifakına savaş ilan edildi`);
+      setWarModalOpen(false);
+      refreshWars();
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'Savaş ilan edilemedi';
+      toast.error(msg);
+    } finally {
+      setDeclaringWarOn(null);
+    }
+  }
 
   const summary = {
     name: profile?.allianceTag ? race.allianceName : 'İttifak Yok',
@@ -378,17 +437,44 @@ export default function AlliancePage() {
          *  because `summary` zeros out fields when hasAlliance is false. */}
         {tab === 'savas' && hasAlliance && (
           <>
-            {WARS.map(w => (
+            {warsLoading && projectedWars.length === 0 && (
+              <Caption style={{ padding: 12, textAlign: 'center' }}>
+                Savaş geçmişi yükleniyor…
+              </Caption>
+            )}
+            {!warsLoading && projectedWars.length === 0 && (
+              <NotchPanel race={race}>
+                <Eyebrow color={race.primary}>SAVAŞ YOK</Eyebrow>
+                <H3 style={{ marginTop: 6, color: ND.text }}>
+                  Henüz savaş ilan edilmedi
+                </H3>
+                <Caption style={{ marginTop: 6 }}>
+                  Bir hedef ittifak seçerek ilk savaşı başlatabilirsin.
+                </Caption>
+              </NotchPanel>
+            )}
+            {projectedWars.map((w) => (
               <WarCard key={w.id} war={w} myRace={race} />
             ))}
             <NDButton
               race={race}
               full
-              onClick={() => toast.info(tAlliance('warSoonHint'))}
+              variant="primary"
+              onClick={() => setWarModalOpen(true)}
             >
               İttifak Savaşı Bildir
             </NDButton>
           </>
+        )}
+
+        {warModalOpen && (
+          <DeclareWarModal
+            race={race}
+            targets={warTargets}
+            busyId={declaringWarOn}
+            onCancel={() => setWarModalOpen(false)}
+            onPick={handleDeclareWar}
+          />
         )}
 
         {tab === 'uyeler' && hasAlliance && (
@@ -647,6 +733,125 @@ function MemberRow({ member }: { member: AllianceMember }) {
       </div>
       <Code style={{ color: r.primary }}>{member.power.toLocaleString()}</Code>
       <Code style={{ color: ND.textDim }}>+{member.contribution.toLocaleString()}</Code>
+    </div>
+  );
+}
+
+/* Declare-war modal — fixed overlay that lists eligible target alliances
+ * pulled from the public /alliances endpoint, filtered by the parent to
+ * exclude the player's own alliance and any pairs already in an
+ * active/declared war. Clicking a row fires POST /alliance-wars and the
+ * parent handles the toast + tab refresh on success. */
+function DeclareWarModal({
+  race,
+  targets,
+  busyId,
+  onCancel,
+  onPick,
+}: {
+  race: NDRace;
+  targets: Array<{ id: string; name: string; tag: string; memberCount?: number }>;
+  busyId: string | null;
+  onCancel: () => void;
+  onPick: (target: { id: string; name: string; tag: string }) => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onCancel}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(2,4,8,0.78)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          maxHeight: '78dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: ND.surface,
+          border: `1px solid ${race.primary}`,
+          boxShadow: `0 0 32px -8px ${race.glow}`,
+          borderRadius: 4,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 14px',
+            borderBottom: `1px solid ${ND.border}`,
+          }}
+        >
+          <div>
+            <Eyebrow color={race.primary}>İLAN HEDEFİ</Eyebrow>
+            <H3 style={{ marginTop: 2, color: ND.text }}>
+              Savaş Bildir
+            </H3>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Kapat"
+            style={{
+              ...iconBtn(),
+              cursor: 'pointer',
+              background: 'transparent',
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {targets.length === 0 && (
+            <Caption style={{ padding: 16, textAlign: 'center' }}>
+              Şu anda savaş ilan edilebilecek ittifak yok.
+            </Caption>
+          )}
+          {targets.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={busyId === t.id}
+              onClick={() => onPick({ id: t.id, name: t.name, tag: t.tag })}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: 8,
+                alignItems: 'center',
+                width: '100%',
+                padding: '12px 14px',
+                borderBottom: `1px solid ${ND.border}`,
+                background: 'transparent',
+                cursor: busyId === t.id ? 'wait' : 'pointer',
+                textAlign: 'left',
+                color: ND.text,
+                fontFamily: ND.display,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13 }}>{t.name}</div>
+                <Caption style={{ fontSize: 10 }}>[{t.tag}]</Caption>
+              </div>
+              <Code style={{ color: busyId === t.id ? ND.textDim : race.primary }}>
+                {busyId === t.id ? 'İlan ediliyor…' : 'BİLDİR'}
+              </Code>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

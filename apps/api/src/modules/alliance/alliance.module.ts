@@ -6,6 +6,8 @@ import { AllianceController } from './alliance.controller';
 import { AllianceService } from './alliance.service';
 import { AlliancePlayerController } from './alliance-player.controller';
 import { AlliancePlayerService } from './alliance-player.service';
+import { AllianceWarController } from './alliance-war.controller';
+import { AllianceWarService } from './alliance-war.service';
 import { AllianceChatGateway } from './alliance-chat.gateway';
 import { Alliance } from './entities/alliance.entity';
 import { AllianceMember } from './entities/alliance-member.entity';
@@ -36,8 +38,8 @@ import { AllianceDonation } from './entities/alliance-donation.entity';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AllianceController, AlliancePlayerController],
-  providers: [AllianceService, AlliancePlayerService, AllianceChatGateway],
-  exports: [AllianceService, AlliancePlayerService],
+  controllers: [AllianceController, AlliancePlayerController, AllianceWarController],
+  providers: [AllianceService, AlliancePlayerService, AllianceWarService, AllianceChatGateway],
+  exports: [AllianceService, AlliancePlayerService, AllianceWarService],
 })
 export class AllianceModule {}

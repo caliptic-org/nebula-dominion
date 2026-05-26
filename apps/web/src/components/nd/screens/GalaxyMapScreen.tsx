@@ -19,6 +19,7 @@ import {
   type NDRaceKey,
 } from '@/components/handoff';
 import { formatResource, useGameResources } from '@/hooks/useGameResources';
+import { useBaseState } from '@/hooks/useBaseState';
 import {
   GALAXY_EDGES,
   GALAXY_NODES,
@@ -620,8 +621,10 @@ function NodeDetailPanel({
 }) {
   const router  = useRouter();
   const { node, ownerColor: c, isEnemy } = info;
+  const { data: baseState } = useBaseState();
+  const livePlayerLevel = baseState?.tier?.currentLevel ?? 1;
   const dist    = distanceLy(node);
-  const tTime   = travelTimeSecs(node, 1); // level 1 baseline; TODO: wire live level
+  const tTime   = travelTimeSecs(node, livePlayerLevel);
   const isHome  = node.owner === 'player';
 
   return (

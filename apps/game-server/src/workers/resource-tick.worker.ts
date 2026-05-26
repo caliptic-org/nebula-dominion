@@ -5,6 +5,8 @@ import { Repository } from 'typeorm';
 import { Resource } from '../resources/entities/resource.entity';
 import { ResourcesService } from '../resources/resources.service';
 import { BuildingsService } from '../buildings/buildings.service';
+import { UnitsService } from '../units/units.service';
+import { GalaxyMapService } from '../map/galaxy-map.service';
 
 @Injectable()
 export class ResourceTickWorker {
@@ -16,6 +18,8 @@ export class ResourceTickWorker {
     private readonly resourceRepo: Repository<Resource>,
     private readonly resourcesService: ResourcesService,
     private readonly buildingsService: BuildingsService,
+    private readonly unitsService: UnitsService,
+    private readonly galaxyMapService: GalaxyMapService,
   ) {}
 
   /** Runs every 30 seconds */
@@ -33,6 +37,26 @@ export class ResourceTickWorker {
       const completed = await this.buildingsService.completeOverdueConstructions();
       if (completed > 0) {
         this.logger.log(`Completed ${completed} construction(s) this tick.`);
+      }
+
+      const completedUnits = await this.unitsService.completeTraining();
+      if (completedUnits > 0) {
+        this.logger.log(`Completed ${completedUnits} training queue entry(ies) this tick.`);
+      }
+
+      // Apply resource income from garrisoned galaxy nodes (mineral + gas + science)
+      const incomeResults = await this.galaxyMapService.processNodeIncome();
+      for (const { userId, mineral, gas, science } of incomeResults) {
+        try {
+          await this.resourcesService.grant(userId, { mineral, gas, science });
+        } catch (err) {
+          this.logger.error(
+            `Failed to apply node income for player ${userId}: ${(err as Error).message}`,
+          );
+        }
+      }
+      if (incomeResults.length > 0) {
+        this.logger.log(`Applied galaxy node income to ${incomeResults.length} player(s) this tick.`);
       }
 
       const playerIds = await this.getActivePlayerIds();

@@ -20,6 +20,7 @@ import { ChatModule } from './chat/chat.module';
 import { EconomyModule } from './economy/economy.module';
 import { GuildsModule } from './guilds/guilds.module';
 import { UnitsModule } from './units/units.module';
+import { GalaxyMapModule } from './map/galaxy-map.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { UnitsModule } from './units/units.module';
     EconomyModule,
     GuildsModule,
     UnitsModule,
+    GalaxyMapModule,
   ],
 })
 export class AppModule {}

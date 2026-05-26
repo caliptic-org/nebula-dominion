@@ -13,10 +13,13 @@ export interface ResourceSnapshot {
   gas: number;
   energy: number;
   population: number;
+  /** Science points — earned from battles and garrisoned galaxy nodes */
+  science: number;
   mineralCap: number;
   gasCap: number;
   energyCap: number;
   populationCap: number;
+  scienceCap: number;
   mineralPerTick: number;
   gasPerTick: number;
   energyPerTick: number;
@@ -158,14 +161,36 @@ export class ResourcesService {
   ): Promise<ResourceSnapshot> {
     const resource = await this.getOrCreate(playerId);
 
+    // Postgres `numeric(12,4)` round-trips through TypeORM as a STRING.
+    // Without an explicit Number() coercion `resource.mineral + amounts.mineral`
+    // performed string concatenation ("19130" + 100 → "19130100"), the
+    // resulting Math.min clamped to the cap, and the grant either no-op'd
+    // or jumped to the cap value — wallets stayed visually stuck even
+    // though the endpoint returned 200.  Mirror the science-block pattern
+    // by wrapping all reads in `Number(...)` so the arithmetic is real.
     if (amounts.mineral) {
-      resource.mineral = Math.min(resource.mineral + amounts.mineral, resource.mineralCap);
+      resource.mineral = Math.min(
+        Math.floor(Number(resource.mineral)) + amounts.mineral,
+        resource.mineralCap,
+      );
     }
     if (amounts.gas) {
-      resource.gas = Math.min(resource.gas + amounts.gas, resource.gasCap);
+      resource.gas = Math.min(
+        Math.floor(Number(resource.gas)) + amounts.gas,
+        resource.gasCap,
+      );
     }
     if (amounts.energy) {
-      resource.energy = Math.min(resource.energy + amounts.energy, resource.energyCap);
+      resource.energy = Math.min(
+        Math.floor(Number(resource.energy)) + amounts.energy,
+        resource.energyCap,
+      );
+    }
+    if (amounts.science) {
+      resource.science = Math.min(
+        Math.floor(Number(resource.science)) + amounts.science,
+        resource.scienceCap,
+      );
     }
 
     await this.resourceRepo.save(resource);
@@ -173,7 +198,7 @@ export class ResourcesService {
     await this.setCache(playerId, snapshot);
 
     this.logger.debug(
-      `Granted resources to player ${playerId}: +${amounts.mineral ?? 0}M +${amounts.gas ?? 0}G +${amounts.energy ?? 0}E`,
+      `Granted resources to player ${playerId}: +${amounts.mineral ?? 0}M +${amounts.gas ?? 0}G +${amounts.energy ?? 0}E +${amounts.science ?? 0}◈`,
     );
     return snapshot;
   }
@@ -297,10 +322,12 @@ export class ResourcesService {
       gas:              Math.floor(Number(resource.gas)),
       energy:           Math.floor(Number(resource.energy)),
       population:       Math.floor(Number(resource.population)),
+      science:          Math.floor(Number(resource.science ?? 0)),
       mineralCap:       resource.mineralCap,
       gasCap:           resource.gasCap,
       energyCap:        resource.energyCap,
       populationCap:    resource.populationCap,
+      scienceCap:       resource.scienceCap ?? 999999,
       mineralPerTick:   Number(resource.mineralPerTick),
       gasPerTick:       Number(resource.gasPerTick),
       energyPerTick:    Number(resource.energyPerTick),

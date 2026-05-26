@@ -4,6 +4,8 @@ export interface ResourceCost {
   mineral: number;
   gas: number;
   energy: number;
+  /** Science points — optional on cost objects, used for grants (battles, node income) */
+  science?: number;
 }
 
 export interface BuildingProduction {

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { BuildingsService } from './buildings.service';
 import { ResourcesService } from '../resources/resources.service';
@@ -76,5 +77,39 @@ export class BuildingsController {
   @UseGuards(HttpJwtGuard)
   async getResources(@CurrentUser() userId: string) {
     return this.resources.getSnapshot(userId);
+  }
+
+  /**
+   * POST /api/buildings/resources/battle-reward
+   * Credits battle rewards (mineral, gas, science) to the authenticated player.
+   * Called by BattleScreen.onContinue after a battle resolves on the client.
+   * The body mirrors the `rewards` object from POST /battles (battles-stub).
+   */
+  @Post('/resources/battle-reward')
+  @UseGuards(HttpJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  async grantBattleReward(
+    @CurrentUser() userId: string,
+    @Body()
+    body: {
+      mineral?: number;
+      gas?: number;
+      science?: number;
+      xp?: number;
+    },
+  ) {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('reward body required');
+    }
+    const grant: { mineral?: number; gas?: number; science?: number } = {};
+    if (body.mineral && body.mineral > 0) grant.mineral = Math.floor(body.mineral);
+    if (body.gas     && body.gas     > 0) grant.gas     = Math.floor(body.gas);
+    if (body.science && body.science > 0) grant.science = Math.floor(body.science);
+
+    if (Object.keys(grant).length === 0) {
+      return this.resources.getSnapshot(userId);
+    }
+
+    return this.resources.grant(userId, grant);
   }
 }

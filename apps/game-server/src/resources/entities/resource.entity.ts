@@ -40,6 +40,10 @@ export class Resource {
   @Column({ type: 'numeric', precision: 12, scale: 4, default: 0 })
   population: number;
 
+  /** Science points — earned from battles + garrisoned relay/colony/mine nodes */
+  @Column({ type: 'numeric', precision: 12, scale: 4, default: 0 })
+  science: number;
+
   /** Storage caps — recalculated when the player advances to a new age */
   @Column({ name: 'mineral_cap', default: 24000 })
   mineralCap: number;
@@ -52,6 +56,9 @@ export class Resource {
 
   @Column({ name: 'population_cap', default: 5000 })
   populationCap: number;
+
+  @Column({ name: 'science_cap', default: 999999 })
+  scienceCap: number;
 
   /** Net production per tick (30 s) — stored as float for precision, derived from active buildings */
   @Column({ name: 'mineral_per_tick', type: 'numeric', precision: 10, scale: 4, default: 0 })

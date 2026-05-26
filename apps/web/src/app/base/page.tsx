@@ -41,7 +41,7 @@ import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base:     '/base',
   map:      '/map',
-  battle:   '/battle',
+  settings: '/settings',
   alliance: '/alliance',
   shop:     '/shop',
 };
@@ -339,6 +339,10 @@ export default function BaseHomePage() {
               * Resources accumulate passively per tick; this button makes the
               * current total visible immediately. Disabled for 3s after each tap. */}
             <CollectButton race={race} />
+            {/* SAVAŞ — moved here from the BottomNav.  Sits at the bottom
+              * of the column so the combat-flow trio (TUGAY → TOPLA → SAVAŞ)
+              * stays visually grouped. */}
+            <BattleButton race={race} />
           </div>
 
           {/* Selected-building card.  Has two states:
@@ -736,6 +740,52 @@ function CollectButton({ race }: { race: NDRace }) {
       </svg>
       <span style={{ fontFamily: ND.display, fontSize: RAIL_CHIP_SIZE.fontSize, letterSpacing: '0.08em', lineHeight: 1 }}>
         {cooling ? '···' : 'TOPLA'}
+      </span>
+    </button>
+  );
+}
+
+/* ── BattleButton — SAVAŞ shortcut sitting at the bottom of the right-rail ─
+ * SAVAŞ used to live in the BottomNav (3rd of 5 tabs), but battle access
+ * always starts at the base anyway, so it migrated into the rail next to
+ * TOPLA.  Frees the BottomNav slot for AYARLAR and keeps the column's
+ * combat affordances together: TUGAY → roster, TOPLA → resources, SAVAŞ
+ * → enter combat.  Shares RAIL_CHIP_SIZE so every chip in the column is
+ * pixel-aligned. */
+function BattleButton({ race }: { race: NDRace }) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={() => router.push('/battle')}
+      aria-label="Savaşa gir"
+      title="Savaşa gir"
+      style={{
+        all: 'unset',
+        width: RAIL_CHIP_SIZE.width,
+        height: RAIL_CHIP_SIZE.height,
+        padding: RAIL_CHIP_SIZE.padding,
+        background: 'rgba(8,12,26,0.78)',
+        border: `1px solid ${race.primary}77`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: RAIL_CHIP_SIZE.gap,
+        color: race.primary,
+        cursor: 'pointer',
+        boxSizing: 'border-box',
+        borderRadius: 4,
+      }}
+    >
+      {/* crossed swords glyph — matches the BottomNav 'battle' icon that
+       *  used to live there before the SAVAŞ tab moved out. */}
+      <svg width={RAIL_CHIP_SIZE.iconSize} height={RAIL_CHIP_SIZE.iconSize} viewBox="0 0 18 18" fill="none" aria-hidden>
+        <path d="M3 3 L 15 15 M 15 3 L 3 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="9" cy="9" r="1.6" fill="currentColor" />
+      </svg>
+      <span style={{ fontFamily: ND.display, fontSize: RAIL_CHIP_SIZE.fontSize, letterSpacing: '0.08em', lineHeight: 1 }}>
+        SAVAŞ
       </span>
     </button>
   );

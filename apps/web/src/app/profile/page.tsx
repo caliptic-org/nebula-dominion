@@ -103,7 +103,7 @@ function fmtDuration(sec: number) {
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base:     '/base',
   map:      '/map',
-  battle:   '/battle',
+  settings: '/settings',
   alliance: '/alliance',
   shop:     '/shop',
 };

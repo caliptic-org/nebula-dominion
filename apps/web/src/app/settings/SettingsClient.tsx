@@ -87,7 +87,7 @@ function loadSettings(): SettingsState {
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base:     '/base',
   map:      '/map',
-  battle:   '/battle',
+  settings: '/settings',
   alliance: '/alliance',
   shop:     '/shop',
 };
@@ -285,7 +285,7 @@ export function SettingsClient() {
 
       <BottomNav
         race={race}
-        active={null}
+        active="settings"
         onChange={(key) => router.push(BOTTOM_NAV_ROUTES[key] ?? '/base')}
       />
     </Screen>

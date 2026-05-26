@@ -977,7 +977,7 @@ function ResInfoPopover({
  * draws from.
  */
 
-type BottomNavKey = 'base' | 'map' | 'battle' | 'alliance' | 'shop';
+type BottomNavKey = 'base' | 'map' | 'alliance' | 'shop' | 'settings';
 
 interface BottomNavProps {
   race: NDRace;
@@ -1014,13 +1014,17 @@ function bottomNavGlyph(key: BottomNavKey, c: string): JSX.Element {
       </svg>
     );
   }
-  if (key === 'battle') {
-    // Two crossed strokes — abstract sword/blade silhouette that scales
-    // cleanly at 18px without the emoji ⚔ kerning issues.
+  if (key === 'settings') {
+    // Gear / cog icon — 8-tooth radial silhouette plus a centered hub.
+    // Replaces the old "SAVAŞ" sword glyph after BottomNav was reshuffled
+    // (SAVAŞ moved to the /base right-rail; AYARLAR took the freed slot).
     return (
       <svg width="18" height="18" viewBox="0 0 18 18">
-        <path d="M3 3 L 15 15 M 15 3 L 3 15" fill="none" stroke={c} strokeWidth={sw} strokeLinecap="round" />
-        <circle cx="9" cy="9" r="1.6" fill={c} />
+        <path
+          d="M9 1.5 L 10 3.5 L 12.2 3 L 12.7 5.2 L 14.7 6 L 13.5 7.8 L 14.7 9.6 L 12.7 10.4 L 12.2 12.6 L 10 12.1 L 9 14.1 L 8 12.1 L 5.8 12.6 L 5.3 10.4 L 3.3 9.6 L 4.5 7.8 L 3.3 6 L 5.3 5.2 L 5.8 3 L 8 3.5 Z"
+          fill="none" stroke={c} strokeWidth={sw} strokeLinejoin="round"
+        />
+        <circle cx="9" cy="8" r="2.2" fill="none" stroke={c} strokeWidth={sw} />
       </svg>
     );
   }
@@ -1044,11 +1048,15 @@ function bottomNavGlyph(key: BottomNavKey, c: string): JSX.Element {
 
 export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
   const items: { key: BottomNavKey; label: string }[] = [
+    // SAVAŞ tab removed from the primary nav and relocated to the /base
+    // right-rail (next to TUGAY / TOPLA) since players reach battle
+    // exclusively from the base anyway.  AYARLAR took the vacated slot
+    // so settings is one tap away again instead of buried under "more".
     { key: 'base',     label: 'ÜS' },
     { key: 'map',      label: 'HARİTA' },
-    { key: 'battle',   label: 'SAVAŞ' },
     { key: 'alliance', label: 'LONCA' },
     { key: 'shop',     label: 'MAĞAZA' },
+    { key: 'settings', label: 'AYARLAR' },
   ];
   return (
     <nav

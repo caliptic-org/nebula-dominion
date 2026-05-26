@@ -62,7 +62,7 @@ const SWIPE_THRESHOLD_PX = 56;
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base:     '/base',
   map:      '/map',
-  battle:   '/battle',
+  settings: '/settings',
   alliance: '/alliance',
   shop:     '/shop',
   // (Legacy keys kept below for any callers not yet migrated.)

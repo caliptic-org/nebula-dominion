@@ -30,10 +30,13 @@ export interface ResourceSnapshotDto {
   gas: number;
   energy: number;
   population: number;
+  /** Science points — earned from battles and garrisoned galaxy nodes */
+  science: number;
   mineralCap: number;
   gasCap: number;
   energyCap: number;
   populationCap: number;
+  scienceCap: number;
   mineralPerTick: number;
   gasPerTick: number;
   energyPerTick: number;

@@ -510,6 +510,10 @@ interface HUDProps {
   resB?: string;
   crystal?: string;
   pop?: string;
+  /** Science is the cross-race research currency (◈). When undefined the
+   *  pill is hidden entirely — keeps fresh accounts that haven't earned
+   *  any science from carrying an empty chip in the HUD. */
+  science?: string | number;
   /** Optional per-resource live telemetry fed straight from useHudState.
    *  When present, the help popover surfaces "+X/tick · Y / Z depo" so
    *  the player can see whether they're producing anything and whether
@@ -524,9 +528,11 @@ interface HUDProps {
 
 /* Per-resource help copy — shown when the player taps a HUD resource pill.
  * Three slots map to game-server resource columns: A=mineral, B=gas,
- * crystal=energy. The race's own resourceA.name / resourceB.name supply
- * the title so insan reads "Mineral / Gas", zerg reads "Biyokütle /
- * Genetik" etc. — keeps the lore consistent. */
+ * crystal=energy (the canonical binding lives in nd-tokens.ts via
+ * Resource.field, consumed by useHudState). The race's own
+ * resourceA.name / resourceB.name supply the title so insan reads
+ * "Kredi / Yakıt", zerg reads "Biyokütle / Genetik" etc. — keeps the
+ * lore consistent while honestly representing the underlying field. */
 type ResSlot = 'A' | 'B' | 'crystal';
 
 interface ResInfo {
@@ -564,6 +570,7 @@ export function HUD({
   resA = '—',
   resB = '—',
   crystal = '—',
+  science,
   resAPerTick,
   resBPerTick,
   crystalPerTick,
@@ -668,6 +675,47 @@ export function HUD({
         active={openSlot === 'crystal'}
         ariaControls="hud-res-popover"
       />
+      {/* Science (◈) — research currency earned from battles + garrisoned
+       *  galaxy nodes.  Style mirrors `ResPill` exactly (same padding /
+       *  font-size / gap / border) so the four chips read as one row
+       *  instead of one chip looking visibly smaller-and-thinner than the
+       *  other three.  No popover yet — it's grant-only with no per-tick
+       *  rate to surface.  Hidden when `science` is undefined so fresh
+       *  accounts don't carry an empty chip in the HUD.
+       *
+       *  Glyph rendered via a span (not ResIcon) because `◈` is the
+       *  cross-race science symbol and doesn't belong in the race-keyed
+       *  `ResIconKind` enum. */}
+      {science !== undefined && (
+        <div
+          aria-label="Bilim"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 8px 4px 6px',
+            background: 'rgba(8, 12, 26, 0.7)',
+            border: `1px solid ${ND.border}`,
+            borderRadius: 3,
+            fontFamily: ND.mono,
+            fontSize: 11,
+            color: ND.text,
+            letterSpacing: '0.04em',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              fontSize: 12,
+              lineHeight: 1,
+              color: 'oklch(0.80 0.18 260)',
+            }}
+          >
+            ◈
+          </span>
+          <span>{science}</span>
+        </div>
+      )}
 
       {openSlot && (
         <ResInfoPopover
@@ -722,12 +770,16 @@ function ResInfoPopover({
     : Math.floor(n).toLocaleString();
   const rateText = perTick !== undefined ? (perTick > 0 ? `+${fmtNum(perTick)}/tick` : '0/tick') : null;
   const capText = cap !== undefined && cap > 0 ? `${currentValue ?? '—'} / ${fmtNum(cap)}` : null;
-  // Race-aware "build this to earn more" hint. Slot 1 of every race is the
-  // primary resource building, slot 3 is the research/secondary building —
-  // most races map slot 1→A, slot 1→crystal, slot 3→B, with some variation
-  // for canavar/seytan. We point at slot 1 for A+crystal and slot 3 for B
-  // as a sensible default that always resolves to a real race building.
-  const focusSlotIdx = slot === 'B' ? 3 : 1;
+  // Race-aware "build this to earn more" hint. Different slots point to
+  // different race buildings:
+  //   A (mineral) → slot 0 (Capital — produces mineral via baseline)
+  //   B (gas)     → slot 3 (Research/secondary that boosts gas/genome)
+  //   crystal     → slot 1 (Energy producer — reactor / spore pool / etc.)
+  // Previously slot A also pointed at slot 1 ("Reaktör Modülü"), which
+  // taught players the wrong building when their mineral was low. Slot 0
+  // is the player's capital — upgrading it improves baseline yield on
+  // every race, so it's always a sensible "next step" for the A pill.
+  const focusSlotIdx = slot === 'A' ? 0 : slot === 'B' ? 3 : 1;
   const focusBuilding = race.buildings[focusSlotIdx];
   const focusHref = focusBuilding?.slug
     ? `/base/build?focus=${focusBuilding.slug}`
@@ -906,41 +958,51 @@ function ResInfoPopover({
   );
 }
 
-/* ── Bottom nav ───────────────────────────────────────────────────────── */
+/* ── Bottom nav ───────────────────────────────────────────────────────── *
+ * Single shared 5-tab navigation used across every primary game screen
+ * (Base, Map, Battle, Alliance, Shop).  Secondary screens like /missions,
+ * /profile, /settings deliberately omit BottomNav since their own back
+ * affordance returns the player to the originating tab.
+ *
+ * Tab keys mirror the GalaxyMapScreen design tokens so the same 5 chips
+ * appear on every primary route — no more per-screen drift between the
+ * old "story/cmd/more" navigation and the new "map/battle/alliance/shop"
+ * one.  See ../nd/screens/GalaxyMapScreen.tsx for the icon palette this
+ * draws from.
+ */
 
-type BottomNavKey = 'base' | 'galaxy' | 'cmd' | 'story' | 'more';
+type BottomNavKey = 'base' | 'map' | 'battle' | 'alliance' | 'shop';
 
 interface BottomNavProps {
   race: NDRace;
-  active?: BottomNavKey;
+  /** Highlighted tab. Pass `null` (or omit) on screens that aren't one of
+   *  the 5 primary destinations so no tab pulses active. */
+  active?: BottomNavKey | null;
   onChange?: (key: BottomNavKey) => void;
 }
 
 export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
-  const tNav = useTranslations('nav');
-  const items: { key: BottomNavKey; label: string }[] = [
-    { key: 'base',   label: tNav('base') },
-    { key: 'galaxy', label: tNav('galaxy') },
-    { key: 'cmd',    label: tNav('commanders') },
-    { key: 'story',  label: tNav('story') },
-    { key: 'more',   label: tNav('more') },
+  const items: { key: BottomNavKey; label: string; icon: string }[] = [
+    { key: 'base',     label: 'ÜS',     icon: '◈' },
+    { key: 'map',      label: 'HARİTA', icon: '⊕' },
+    { key: 'battle',   label: 'SAVAŞ',  icon: '⚔' },
+    { key: 'alliance', label: 'LONCA',  icon: '⬡' },
+    { key: 'shop',     label: 'MAĞAZA', icon: '◆' },
   ];
-  const ico = (k: BottomNavKey, c: string) => {
-    const s = 18, sw = 1.5;
-    if (k === 'base')   return <svg width={s} height={s} viewBox="0 0 18 18"><rect x="2" y="9" width="14" height="7" fill="none" stroke={c} strokeWidth={sw}/><polygon points="2,9 9,3 16,9" fill="none" stroke={c} strokeWidth={sw}/><rect x="7" y="11" width="4" height="5" fill={c} opacity="0.4"/></svg>;
-    if (k === 'galaxy') return <svg width={s} height={s} viewBox="0 0 18 18"><circle cx="9" cy="9" r="6" fill="none" stroke={c} strokeWidth={sw}/><ellipse cx="9" cy="9" rx="6" ry="2" fill="none" stroke={c} strokeWidth={sw} transform="rotate(35 9 9)"/></svg>;
-    if (k === 'cmd')    return <svg width={s} height={s} viewBox="0 0 18 18"><circle cx="9" cy="6" r="3" fill="none" stroke={c} strokeWidth={sw}/><path d="M3 16 Q 9 10, 15 16" fill="none" stroke={c} strokeWidth={sw}/></svg>;
-    if (k === 'story')  return <svg width={s} height={s} viewBox="0 0 18 18"><rect x="3" y="3" width="12" height="12" fill="none" stroke={c} strokeWidth={sw}/><path d="M3 7 H 15 M 7 3 V 15" stroke={c} strokeWidth={sw}/></svg>;
-    return              <svg width={s} height={s} viewBox="0 0 18 18"><circle cx="4" cy="9" r="1.5" fill={c}/><circle cx="9" cy="9" r="1.5" fill={c}/><circle cx="14" cy="9" r="1.5" fill={c}/></svg>;
-  };
   return (
-    <div
+    <nav
+      aria-label="Ana navigasyon"
       style={{
+        flexShrink: 0,
+        zIndex: 10,
+        position: 'relative',
         display: 'grid',
         gridTemplateColumns: 'repeat(5, 1fr)',
+        background: 'rgba(6,8,15,0.97)',
         borderTop: `1px solid ${ND.border}`,
-        background: 'linear-gradient(180deg, rgba(6,8,15,0.85) 0%, rgba(6,8,15,0.98) 100%)',
-        padding: '6px 0 10px',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       {items.map(it => {
@@ -956,34 +1018,49 @@ export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 3,
+              justifyContent: 'center',
+              gap: 2,
+              padding: '8px 0',
+              minHeight: 52,
               position: 'relative',
               cursor: 'pointer',
-              padding: '2px 0',
+              color: c,
+              transition: 'color 150ms ease-out',
             }}
             aria-current={isOn ? 'page' : undefined}
             aria-label={it.label}
           >
             {isOn && (
-              <div
+              <span
+                aria-hidden
                 style={{
                   position: 'absolute',
-                  top: -6,
-                  height: 2,
+                  top: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
                   width: 24,
+                  height: 2,
                   background: race.primary,
+                  borderRadius: 1,
                   boxShadow: `0 0 8px ${race.glow}`,
                 }}
               />
             )}
-            {ico(it.key, c)}
-            <span style={{ fontFamily: ND.display, fontSize: 9, color: c, letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{it.icon}</span>
+            <span
+              style={{
+                fontFamily: ND.mono,
+                fontSize: 8,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+              }}
+            >
               {it.label}
             </span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 

@@ -48,11 +48,15 @@ function resourceLabels(): { mineral: string; gas: string; energy: string } {
   const key = currentRaceKey();
   if (!key) return { mineral: 'mineral', gas: 'gaz', energy: 'enerji' };
   const r = RACES[key];
-  // Backend slot → race lex name. Mirrors useHudState's mapping:
+  // Backend slot → race lex name. Mirrors useHudState's race-aware mapping
+  // (see nd-tokens.ts → Resource.field for the canonical wiring):
   //   mineral → race.resourceA (Kredi / Biyokütle / Mineral / Vahşi Et / Ruh Özü)
-  //   gas     → race.resourceB (Bilim / Genetik / Hesap / Kan Özü / Karanlık Md.)
+  //   gas     → race.resourceB (Yakıt / Genetik / Hesap / Kan Özü / Karanlık Md.)
   //   energy  → universal "Enerji" / "Kristal" — keep generic so it doesn't
   //             conflict with resourceB labels like "Genetik".
+  // Insan's resourceB was renamed from "Bilim" (Science) to "Yakıt" (Fuel)
+  // so the label no longer collides with the literal backend `science`
+  // field that's earned from battles + galaxy nodes.
   return {
     mineral: r.resourceA.name,
     gas: r.resourceB.name,
@@ -157,6 +161,29 @@ const RULES: Rule[] = [
   { re: /^damage must be > 0$/i, tr: () => 'Hasar değeri 0\'dan büyük olmalı.' },
   { re: /^xp must be > 0$/i,     tr: () => 'TP değeri 0\'dan büyük olmalı.' },
   { re: /^Age must be between 1 and 6, got: (\d+)$/, tr: () => 'Çağ değeri 1-6 arasında olmalı.' },
+
+  /* Generic class-validator phrasings ("X must be longer than …", "X must
+   * be …, "X should not be empty", …). These leak out of the api whenever
+   * a DTO rejects a value, and were rendering raw English in toasts. */
+  { re: /^identifier must be longer than or equal to \d+ characters$/i,
+    tr: () => 'Komutan kimliği gerekli.' },
+  { re: /^password must be longer than or equal to \d+ characters$/i,
+    tr: () => 'Şifre en az 8 karakter olmalı.' },
+  { re: /^email must be an email$/i,
+    tr: () => 'Geçerli bir e-posta adresi gerekli.' },
+  { re: /^(\w+) should not be empty$/i,
+    tr: (m) => `${m[1]} alanı boş olamaz.` },
+  { re: /^(\w+) must be a string$/i,
+    tr: () => 'Geçersiz değer.' },
+  { re: /^(\w+) must be longer than or equal to (\d+) characters$/i,
+    tr: (m) => `${m[1]} en az ${m[2]} karakter olmalı.` },
+  { re: /^(\w+) must be shorter than or equal to (\d+) characters$/i,
+    tr: (m) => `${m[1]} en fazla ${m[2]} karakter olabilir.` },
+
+  /* "Cannot POST /api/v1/shop/purchase" → friendlier message when the
+   * backend endpoint isn't shipped yet. Express's express.json() defaults to
+   * 404 with this message for unmounted routes. */
+  { re: /^Cannot (GET|POST|PUT|PATCH|DELETE) \//i, tr: () => 'Bu özellik henüz hazır değil. Yakında!' },
 
   /* Generic fallback prefix for unknown 4xx/5xx */
   { re: /^API error: \d+ (.+)$/, tr: () => 'Sunucu hatası, lütfen tekrar dene.' },

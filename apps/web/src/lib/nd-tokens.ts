@@ -24,9 +24,29 @@ export type ResourceIconKind =
   | 'cred' | 'sci' | 'bio' | 'gen' | 'min' | 'cpu'
   | 'meat' | 'blood' | 'soul' | 'dark' | 'crystal' | 'energy' | 'pop';
 
+/**
+ * Backend resource field a race-themed slot is wired to.
+ *
+ * Every race exposes 2 race-flavoured pills + 1 universal energy pill in the
+ * HUD. To eliminate any confusion about *what value is actually being shown*
+ * each Resource declares the concrete game-server snapshot field it reads
+ * from. This makes the binding chain auditable from the type level:
+ *
+ *   race.resourceA.field === 'mineral' → pill shows snapshot.mineral
+ *   race.resourceB.field === 'gas'     → pill shows snapshot.gas
+ *
+ * Without this, the wiring lived only in useHudState.ts and a player could
+ * see "Bilim 75" (insan's slot B, labelled "Science") not realising the
+ * underlying value was actually `gas` — there was no compile-time link
+ * between the label and the field.
+ */
+export type ResourceField = 'mineral' | 'gas' | 'energy' | 'science';
+
 export interface Resource {
   name: string;
   icon: ResourceIconKind;
+  /** Which backend ResourceSnapshot field this slot reads from. */
+  field: ResourceField;
 }
 
 /** Sigil identifiers as authored in the design handoff. */
@@ -130,8 +150,15 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     primaryDim: 'oklch(0.62 0.13 80)',
     glow: 'oklch(0.85 0.18 80)',
     sigil: 'TRIDENT',
-    resourceA: { name: 'Kredi', icon: 'cred' },
-    resourceB: { name: 'Bilim', icon: 'sci' },
+    // Slot A (mineral): "Kredi" — primary build/train currency.
+    // Slot B (gas): "Yakıt" (fuel) — was previously labelled "Bilim" (science)
+    //   which collided with the literal backend `science` field that's
+    //   earned from battles + garrisoned galaxy nodes. Renamed so the HUD
+    //   label honestly reflects the underlying gas value. Icon stays as
+    //   `sci` (circle-with-dot) for visual continuity — it now reads as a
+    //   "fuel cell" cross-section rather than an atom/research symbol.
+    resourceA: { name: 'Kredi', icon: 'cred', field: 'mineral' },
+    resourceB: { name: 'Yakıt', icon: 'sci',  field: 'gas'     },
     avatar: 'Kmt. A. Voss',
     title: 'Yutucu Yıldız Varisi',
     handle: 'voss.cmd',
@@ -150,6 +177,12 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     buildings: [
       { slug: 'komuta_ussu',     n: 'Komuta Üssü',     t: 'Ana yapı',             locked: false },
       { slug: 'reaktor_modulu',  n: 'Reaktör Modülü',  t: 'Enerji üretir',        locked: false },
+      // Yakıt Rafinerisi — gas üreten bina.  Önce hiçbir İnsan slot'u
+      // gas_refinery'ye map etmiyordu, dolayısıyla insan oyuncusu hiç
+      // Yakıt biriktiremiyordu (HUD 0/0/0 görünüyordu).  Erken oyun
+      // economy'sinin çalışması için unlocked, capital + reaktör'den
+      // hemen sonra inşa edilebilir.
+      { slug: 'yakit_rafinerisi',n: 'Yakıt Rafinerisi',t: 'Yakıt üretir',         locked: false },
       { slug: 'kisla',           n: 'Kışla',           t: 'Birim eğitimi',        locked: false },
       { slug: 'bilim_akademisi', n: 'Bilim Akademisi', t: 'Araştırma',            locked: false },
       { slug: 'subspace_anteni', n: 'Subspace Anteni', t: 'Galaksi haberleşmesi', locked: true  },
@@ -176,8 +209,8 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     primaryDim: 'oklch(0.48 0.18 340)',
     glow: 'oklch(0.72 0.26 340)',
     sigil: 'HIVE',
-    resourceA: { name: 'Biyokütle', icon: 'bio' },
-    resourceB: { name: 'Genetik',   icon: 'gen' },
+    resourceA: { name: 'Biyokütle', icon: 'bio', field: 'mineral' },
+    resourceB: { name: 'Genetik',   icon: 'gen', field: 'gas'     },
     avatar: 'Ana Krl. Vex’thara',
     title: 'Yutucu Kraliçe',
     handle: 'vex.brood',
@@ -222,8 +255,8 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     primaryDim: 'oklch(0.58 0.13 220)',
     glow: 'oklch(0.82 0.18 220)',
     sigil: 'CORE',
-    resourceA: { name: 'Mineral', icon: 'min' },
-    resourceB: { name: 'Hesap',   icon: 'cpu' },
+    resourceA: { name: 'Mineral', icon: 'min', field: 'mineral' },
+    resourceB: { name: 'Hesap',   icon: 'cpu', field: 'gas'     },
     avatar: 'Demiurge Prime',
     title: 'Sonsuz Mantık Demiurge',
     handle: 'demiurge.pr',
@@ -241,7 +274,14 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     ],
     buildings: [
       { slug: 'sonsuzluk_cekirdegi', n: 'Sonsuzluk Çekirdeği', t: 'Ana yapı',        locked: false },
-      { slug: 'veri_kaynagi',        n: 'Veri Kaynağı',        t: 'Hesap üretir',    locked: false },
+      // veri_kaynagi description previously said "Hesap üretir" but the
+      // backend mapping is solar_plant (= energy).  Aligned the desc with
+      // the real production type so the player sees what they get.
+      { slug: 'veri_kaynagi',        n: 'Veri Kaynağı',        t: 'Enerji üretir',   locked: false },
+      // Hesap Havuzu — gas (Hesap) üreten bina.  Otomat ırkında daha önce
+      // hiçbir slot gas_refinery'ye map etmiyordu, "Hesap" rezervi sıfır
+      // kalıyordu.  Erken oyun economy'sinin çalışması için unlocked.
+      { slug: 'hesap_havuzu',        n: 'Hesap Havuzu',        t: 'Hesap üretir',    locked: false },
       { slug: 'montaj_hatti',        n: 'Montaj Hattı',        t: 'Birim üretimi',   locked: false },
       { slug: 'mantik_matrisi',      n: 'Mantık Matrisi',      t: 'Araştırma',       locked: false },
       { slug: 'cihaz_hazinesi',      n: 'Cihaz Hazinesi',      t: 'Kadim teknoloji', locked: true  },
@@ -268,8 +308,8 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     primaryDim: 'oklch(0.52 0.14 50)',
     glow: 'oklch(0.78 0.20 50)',
     sigil: 'FANG',
-    resourceA: { name: 'Vahşi Et', icon: 'meat' },
-    resourceB: { name: 'Kan Özü',  icon: 'blood' },
+    resourceA: { name: 'Vahşi Et', icon: 'meat',  field: 'mineral' },
+    resourceB: { name: 'Kan Özü',  icon: 'blood', field: 'gas'     },
     avatar: 'Alpha Khorvash',
     title: 'Primordial Canavar Tanrı',
     handle: 'khorvash.a',
@@ -314,8 +354,8 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     primaryDim: 'oklch(0.45 0.18 15)',
     glow: 'oklch(0.70 0.24 15)',
     sigil: 'SIGIL',
-    resourceA: { name: 'Ruh Özü',      icon: 'soul' },
-    resourceB: { name: 'Karanlık Md.', icon: 'dark' },
+    resourceA: { name: 'Ruh Özü',      icon: 'soul', field: 'mineral' },
+    resourceB: { name: 'Karanlık Md.', icon: 'dark', field: 'gas'     },
     avatar: 'K. Lord Malphas',
     title: 'Sonsuz Karanlık Hükümdar',
     handle: 'malphas.l',

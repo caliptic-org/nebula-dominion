@@ -437,6 +437,10 @@ export function ResIcon({ kind, size = 14, color }: ResIconProps) {
     crystal:<polygon points="8,1 13,6 10,15 6,15 3,6" fill="none" stroke={c} strokeWidth="1.4"/>,
     energy: <path d="M9 1 L 4 9 L 8 9 L 6 15 L 12 7 L 8 7 Z" fill="none" stroke={c} strokeWidth="1.4"/>,
     pop:    <g><circle cx="8" cy="5" r="2.5" fill="none" stroke={c} strokeWidth="1.4"/><path d="M3 14 Q 8 9, 13 14" fill="none" stroke={c} strokeWidth="1.4"/></g>,
+    // Science (◈) — 4-point diamond outline + center dot.  Matches the
+    // glyph used in the BottomNav "MAĞAZA" tab + the inline ◈ characters
+    // peppered through battle-result / map for visual consistency.
+    science:<g><polygon points="8,1 15,8 8,15 1,8" fill="none" stroke={c} strokeWidth="1.4"/><circle cx="8" cy="8" r="1.6" fill={c}/></g>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'inline-block', verticalAlign: 'middle' }} aria-hidden="true">
@@ -521,9 +525,15 @@ interface HUDProps {
   resAPerTick?: number;
   resBPerTick?: number;
   crystalPerTick?: number;
+  /** Science (◈) telemetry — populated when useHudState exposes
+   *  `science / sciencePerTick / scienceCap`.  Per-tick is 0 until the
+   *  player garrisons a galaxy node, but we still pass it through so the
+   *  popover can honestly report "+0/tick". */
+  sciencePerTick?: number;
   resACap?: number;
   resBCap?: number;
   crystalCap?: number;
+  scienceCap?: number;
 }
 
 /* Per-resource help copy — shown when the player taps a HUD resource pill.
@@ -533,7 +543,7 @@ interface HUDProps {
  * resourceA.name / resourceB.name supply the title so insan reads
  * "Kredi / Yakıt", zerg reads "Biyokütle / Genetik" etc. — keeps the
  * lore consistent while honestly representing the underlying field. */
-type ResSlot = 'A' | 'B' | 'crystal';
+type ResSlot = 'A' | 'B' | 'crystal' | 'science';
 
 interface ResInfo {
   title: string;
@@ -556,6 +566,16 @@ function resInfoFor(slot: ResSlot, race: NDRace, t: ReturnType<typeof useTransla
       howTo: t('resB.howTo'),
     };
   }
+  if (slot === 'science') {
+    // Cross-race currency — popover copy comes from the dedicated
+    // `science.*` i18n group so it doesn't pull labels from any per-race
+    // resourceA/B description.  See messages/{tr,en,zh}.json hud.science.
+    return {
+      title: t('science.title'),
+      description: t('science.description'),
+      howTo: t('science.howTo'),
+    };
+  }
   return {
     title: t('crystal.title'),
     description: t('crystal.description'),
@@ -574,9 +594,11 @@ export function HUD({
   resAPerTick,
   resBPerTick,
   crystalPerTick,
+  sciencePerTick,
   resACap,
   resBCap,
   crystalCap,
+  scienceCap,
 }: HUDProps) {
   // Single-slot popover: tap a pill to open, tap again or outside to close.
   // Lives in HUD so all three pills share one open-state (only one popover
@@ -676,45 +698,21 @@ export function HUD({
         ariaControls="hud-res-popover"
       />
       {/* Science (◈) — research currency earned from battles + garrisoned
-       *  galaxy nodes.  Style mirrors `ResPill` exactly (same padding /
-       *  font-size / gap / border) so the four chips read as one row
-       *  instead of one chip looking visibly smaller-and-thinner than the
-       *  other three.  No popover yet — it's grant-only with no per-tick
-       *  rate to surface.  Hidden when `science` is undefined so fresh
-       *  accounts don't carry an empty chip in the HUD.
-       *
-       *  Glyph rendered via a span (not ResIcon) because `◈` is the
-       *  cross-race science symbol and doesn't belong in the race-keyed
-       *  `ResIconKind` enum. */}
+       *  galaxy nodes.  Rendered through ResPill (kind='science') exactly
+       *  like the other three pills so the row is *structurally* uniform:
+       *  same tag (<button>), same props, same popover-open behaviour.
+       *  Earlier this was an inline <div> which made the chip look right
+       *  visually but diverged from the others' interactive contract —
+       *  no hover/active state, no popover, different DOM shape. */}
       {science !== undefined && (
-        <div
-          aria-label="Bilim"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 8px 4px 6px',
-            background: 'rgba(8, 12, 26, 0.7)',
-            border: `1px solid ${ND.border}`,
-            borderRadius: 3,
-            fontFamily: ND.mono,
-            fontSize: 11,
-            color: ND.text,
-            letterSpacing: '0.04em',
-          }}
-        >
-          <span
-            aria-hidden
-            style={{
-              fontSize: 12,
-              lineHeight: 1,
-              color: 'oklch(0.80 0.18 260)',
-            }}
-          >
-            ◈
-          </span>
-          <span>{science}</span>
-        </div>
+        <ResPill
+          kind="science"
+          value={science}
+          accent="oklch(0.80 0.18 260)"
+          onClick={() => toggle('science')}
+          active={openSlot === 'science'}
+          ariaControls="hud-res-popover"
+        />
       )}
 
       {openSlot && (
@@ -724,14 +722,21 @@ export function HUD({
           slot={openSlot}
           t={t}
           perTick={
-            openSlot === 'A' ? resAPerTick
-            : openSlot === 'B' ? resBPerTick
+            openSlot === 'A'       ? resAPerTick
+            : openSlot === 'B'     ? resBPerTick
+            : openSlot === 'science' ? sciencePerTick
             : crystalPerTick
           }
-          currentValue={openSlot === 'A' ? resA : openSlot === 'B' ? resB : crystal}
+          currentValue={
+            openSlot === 'A'       ? resA
+            : openSlot === 'B'     ? resB
+            : openSlot === 'science' ? (science !== undefined ? String(science) : '—')
+            : crystal
+          }
           cap={
-            openSlot === 'A' ? resACap
-            : openSlot === 'B' ? resBCap
+            openSlot === 'A'       ? resACap
+            : openSlot === 'B'     ? resBCap
+            : openSlot === 'science' ? scienceCap
             : crystalCap
           }
           onClose={() => setOpenSlot(null)}

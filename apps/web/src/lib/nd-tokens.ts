@@ -22,7 +22,12 @@ export type RaceKey = (typeof RACE_KEYS)[number];
 
 export type ResourceIconKind =
   | 'cred' | 'sci' | 'bio' | 'gen' | 'min' | 'cpu'
-  | 'meat' | 'blood' | 'soul' | 'dark' | 'crystal' | 'energy' | 'pop';
+  | 'meat' | 'blood' | 'soul' | 'dark' | 'crystal' | 'energy' | 'pop'
+  /** Science (◈) — cross-race research currency.  Distinct kind so the
+   *  HUD's 4th pill can render through the same ResPill/ResIcon path as
+   *  the other three (button + onClick + popover) instead of an inline
+   *  div, keeping the pill row structurally uniform. */
+  | 'science';
 
 /**
  * Backend resource field a race-themed slot is wired to.

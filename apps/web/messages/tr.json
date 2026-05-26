@@ -89,6 +89,11 @@
       "title": "Enerji",
       "description": "Birim üretimi ve özel yetenekler için tüketilir. Yüksek seviye birimler daha fazla harcar.",
       "howTo": "Reaktör/enerji binası inşa et. Aktif kalkan + buff kullanırken hızla biter — depoyu izle."
+    },
+    "science": {
+      "title": "Bilim",
+      "description": "Araştırma ağacını ilerletmek için kullanılan ırklar üstü para birimi (◈). Savaşlardan ve garnizonlu galaksi düğümlerinden kazanılır.",
+      "howTo": "Galaksi haritasında bir düğümü ele geçirip içeride asker bırak — her tick'te düğüm türüne göre pasif Bilim üretir. Savaşı kazanmak da Bilim verir."
     }
   },
   "nav": {

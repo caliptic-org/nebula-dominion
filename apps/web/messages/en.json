@@ -89,6 +89,11 @@
       "title": "Energy",
       "description": "Consumed by unit production and special abilities. High-tier units drain it quickly.",
       "howTo": "Build a reactor/energy building. Drains fast with active shields + buffs — watch your storage."
+    },
+    "science": {
+      "title": "Science",
+      "description": "Cross-race research currency (◈) used to progress the tech tree. Earned from battles and garrisoned galaxy nodes.",
+      "howTo": "Capture a galaxy node and keep troops garrisoned inside — each tick yields passive Science scaled to the node kind. Battle victories also award Science."
     }
   },
   "nav": {

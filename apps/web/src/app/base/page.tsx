@@ -225,9 +225,11 @@ export default function BaseHomePage() {
           resAPerTick={hud.resAPerTick}
           resBPerTick={hud.resBPerTick}
           crystalPerTick={hud.crystalPerTick}
+          sciencePerTick={hud.sciencePerTick}
           resACap={hud.resACap}
           resBCap={hud.resBCap}
           crystalCap={hud.crystalCap}
+          scienceCap={hud.scienceCap}
         />
 
         <TierBanner race={race} level={hud.level} age={hud.age} xpPercent={hud.xpPercent} />

@@ -386,29 +386,16 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
             value={liveResources ? formatResource(liveResources.energy) : '–'}
             accent="oklch(0.82 0.16 80)"
           />
-          {/* Science pill — kept structurally identical to ResPill (same
-           *  padding / font-size / gap / border) so the four chips align
-           *  visually as a single row.  Mirrors the atoms.tsx HUD science
-           *  block; if you change one, change both. */}
-          <div
-            aria-label="Bilim"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px 4px 6px',
-              background: 'rgba(8, 12, 26, 0.7)',
-              border: `1px solid ${ND.border}`,
-              borderRadius: 3,
-              fontFamily: ND.mono,
-              fontSize: 11,
-              color: ND.text,
-              letterSpacing: '0.04em',
-            }}
-          >
-            <span aria-hidden style={{ fontSize: 12, lineHeight: 1, color: 'oklch(0.80 0.18 260)' }}>◈</span>
-            <span>{liveResources ? formatResource(liveResources.science ?? 0) : '–'}</span>
-          </div>
+          {/* Science pill — renders through ResPill kind='science' so the
+           *  galaxy-map chip row uses the same <button> + ◈ ResIcon path
+           *  as the rest of the HUD.  Previously an inline <div> here,
+           *  which broke structural parity with the other three pills
+           *  (they were <button>, science was <div>). */}
+          <ResPill
+            kind="science"
+            value={liveResources ? formatResource(liveResources.science ?? 0) : '–'}
+            accent="oklch(0.80 0.18 260)"
+          />
         </div>
       </header>
 

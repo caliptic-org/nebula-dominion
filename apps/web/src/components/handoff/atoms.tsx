@@ -488,7 +488,8 @@ export function ResPill({ kind, value, accent, onClick, ariaControls, active }: 
         style={{
           ...sharedStyle,
           cursor: 'pointer',
-          font: 'inherit',
+          fontFamily:'font-family: var var(--font-nd-mono) (--font-nd-mono), "JetBrains Mono", ui-monospace, monospace',
+          fontSize: '11px',
         }}
       >
         <ResIcon kind={kind} size={12} color={accent}/>
@@ -986,28 +987,89 @@ interface BottomNavProps {
   onChange?: (key: BottomNavKey) => void;
 }
 
+/* Per-tab SVG glyph.  Earlier this component used inline emoji (◈ ⊕ ⚔
+ * ⬡ ◆) which rendered with platform font metrics and visibly diverged
+ * from the standalone HTML design reference (18×18 stroked SVGs with
+ * race-tinted color).  Returning SVGs here restores 1:1 design parity:
+ * stroke-width 1.5 matches the reference, color flows from `c` so the
+ * active tab adopts race.primary while idle tabs stay textMute. */
+function bottomNavGlyph(key: BottomNavKey, c: string): JSX.Element {
+  const sw = 1.5;
+  if (key === 'base') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <rect x="2" y="9" width="14" height="7" fill="none" stroke={c} strokeWidth={sw} />
+        <polygon points="2,9 9,3 16,9" fill="none" stroke={c} strokeWidth={sw} />
+        <rect x="7" y="11" width="4" height="5" fill={c} opacity="0.4" />
+      </svg>
+    );
+  }
+  if (key === 'map') {
+    // Orbit ring with tilted ellipse — same primitive the reference uses
+    // for "galaxy", repurposed for the unified "HARİTA" tab.
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <circle cx="9" cy="9" r="6" fill="none" stroke={c} strokeWidth={sw} />
+        <ellipse cx="9" cy="9" rx="6" ry="2" fill="none" stroke={c} strokeWidth={sw} transform="rotate(35 9 9)" />
+      </svg>
+    );
+  }
+  if (key === 'battle') {
+    // Two crossed strokes — abstract sword/blade silhouette that scales
+    // cleanly at 18px without the emoji ⚔ kerning issues.
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <path d="M3 3 L 15 15 M 15 3 L 3 15" fill="none" stroke={c} strokeWidth={sw} strokeLinecap="round" />
+        <circle cx="9" cy="9" r="1.6" fill={c} />
+      </svg>
+    );
+  }
+  if (key === 'alliance') {
+    // Hexagon — guild / alliance heraldry shape.
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <polygon points="9,2 15,5.5 15,12.5 9,16 3,12.5 3,5.5" fill="none" stroke={c} strokeWidth={sw} />
+        <circle cx="9" cy="9" r="1.6" fill={c} opacity="0.6" />
+      </svg>
+    );
+  }
+  // shop — diamond shape (mirrors the ◆ glyph it replaced).
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <polygon points="9,2 15,9 9,16 3,9" fill="none" stroke={c} strokeWidth={sw} />
+      <polygon points="9,5 12,9 9,13 6,9" fill={c} opacity="0.4" />
+    </svg>
+  );
+}
+
 export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
-  const items: { key: BottomNavKey; label: string; icon: string }[] = [
-    { key: 'base',     label: 'ÜS',     icon: '◈' },
-    { key: 'map',      label: 'HARİTA', icon: '⊕' },
-    { key: 'battle',   label: 'SAVAŞ',  icon: '⚔' },
-    { key: 'alliance', label: 'LONCA',  icon: '⬡' },
-    { key: 'shop',     label: 'MAĞAZA', icon: '◆' },
+  const items: { key: BottomNavKey; label: string }[] = [
+    { key: 'base',     label: 'ÜS' },
+    { key: 'map',      label: 'HARİTA' },
+    { key: 'battle',   label: 'SAVAŞ' },
+    { key: 'alliance', label: 'LONCA' },
+    { key: 'shop',     label: 'MAĞAZA' },
   ];
   return (
     <nav
       aria-label="Ana navigasyon"
       style={{
+        // Sizing tokens come straight from the standalone HTML design
+        // reference: padding 6px top / 10px bottom, gradient bg (not
+        // solid), 1px border-top in ND.border.  Earlier we'd flattened
+        // the gradient and bumped padding/minHeight which made the bar
+        // read taller than the reference.
         flexShrink: 0,
         zIndex: 10,
         position: 'relative',
         display: 'grid',
         gridTemplateColumns: 'repeat(5, 1fr)',
-        background: 'rgba(6,8,15,0.97)',
+        background: 'linear-gradient(180deg, rgba(6,8,15,0.85) 0%, rgba(6,8,15,0.98) 100%)',
         borderTop: `1px solid ${ND.border}`,
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        padding: '6px 0 10px',
+        paddingBottom: `calc(10px + env(safe-area-inset-bottom, 0px))`,
       }}
     >
       {items.map(it => {
@@ -1023,10 +1085,9 @@ export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              padding: '8px 0',
-              minHeight: 52,
+              // gap 3px + no minHeight + no per-button padding — matches
+              // the reference's natural sizing (~36px tall).
+              gap: 3,
               position: 'relative',
               cursor: 'pointer',
               color: c,
@@ -1039,23 +1100,29 @@ export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
               <span
                 aria-hidden
                 style={{
+                  // Active pip sits 6px above the icon (top: -6), not
+                  // clamped to the container top.  This is what makes
+                  // the underline look like it "highlights" the icon
+                  // instead of riding the container border.
                   position: 'absolute',
-                  top: 0,
+                  top: -6,
                   left: '50%',
                   transform: 'translateX(-50%)',
                   width: 24,
                   height: 2,
                   background: race.primary,
-                  borderRadius: 1,
                   boxShadow: `0 0 8px ${race.glow}`,
                 }}
               />
             )}
-            <span style={{ fontSize: 16, lineHeight: 1 }}>{it.icon}</span>
+            {bottomNavGlyph(it.key, c)}
             <span
               style={{
-                fontFamily: ND.mono,
-                fontSize: 8,
+                // Chakra Petch / display font, 9px uppercase — matches
+                // the reference exactly.  Mono+8 read as a different
+                // typographic system from the rest of the chrome.
+                fontFamily: ND.display,
+                fontSize: 9,
                 letterSpacing: '0.10em',
                 textTransform: 'uppercase',
               }}

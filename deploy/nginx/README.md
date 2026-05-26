@@ -1,3 +1,4 @@
+<!-- v1: initial drop-in deploy via self-hosted bastion runner -->
 # Nebula Dominion — bastion nginx config
 
 Drop-in nginx reverse proxy config for the **Caliptic bastion VM** that

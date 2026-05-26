@@ -48,12 +48,21 @@ export class MissionsStubController {
   @Get('quests/:playerId')
   @ApiOperation({ summary: 'Get the day\'s quests for a player (stub seed)' })
   quests(@Param('playerId') playerId: string) {
+    // Reflect the per-player CLAIMED set into each quest's `claimed` flag.
+    // Earlier the seed always returned `claimed: false` for everyone, so
+    // the UI showed "ÖDÜL AL" even on quests the server had already
+    // marked claimed — and re-clicking surfaced an "already claimed"
+    // toast that felt like a regression.  Hydrating from CLAIMED here
+    // makes the GET response the single source of truth for claim state.
+    const set = CLAIMED.get(playerId) ?? new Set<string>();
+    const quests = QUESTS.map((q) => ({ ...q, claimed: set.has(q.id) }));
     return {
       playerId,
       day: new Date().toISOString().slice(0, 10),
-      quests: QUESTS,
+      quests,
       bonusUnlockedAt: 4, // claim daily bonus chest at 4/5 done
-      totalDone: QUESTS.filter((q) => q.progress >= q.target).length,
+      totalDone: quests.filter((q) => q.progress >= q.target).length,
+      claimedCount: set.size,
     };
   }
 

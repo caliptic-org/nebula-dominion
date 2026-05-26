@@ -366,10 +366,43 @@ function MissionCard({ mission, race }: { mission: Mission; race: NDRace }) {
         toast.info(tMissions('alreadyClaimed'));
         return;
       }
-      // Broadcast wallet refresh so the HUD pill repolls immediately rather
-      // than waiting for the next 5s tick. Even on the "defensive" branch
-      // we fire it — if the server changed wallet state silently the HUD
-      // catches up; if it didn't, a no-op refetch is harmless.
+
+      // Credit the reward to the player's wallet on game-server.  Earlier
+      // we only fired `refreshGameResources()`, but the api missions stub
+      // doesn't touch the player_resources table — so the HUD repolled
+      // and saw unchanged values, making the "claim" feel cosmetic.
+      // Now we POST the reward to game-server's battle-reward endpoint
+      // (same path BattleScreen uses) so gold → mineral, gems → science,
+      // xp → xp land in the wallet for real.
+      const r = res.rewards ?? {};
+      if (r.gold || r.gems || r.xp) {
+        try {
+          const GAME_SERVER =
+            (process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:4001')
+              .replace(/\/+$/, '');
+          const { getAccessToken } = await import('@/lib/session');
+          const token = getAccessToken();
+          if (token) {
+            await fetch(`${GAME_SERVER}/api/buildings/resources/battle-reward`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                mineral: r.gold  ?? 0, // legacy field name from /battles
+                science: r.gems  ?? 0, // gems map to ◈ on the wallet
+                xp:      r.xp    ?? 0,
+              }),
+            });
+          }
+        } catch {
+          /* swallow — wallet refresh below still fires; if grant fails
+           * the next poll will reflect the real state. */
+        }
+      }
+      // Broadcast wallet refresh so the HUD pill repolls immediately
+      // rather than waiting for the next 5s tick.
       refreshGameResources();
       if (res.claimed) {
         toast.success(`Ödül alındı: ${totalReward}`);

@@ -11,6 +11,7 @@ import { BUILDING_CONFIGS } from './buildings.constants';
 import { ResourcesService } from '../resources/resources.service';
 import { EconomyService } from '../economy/economy.service';
 import { StartConstructionDto } from './dto/start-construction.dto';
+import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 
 @Injectable()
 export class BuildingsService {
@@ -21,6 +22,7 @@ export class BuildingsService {
     private readonly buildingRepo: Repository<Building>,
     private readonly resources: ResourcesService,
     private readonly economyService: EconomyService,
+    private readonly questProgress: QuestProgressNotifier,
   ) {}
 
   async startConstruction(playerId: string, dto: StartConstructionDto): Promise<Building> {
@@ -72,6 +74,19 @@ export class BuildingsService {
 
     if (building.status === BuildingStatus.ACTIVE) {
       await this.recalculateProductionRates(playerId);
+
+      // QUEST PROGRESS HOOK — building.completed (instant-build path)
+      // Only fires when the building goes straight to ACTIVE because
+      // buildTimeSeconds was 0. The "build queue completes overdue
+      // constructions" path is handled in completeOverdueConstructions().
+      // Idempotency key is the buildingId so a retry of startConstruction
+      // can't double-count — though in practice this row was just
+      // created so the key is fresh.
+      this.questProgress.notify(
+        playerId,
+        'buildings_built',
+        `building:${building.id}`,
+      );
     }
 
     return building;
@@ -180,6 +195,19 @@ export class BuildingsService {
 
     for (const pid of affectedPlayers) {
       await this.recalculateProductionRates(pid);
+    }
+
+    // QUEST PROGRESS HOOK — building.completed (queued-build path)
+    // One increment per building that transitioned to ACTIVE this tick.
+    // Idempotency keyed by buildingId so a second sweep over the same
+    // overdue row (shouldn't happen — the WHERE clause filters to
+    // CONSTRUCTING — but defense-in-depth) is a no-op on the api side.
+    for (const building of overdue) {
+      this.questProgress.notify(
+        building.playerId,
+        'buildings_built',
+        `building:${building.id}`,
+      );
     }
 
     return overdue.length;

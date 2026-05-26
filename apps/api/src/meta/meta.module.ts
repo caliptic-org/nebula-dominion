@@ -7,6 +7,7 @@ import { BattlesStubController, BattlePrepStubController } from './battles-stub.
 import { ChatStubController } from './chat-stub.controller';
 import { BuffsStubController } from './buffs-stub.controller';
 import { ResearchStubController } from './research-stub.controller';
+import { QuestProgressModule } from '../modules/quest-progress/quest-progress.module';
 
 /* MetaModule
  *
@@ -21,6 +22,7 @@ import { ResearchStubController } from './research-stub.controller';
  * When the canonical modules land (LeaderboardModule from backend/src,
  * DailyEngagement, etc.), remove the matching stub here. */
 @Module({
+  imports: [QuestProgressModule],
   controllers: [
     LeaderboardStubController,
     MissionsStubController,

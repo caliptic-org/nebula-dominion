@@ -1,33 +1,9 @@
-name: Deploy Nginx Config (bastion)
-
-# Self-hosted bastion runner üzerinde nginx reverse-proxy config'imizi
-# /etc/nginx/conf.d/ altına kurar.  Tetikleme stratejisi:
-#
-#   1. push to main, deploy/nginx/** içinde değişiklik var → otomatik
-#   2. workflow_dispatch  → UI'dan manuel
-#   3. Tag deploy'lara bağlanmıyor — nginx config'i imaj versiyonundan
-#      bağımsız, kendi yaşam döngüsü var (caliptic / OCP rollout'larından
-#      etkilenmez).
-#
-# Idempotent: install.sh `nginx -t` ile doğrular, başarısızsa nginx'i
-# reload ETMEZ.  Eski config dosyaları yerinde kalır → cluster
-# downtime'sız geri-roll back.
-#
-# Sudo:
-#   Bastion'daki runner kullanıcısının NOPASSWD sudoers kuralı olmalı:
-#     <runner-user> ALL=(ALL) NOPASSWD: /usr/bin/install -m 0644 *, \
-#                                       /usr/sbin/nginx -t, \
-#                                       /bin/systemctl reload nginx, \
-#                                       /bin/cp * /etc/nginx/conf.d/*, \
-#                                       /usr/bin/rm /etc/nginx/conf.d/00-nebula-maps.conf, \
-#                                       /usr/bin/rm /etc/nginx/conf.d/nebula-dominion.conf, \
-#                                       /usr/bin/bash * /install.sh
-#   Daha temiz: sadece script'i whitelist'le:
-#     <runner-user> ALL=(ALL) NOPASSWD: /usr/bin/bash /opt/runner-actions-cache/*/deploy/nginx/install.sh
+name: Deploy Nginx Config
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - 'deploy/nginx/**'
       - '.github/workflows/nginx-bastion.yml'
@@ -37,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy-nginx:
+  deploy:
     name: Install Nebula nginx config on bastion
     runs-on: [self-hosted, bastion]
     timeout-minutes: 5
@@ -46,23 +22,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Sığ checkout yeter — install.sh + 2 conf dosyası, başka
-          # dosyaya ihtiyaç yok.
           fetch-depth: 1
 
-      - name: Verify config syntax (pre-flight)
-        # Yerel /tmp altında nginx -t'yi sahte conf.d ile koştur.  Eğer
-        # syntax bozuksa burada düşsün; bastion'un canlı conf.d'sine hiç
-        # dokunmayalım.  Bu adım sudosuz çalışır.
+      - name: Pre-flight syntax check
         run: |
           set -euo pipefail
           TMP_DIR="$(mktemp -d)"
           mkdir -p "$TMP_DIR/conf.d"
           cp deploy/nginx/nebula-dominion.conf "$TMP_DIR/conf.d/"
           cp deploy/nginx/00-nebula-maps.conf  "$TMP_DIR/conf.d/"
-
-          # Geçici minimal nginx.conf — sadece conf.d'yi include et.
-          # Working / pid path'leri /tmp altında ki sudosuz çalışsın.
           cat > "$TMP_DIR/nginx.conf" <<EOF
           worker_processes 1;
           error_log $TMP_DIR/error.log warn;
@@ -72,59 +40,24 @@ jobs:
             include $TMP_DIR/conf.d/*.conf;
           }
           EOF
-
-          # `nginx -t` kendi default-prefix yollarına da bakar ama -c
-          # ile bizimkine sabitliyoruz.  Çıkış kodu 0 → syntax OK.
           nginx -t -c "$TMP_DIR/nginx.conf" -p "$TMP_DIR"
 
-      - name: Show diff vs currently-installed config
-        # Sadece bilgi amaçlı — sudosuz okuyabildiklerimizi kıyaslar.
-        # `|| true` çünkü diff exit-1 dönerse de devam etmek istiyoruz.
+      - name: Install + reload nginx
         run: |
-          echo "--- existing /etc/nginx/conf.d/nebula-dominion.conf"
-          if [ -r /etc/nginx/conf.d/nebula-dominion.conf ]; then
-            diff -u /etc/nginx/conf.d/nebula-dominion.conf deploy/nginx/nebula-dominion.conf || true
-          else
-            echo "(no existing file)"
-          fi
-          echo "--- existing /etc/nginx/conf.d/00-nebula-maps.conf"
-          if [ -r /etc/nginx/conf.d/00-nebula-maps.conf ]; then
-            diff -u /etc/nginx/conf.d/00-nebula-maps.conf  deploy/nginx/00-nebula-maps.conf  || true
-          else
-            echo "(no existing file)"
-          fi
-
-      - name: Install (sudo) + nginx -t + reload
-        run: |
-          set -euo pipefail
-          # install.sh root sudo gerektiriyor.  Runner host'ta yukarıdaki
-          # NOPASSWD sudoers kuralı varsa direkt geçer.
           sudo bash deploy/nginx/install.sh
 
-      - name: Post-deploy smoke test
-        # Doğru vhost'lar canlı mı?  Bastion'da localhost'a kendi Host
-        # header'ı ile vur — Cloudflare tunnel'a hiç dokunma.
+      - name: Smoke test vhosts
         run: |
           for host in nebula.caliptic.com api-nebula.caliptic.com game-nebula.caliptic.com; do
             STATUS=$(curl -sI -o /dev/null -w "%{http_code}" \
                           -H "Host: ${host}" \
                           --max-time 5 \
                           http://127.0.0.1/ || echo "000")
-            echo "Host: ${host} → HTTP ${STATUS}"
-            # 200, 301/302/304, 401 (api requires auth), 405 hepsi ok.
-            # 502 (upstream down) / 000 (no nginx response) → fail.
+            echo "Host: ${host} -> HTTP ${STATUS}"
             case "$STATUS" in
-              2*|3*|401|404|405) echo "  ✅ vhost serving" ;;
-              502|503|504)       echo "  ❌ upstream unhealthy (cluster down?)" ; exit 1 ;;
-              000|"")            echo "  ❌ nginx not responding" ; exit 1 ;;
-              *)                 echo "  ⚠️  unexpected ${STATUS} — continuing" ;;
+              2*|3*|401|404|405) echo "  vhost OK" ;;
+              502|503|504)       echo "  upstream unhealthy"; exit 1 ;;
+              000|"")            echo "  nginx not responding"; exit 1 ;;
+              *)                 echo "  unexpected ${STATUS} - continuing" ;;
             esac
           done
-
-      - name: Summary
-        if: success()
-        run: |
-          echo "### nginx config deployed :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Files:** \`/etc/nginx/conf.d/{nebula-dominion,00-nebula-maps}.conf\`"  >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode:** applied + reloaded" >> $GITHUB_STEP_SUMMARY
-          echo "- **Hosts:** nebula.caliptic.com · api-nebula.caliptic.com · game-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY

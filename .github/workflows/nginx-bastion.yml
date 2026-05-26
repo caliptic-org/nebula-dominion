@@ -61,6 +61,10 @@ jobs:
           pid $TMP_DIR/nginx.pid;
           events { worker_connections 64; }
           http {
+            # Override the compiled-in default /var/log/nginx/access.log
+            # which nginx -t tries to open even when no server block
+            # declares access_log; the non-root runner can't write there.
+            access_log off;
             include $TMP_DIR/conf.d/*.conf;
           }
           EOF

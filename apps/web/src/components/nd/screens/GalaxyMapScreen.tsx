@@ -584,11 +584,15 @@ export function GalaxyMapScreen({ race: forcedRace, liveBase }: Props) {
         race={race}
         active="map"
         onChange={(k) => {
+          // BottomNavKey lost its 'battle' member when SAVAŞ moved into
+          // the /base right-rail, and gained 'settings' for the new
+          // AYARLAR tab — keep this lookup in sync so /map's footer
+          // sends the player to the right screen.
           const dest =
             k === 'base'     ? '/base' :
             k === 'map'      ? '/map' :
-            k === 'battle'   ? '/battle' :
             k === 'alliance' ? '/alliance' :
+            k === 'settings' ? '/settings' :
             '/shop';
           router.push(dest);
         }}

@@ -183,7 +183,8 @@ function tick(state: SimState, dt: number): SimState {
   // projectile was spawned from, so the id always resolves.  Attribution
   // mutates the shooter's `damageDealt` / `kills` in place so the final
   // state at end-of-battle carries the real numbers /battle-result needs.
-  const shooterPool = proj => (proj.side === 'us' ? ours.units : theirs.units);
+  const shooterPool = (proj: Projectile): Combatant[] =>
+    (proj.side === 'us' ? ours.units : theirs.units);
 
   const apply = (proj: Projectile) => {
     const candidates = proj.side === 'us' ? theirs.units : ours.units;

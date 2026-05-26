@@ -17,8 +17,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * already have the table from a `synchronize: true` boot won't fail
  * on first run.
  */
-export class QuestProgressSchema1779700000000 implements MigrationInterface {
-  name = 'QuestProgressSchema1779700000000';
+export class QuestProgressSchema1779840000000 implements MigrationInterface {
+  name = 'QuestProgressSchema1779840000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

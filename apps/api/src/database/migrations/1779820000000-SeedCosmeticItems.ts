@@ -307,8 +307,8 @@ const ITEMS: SeedRow[] = [
   },
 ];
 
-export class SeedCosmeticItems1779700000000 implements MigrationInterface {
-  name = 'SeedCosmeticItems1779700000000';
+export class SeedCosmeticItems1779820000000 implements MigrationInterface {
+  name = 'SeedCosmeticItems1779820000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     for (const row of ITEMS) {

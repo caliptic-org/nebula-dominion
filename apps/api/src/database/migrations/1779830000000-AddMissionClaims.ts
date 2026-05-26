@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Idempotent: `CREATE TABLE IF NOT EXISTS` guards against a re-run when
  * synchronize had already created the table on a dev DB.
  */
-export class AddMissionClaims1779700000000 implements MigrationInterface {
-  name = 'AddMissionClaims1779700000000';
+export class AddMissionClaims1779830000000 implements MigrationInterface {
+  name = 'AddMissionClaims1779830000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

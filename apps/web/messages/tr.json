@@ -207,9 +207,7 @@
     "warSoonHint": "Savaş ilan akışı yakında — diplomatik kanallar henüz açık değil",
     "strategyRoomSoon": "{tag} strateji odası yakında"
   },
-  "commanders": {
-    "slotSoon": "{label} slotu — envanter yakında açılacak"
-  },
+  "commanders": {},
   "missions": {
     "alreadyClaimed": "Bu görevin ödülü zaten alınmış."
   },

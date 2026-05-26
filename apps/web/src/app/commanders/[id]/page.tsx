@@ -1,12 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { COMMANDERS, RACE_THEMES, Commander, RaceTheme } from '../data';
-import { SLOT_META, SLOT_ORDER } from '@/types/equipment';
+import {
+  EquipmentItem,
+  EquipmentSlotType,
+  EquipmentStats,
+  SLOT_META,
+  SLOT_ORDER,
+} from '@/types/equipment';
+import { equipmentApi, OwnedEquipment } from '@/lib/equipment-api';
+import { EquipmentModal } from '@/components/ui/EquipmentModal';
 import { toast } from '@/components/handoff/Toaster';
 
 /* ── Skill tree configuration ─────────────────────────────────────────────── */
@@ -38,6 +45,98 @@ function CommanderDetail({ commander }: { commander: Commander }) {
   const [activeTab, setActiveTab] = useState<Tab>('hikaye');
   const [currentLevel, setCurrentLevel] = useState(commander.level);
   const [currentXp, setCurrentXp] = useState(Math.floor(xpForLevel(commander.level) * 0.45));
+
+  // ── Equipment state (lifted so the Hikaye stat block can reflect totals) ──
+  // Owned items are fetched once on mount (skipped for locked commanders since
+  // they can't equip anyway). Refetched after every equip/unequip so the
+  // commander binding column stays authoritative.
+  const [inventory, setInventory] = useState<OwnedEquipment[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [equipMutating, setEquipMutating] = useState(false);
+
+  const loadInventory = useCallback(async () => {
+    if (locked) return;
+    setInventoryLoading(true);
+    setInventoryError(null);
+    try {
+      const data = await equipmentApi.getInventory();
+      setInventory(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Envanter yüklenemedi';
+      setInventoryError(msg);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [locked]);
+
+  useEffect(() => {
+    void loadInventory();
+  }, [loadInventory]);
+
+  // Items currently equipped on THIS commander, keyed by slot for O(1) lookup.
+  const equippedBySlot = useMemo(() => {
+    const map: Partial<Record<EquipmentSlotType, OwnedEquipment>> = {};
+    for (const item of inventory) {
+      if (item.equippedOnCommanderId === commander.id) {
+        map[item.slot] = item;
+      }
+    }
+    return map;
+  }, [inventory, commander.id]);
+
+  // Aggregate stat boost from all equipped items on this commander.
+  const equipmentStatBoost = useMemo((): Required<EquipmentStats> => {
+    const totals: Required<EquipmentStats> = {
+      attack: 0,
+      defense: 0,
+      speed: 0,
+      hp: 0,
+    };
+    for (const slot of SLOT_ORDER) {
+      const item = equippedBySlot[slot];
+      if (!item) continue;
+      totals.attack += item.stats.attack ?? 0;
+      totals.defense += item.stats.defense ?? 0;
+      totals.speed += item.stats.speed ?? 0;
+      totals.hp += item.stats.hp ?? 0;
+    }
+    return totals;
+  }, [equippedBySlot]);
+
+  const handleEquip = useCallback(
+    async (item: EquipmentItem) => {
+      setEquipMutating(true);
+      try {
+        await equipmentApi.equip(item.id, commander.id);
+        toast.success(`${item.name} giydirildi`);
+        await loadInventory();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Giydirilemedi';
+        toast.error(msg);
+      } finally {
+        setEquipMutating(false);
+      }
+    },
+    [commander.id, loadInventory],
+  );
+
+  const handleUnequip = useCallback(
+    async (equipmentId: string) => {
+      setEquipMutating(true);
+      try {
+        await equipmentApi.unequip(equipmentId);
+        toast.info('Ekipman çıkarıldı');
+        await loadInventory();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Çıkarılamadı';
+        toast.error(msg);
+      } finally {
+        setEquipMutating(false);
+      }
+    },
+    [loadInventory],
+  );
 
   const xpNeeded = xpForLevel(currentLevel + 1);
   const xpPercent = Math.min(100, Math.round((currentXp / xpNeeded) * 100));
@@ -370,41 +469,56 @@ function CommanderDetail({ commander }: { commander: Commander }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Saldırı', value: commander.level * 12 + 40, max: 150, icon: '⚔' },
-                    { label: 'Savunma', value: commander.level * 8 + 30, max: 150, icon: '🛡' },
-                    { label: 'Hız', value: commander.level * 6 + 25, max: 150, icon: '💨' },
-                    { label: 'Can', value: commander.level * 20 + 100, max: 400, icon: '❤' },
-                  ].map((stat) => (
-                    <div key={stat.label} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span
-                          className="text-[10px] font-display font-bold uppercase tracking-wide"
-                          style={{ color: 'var(--color-text-secondary)' }}
-                        >
-                          {stat.icon} {stat.label}
-                        </span>
-                        <span
-                          className="text-[11px] font-display font-black"
-                          style={{ color: theme.color }}
-                        >
-                          {stat.value}
-                        </span>
-                      </div>
-                      <div
-                        className="h-1.5 rounded-full overflow-hidden"
-                        style={{ background: 'rgba(255,255,255,0.06)' }}
-                      >
+                    { label: 'Saldırı', base: commander.level * 12 + 40, bonus: equipmentStatBoost.attack,  max: 200, icon: '⚔' },
+                    { label: 'Savunma', base: commander.level * 8  + 30, bonus: equipmentStatBoost.defense, max: 200, icon: '🛡' },
+                    { label: 'Hız',     base: commander.level * 6  + 25, bonus: equipmentStatBoost.speed,   max: 200, icon: '💨' },
+                    { label: 'Can',     base: commander.level * 20 + 100, bonus: equipmentStatBoost.hp,     max: 600, icon: '❤' },
+                  ].map((stat) => {
+                    const total = stat.base + stat.bonus;
+                    const hasBonus = stat.bonus !== 0;
+                    return (
+                      <div key={stat.label} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className="text-[10px] font-display font-bold uppercase tracking-wide"
+                            style={{ color: 'var(--color-text-secondary)' }}
+                          >
+                            {stat.icon} {stat.label}
+                          </span>
+                          <span
+                            className="text-[11px] font-display font-black"
+                            style={{ color: theme.color }}
+                          >
+                            {total}
+                            {hasBonus && (
+                              <span
+                                className="ml-1 text-[9px] font-display font-bold"
+                                style={{
+                                  color: stat.bonus > 0 ? '#44ff88' : '#ff3355',
+                                }}
+                              >
+                                ({stat.bonus > 0 ? '+' : ''}
+                                {stat.bonus})
+                              </span>
+                            )}
+                          </span>
+                        </div>
                         <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{
-                            width: `${Math.min(100, (stat.value / stat.max) * 100)}%`,
-                            background: `linear-gradient(90deg, ${theme.color} 0%, ${theme.color}aa 100%)`,
-                            boxShadow: `0 0 6px ${theme.glowColor}`,
-                          }}
-                        />
+                          className="h-1.5 rounded-full overflow-hidden"
+                          style={{ background: 'rgba(255,255,255,0.06)' }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${Math.min(100, (total / stat.max) * 100)}%`,
+                              background: `linear-gradient(90deg, ${theme.color} 0%, ${theme.color}aa 100%)`,
+                              boxShadow: `0 0 6px ${theme.glowColor}`,
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             </>
@@ -421,7 +535,18 @@ function CommanderDetail({ commander }: { commander: Commander }) {
 
           {/* ── Ekipman tab ────────────────────────────────── */}
           {activeTab === 'ekipman' && (
-            <EquipmentPanel theme={theme} locked={locked} />
+            <EquipmentPanel
+              theme={theme}
+              locked={locked}
+              inventory={inventory}
+              inventoryLoading={inventoryLoading}
+              inventoryError={inventoryError}
+              onRetry={() => void loadInventory()}
+              equippedBySlot={equippedBySlot}
+              mutating={equipMutating}
+              onEquip={handleEquip}
+              onUnequip={handleUnequip}
+            />
           )}
 
           {/* ── Güçlendir tab ──────────────────────────────── */}
@@ -611,11 +736,39 @@ function SkillTree({
 function EquipmentPanel({
   theme,
   locked,
+  inventory,
+  inventoryLoading,
+  inventoryError,
+  onRetry,
+  equippedBySlot,
+  mutating,
+  onEquip,
+  onUnequip,
 }: {
   theme: RaceTheme;
   locked: boolean;
+  inventory: OwnedEquipment[];
+  inventoryLoading: boolean;
+  inventoryError: string | null;
+  onRetry: () => void;
+  equippedBySlot: Partial<Record<EquipmentSlotType, OwnedEquipment>>;
+  mutating: boolean;
+  onEquip: (item: EquipmentItem) => void | Promise<void>;
+  onUnequip: (equipmentId: string) => void | Promise<void>;
 }) {
-  const tCommanders = useTranslations('commanders');
+  // Drawer state. `pickerSlot` is the slot the player tapped; null means
+  // closed. The modal filters the inventory to this slot internally.
+  const [pickerSlot, setPickerSlot] = useState<EquipmentSlotType | null>(null);
+
+  // Convert OwnedEquipment[] -> EquipmentItem[] for the modal. The modal
+  // doesn't care about commander-binding state; it just needs slot/rarity/stats.
+  const modalInventory: EquipmentItem[] = useMemo(
+    () => inventory.map(({ equippedOnCommanderId: _ignored, ...rest }) => rest),
+    [inventory],
+  );
+
+  const currentSlotItem = pickerSlot ? equippedBySlot[pickerSlot] : undefined;
+
   return (
     <div className="space-y-4">
       <div
@@ -637,18 +790,16 @@ function EquipmentPanel({
           {SLOT_ORDER.map((slot) => {
             const meta = SLOT_META[slot];
             const isOzel = slot === 'ozel';
+            const equipped = equippedBySlot[slot];
 
             return (
               <button
                 key={slot}
                 type="button"
-                disabled={locked}
+                disabled={locked || mutating}
                 onClick={() => {
-                  if (locked) return;
-                  // Equipment picker doesn't exist yet — surface a toast so
-                  // the tap is at least felt. Once /equipment/inventory lands
-                  // we open a drawer with available items for this slot.
-                  toast.info(tCommanders('slotSoon', { label: meta.label }));
+                  if (locked || mutating) return;
+                  setPickerSlot(slot);
                 }}
                 className="relative flex flex-col items-center justify-center gap-1.5 rounded-xl border transition-all duration-200 group"
                 style={{
@@ -662,7 +813,7 @@ function EquipmentPanel({
                   cursor: locked ? 'not-allowed' : 'pointer',
                   opacity: locked ? 0.5 : 1,
                 }}
-                aria-label={`${meta.label} slotu — ${locked ? 'kilitli' : 'boş'}`}
+                aria-label={`${meta.label} slotu — ${locked ? 'kilitli' : equipped ? equipped.name : 'boş'}`}
               >
                 {/* Hover glow */}
                 {!locked && (
@@ -676,17 +827,21 @@ function EquipmentPanel({
                 )}
 
                 <span className="text-2xl leading-none">
-                  {locked ? '🔒' : meta.icon}
+                  {locked ? '🔒' : equipped?.icon ?? meta.icon}
                 </span>
                 <span
-                  className="text-[9px] font-display font-bold uppercase tracking-widest"
+                  className="text-[9px] font-display font-bold uppercase tracking-widest truncate max-w-[90%]"
                   style={{
-                    color: isOzel ? theme.color : 'var(--color-text-muted)',
+                    color: equipped
+                      ? theme.color
+                      : isOzel
+                      ? theme.color
+                      : 'var(--color-text-muted)',
                   }}
                 >
-                  {meta.label}
+                  {equipped ? equipped.name : meta.label}
                 </span>
-                {isOzel && !locked && (
+                {isOzel && !locked && !equipped && (
                   <span
                     className="absolute top-1.5 right-1.5 text-[7px] font-display font-black uppercase tracking-wider px-1 py-0.5 rounded"
                     style={{
@@ -697,6 +852,16 @@ function EquipmentPanel({
                   >
                     Özel
                   </span>
+                )}
+                {equipped && (
+                  <span
+                    className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+                    style={{
+                      background: '#44ff88',
+                      boxShadow: '0 0 6px rgba(68,255,136,0.6)',
+                    }}
+                    aria-hidden
+                  />
                 )}
               </button>
             );
@@ -709,9 +874,38 @@ function EquipmentPanel({
         >
           {locked
             ? 'Ekipman slotlarına erişmek için komutanı kilidi açın.'
+            : inventory.length === 0 && !inventoryLoading
+            ? 'Envanteriniz boş — savaşlardan veya dükkandan ekipman kazanın.'
             : 'Bir slota tıklayarak ekipman ekleyin veya değiştirin.'}
         </p>
       </div>
+
+      {pickerSlot && (
+        <EquipmentModal
+          slot={pickerSlot}
+          currentItem={currentSlotItem}
+          inventory={modalInventory}
+          inventoryLoading={inventoryLoading}
+          inventoryError={inventoryError}
+          onRetry={onRetry}
+          raceColor={theme.color}
+          raceGlow={theme.glowColor}
+          mutating={mutating}
+          onSelect={async (item) => {
+            await onEquip(item);
+            setPickerSlot(null);
+          }}
+          onClose={() => setPickerSlot(null)}
+          onUnequip={
+            currentSlotItem
+              ? async () => {
+                  await onUnequip(currentSlotItem.id);
+                  setPickerSlot(null);
+                }
+              : undefined
+          }
+        />
+      )}
 
       {/* Equipment slot legend */}
       <div

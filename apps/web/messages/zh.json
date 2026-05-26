@@ -207,9 +207,7 @@
     "warSoonHint": "宣战功能即将推出 — 外交渠道尚未开放",
     "strategyRoomSoon": "{tag} 战略室即将开放"
   },
-  "commanders": {
-    "slotSoon": "{label} 槽位 — 装备库即将推出"
-  },
+  "commanders": {},
   "missions": {
     "alreadyClaimed": "该任务的奖励已经领取。"
   },

@@ -18,6 +18,7 @@ import { PremiumModule } from './modules/premium/premium.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { EventsModule } from './modules/events/events.module';
 import { CosmeticsModule } from './modules/cosmetics/cosmetics.module';
+import { EquipmentModule } from './modules/equipment/equipment.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { StoryModule } from './modules/story/story.module';
 import { TierModule } from './modules/tier/tier.module';
@@ -50,6 +51,7 @@ import { FormationsModule } from './modules/formations/formations.module';
     PaymentModule,
     EventsModule,
     CosmeticsModule,
+    EquipmentModule,
     InventoryModule,
     StoryModule,
     TierModule,

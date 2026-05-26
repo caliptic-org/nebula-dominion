@@ -40,6 +40,12 @@ jobs:
           # Redirect every "/var/log/nginx/" → "$TMP_DIR/logs/" so the
           # writability test succeeds without touching the real log dir.
           sed -i "s|/var/log/nginx/|$TMP_DIR/logs/|g" "$TMP_DIR/conf.d/"*.conf
+          # Rewrite the privileged listen 80 directives to an unprivileged
+          # high port — `nginx -t` actually attempts to bind() the
+          # declared sockets, and non-root runners can't grab :80.  The
+          # bastion install path keeps the original `listen 80` because
+          # it runs via sudo.
+          sed -i 's|listen 80;|listen 18080;|g; s|listen \[::\]:80;|listen [::]:18080;|g' "$TMP_DIR/conf.d/"*.conf
           cat > "$TMP_DIR/nginx.conf" <<EOF
           worker_processes 1;
           error_log $TMP_DIR/error.log warn;

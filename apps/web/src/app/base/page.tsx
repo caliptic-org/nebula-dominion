@@ -315,8 +315,19 @@ export default function BaseHomePage() {
             <BaseFieldStatusChip race={race} label={lex.statusOk} />
           </div>
 
-          {/* quick actions mid-right + TOPLA collect button */}
-          <div style={{ position: 'absolute', right: 10, top: '32%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Right-rail vertical button stack — all 7 chips share the same
+            * 42×33 RAIL_CHIP_SIZE so the column reads as one continuous
+            * group: SOHBET · GÖREV · (race quick actions) · TOPLA.
+            * Earlier SOHBET + GÖREV lived in a separate fixed-positioned
+            * floater at top: 4.5rem which made them look unrelated to
+            * the actual right-rail; merged here per user request. */}
+          <div style={{ position: 'absolute', right: 10, top: '20%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <ShortcutButtons
+              unreadMessages={3}
+              activeMissions={2}
+              onChatClick={() => router.push('/chat')}
+              onMissionsClick={() => router.push('/missions')}
+            />
             <RaceQuickActions
               race={race}
               onAction={(key) => {
@@ -351,17 +362,10 @@ export default function BaseHomePage() {
           />
         </div>
 
-        {/* Right-rail shortcuts (chat / missions / inventory) and bottom-left
-         *  production queue — both are HUD overlays that sit above the iso
-         *  field but below the bottom nav.  The queue is live-wired to
-         *  GET /api/bases/:id/production-queue (CAL-586); collapses to
-         *  nothing when the player has no units in flight. */}
-        <ShortcutButtons
-          unreadMessages={3}
-          activeMissions={2}
-          onChatClick={() => router.push('/chat')}
-          onMissionsClick={() => router.push('/missions')}
-        />
+        {/* ShortcutButtons (SOHBET + GÖREV) moved into the right-rail
+         *  absolute container above so it sits directly on top of
+         *  RaceQuickActions — see the comment block higher up.  The
+         *  bottom-left production queue stays here. */}
         {/* Pass the live queue array; the component returns null when empty,
           * so the overlay disappears automatically when nothing is in
           * flight.  DEMO_QUEUE is no longer injected now that CAL-586 is

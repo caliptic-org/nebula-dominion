@@ -64,14 +64,13 @@ export function ShortcutButtons({
   return (
     <div
       style={{
-        position: 'fixed',
-        right: 12,
-        top: '4.5rem',
-        zIndex: 40,
+        // Static layout — parent decides where this column lives.  On /base
+        // it stacks directly above RaceQuickActions in the right-rail
+        // absolute container so SOHBET + GÖREV read as the top of a single
+        // column (SOHBET · GÖREV · İNŞA · EĞİT · TERFİ · TUGAY · TOPLA)
+        // instead of two unrelated floating clumps.
         display: 'flex',
         flexDirection: 'column',
-        // Same stack gap as RaceQuickActions on the other side so both
-        // columns read as a single design system.
         gap: RAIL_CHIP_SIZE.stackGap,
       }}
       role="toolbar"

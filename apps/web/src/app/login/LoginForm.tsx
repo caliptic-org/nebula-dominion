@@ -20,7 +20,6 @@ import { setTokens } from '@/lib/session';
 import { translateBackendError } from '@/lib/translate-backend-error';
 import { raceApi, syncRaceCommitmentFromBackend } from '@/lib/race-api';
 import { Analytics } from '@/lib/analytics';
-import { toast } from '@/components/handoff/Toaster';
 
 const RACE_COMMITMENT_KEY = 'nebula:race-commitment:v1';
 
@@ -368,22 +367,19 @@ export function LoginForm() {
               />
               Beni hatırla
             </label>
-            <button
-              type="button"
-              onClick={() =>
-                toast.info(t('forgotPasswordHint'))
-              }
+            <Link
+              href="/forgot-password"
               style={{
-                all: 'unset',
                 cursor: 'pointer',
                 color: race.primary,
                 fontFamily: ND.mono,
                 fontSize: 11,
                 letterSpacing: '0.04em',
+                textDecoration: 'none',
               }}
             >
               {copy.recover}
-            </button>
+            </Link>
           </div>
 
           <NDButton race={race} size="lg" type="submit" full disabled={isLoading}>

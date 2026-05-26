@@ -32,8 +32,7 @@
       "noAccount": "还没有账号?",
       "registerLink": "注册",
       "errorInvalid": "凭证无效。请重试。",
-      "errorGeneric": "登录失败。请重试。",
-      "forgotPasswordHint": "密码找回功能即将推出 — 请联系 support@nebula.com"
+      "errorGeneric": "登录失败。请重试。"
     },
     "register": {
       "title": "注册",
@@ -215,7 +214,8 @@
     "alreadyClaimed": "该任务的奖励已经领取。"
   },
   "inventory": {
-    "trainFirst": "请先训练该类型单位"
+    "trainFirst": "你还没有训练这种单位 — 前往兵营",
+    "notTrainedHint": "请先在兵营队列中训练此单位"
   },
   "tutorial": {
     "giftClaimed": "初始礼包已领取：+500矿物 · +25水晶 · +200XP",

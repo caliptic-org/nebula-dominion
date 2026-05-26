@@ -32,8 +32,7 @@
       "noAccount": "No account yet?",
       "registerLink": "Sign up",
       "errorInvalid": "Invalid credentials. Try again.",
-      "errorGeneric": "Login failed. Try again.",
-      "forgotPasswordHint": "Password recovery coming soon — contact support@nebula.com for now"
+      "errorGeneric": "Login failed. Try again."
     },
     "register": {
       "title": "Sign Up",
@@ -215,7 +214,8 @@
     "alreadyClaimed": "This mission's reward has already been claimed."
   },
   "inventory": {
-    "trainFirst": "Train that unit type first"
+    "trainFirst": "You haven't trained this unit — head to the barracks",
+    "notTrainedHint": "Queue this unit in the barracks first"
   },
   "tutorial": {
     "giftClaimed": "Starter gift received: +500 mineral · +25 crystal · +200 XP",

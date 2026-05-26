@@ -32,8 +32,7 @@
       "noAccount": "Henüz hesabın yok mu?",
       "registerLink": "Kaydol",
       "errorInvalid": "Geçersiz bilgiler. Tekrar dene.",
-      "errorGeneric": "Giriş başarısız. Tekrar dene.",
-      "forgotPasswordHint": "Şifre kurtarma yakında — şimdilik destek@nebula.com ile iletişime geç"
+      "errorGeneric": "Giriş başarısız. Tekrar dene."
     },
     "register": {
       "title": "Kayıt Ol",
@@ -215,7 +214,8 @@
     "alreadyClaimed": "Bu görevin ödülü zaten alınmış."
   },
   "inventory": {
-    "trainFirst": "Önce o tür birim eğit"
+    "trainFirst": "Bu türden eğitilmiş birimin yok — barakaya git",
+    "notTrainedHint": "Önce baraka kuyruğunda bu birimi eğit"
   },
   "tutorial": {
     "giftClaimed": "Başlangıç hediyesi alındı: +500 mineral · +25 kristal · +200 XP",

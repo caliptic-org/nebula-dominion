@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,30 +29,41 @@ export class BuildingsService {
   async startConstruction(playerId: string, dto: StartConstructionDto): Promise<Building> {
     const config = BUILDING_CONFIGS[dto.type];
 
-    const existing = await this.buildingRepo.count({
-      where: { playerId, type: dto.type, status: BuildingStatus.ACTIVE },
-    });
-    if (existing >= config.maxPerPlayer) {
-      throw new BadRequestException(
-        `Maximum ${config.maxPerPlayer} ${dto.type} buildings allowed per player.`,
-      );
-    }
+    let step = 'count';
+    try {
+      const existing = await this.buildingRepo.count({
+        where: { playerId, type: dto.type, status: BuildingStatus.ACTIVE },
+      });
+      if (existing >= config.maxPerPlayer) {
+        throw new BadRequestException(
+          `Maximum ${config.maxPerPlayer} ${dto.type} buildings allowed per player.`,
+        );
+      }
 
-    const occupied = await this.buildingRepo.findOne({
-      where: { playerId, positionX: dto.positionX, positionY: dto.positionY },
-    });
-    if (occupied) {
-      throw new BadRequestException(`Position (${dto.positionX}, ${dto.positionY}) is already occupied.`);
-    }
+      step = 'findOne';
+      const occupied = await this.buildingRepo.findOne({
+        where: { playerId, positionX: dto.positionX, positionY: dto.positionY },
+      });
+      if (occupied) {
+        throw new BadRequestException(`Position (${dto.positionX}, ${dto.positionY}) is already occupied.`);
+      }
 
-    const canAfford = await this.resources.canAfford(playerId, config.cost);
-    if (!canAfford) {
-      throw new BadRequestException(
-        `Insufficient resources. Required: ${config.cost.mineral}M ${config.cost.gas}G ${config.cost.energy}E`,
-      );
-    }
+      step = 'canAfford';
+      const canAfford = await this.resources.canAfford(playerId, config.cost);
+      if (!canAfford) {
+        throw new BadRequestException(
+          `Insufficient resources. Required: ${config.cost.mineral}M ${config.cost.gas}G ${config.cost.energy}E`,
+        );
+      }
 
-    await this.resources.deduct(playerId, config.cost);
+      step = 'deduct';
+      await this.resources.deduct(playerId, config.cost);
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`startConstruction failed at step=${step} type=${dto.type} player=${playerId}: ${msg}`, (err as Error).stack);
+      throw new InternalServerErrorException(`startConstruction[${step}]: ${msg}`);
+    }
 
     const now = new Date();
     const completeAt = new Date(now.getTime() + config.buildTimeSeconds * 1000);
@@ -66,7 +78,13 @@ export class BuildingsService {
       constructionCompleteAt: config.buildTimeSeconds === 0 ? null : completeAt,
     });
 
-    await this.buildingRepo.save(building);
+    try {
+      await this.buildingRepo.save(building);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`startConstruction failed at step=save type=${dto.type} player=${playerId}: ${msg}`, (err as Error).stack);
+      throw new InternalServerErrorException(`startConstruction[save]: ${msg}`);
+    }
 
     this.logger.log(
       `Player ${playerId} started construction of ${dto.type} at (${dto.positionX},${dto.positionY}). Complete at: ${completeAt.toISOString()}`,

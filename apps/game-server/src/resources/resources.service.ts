@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
@@ -211,7 +211,7 @@ export class ResourcesService {
       Number(resource.gas) < cost.gas ||
       Number(resource.energy) < cost.energy
     ) {
-      throw new Error(`Insufficient resources for player ${playerId}`);
+      throw new BadRequestException(`Insufficient resources for player ${playerId}`);
     }
 
     resource.mineral = Number(resource.mineral) - cost.mineral;

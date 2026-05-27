@@ -152,31 +152,37 @@ export const TILE_PALETTE: Record<NDRaceKey, TilePalette> = {
  *  retired. */
 export type TileVariant = 'ground' | 'resource' | 'blocked';
 
+// Tiles ship in 6 age variants (Hikaye Kitabı §2.1 → §2.7). Static map
+// pins each race to age 1 — the earliest, most colonial palette — which
+// is what unauthenticated visitors + new players see.  Authenticated
+// screens can drive a tile picker that swaps to age N once tier hydrates,
+// but the visual diff across ages is subtle enough that age 1 is a safe
+// default everywhere a hook isn't available.
 export const TILE_SPRITES: Record<NDRaceKey, Record<TileVariant, string>> = {
   insan: {
-    ground:   '/assets/tiles/insan/ground.png',
-    resource: '/assets/tiles/insan/resource.png',
-    blocked:  '/assets/tiles/insan/blocked.png',
+    ground:   '/assets/tiles/insan/age1-ground.png',
+    resource: '/assets/tiles/insan/age1-resource.png',
+    blocked:  '/assets/tiles/insan/age1-blocked.png',
   },
   zerg: {
-    ground:   '/assets/tiles/zerg/ground.png',
-    resource: '/assets/tiles/zerg/resource.png',
-    blocked:  '/assets/tiles/zerg/blocked.png',
+    ground:   '/assets/tiles/zerg/age1-ground.png',
+    resource: '/assets/tiles/zerg/age1-resource.png',
+    blocked:  '/assets/tiles/zerg/age1-blocked.png',
   },
   otomat: {
-    ground:   '/assets/tiles/otomat/ground.png',
-    resource: '/assets/tiles/otomat/resource.png',
-    blocked:  '/assets/tiles/otomat/blocked.png',
+    ground:   '/assets/tiles/otomat/age1-ground.png',
+    resource: '/assets/tiles/otomat/age1-resource.png',
+    blocked:  '/assets/tiles/otomat/age1-blocked.png',
   },
   canavar: {
-    ground:   '/assets/tiles/canavar/ground.png',
-    resource: '/assets/tiles/canavar/resource.png',
-    blocked:  '/assets/tiles/canavar/blocked.png',
+    ground:   '/assets/tiles/canavar/age1-ground.png',
+    resource: '/assets/tiles/canavar/age1-resource.png',
+    blocked:  '/assets/tiles/canavar/age1-blocked.png',
   },
   seytan: {
-    ground:   '/assets/tiles/seytan/ground.png',
-    resource: '/assets/tiles/seytan/resource.png',
-    blocked:  '/assets/tiles/seytan/blocked.png',
+    ground:   '/assets/tiles/seytan/age1-ground.png',
+    resource: '/assets/tiles/seytan/age1-resource.png',
+    blocked:  '/assets/tiles/seytan/age1-blocked.png',
   },
 };
 

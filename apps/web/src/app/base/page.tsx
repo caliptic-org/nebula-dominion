@@ -58,12 +58,17 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
  * Caliptic project assets (commit ddc7137, ticket CAL-341) that shouldn't
  * be shipped with Nebula — swapping to Nebula's own renders keeps the
  * project visually self-contained. */
+// Per-race capital building backdrop. ComfyUI sweep now ships 6-age
+// variants of every building (Hikaye Kitabı §2.1), so this static map
+// defaults each race to age 1; useBaseState's live tier could swap it
+// dynamically but the static fallback covers the pre-hydration render
+// (and guests who never have a tier).
 const BASE_BG_FALLBACK: Record<string, string> = {
-  insan:   '/assets/buildings/insan/komuta_ussu.png',
-  zerg:    '/assets/buildings/zerg/kovan_cekirdegi.png',
-  otomat:  '/assets/buildings/otomat/sonsuzluk_cekirdegi.png',
-  canavar: '/assets/buildings/canavar/alfa_tahti.png',
-  seytan:  '/assets/buildings/seytan/karanlik_taht.png',
+  insan:   '/assets/buildings/insan/komuta_ussu-age1.png',
+  zerg:    '/assets/buildings/zerg/kovan_cekirdegi-age1.png',
+  otomat:  '/assets/buildings/otomat/sonsuzluk_cekirdegi-age1.png',
+  canavar: '/assets/buildings/canavar/alfa_tahti-age1.png',
+  seytan:  '/assets/buildings/seytan/karanlik_taht-age1.png',
 };
 
 const QUICK_ACTION_ROUTES: Record<string, string> = {

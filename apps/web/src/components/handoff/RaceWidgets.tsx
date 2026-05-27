@@ -383,7 +383,11 @@ export function BaseField({
         const imgY = tileCy - imgH * 0.78; // 78% up so the base "feet" sit ON the tile
 
         const slug = race.buildings[i]?.slug;
-        const assetHref = slug ? `/assets/buildings/${race.key}/${slug}.png` : null;
+        // Per-age building sprite — defaults to age 1 here because the
+        // iso preview widget renders without a tier hook (used in
+        // race-select etc.). Live /base swaps to the player's actual
+        // tier via building/[slug]/page.tsx.
+        const assetHref = slug ? `/assets/buildings/${race.key}/${slug}-age1.png` : null;
 
         const tokenBuilding = race.buildings[i];
         // SVG <title> renders as a native browser tooltip on hover —

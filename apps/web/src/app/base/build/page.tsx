@@ -661,7 +661,10 @@ function buildCatalog(
       durationSec: backend?.buildTimeSeconds ?? 90 + i * 60,
       level: b.locked ? 0 : ownedLevel,
       backendType: mappedType ?? backend?.type,
-      assetPath: b.slug ? `/assets/buildings/${race.key}/${b.slug}.png` : undefined,
+      // Per-age building asset; defaults to age 1 in this catalog view
+      // since the player hasn't picked a specific instance yet. The
+      // detail page uses the live tier to render the current age.
+      assetPath: b.slug ? `/assets/buildings/${race.key}/${b.slug}-age1.png` : undefined,
     };
   });
 }

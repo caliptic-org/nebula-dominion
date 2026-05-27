@@ -206,7 +206,11 @@ function Inner({ slug }: { slug: string }) {
     }
   }
 
-  const assetPath = `/assets/buildings/${race.key}/${slug}.png`;
+  // Per-age building asset — falls back to age 1 until the player tier
+  // hydrates. levelToAge() lives in lib/asset-paths.ts (1..9→1, 10..18→2,
+  // etc.) and matches Hikaye Kitabı §2.1's 54-level → 6-age mapping.
+  const ageForAsset = liveLevel == null ? 1 : (liveLevel >= 46 ? 6 : liveLevel >= 37 ? 5 : liveLevel >= 28 ? 4 : liveLevel >= 19 ? 3 : liveLevel >= 10 ? 2 : 1);
+  const assetPath = `/assets/buildings/${race.key}/${slug}-age${ageForAsset}.png`;
 
   const statusChip = tokenBuilding.locked
     ? 'KİLİTLİ'

@@ -95,10 +95,17 @@ export type GroundRaceKey = keyof typeof GROUND_TEXTURES;
  *   beast   → CAL-515 (HOWL-1 Alfa Tahtı Kampı)         — pending
  *   demon   → CAL-516 (Karanlık Mahkeme Lanet Tapınağı) — pending
  */
+// Per-race /base capital backdrops — the wide-angle planet surface that
+// sits behind the iso tilemap.  ComfyUI sweep now ships 6 ages per race
+// (Hikaye Kitabı §2.1) under /assets/map/<race>/bg-age<N>.png; this map
+// pins all five races to age 1 (Gezegensel Uyanış / Planetary
+// Awakening).  IsoMap callers that have hydrated tier can swap to age N
+// via mapBgAsset() in lib/asset-paths.ts; the static fallback is what
+// pre-auth + new-player visitors see.
 export const CAPITAL_BACKDROPS: Record<GroundRaceKey, string | null> = {
-  human:   '/assets/map/base-bg-insan.png',
-  zerg:    '/assets/map/base-bg-zerg.png',
-  automat: null,
-  beast:   null,
-  demon:   null,
+  human:   '/assets/map/insan/bg-age1.png',
+  zerg:    '/assets/map/zerg/bg-age1.png',
+  automat: '/assets/map/otomat/bg-age1.png',
+  beast:   '/assets/map/canavar/bg-age1.png',
+  demon:   '/assets/map/seytan/bg-age1.png',
 };

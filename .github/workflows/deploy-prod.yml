@@ -96,7 +96,7 @@ jobs:
         run: |
           oc start-build nebula-api \
             --from-dir=. \
-            --follow \
+            --wait \
             -n "$NAMESPACE"
           oc tag "${NAMESPACE}/nebula-api:latest" \
                  "${NAMESPACE}/nebula-api:${{ steps.meta.outputs.tag }}" \
@@ -106,7 +106,7 @@ jobs:
         run: |
           oc start-build nebula-game-server \
             --from-dir=. \
-            --follow \
+            --wait \
             -n "$NAMESPACE"
           oc tag "${NAMESPACE}/nebula-game-server:latest" \
                  "${NAMESPACE}/nebula-game-server:${{ steps.meta.outputs.tag }}" \
@@ -120,7 +120,7 @@ jobs:
         run: |
           oc start-build nebula-web \
             --from-dir=. \
-            --follow \
+            --wait \
             --build-arg=NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
             --build-arg=NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
             --build-arg=NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \

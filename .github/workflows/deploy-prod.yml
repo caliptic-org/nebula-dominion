@@ -61,6 +61,36 @@ jobs:
           echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" >> $GITHUB_OUTPUT
 
+      # ── Wait for cluster API to be reachable ──────────────────────────────
+      # Cluster's apiserver flaps during this recovery (SNO control plane
+      # under intermittent pressure). The redhat-actions/oc-login action
+      # has no retry, so if `oc login` hits a 1-second window where the
+      # apiserver is down, the whole workflow fails. We poll the
+      # /healthz endpoint up front and only proceed once it's been
+      # returning OK for two consecutive checks (avoids racing the
+      # apiserver mid-restart).
+      - name: Wait for cluster API
+        run: |
+          server="${{ secrets.OPENSHIFT_SERVER }}"
+          echo "Polling ${server}/healthz (up to 30 min, 2× consecutive OK required)…"
+          ok_streak=0
+          for i in $(seq 1 180); do
+            if curl -ksm 10 "${server}/healthz" 2>/dev/null | grep -q '^ok$'; then
+              ok_streak=$((ok_streak + 1))
+              if [ ${ok_streak} -ge 2 ]; then
+                echo "✅ Cluster healthy (attempt ${i}/180, streak=${ok_streak})"
+                exit 0
+              fi
+              echo "  attempt ${i}/180: ok (streak=${ok_streak}/2)"
+            else
+              ok_streak=0
+              [ $((i % 6)) -eq 1 ] && echo "  attempt ${i}/180: cluster API unreachable, retrying"
+            fi
+            sleep 10
+          done
+          echo "❌ Cluster API never became consistently healthy in 30 min"
+          exit 1
+
       # ── OpenShift login ────────────────────────────────────────────────────
       # redhat-actions/oc-login@v1 still ships with `using: node20` (no v2 or
       # Node 24 release as of 2026-05). Force the GitHub Actions runner to

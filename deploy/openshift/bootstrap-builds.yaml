@@ -1,0 +1,122 @@
+# Manual bootstrap manifest for the BuildConfig + ImageStream pipeline.
+#
+# Terraform's kubernetes_manifest provider needs cluster-wide CRD list
+# permission to validate OpenShift custom resources before applying them.
+# If the kubeconfig in use is a namespace-scoped service account (the
+# common case when `oc login --token=$SA_TOKEN` was used), that
+# permission isn't granted, and `terraform apply` fails with:
+#
+#   customresourcedefinitions.apiextensions.k8s.io is forbidden ...
+#
+# This file is the manual escape hatch — apply it directly with `oc`,
+# which doesn't need CRD list (it knows the OpenShift CRDs from its
+# built-in client). Once the BuildConfigs exist the rest of the
+# terraform-managed deployments + workflow run normally.
+#
+# Usage (with cluster-admin / system:admin auth — kubeadmin password
+# typically lives in ~/install_dir/auth/kubeadmin-password from the SNO
+# install):
+#
+#   oc login -u kubeadmin -p <pwd>
+#   oc apply -n nebula-prod -f bootstrap-builds.yaml
+#
+# Idempotent — safe to re-run. `terraform import` can adopt these later
+# if you want them under TF state management; the resource shape in
+# 09-builds.tf matches.
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: nebula-api
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: nebula-game-server
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: nebula-web
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: nebula-api
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: apps/api/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: nebula-api:latest
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  runPolicy: Serial
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: nebula-game-server
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: apps/game-server/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: nebula-game-server:latest
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  runPolicy: Serial
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: nebula-web
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: apps/web/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: nebula-web:latest
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  runPolicy: Serial

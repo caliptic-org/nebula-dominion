@@ -183,13 +183,42 @@ jobs:
             fi
 
             build_name="build/${build_name}"
-            echo "→ Waiting for ${build_name} to reach Complete (25-min cap)…"
-            if ! oc wait --for=condition=Complete --timeout=25m "${build_name}" -n "${ns}" 2>&1; then
-              echo "❌ ${build_name} did not reach Complete in time. Last 80 log lines:"
-              oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
-              return 1
-            fi
-            echo "✅ ${build_name} Complete"
+            echo "→ Waiting for ${build_name} to reach Complete (cluster API may flap)…"
+
+            # Cluster API has been flapping during this recovery — `oc
+            # wait` can hit ServiceUnavailable mid-poll. Poll the build's
+            # status field manually in a retry loop instead. Total cap
+            # is 30 min: 180 attempts × 10s each.
+            local phase=""
+            local j
+            for j in $(seq 1 180); do
+              phase=$(oc -n "${ns}" get "${build_name}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+              case "${phase}" in
+                Complete)
+                  echo "✅ ${build_name} Complete (attempt ${j}/180)"
+                  return 0
+                  ;;
+                Failed|Error|Cancelled)
+                  echo "❌ ${build_name} reached terminal state ${phase}. Last 80 log lines:"
+                  oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
+                  return 1
+                  ;;
+                "")
+                  # API server temporarily unavailable — log once every
+                  # 6 attempts (~1 min) to avoid log spam.
+                  [ $((j % 6)) -eq 1 ] && echo "  attempt ${j}/180: API server unreachable, retrying in 10s"
+                  ;;
+                *)
+                  # Running, New, Pending — log every 6 attempts
+                  [ $((j % 6)) -eq 1 ] && echo "  attempt ${j}/180: phase=${phase}, still building"
+                  ;;
+              esac
+              sleep 10
+            done
+
+            echo "❌ ${build_name} did not reach Complete after 30 min. Last status: ${phase}"
+            oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
+            return 1
           }
           export -f build_and_wait
           BASH

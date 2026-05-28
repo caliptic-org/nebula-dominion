@@ -104,45 +104,58 @@ jobs:
       - name: Define build helper
         run: |
           cat > /tmp/build-helper.sh <<'BASH'
-          set -uo pipefail   # NB: no -e — start-build's connection drop is tolerated
+          # NB: deliberately no `set -e` — start-build's connection drop is
+          # an EXPECTED, non-fatal condition. The wrapping GHA step still
+          # runs under `bash -e`, but every command below explicitly OR's
+          # to a no-op so the failure can't propagate. The helper returns
+          # non-zero ONLY when the build genuinely cannot reach Complete.
+          set -uo pipefail
 
           # build_and_wait <buildconfig-name> [<extra start-build flags...>]
           #
           # Robustness story: the bastion ↔ cluster API connection drops
-          # mid-call several times during a long binary upload (the asset
-          # sweep adds ~330 MB to context). When that happens, the build
-          # is ALREADY registered on the cluster but `oc start-build`'s
-          # response is lost, so its exit code can't be trusted.
+          # several times per build (binary upload + cluster API response).
+          # When that happens, the build is ALREADY registered on the
+          # cluster but `oc start-build`'s response is lost.
           #
           # Pattern:
-          #   1. Fire `oc start-build` and ignore its exit code
-          #   2. Sleep briefly so the API has time to commit the new
-          #      build object to etcd
-          #   3. Read the BC's `.status.lastVersion` — server-side source
-          #      of truth for "what's the most recent build of this BC"
-          #   4. Construct the build name and wait on it explicitly
-          #
-          # This survives transient network errors on every step except
-          # the actual `oc wait`, and `oc wait` itself retries internally.
+          #   1. Fire `oc start-build`, tolerate exit code
+          #   2. Sleep then poll BC's `.status.lastVersion` with retries
+          #      (each `oc get bc` call also tolerates network drops)
+          #   3. Once we learn the build number, `oc wait` on it explicitly
           build_and_wait() {
             local bc="$1"; shift
             local ns="${NAMESPACE}"
             echo "→ Starting build for ${bc} (uploading binary context, network drops tolerated)…"
             oc start-build "${bc}" --from-dir=. -n "${ns}" "$@" >/dev/null 2>&1 || \
               echo "  (start-build returned non-zero — likely a connection drop, querying BC for new build)"
-            # Give the API a couple seconds to register the new build object.
-            sleep 5
-            local last_version
-            last_version=$(oc -n "${ns}" get bc "${bc}" -o jsonpath='{.status.lastVersion}' 2>/dev/null)
-            if [ -z "${last_version}" ]; then
-              echo "❌ Could not read lastVersion for bc/${bc} after start-build"
+
+            local last_version=""
+            local i
+            # Up to 6 retries × 10s = 60s to learn the new build number.
+            # `|| true` on the assignment is critical: bash assignment
+            # propagates the inner command's exit code, and `set -e` in
+            # the GHA wrapper would otherwise kill the whole step.
+            for i in 1 2 3 4 5 6; do
+              sleep 10
+              last_version=$(oc -n "${ns}" get bc "${bc}" -o jsonpath='{.status.lastVersion}' 2>/dev/null || true)
+              if [ -n "${last_version}" ] && [ "${last_version}" != "0" ]; then
+                echo "  ← bc/${bc} lastVersion=${last_version} (attempt ${i}/6)"
+                break
+              fi
+              echo "  attempt ${i}/6: bc/${bc} lastVersion='${last_version}' — retrying"
+            done
+
+            if [ -z "${last_version}" ] || [ "${last_version}" = "0" ]; then
+              echo "❌ Could not read lastVersion for bc/${bc} after 6 attempts"
               return 1
             fi
+
             local build_name="build/${bc}-${last_version}"
             echo "→ Waiting for ${build_name} to reach Complete (25-min cap)…"
             if ! oc wait --for=condition=Complete --timeout=25m "${build_name}" -n "${ns}" 2>&1; then
               echo "❌ ${build_name} did not reach Complete in time. Last 80 log lines:"
-              oc logs "${build_name}" -n "${ns}" --tail=80 || true
+              oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
               return 1
             fi
             echo "✅ ${build_name} Complete"

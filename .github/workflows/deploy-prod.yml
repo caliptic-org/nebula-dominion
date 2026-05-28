@@ -127,31 +127,62 @@ jobs:
             local bc="$1"; shift
             local ns="${NAMESPACE}"
             echo "→ Starting build for ${bc} (uploading binary context, network drops tolerated)…"
-            oc start-build "${bc}" --from-dir=. -n "${ns}" "$@" >/dev/null 2>&1 || \
-              echo "  (start-build returned non-zero — likely a connection drop, querying BC for new build)"
+            # Capture stderr to a temp file so we can surface the real
+            # error message when start-build fails — diagnostics matter
+            # more than silence here.
+            local stderr_log="/tmp/${bc}-start-build.err"
+            oc start-build "${bc}" --from-dir=. -n "${ns}" "$@" >/dev/null 2>"${stderr_log}" || {
+              echo "  start-build returned non-zero. stderr tail:"
+              tail -10 "${stderr_log}" || true
+              echo "  --- continuing to look for a registered build ---"
+            }
 
-            local last_version=""
+            # Don't trust BC.status.lastVersion (reset by BC recreation;
+            # also lags behind the apiserver write). Instead list actual
+            # build objects sorted by creationTimestamp and take the last
+            # one for this BC. If start-build at least committed a build
+            # object before its response was lost, we'll find it here.
+            local build_name=""
             local i
-            # Up to 6 retries × 10s = 60s to learn the new build number.
-            # `|| true` on the assignment is critical: bash assignment
-            # propagates the inner command's exit code, and `set -e` in
-            # the GHA wrapper would otherwise kill the whole step.
             for i in 1 2 3 4 5 6; do
               sleep 10
-              last_version=$(oc -n "${ns}" get bc "${bc}" -o jsonpath='{.status.lastVersion}' 2>/dev/null || true)
-              if [ -n "${last_version}" ] && [ "${last_version}" != "0" ]; then
-                echo "  ← bc/${bc} lastVersion=${last_version} (attempt ${i}/6)"
-                break
+              build_name=$(oc -n "${ns}" get builds \
+                -l openshift.io/build-config.name="${bc}" \
+                --sort-by=.metadata.creationTimestamp \
+                -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || true)
+              if [ -n "${build_name}" ]; then
+                # Skip builds older than 2 min — those are leftovers from
+                # a previous workflow run, not ours.
+                local age_iso
+                age_iso=$(oc -n "${ns}" get "build/${build_name}" \
+                  -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
+                if [ -n "${age_iso}" ]; then
+                  local now_epoch age_epoch age_sec
+                  now_epoch=$(date -u +%s)
+                  age_epoch=$(date -u -d "${age_iso}" +%s 2>/dev/null || echo "0")
+                  age_sec=$((now_epoch - age_epoch))
+                  if [ "${age_sec}" -lt 180 ]; then
+                    echo "  ← latest build for ${bc} is ${build_name} (age ${age_sec}s, attempt ${i}/6)"
+                    break
+                  fi
+                  echo "  attempt ${i}/6: latest=${build_name} but age=${age_sec}s > 180s — likely stale, retrying"
+                else
+                  echo "  attempt ${i}/6: ${build_name} timestamp unreadable — retrying"
+                fi
+              else
+                echo "  attempt ${i}/6: no builds found for bc/${bc} — retrying"
               fi
-              echo "  attempt ${i}/6: bc/${bc} lastVersion='${last_version}' — retrying"
+              build_name=""
             done
 
-            if [ -z "${last_version}" ] || [ "${last_version}" = "0" ]; then
-              echo "❌ Could not read lastVersion for bc/${bc} after 6 attempts"
+            if [ -z "${build_name}" ]; then
+              echo "❌ Could not find a recent build for bc/${bc} after 6 attempts"
+              echo "  Recent builds for diagnostics:"
+              oc -n "${ns}" get builds -l "openshift.io/build-config.name=${bc}" 2>/dev/null | tail -10 || true
               return 1
             fi
 
-            local build_name="build/${bc}-${last_version}"
+            build_name="build/${build_name}"
             echo "→ Waiting for ${build_name} to reach Complete (25-min cap)…"
             if ! oc wait --for=condition=Complete --timeout=25m "${build_name}" -n "${ns}" 2>&1; then
               echo "❌ ${build_name} did not reach Complete in time. Last 80 log lines:"

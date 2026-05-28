@@ -3,29 +3,28 @@
 # cluster; data loss on pod restart is acceptable since we don't persist
 # game state in Redis (Postgres is source of truth).
 
-resource "kubernetes_persistent_volume_claim" "redis" {
-  metadata {
-    name      = "nebula-redis-data"
-    namespace = kubernetes_namespace.nebula.metadata[0].name
-  }
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        storage = "2Gi"
-      }
-    }
-    # storage_class_name = null — let OpenShift pick the cluster default
-    # (local-path on SNO with rancher provisioner, ocs-storagecluster-ceph-rbd
-    # on OCS, lvms-vg1 on LVMS).
-  }
-  # local-path-provisioner uses WaitForFirstConsumer binding mode — the PVC
-  # only Bounds once a consumer Pod (this StatefulSet) tries to mount it.
-  # Without this flag terraform blocks for 5min waiting for Bound status
-  # that can't happen pre-Pod. Skip the wait; the StatefulSet below will
-  # create the Pod which kicks off PV provisioning.
-  wait_until_bound = false
-}
+# PVC commented out — the SNO recovery showed the cluster has no
+# default StorageClass and no PVs, so PVC bind fails and the
+# StatefulSet pod never schedules. Until LVMS/local-storage is
+# provisioned, redis runs on emptyDir (volatile but tolerable: Postgres
+# is source of truth, redis is only socket.io pub/sub + rate-limit
+# cache and rebuilds fine on restart).
+#
+# resource "kubernetes_persistent_volume_claim" "redis" {
+#   metadata {
+#     name      = "nebula-redis-data"
+#     namespace = kubernetes_namespace.nebula.metadata[0].name
+#   }
+#   spec {
+#     access_modes = ["ReadWriteOnce"]
+#     resources {
+#       requests = {
+#         storage = "2Gi"
+#       }
+#     }
+#   }
+#   wait_until_bound = false
+# }
 
 resource "kubernetes_stateful_set" "redis" {
   metadata {
@@ -52,12 +51,11 @@ resource "kubernetes_stateful_set" "redis" {
     template {
       metadata { labels = { app = "nebula-redis" } }
       spec {
-        # OpenShift runs containers under arbitrary UIDs in the namespace's
-        # SCC range — Redis's official image works because it uses /data
-        # as a relative volume that we own via PVC group permissions.
-        security_context {
-          fs_group = 1000
-        }
+        # No security_context — let OpenShift restricted-v2 SCC inject the
+        # namespace-allowed UID/fsGroup range automatically. Hard-coding
+        # fs_group=1000 caused the pod to be rejected because 1000 is not
+        # inside the nebula-prod range. The redis image runs fine under
+        # arbitrary UIDs.
         container {
           name  = "redis"
           image = "redis:7-alpine"
@@ -87,8 +85,11 @@ resource "kubernetes_stateful_set" "redis" {
         }
         volume {
           name = "data"
-          persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.redis.metadata[0].name
+          # emptyDir until LVMS/local-storage provisioner lands — see
+          # comment above. Pod restart loses data; that's OK for socket.io
+          # pub/sub + rate-limit cache use case.
+          empty_dir {
+            size_limit = "2Gi"
           }
         }
       }

@@ -5,23 +5,26 @@
 # Browser-facing operations go through the api service (signed URLs), so we
 # don't expose minio externally — only an internal ClusterIP Service.
 
-resource "kubernetes_persistent_volume_claim" "minio" {
-  metadata {
-    name      = "nebula-minio-data"
-    namespace = kubernetes_namespace.nebula.metadata[0].name
-  }
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        storage = "20Gi"
-      }
-    }
-  }
-  # See 03-redis.tf for rationale — WaitForFirstConsumer mode requires the
-  # Pod to exist before Bind can happen, so terraform must not block on it.
-  wait_until_bound = false
-}
+# PVC commented out — see 03-redis.tf for full rationale (no
+# StorageClass on the recovered cluster). MinIO runs on emptyDir for
+# now. ⚠ Asset uploads (user avatars, race art uploads) are LOST on
+# pod restart. Re-enable the PVC once LVMS/local-storage is provisioned.
+#
+# resource "kubernetes_persistent_volume_claim" "minio" {
+#   metadata {
+#     name      = "nebula-minio-data"
+#     namespace = kubernetes_namespace.nebula.metadata[0].name
+#   }
+#   spec {
+#     access_modes = ["ReadWriteOnce"]
+#     resources {
+#       requests = {
+#         storage = "20Gi"
+#       }
+#     }
+#   }
+#   wait_until_bound = false
+# }
 
 resource "kubernetes_stateful_set" "minio" {
   metadata {
@@ -40,9 +43,9 @@ resource "kubernetes_stateful_set" "minio" {
     template {
       metadata { labels = { app = "nebula-minio" } }
       spec {
-        security_context {
-          fs_group = 1000
-        }
+        # No security_context — let OpenShift restricted-v2 SCC inject
+        # the namespace-allowed UID/fsGroup range. fs_group=1000 was
+        # outside the namespace SCC range and got rejected.
         container {
           name  = "minio"
           image = "minio/minio:latest"
@@ -92,8 +95,10 @@ resource "kubernetes_stateful_set" "minio" {
         }
         volume {
           name = "data"
-          persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.minio.metadata[0].name
+          # emptyDir until a default StorageClass is available. ⚠ Uploads
+          # don't survive pod restart. See top of file.
+          empty_dir {
+            size_limit = "10Gi"
           }
         }
       }

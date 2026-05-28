@@ -76,101 +76,62 @@ jobs:
           namespace: ${{ env.NAMESPACE }}
           insecure_skip_tls_verify: false
 
-      - name: Login to OpenShift internal registry
+      # ── OpenShift in-cluster builds (no Docker on bastion) ────────────────
+      # Previously this workflow shelled out to `docker build` on the bastion
+      # runner, requiring docker-ce + buildx + the image registry route
+      # exposed externally. A cluster crash recovery exposed that whole
+      # chain as brittle: a fresh runner VM meant a fresh docker install
+      # before any deploy could succeed.
+      #
+      # Replaced with binary BuildConfigs (deploy/openshift/09-builds.tf):
+      # `oc start-build --from-dir=. --follow` uploads the checked-out
+      # working tree to a build pod inside the cluster, which runs the
+      # Dockerfile and pushes the result to the internal ImageStream.
+      # Runner needs only `oc` and `git` now.
+      #
+      # The `oc tag` step preserves the per-commit tag so historical
+      # versions remain pullable for rollback (otherwise BuildConfig only
+      # ever updates `:latest`).
+      - name: Build api in-cluster
         run: |
-          OC_TOKEN=$(oc whoami --show-token)
-          echo "$OC_TOKEN" | docker login \
-            -u "unused" \
-            --password-stdin \
-            "${{ env.REGISTRY }}"
+          oc start-build nebula-api \
+            --from-dir=. \
+            --follow \
+            -n "$NAMESPACE"
+          oc tag "${NAMESPACE}/nebula-api:latest" \
+                 "${NAMESPACE}/nebula-api:${{ steps.meta.outputs.tag }}" \
+            -n "$NAMESPACE"
 
-      # ── Build api ──────────────────────────────────────────────────────────
-      # Same Dockerfile as docker-compose uses, with BuildKit cache mounts
-      # (added in apps/api/Dockerfile) so subsequent pushes reuse pnpm store.
-      - name: Build api image
+      - name: Build game-server in-cluster
         run: |
-          DOCKER_BUILDKIT=1 docker build \
-            --file apps/api/Dockerfile \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:latest" \
-            .
+          oc start-build nebula-game-server \
+            --from-dir=. \
+            --follow \
+            -n "$NAMESPACE"
+          oc tag "${NAMESPACE}/nebula-game-server:latest" \
+                 "${NAMESPACE}/nebula-game-server:${{ steps.meta.outputs.tag }}" \
+            -n "$NAMESPACE"
 
-      - name: Push api image
-        run: |
-          push_with_retry() {
-            local image="$1"
-            for attempt in 1 2 3; do
-              echo "Push attempt $attempt: $image"
-              docker push "$image" && return 0
-              echo "Attempt $attempt failed — waiting 15s before retry…"
-              sleep 15
-            done
-            echo "All 3 push attempts failed for $image"
-            return 1
-          }
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}"
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:latest"
-
-      # ── Build game-server ──────────────────────────────────────────────────
-      - name: Build game-server image
-        run: |
-          DOCKER_BUILDKIT=1 docker build \
-            --file apps/game-server/Dockerfile \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:latest" \
-            .
-
-      - name: Push game-server image
-        run: |
-          push_with_retry() {
-            local image="$1"
-            for attempt in 1 2 3; do
-              echo "Push attempt $attempt: $image"
-              docker push "$image" && return 0
-              echo "Attempt $attempt failed — waiting 15s before retry…"
-              sleep 15
-            done
-            echo "All 3 push attempts failed for $image"
-            return 1
-          }
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}"
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:latest"
-
-      # ── Build web ──────────────────────────────────────────────────────────
       # NEXT_PUBLIC_* must be passed as build args because Next.js inlines
-      # them into the client bundle at `next build` — runtime env vars in the
-      # standalone runner stage are too late. Empty values fall through and
-      # leave the corresponding integration silent.
-      - name: Build web image
+      # them into the client bundle at `next build` — runtime env vars in
+      # the standalone runner stage are too late. Empty values fall through
+      # and leave the corresponding integration silent.
+      - name: Build web in-cluster
         run: |
-          DOCKER_BUILDKIT=1 docker build \
-            --file apps/web/Dockerfile \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-            --tag "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:latest" \
-            --build-arg NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
-            --build-arg NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
-            --build-arg NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \
-            --build-arg NEXT_PUBLIC_FB_PIXEL_ID="${{ secrets.NEXT_PUBLIC_FB_PIXEL_ID }}" \
-            --build-arg NEXT_PUBLIC_SENTRY_DSN="${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
-            --build-arg NEXT_PUBLIC_SENTRY_ENV="production" \
-            --build-arg NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}" \
-            .
-
-      - name: Push web image
-        run: |
-          push_with_retry() {
-            local image="$1"
-            for attempt in 1 2 3; do
-              echo "Push attempt $attempt: $image"
-              docker push "$image" && return 0
-              echo "Attempt $attempt failed — waiting 15s before retry…"
-              sleep 15
-            done
-            echo "All 3 push attempts failed for $image"
-            return 1
-          }
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}"
-          push_with_retry "${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:latest"
+          oc start-build nebula-web \
+            --from-dir=. \
+            --follow \
+            --build-arg=NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
+            --build-arg=NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
+            --build-arg=NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \
+            --build-arg=NEXT_PUBLIC_FB_PIXEL_ID="${{ secrets.NEXT_PUBLIC_FB_PIXEL_ID }}" \
+            --build-arg=NEXT_PUBLIC_SENTRY_DSN="${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
+            --build-arg=NEXT_PUBLIC_SENTRY_ENV="production" \
+            --build-arg=NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}" \
+            -n "$NAMESPACE"
+          oc tag "${NAMESPACE}/nebula-web:latest" \
+                 "${NAMESPACE}/nebula-web:${{ steps.meta.outputs.tag }}" \
+            -n "$NAMESPACE"
 
       # ── Sync runtime config ────────────────────────────────────────────────
       # TypeORM migrations run on api boot (DB_RUN_MIGRATIONS=true in the

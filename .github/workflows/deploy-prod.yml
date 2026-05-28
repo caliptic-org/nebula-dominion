@@ -104,16 +104,41 @@ jobs:
       - name: Define build helper
         run: |
           cat > /tmp/build-helper.sh <<'BASH'
-          set -euo pipefail
+          set -uo pipefail   # NB: no -e — start-build's connection drop is tolerated
 
-          # build_and_wait <buildconfig-name> [-- <extra start-build flags...>]
+          # build_and_wait <buildconfig-name> [<extra start-build flags...>]
+          #
+          # Robustness story: the bastion ↔ cluster API connection drops
+          # mid-call several times during a long binary upload (the asset
+          # sweep adds ~330 MB to context). When that happens, the build
+          # is ALREADY registered on the cluster but `oc start-build`'s
+          # response is lost, so its exit code can't be trusted.
+          #
+          # Pattern:
+          #   1. Fire `oc start-build` and ignore its exit code
+          #   2. Sleep briefly so the API has time to commit the new
+          #      build object to etcd
+          #   3. Read the BC's `.status.lastVersion` — server-side source
+          #      of truth for "what's the most recent build of this BC"
+          #   4. Construct the build name and wait on it explicitly
+          #
+          # This survives transient network errors on every step except
+          # the actual `oc wait`, and `oc wait` itself retries internally.
           build_and_wait() {
             local bc="$1"; shift
             local ns="${NAMESPACE}"
-            local build_name
-            echo "→ Starting build for ${bc} (uploading binary context)…"
-            build_name=$(oc start-build "${bc}" --from-dir=. -o name -n "${ns}" "$@")
-            echo "→ ${bc} build object: ${build_name}"
+            echo "→ Starting build for ${bc} (uploading binary context, network drops tolerated)…"
+            oc start-build "${bc}" --from-dir=. -n "${ns}" "$@" >/dev/null 2>&1 || \
+              echo "  (start-build returned non-zero — likely a connection drop, querying BC for new build)"
+            # Give the API a couple seconds to register the new build object.
+            sleep 5
+            local last_version
+            last_version=$(oc -n "${ns}" get bc "${bc}" -o jsonpath='{.status.lastVersion}' 2>/dev/null)
+            if [ -z "${last_version}" ]; then
+              echo "❌ Could not read lastVersion for bc/${bc} after start-build"
+              return 1
+            fi
+            local build_name="build/${bc}-${last_version}"
             echo "→ Waiting for ${build_name} to reach Complete (25-min cap)…"
             if ! oc wait --for=condition=Complete --timeout=25m "${build_name}" -n "${ns}" 2>&1; then
               echo "❌ ${build_name} did not reach Complete in time. Last 80 log lines:"

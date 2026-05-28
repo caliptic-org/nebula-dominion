@@ -92,22 +92,51 @@ jobs:
       # The `oc tag` step preserves the per-commit tag so historical
       # versions remain pullable for rollback (otherwise BuildConfig only
       # ever updates `:latest`).
+      # ── Build-and-wait helper ─────────────────────────────────────────────
+      # `oc start-build --wait` has a hard-coded 5-minute deadline for the
+      # build pod to reach Running, which expires before the binary upload
+      # even finishes when the working tree is large (the 332-PNG asset
+      # sweep alone pushes ~330 MB through the upload). We split the call
+      # in two: start the build (captures the build name via `-o name`),
+      # then `oc wait --for=condition=Complete --timeout=25m` against that
+      # explicit object. 25-min cap absorbs slow uploads + the actual
+      # build pod runtime (typically 4-6 min on this SNO).
+      - name: Define build helper
+        run: |
+          cat > /tmp/build-helper.sh <<'BASH'
+          set -euo pipefail
+
+          # build_and_wait <buildconfig-name> [-- <extra start-build flags...>]
+          build_and_wait() {
+            local bc="$1"; shift
+            local ns="${NAMESPACE}"
+            local build_name
+            echo "→ Starting build for ${bc} (uploading binary context)…"
+            build_name=$(oc start-build "${bc}" --from-dir=. -o name -n "${ns}" "$@")
+            echo "→ ${bc} build object: ${build_name}"
+            echo "→ Waiting for ${build_name} to reach Complete (25-min cap)…"
+            if ! oc wait --for=condition=Complete --timeout=25m "${build_name}" -n "${ns}" 2>&1; then
+              echo "❌ ${build_name} did not reach Complete in time. Last 80 log lines:"
+              oc logs "${build_name}" -n "${ns}" --tail=80 || true
+              return 1
+            fi
+            echo "✅ ${build_name} Complete"
+          }
+          export -f build_and_wait
+          BASH
+
       - name: Build api in-cluster
         run: |
-          oc start-build nebula-api \
-            --from-dir=. \
-            --wait \
-            -n "$NAMESPACE"
+          source /tmp/build-helper.sh
+          build_and_wait nebula-api
           oc tag "${NAMESPACE}/nebula-api:latest" \
                  "${NAMESPACE}/nebula-api:${{ steps.meta.outputs.tag }}" \
             -n "$NAMESPACE"
 
       - name: Build game-server in-cluster
         run: |
-          oc start-build nebula-game-server \
-            --from-dir=. \
-            --wait \
-            -n "$NAMESPACE"
+          source /tmp/build-helper.sh
+          build_and_wait nebula-game-server
           oc tag "${NAMESPACE}/nebula-game-server:latest" \
                  "${NAMESPACE}/nebula-game-server:${{ steps.meta.outputs.tag }}" \
             -n "$NAMESPACE"
@@ -118,17 +147,15 @@ jobs:
       # and leave the corresponding integration silent.
       - name: Build web in-cluster
         run: |
-          oc start-build nebula-web \
-            --from-dir=. \
-            --wait \
+          source /tmp/build-helper.sh
+          build_and_wait nebula-web \
             --build-arg=NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
             --build-arg=NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
             --build-arg=NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \
             --build-arg=NEXT_PUBLIC_FB_PIXEL_ID="${{ secrets.NEXT_PUBLIC_FB_PIXEL_ID }}" \
             --build-arg=NEXT_PUBLIC_SENTRY_DSN="${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
             --build-arg=NEXT_PUBLIC_SENTRY_ENV="production" \
-            --build-arg=NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}" \
-            -n "$NAMESPACE"
+            --build-arg=NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}"
           oc tag "${NAMESPACE}/nebula-web:latest" \
                  "${NAMESPACE}/nebula-web:${{ steps.meta.outputs.tag }}" \
             -n "$NAMESPACE"

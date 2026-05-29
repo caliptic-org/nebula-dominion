@@ -9,7 +9,15 @@ export const databaseConfig: TypeOrmModuleOptions = {
   password: process.env.DB_PASSWORD || 'nebula_pass',
   database: process.env.DB_NAME || 'nebula_dominion',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/../../database/migrations/*{.ts,.js}'],
+  // Migrations iki path'te yaşıyor: src/database/migrations/ (yeni, 8 dosya)
+  // ve database/migrations/ (eski, 2 dosya). Dist'te __dirname içeren yol:
+  //   src/database/migrations  → __dirname + '/../database/migrations'
+  //   database/migrations      → __dirname + '/../../database/migrations'
+  // Her ikisini de tara, timestamp'e göre sıralanır.
+  migrations: [
+    __dirname + '/../database/migrations/*{.ts,.js}',
+    __dirname + '/../../database/migrations/*{.ts,.js}',
+  ],
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,

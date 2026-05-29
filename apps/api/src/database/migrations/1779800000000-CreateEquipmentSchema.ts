@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+﻿import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Creates the commander equipment schema (tables + enums + indices) and
@@ -12,22 +12,22 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *     lock-step.
  *
  * Schema:
- *   equipment_items    — catalogue of available items
- *   user_equipment     — per-user ownership rows, optionally bound to a commander
+ *   equipment_items    â€” catalogue of available items
+ *   user_equipment     â€” per-user ownership rows, optionally bound to a commander
  *
- *   user_equipment.equipped_on_commander_id is a free-form varchar — commanders
+ *   user_equipment.equipped_on_commander_id is a free-form varchar â€” commanders
  *   live in apps/web/src/app/commanders/data.ts as static slugs (voss, malphas,
- *   …), not a DB table yet. Index on (user_id) and (equipped_on_commander_id)
+ *   â€¦), not a DB table yet. Index on (user_id) and (equipped_on_commander_id)
  *   covers the inventory + per-commander-render hot paths.
  *
- * Seed matrix (15 items, 6 slots × graded rarities):
+ * Seed matrix (15 items, 6 slots Ã— graded rarities):
  *   silah       (weapon)        common  / rare / epic
  *   zirh        (armor)         common  / rare / epic
  *   aksesuar_1  (accessory)     common  / rare
  *   aksesuar_2  (accessory)     common  / rare
  *   aksesuar_3  (accessory)     common  / rare
  *   ozel        (special slot)  rare    / legendary
- *   Note: aksesuar_2/3 carry one item each (rare) — slot stays selectable
+ *   Note: aksesuar_2/3 carry one item each (rare) â€” slot stays selectable
  *   from day one but doesn't get bloated. Future migrations grow per-slot.
  *
  * Down: drops in reverse order. Enums dropped last because tables reference them.
@@ -54,50 +54,50 @@ interface SeedRow {
 }
 
 const ITEMS: SeedRow[] = [
-  // ── Silah (Weapons) ─────────────────────────────────────────────────────
+  // â”€â”€ Silah (Weapons) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000101',
-    name: 'Plazma Tabancası',
+    id: 'e9000000-0000-4000-a000-000000000101',
+    name: 'Plazma TabancasÄ±',
     slot: 'silah',
     rarity: 'siradan',
     atkBoost: 4,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 1,
-    icon: '🔫',
-    description: 'Standart komuta seti — hızlı atışlı plazma tabancası.',
+    icon: 'ğŸ”«',
+    description: 'Standart komuta seti â€” hÄ±zlÄ± atÄ±ÅŸlÄ± plazma tabancasÄ±.',
     sortOrder: 1,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000102',
-    name: 'İyon Kılıcı',
+    id: 'e9000000-0000-4000-a000-000000000102',
+    name: 'Ä°yon KÄ±lÄ±cÄ±',
     slot: 'silah',
     rarity: 'nadir',
     atkBoost: 10,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 2,
-    icon: '⚔️',
-    description: 'İyonize parıltıyla yüklü el silahı — yakın savaşta üstün.',
+    icon: 'âš”ï¸',
+    description: 'Ä°yonize parÄ±ltÄ±yla yÃ¼klÃ¼ el silahÄ± â€” yakÄ±n savaÅŸta Ã¼stÃ¼n.',
     sortOrder: 2,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000103',
-    name: 'Nebula Tüfeği',
+    id: 'e9000000-0000-4000-a000-000000000103',
+    name: 'Nebula TÃ¼feÄŸi',
     slot: 'silah',
     rarity: 'destansi',
     atkBoost: 18,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 0,
-    icon: '🗡️',
-    description: 'Yüksek menzilli nebula enerjili tüfek — kuşatma sınıfı.',
+    icon: 'ğŸ—¡ï¸',
+    description: 'YÃ¼ksek menzilli nebula enerjili tÃ¼fek â€” kuÅŸatma sÄ±nÄ±fÄ±.',
     sortOrder: 3,
   },
 
-  // ── Zirh (Armor) ────────────────────────────────────────────────────────
+  // â”€â”€ Zirh (Armor) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000201',
+    id: 'e9000000-0000-4000-a000-000000000201',
     name: 'Taktik Yelek',
     slot: 'zirh',
     rarity: 'siradan',
@@ -105,146 +105,146 @@ const ITEMS: SeedRow[] = [
     defBoost: 5,
     hpBoost: 25,
     spdBoost: 0,
-    icon: '🦺',
-    description: 'Hafif kompozit panellerle güçlendirilmiş taktik yelek.',
+    icon: 'ğŸ¦º',
+    description: 'Hafif kompozit panellerle gÃ¼Ã§lendirilmiÅŸ taktik yelek.',
     sortOrder: 11,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000202',
-    name: 'Kuvars Zırh',
+    id: 'e9000000-0000-4000-a000-000000000202',
+    name: 'Kuvars ZÄ±rh',
     slot: 'zirh',
     rarity: 'nadir',
     atkBoost: 0,
     defBoost: 11,
     hpBoost: 50,
     spdBoost: -1,
-    icon: '🛡️',
-    description: 'Kuvars-titanyum karışımı, plazma hasarını dağıtan zırh.',
+    icon: 'ğŸ›¡ï¸',
+    description: 'Kuvars-titanyum karÄ±ÅŸÄ±mÄ±, plazma hasarÄ±nÄ± daÄŸÄ±tan zÄ±rh.',
     sortOrder: 12,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000203',
-    name: 'Singularity Zırh',
+    id: 'e9000000-0000-4000-a000-000000000203',
+    name: 'Singularity ZÄ±rh',
     slot: 'zirh',
     rarity: 'destansi',
     atkBoost: 0,
     defBoost: 20,
     hpBoost: 90,
     spdBoost: -1,
-    icon: '🛡️',
-    description: 'Yıkıcı çekim alanına dayanıklı, ağır mühendislik zırhı.',
+    icon: 'ğŸ›¡ï¸',
+    description: 'YÄ±kÄ±cÄ± Ã§ekim alanÄ±na dayanÄ±klÄ±, aÄŸÄ±r mÃ¼hendislik zÄ±rhÄ±.',
     sortOrder: 13,
   },
 
-  // ── Aksesuar_1 ──────────────────────────────────────────────────────────
+  // â”€â”€ Aksesuar_1 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000301',
-    name: 'Hız Amplifikatörü',
+    id: 'e9000000-0000-4000-a000-000000000301',
+    name: 'HÄ±z AmplifikatÃ¶rÃ¼',
     slot: 'aksesuar_1',
     rarity: 'siradan',
     atkBoost: 0,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 4,
-    icon: '💨',
-    description: 'Bacak servoslarını hızlandıran küçük amplifikatör.',
+    icon: 'ğŸ’¨',
+    description: 'Bacak servoslarÄ±nÄ± hÄ±zlandÄ±ran kÃ¼Ã§Ã¼k amplifikatÃ¶r.',
     sortOrder: 21,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000302',
-    name: 'Reflektör Kalkan',
+    id: 'e9000000-0000-4000-a000-000000000302',
+    name: 'ReflektÃ¶r Kalkan',
     slot: 'aksesuar_1',
     rarity: 'nadir',
     atkBoost: 0,
     defBoost: 6,
     hpBoost: 20,
     spdBoost: 2,
-    icon: '💎',
-    description: 'Lazer hasarını yansıtan kompakt enerji kalkanı.',
+    icon: 'ğŸ’',
+    description: 'Lazer hasarÄ±nÄ± yansÄ±tan kompakt enerji kalkanÄ±.',
     sortOrder: 22,
   },
 
-  // ── Aksesuar_2 ──────────────────────────────────────────────────────────
+  // â”€â”€ Aksesuar_2 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000401',
-    name: 'Saldırı Çipi',
+    id: 'e9000000-0000-4000-a000-000000000401',
+    name: 'SaldÄ±rÄ± Ã‡ipi',
     slot: 'aksesuar_2',
     rarity: 'siradan',
     atkBoost: 3,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 0,
-    icon: '💠',
-    description: 'Doğrudan beyin-ara yüze takılan saldırı modülü.',
+    icon: 'ğŸ’ ',
+    description: 'DoÄŸrudan beyin-ara yÃ¼ze takÄ±lan saldÄ±rÄ± modÃ¼lÃ¼.',
     sortOrder: 31,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000402',
-    name: 'Nöro Booster',
+    id: 'e9000000-0000-4000-a000-000000000402',
+    name: 'NÃ¶ro Booster',
     slot: 'aksesuar_2',
     rarity: 'nadir',
     atkBoost: 8,
     defBoost: 0,
     hpBoost: 0,
     spdBoost: 3,
-    icon: '🧠',
-    description: 'Refleksleri keskinleştiren nöral hızlandırıcı.',
+    icon: 'ğŸ§ ',
+    description: 'Refleksleri keskinleÅŸtiren nÃ¶ral hÄ±zlandÄ±rÄ±cÄ±.',
     sortOrder: 32,
   },
 
-  // ── Aksesuar_3 ──────────────────────────────────────────────────────────
+  // â”€â”€ Aksesuar_3 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000501',
-    name: 'Endurans Modülü',
+    id: 'e9000000-0000-4000-a000-000000000501',
+    name: 'Endurans ModÃ¼lÃ¼',
     slot: 'aksesuar_3',
     rarity: 'siradan',
     atkBoost: 0,
     defBoost: 2,
     hpBoost: 35,
     spdBoost: 0,
-    icon: '🔋',
-    description: 'Vücut sistemlerini stabilize eden enerji modülü.',
+    icon: 'ğŸ”‹',
+    description: 'VÃ¼cut sistemlerini stabilize eden enerji modÃ¼lÃ¼.',
     sortOrder: 41,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000502',
-    name: 'Şifa Sentezleyici',
+    id: 'e9000000-0000-4000-a000-000000000502',
+    name: 'Åifa Sentezleyici',
     slot: 'aksesuar_3',
     rarity: 'nadir',
     atkBoost: 0,
     defBoost: 4,
     hpBoost: 75,
     spdBoost: 0,
-    icon: '🩹',
-    description: 'Yaralanmada otomatik mikro-onarım salgılayan sentezleyici.',
+    icon: 'ğŸ©¹',
+    description: 'Yaralanmada otomatik mikro-onarÄ±m salgÄ±layan sentezleyici.',
     sortOrder: 42,
   },
 
-  // ── Ozel (Special slot, race-flavored hero gear) ────────────────────────
+  // â”€â”€ Ozel (Special slot, race-flavored hero gear) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'eq000000-0000-4000-a000-000000000601',
-    name: 'Komuta Tacı',
+    id: 'e9000000-0000-4000-a000-000000000601',
+    name: 'Komuta TacÄ±',
     slot: 'ozel',
     rarity: 'nadir',
     atkBoost: 5,
     defBoost: 5,
     hpBoost: 30,
     spdBoost: 2,
-    icon: '👑',
-    description: 'Komutan rütbesini taşıyanlara verilen onursal taç — dengeli boost.',
+    icon: 'ğŸ‘‘',
+    description: 'Komutan rÃ¼tbesini taÅŸÄ±yanlara verilen onursal taÃ§ â€” dengeli boost.',
     sortOrder: 51,
   },
   {
-    id: 'eq000000-0000-4000-a000-000000000602',
-    name: 'Boyut Yarığı Mührü',
+    id: 'e9000000-0000-4000-a000-000000000602',
+    name: 'Boyut YarÄ±ÄŸÄ± MÃ¼hrÃ¼',
     slot: 'ozel',
     rarity: 'efsanevi',
     atkBoost: 15,
     defBoost: 15,
     hpBoost: 100,
     spdBoost: 5,
-    icon: '✨',
-    description: 'Yıldızlar arası rünlerle örülmüş, efsanevi savaş mührü.',
+    icon: 'âœ¨',
+    description: 'YÄ±ldÄ±zlar arasÄ± rÃ¼nlerle Ã¶rÃ¼lmÃ¼ÅŸ, efsanevi savaÅŸ mÃ¼hrÃ¼.',
     sortOrder: 52,
   },
 ];

@@ -39,4 +39,20 @@ elif [ -n "$REDIS_HOST" ]; then
   wait_for "${REDIS_HOST}" "${REDIS_PORT:-6379}" "Redis"
 fi
 
+# DB migrations — sadece DB_RUN_MIGRATIONS=true set'liyse koş. Production'da
+# default true; dev'de istenirse env'le açılır. Game-server'la aynı pattern.
+# Failure non-fatal: migration drift bir konteyner restart loop yaratmamalı,
+# operatör logdan görür ve düzeltir.
+if [ "$DB_RUN_MIGRATIONS" = "true" ]; then
+  echo "Running database migrations..."
+  if [ -d /app/dist/apps/api/src/database/migrations ]; then
+    NODE_PATH=/app/node_modules node /app/node_modules/typeorm/cli.js migration:run \
+      -d /app/dist/apps/api/src/config/database.config.js || {
+        echo "Migration failed; continuing boot. Check logs and fix migration drift." >&2
+      }
+  else
+    echo "No migrations directory found, skipping." >&2
+  fi
+fi
+
 exec "$@"

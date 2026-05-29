@@ -16,6 +16,7 @@ services:
       - '10.10.10.40:4000:4000'
     environment:
       NODE_ENV: production
+      DB_RUN_MIGRATIONS: ${DB_RUN_MIGRATIONS:-true}
       DB_HOST: 10.10.10.20
       DB_PORT: 5432
       DATABASE_URL: ${DATABASE_URL}

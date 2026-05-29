@@ -1,0 +1,16 @@
+# Terraform local state — asla commit edilmez (secret + IP gerçek değerleri içerir).
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# Provider plugin cache + lock dump
+.terraform/
+.terraform.lock.hcl.tmp
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Sensitive outputs (output sensitive=true zaten gizliyor; double koruma)
+*.sensitive

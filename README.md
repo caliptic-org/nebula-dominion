@@ -119,6 +119,32 @@ pnpm dev
 - pnpm 9+
 - Docker & Docker Compose
 
+## Üretim Ortamı
+
+Canlı: **https://nebula.caliptic.com**
+
+Üretim altyapısı **Proxmox LXC 204** üzerinde Docker Compose ile çalışıyor.
+Veritabanı paylaşımlı Caliptic-postgres VM'inden hizmet alıyor
+(`10.10.10.20`, ayrı `nebula_dominion` DB). Reverse proxy + Cloudflare
+Tunnel Caliptic bastion'undan geçiyor.
+
+Detaylı runbook + mimari + secrets yönetimi: **[`DEPLOYMENT.md`](DEPLOYMENT.md)**
+AI agent context'i / operasyonel kurallar: **[`CLAUDE.md`](CLAUDE.md)**
+
+```
+Cloudflare Edge → cloudflared (bastion) → nginx (bastion)
+                                           ├─ nebula.caliptic.com      → web         :3000
+                                           ├─ api-nebula.caliptic.com  → api         :4000
+                                           └─ game-nebula.caliptic.com → game-server :3001  (Socket.io)
+                                                                          ↑
+                                                                      LXC 204 @ 10.10.10.40
+                                                                      (Docker Compose stack)
+                                                                          │
+                                                                          ▼
+                                                                  postgres @ 10.10.10.20
+                                                                  (nebula_dominion DB)
+```
+
 ## Başarı Kriterleri (MVP)
 
 | Metrik | Hedef |

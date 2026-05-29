@@ -1,0 +1,34 @@
+# Bu dosyayı `terraform.tfvars` olarak kopyala, gerçek secret'larla doldur.
+# `terraform.tfvars` git'e commit ETME (.gitignore'da).
+
+# -----------------------------------------------------------------------------
+# Proxmox host
+# -----------------------------------------------------------------------------
+proxmox_endpoint = "https://192.168.1.220:8006/"
+
+# API token tercihen, hem güvenli hem expirable.
+# Format: "user@realm!tokenid=secret"
+# Yoksa proxmox_password kullan (sadece root@pam).
+proxmox_api_token = ""
+proxmox_password  = "CHANGEME-proxmox-root-password"
+
+# Proxmox host root SSH key (LXC içine remote-exec yapmak için).
+# `~/.ssh/id_ed25519`'un içeriği — provider'a doğrudan veriyoruz.
+proxmox_ssh_private_key = <<EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+... senin private key'in ...
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+# Proxmox node adı. Single-node setup'ta hostname (caliptic, pve, vs.).
+proxmox_node = "caliptic"
+
+# -----------------------------------------------------------------------------
+# LXC 204
+# -----------------------------------------------------------------------------
+lxc_password = "CHANGEME-lxc-root-password-min-12-chars"
+
+lxc_ssh_public_keys = [
+  "ssh-ed25519 AAAA... bilgi@windows",
+  # Diğer team üyelerinin SSH key'lerini de buraya ekle.
+]

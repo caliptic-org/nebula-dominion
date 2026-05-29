@@ -1,0 +1,52 @@
+Warning: Permanently added '192.168.1.231' (ED25519) to the list of known hosts.
+services:
+  postgres: !reset null
+
+  redis:
+    ports: !override
+      - '10.10.10.40:6379:6379'
+
+  minio:
+    ports: !override
+      - '10.10.10.40:9000:9000'
+      - '10.10.10.40:9001:9001'
+
+  api:
+    ports: !override
+      - '10.10.10.40:4000:4000'
+    environment:
+      NODE_ENV: production
+      DB_HOST: 10.10.10.20
+      DB_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_USE_SSL: 'false'
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+  game-server:
+    ports: !override
+      - '10.10.10.40:3001:3001'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      REDIS_URL: redis://redis:6379
+    depends_on: !override
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL}
+    ports: !override
+      - '10.10.10.40:3000:3000'
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL}

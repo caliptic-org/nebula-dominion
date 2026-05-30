@@ -95,6 +95,24 @@ jobs:
           # Bütün env interpolation'larını da resolve eder — eksik var varsa burada görünür.
           docker compose $COMPOSE_FILES --env-file $ENV_FILE config --quiet
 
+      - name: Pre-build disk snapshot
+        # LXC 204 30 GB. Build cache + 3 image rebuild kolayca 10+ GB peak kullanır.
+        # Eğer disk < 6 GB free ise warn; pek seyrek olur ama log'a açıkça düşsün.
+        # Manuel temizlik için: `docker builder prune -af` (sadece reclaimable cache siler).
+        run: |
+          echo "=== / mount ==="
+          df -h /
+          echo ""
+          echo "=== docker system df ==="
+          docker system df
+          echo ""
+          AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          if [ "${AVAIL_GB:-0}" -lt 6 ]; then
+            echo "::warning::Only ${AVAIL_GB}G free — build may run out of disk. Consider docker builder prune -af."
+          else
+            echo "OK: ${AVAIL_GB}G free"
+          fi
+
       - name: Build images
         if: ${{ inputs.skip_build != true }}
         run: |

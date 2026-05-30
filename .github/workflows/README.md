@@ -1,173 +1,210 @@
 # Nebula Dominion — CI/CD
 
-GitHub Actions workflow'ları. Caliptic'in `deploy-prod.yml` pattern'ini mirror
-ediyor: self-hosted bastion runner, tag-bazlı trigger, image build + push to
-OCP internal registry, `oc set image` ile rollout.
+GitHub Actions workflow'ları. **Hedef: Proxmox LXC 204'teki Docker Compose
+stack'i** (`/opt/nebula-dominion/`) main'e push'la otomatik güncelle.
 
-## 📋 Workflow'lar
+> **Mimari değişiklik (2026-05-30)**: OpenShift kaldırıldı. Önceki
+> tag-bazlı `oc set image` modeli yerine main'e push → self-hosted runner
+> LXC 204'te `docker compose build + up -d` koşturur. Eski workflow'un
+> git history'sinde nasıl çalıştığı `git log -p .github/workflows/deploy-prod.yml`
+> ile görülebilir.
 
-| Dosya | Tetikleyici | Ne yapar |
-|---|---|---|
-| `deploy-prod.yml` | `git push v*` tag veya manuel | 3 image (web/api/game-server) build + push + OCP'ye rollout |
+## 📋 Workflow envanteri
 
----
+| Dosya | Tetikleyici | Runner | Ne yapar |
+|---|---|---|---|
+| `deploy-prod.yml` | `push: main` (paths-ignore var) veya manuel dispatch | `[self-hosted, nebula-prod]` (LXC 204) | 3 image build + `docker compose up -d` + healthcheck + internal/public smoke |
+| `nginx-bastion.yml` | `deploy/nginx/**` push | `[self-hosted, bastion]` (LXC 201, Caliptic mirası) | Bastion nginx vhost dosyasını kopyala + reload |
+| `auto-merge.yml` | PR opened/sync (`agent/*` branch) | `ubuntu-latest` (GH-hosted) | Agent PR'larını otomatik squash-merge |
 
-## ⚙️ Bir kerelik kurulum
+## ⚙️ Tek seferlik kurulum (nebula-prod runner)
 
-### 1. Self-hosted runner
+### 1. Self-hosted runner (LXC 204)
 
-Caliptic ile aynı bastion runner kullanılabilir — `[self-hosted, bastion]`
-label'larını taşıyan herhangi bir runner bu workflow'u alır.
+Runner kullanıcısı: `nebula-runner` (docker grubuna üye, NOT root).
+systemd unit: `actions.runner.caliptic-org-nebula-dominion.nebula-prod-runner.service`.
 
-**Yeni repo için runner kayıt:**
+**Otomatik (önerilen):**
 ```bash
-ssh ocp@<bastion-ip>
-cd ~/actions-runner
-./config.sh \
-  --url https://github.com/<owner>/nebula-dominion \
-  --token <runner-registration-token> \
-  --name nebula-bastion \
-  --labels bastion,linux \
-  --replace
-sudo ./svc.sh install ocp
-sudo ./svc.sh start
+# GitHub UI: Settings → Actions → Runners → New self-hosted runner
+# → Linux x64 ekranındaki --token değerini al (1 saat geçerli)
+
+ssh root@192.168.1.231
+REGISTRATION_TOKEN=AXXXX... bash /opt/nebula-dominion/infrastructure/runner/install.sh
 ```
 
-Token: GitHub repo → **Settings → Actions → Runners → New self-hosted runner**.
-
-**Caliptic ile aynı runner'ı kullanmak için** (önerilen — bastion zaten kurulu):
-- Organization-level runner olarak kaydet (`Settings → Actions → Runners` org seviyesinde)
-- Nebula repo'sunu o organization'a taşı / kaydet
-- Workflow'lar otomatik aynı runner'ı kullanır
-
-### 2. GitHub repo secrets
-
-`Settings → Secrets and variables → Actions → New repository secret` ile şu
-secret'ları ekle:
-
-#### Zorunlu (deploy çalışması için)
-
-| Secret | Değer | Nereden |
-|---|---|---|
-| `OPENSHIFT_SERVER` | `https://api.ocp-sno.caliptic.com:6443` | Cluster API endpoint |
-| `OPENSHIFT_TOKEN` | Service account token | `oc create sa nebula-deployer -n nebula-prod` + `oc create token nebula-deployer -n nebula-prod --duration=8760h` (1 yıl) |
-| `OPENSHIFT_NAMESPACE` | `nebula-prod` | terraform.tfvars'taki namespace |
-| `OPENSHIFT_REGISTRY` | `default-route-openshift-image-registry.apps.ocp-sno.caliptic.com` | `oc get route -n openshift-image-registry default-route -o jsonpath='{.spec.host}'` |
-
-#### Opsiyonel (analytics build args)
-
-| Secret | Değer | Nereden |
-|---|---|---|
-| `NEXT_PUBLIC_GA_ID` | `G-H29WNK7XQ1` | .env'inden |
-| `NEXT_PUBLIC_FB_PIXEL_ID` | (boş) | Faz 6'da dolduracaksın |
-| `NEXT_PUBLIC_SENTRY_DSN` | `https://...@...ingest.de.sentry.io/...` | .env'inden |
-
-### 3. Service account izinleri
-
-`OPENSHIFT_TOKEN` için `nebula-deployer` SA'nın gerekli RBAC'i:
-
-```bash
-# Ana namespace'te edit izni — set image, rollout, set env
-oc adm policy add-role-to-user edit -z nebula-deployer -n nebula-prod
-
-# Image registry erişimi — internal registry'e push
-oc adm policy add-role-to-user system:image-builder -z nebula-deployer -n nebula-prod
-oc adm policy add-role-to-user system:image-pusher  -z nebula-deployer -n nebula-prod
+Veya local checkout'tan stream:
+```powershell
+ssh root@192.168.1.231 'REGISTRATION_TOKEN=AXXXX... bash -s' < infrastructure/runner/install.sh
 ```
 
----
+**Manuel adımlar** (script'in yaptıklarının özeti):
+1. `useradd -m -G docker nebula-runner`
+2. `chgrp nebula-runner /opt/nebula-dominion/.env && chmod 640` — runner DATABASE_URL vs. okuyabilsin
+3. Runner tarball indir + extract (`/home/nebula-runner/actions-runner/`)
+4. `./config.sh --url … --token … --labels self-hosted,nebula-prod,linux,x64`
+5. `./svc.sh install nebula-runner && ./svc.sh start`
+
+Verify: GitHub UI'da runner `Idle` (yeşil daire), `nebula-prod-runner` adıyla.
+
+### 2. /opt/nebula-dominion/ on-host state
+
+Runner workflow source-of-truth değil — runner her run'da fresh `actions/checkout@v4`
+yapar. Ama **`.env`** kalıcı olarak `/opt/nebula-dominion/.env`'de durur (mode 640,
+grup `nebula-runner`). Workflow `--env-file /opt/nebula-dominion/.env` ile okur.
+
+Yeni `.env` ekleme:
+```bash
+ssh root@192.168.1.231
+nano /opt/nebula-dominion/.env       # NEW_VAR=value ekle
+chgrp nebula-runner /opt/nebula-dominion/.env && chmod 640 /opt/nebula-dominion/.env
+# Sonra docker-compose.prod.yml'a referans ekle, commit + push → deploy
+```
+
+### 3. GitHub repo secrets
+
+**Şu an workflow secret kullanmıyor** — tüm sensitive değerler `.env` üzerinden,
+on-host. Bu sayede `.env` rotation GitHub UI'sına dokunmadan yapılabiliyor.
+
+Sentry release bildirimi veya benzeri future feature için secret eklenirse buraya yaz:
+
+| Secret | Değer | Kullanan workflow |
+|---|---|---|
+| _(şu an yok)_ | — | — |
 
 ## 🚀 Deploy akışı
 
-### Otomatik (tag push)
+### Otomatik (push to main)
 
 ```bash
 git checkout main
-git pull
-git tag v0.1.0
-git push origin v0.1.0
-# → GitHub Actions başlar, ~10 dk sonra production canlı
+# kod değişikliği yap, commit
+git push origin main
+# → GitHub Actions başlar (paths-ignore'da değilse), ~5-8 dk sonra canlı
 ```
+
+`paths-ignore` hangi değişikliklerde build atlar:
+- `**.md` (dokümantasyon)
+- `docs/**`
+- `infrastructure/terraform/**` (TF değişikliği stack'i etkilemez)
+- `infrastructure/runner/**` (runner config; deploy etkilemez)
+- `.github/workflows/nginx-bastion.yml` ve `deploy/nginx/**` (ayrı workflow)
 
 ### Manuel (workflow_dispatch)
 
-GitHub repo → **Actions → Deploy to Production → Run workflow**:
-- Branch: `main`
-- Tag input: `v0.1.0` (zorunlu, traceability için)
+GitHub repo → **Actions → Deploy to Production → Run workflow**.
 
-İlk deploy (Terraform install) öncesinde manuel apply gerek:
+İnputlar:
+- `skip_build`: `true` yaparsan image build atlanır (sadece `up -d`). Env-only
+  değişiklik veya container restart için kullan.
+- `services`: virgülle ayrı liste (default `api,game-server,web`). Sadece `web`
+  rebuild için `web`.
+
+### Hızlı sanity (deploy sonrası)
+
 ```bash
-cd deploy/openshift
-terraform apply
-# Sonrasında GitHub Actions image swap yapar
+curl -s https://nebula.caliptic.com/health
+curl -s https://api-nebula.caliptic.com/api/docs-json | head -c 100
+curl -s https://game-nebula.caliptic.com/api/health/live
 ```
 
----
+Hepsi 200 (web /health), 200 (api openapi.json), 200 (game-server health) dönmeli.
 
-## 📊 Adım adım workflow
+## 📊 Workflow adımları
 
 ```
-1. Checkout (tag ref)
-2. Set image tag (git short sha)
-3. oc login (OpenShift API)
-4. docker login (registry external route)
-5. Build api image → tag (sha + latest)
-6. Push api image (retry 3x)
-7. Build game-server → tag → push (retry)
-8. Build web → tag → push (retry, NEXT_PUBLIC_* baked in)
-9. Sync runtime env (oc set env on api + game-server)
-10. oc set image deploy/nebula-api → rollout status (5min timeout)
-11. oc set image deploy/nebula-game-server → rollout status
-12. oc set image deploy/nebula-web → rollout status
-13. Smoke test (curl 3 host'a, 2xx/3xx/401/405 = OK)
-14. Step summary (version + image tags)
+1. actions/checkout@v4               (1-3 sn)
+2. Show context                       (~0 sn)
+3. Verify .env exists + required vars (~0 sn)
+4. Validate compose config            (1-2 sn)
+5. Build images (parallel)            (3-6 dk — pnpm + Next standalone)
+6. compose up -d --remove-orphans     (5-15 sn — image değişen container'ları recreate)
+7. Wait for healthchecks              (10-90 sn — game-server migration süresine bağlı)
+8. Internal smoke (10.10.10.40)       (3-5 sn)
+9. Public smoke (Cloudflare → bastion)(3-15 sn — CF tunnel cold start olabilir)
+10. Step summary                      (~0 sn)
 ```
 
-Toplam süre: **6-10 dk** (BuildKit cache mount + 3 paralel push, ilk run hariç).
-
----
+Toplam typical: **4-8 dk** (build dahil). `skip_build:true` ile **30-60 sn**.
 
 ## 🛠 Troubleshooting
 
-**`docker login` 403 unauthorized**
-→ `oc whoami --show-token` boş dönüyor. SA token süresi dolmuş ya da yanlış.
-   Yeniden token üret: `oc create token nebula-deployer -n nebula-prod --duration=8760h`
-   ve `OPENSHIFT_TOKEN` secret'ını güncelle.
+**Runner offline**
+→ Servis durumu kontrol et:
+```bash
+ssh root@192.168.1.231 'systemctl status actions.runner.caliptic-org-nebula-dominion.nebula-prod-runner.service'
+sudo journalctl -u actions.runner.caliptic-org-nebula-dominion.nebula-prod-runner.service --since "10 min ago"
+```
+Restart: `sudo systemctl restart actions.runner.caliptic-org-nebula-dominion.nebula-prod-runner.service`
 
-**`oc set image` "deployment not found"**
-→ İlk deploy için Terraform install gerekli. `cd deploy/openshift && terraform apply`.
+**`Cannot read /opt/nebula-dominion/.env`**
+→ Permission drift. Düzelt:
+```bash
+chgrp nebula-runner /opt/nebula-dominion/.env && chmod 640 /opt/nebula-dominion/.env
+```
 
-**Rollout 5 dk içinde tamamlanmadı**
-→ Pod ImagePullBackOff veya CrashLoopBackOff'tadır. Logs:
+**`Missing required env var: NEXT_PUBLIC_API_URL`**
+→ `.env`'ye eksik var ekle (DEPLOYMENT.md §8'de listelenen secrets). Workflow
+bunu fail-fast yapar çünkü web build'i NEXT_PUBLIC_* olmadan yapılırsa runtime'da
+404 verir.
+
+**Build 10+ dakika sürüyor**
+→ Docker BuildKit cache'i temiz. İlk run'da normaldir. Sonraki run'lar 1-2 dk olmalı
+(pnpm cache mount + apt-get layer cache). `docker builder prune` yapma — cache'i siler.
+
+**Healthcheck "unhealthy" döner**
+→ Container log'una bak:
+```bash
+ssh root@192.168.1.231 'cd /opt/nebula-dominion && docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env logs --tail=100 game-server'
+```
+En tipik: `CORS_ORIGINS` set değil → boot'ta `configuration.js:10:15` crash.
+Veya postgres `10.10.10.20:5432` ulaşılmıyor → DB VM kontrol et.
+
+**Public smoke warning ama internal pass**
+→ Stack canlı, sorun upstream (Cloudflare Tunnel veya bastion nginx).
+```bash
+ssh ocp@192.168.1.228 'sudo nginx -t && sudo tail -50 /var/log/nginx/access.log | grep nebula'
+```
+
+**Runner workspace dolduruyor disk'i**
+→ `_work/` altındaki eski checkout'lar. Manuel temizle:
+```bash
+ssh root@192.168.1.231 'find /home/nebula-runner/actions-runner/_work -mindepth 3 -maxdepth 3 -type d -mtime +30 -exec rm -rf {} +'
+```
+
+## 🔄 Runner yeniden kurma (LXC reset veya token expire)
+
+1. GH UI: **Settings → Actions → Runners → nebula-prod-runner → ⋯ → Remove**
+2. Yeni token al (aynı sayfada **New self-hosted runner**)
+3. LXC 204'te:
+   ```bash
+   # Eski servisi temizle (varsa)
+   cd /home/nebula-runner/actions-runner
+   sudo ./svc.sh stop && sudo ./svc.sh uninstall
+   sudo -u nebula-runner ./config.sh remove --token <REMOVAL_TOKEN>
    ```
-   oc -n nebula-prod logs deploy/nebula-api --tail=100
-   oc -n nebula-prod describe pod -l app=nebula-api
+4. install.sh'i tekrar koştur:
+   ```bash
+   REGISTRATION_TOKEN=AXXXX... bash infrastructure/runner/install.sh
    ```
 
-**Smoke test 503 dönüyor**
-→ Service uplink hâlâ hazır değil. 30 sn bekle, manuel curl ile retry.
-   Eğer 503 sabit kalıyorsa: pod 0/1 ready durumda, readinessProbe hata
-   veriyor. Aynı describe + logs ile gerçek nedeni bul.
+## 🔐 Güvenlik notları
 
-**Smoke test 404 dönüyor**
-→ Cloudflare tunnel veya OCP Route eksik. Bu hostname için Route var mı:
-   ```
-   oc -n nebula-prod get route
-   ```
-   Yoksa terraform apply yapılmamış — `deploy/openshift/08-routes.tf`
-   çalıştırılmamış demek.
+- **Runner repo-scoped** — sadece bu repo'nun workflow'larını alır. Fork PR'ları
+  default'ta DROP edilir (GH policy + `permissions: contents: read`).
+- **Workflow `permissions: contents: read`** — runner GITHUB_TOKEN'ı write
+  yetkisi yok. Bir PR comment'i bile yazamaz.
+- **`.env` GitHub'da değil** — secret rotation GH state'inden bağımsız.
+- **Runner user `nebula-runner`** root değil, docker grup üyesi. Worst-case
+  attack vektörü: docker.sock'a erişim → container escape → root. Bunun için
+  LXC unprivileged + `keyctl=true` kombinasyonu güvenlik perdesi.
+- **Bastion runner ayrı** — bastion-side ops (nginx config) için
+  `[self-hosted, bastion]` etiketli ayrı runner var. nebula-prod runner
+  bastion'a SSH bile etmez.
 
----
+## 🔗 İlgili dokümantasyon
 
-## 🔄 Caliptic'ten farklar (özet)
-
-| Konu | Caliptic | Nebula |
-|---|---|---|
-| Servis sayısı | 3 (backend/web/daemon) | 3 (web/api/game-server) |
-| Migration | Go binary, ayrı pod | TypeORM, api boot'unda |
-| WS sticky | yok | game-server'da haproxy annotation |
-| Hostnames | app.caliptic.com + appi.caliptic.com | nebula.caliptic.com + api-nebula.* + game-nebula.* |
-| License key | Var (CALIPTIC_LICENSE_KEY) | Yok |
-| Resend email | Var (RESEND_API_KEY) | İleride eklenebilir |
-
-Geri kalan tüm pattern aynı — pip cache, retry logic, summary, smoke test.
+- `DEPLOYMENT.md` (root) — runtime arch, env vars, scaling, rollback
+- `CLAUDE.md` (root) — AI agent kontekst notları
+- `infrastructure/runner/install.sh` — bu runner'ın idempotent install script'i
+- `infrastructure/terraform/` — LXC 204'ün Terraform tanımı (runner orada değil; ayrı)

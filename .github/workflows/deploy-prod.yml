@@ -1,467 +1,199 @@
-name: Deploy to Production
+name: Deploy to Production (Docker Compose on LXC 204)
 
-# Tag-bazlı deploy:
-#   main üstündeki bir commit'e semver tag (v*) push edildiğinde
-#   tetiklenir. Örnek:
-#     git tag v0.1.0 origin/main
-#     git push origin v0.1.0
-#   -> Bu workflow başlar, image tag = pushlanan tag adı.
+# Mimari: kod main'e push → self-hosted runner LXC 204'te tetiklenir →
+# runner workspace'inde docker compose build → /opt/nebula-dominion/.env
+# kullanarak `up -d` → healthcheck + internal/public smoke test.
 #
-# Image versioning: git describe --tags (push edilen tag adı).
+# Runner: actions.runner.caliptic-org-nebula-dominion.nebula-prod-runner.service
+#         user: nebula-runner (docker grup üyesi)
+#         host: LXC 204 (10.10.10.40 / 192.168.1.231 mgmt)
 #
-# Acil durumda: workflow_dispatch ile UI'dan manuel çalıştırılabilir.
-# Tag input ZORUNLU — tag-bazlı deploy modelinden sapılmaz.
-#
-# Pattern source: github.com/<caliptic>/.github/workflows/deploy-prod.yml
-#   — aynı self-hosted bastion runner, aynı oc-login + docker push + rollout
-#     akışı. Caliptic backend/web/daemon yerine bizde web/api/game-server.
+# Re-install için: infrastructure/runner/install.sh
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'infrastructure/terraform/**'   # TF dosyaları stack'i etkilemiyor
+      - 'infrastructure/runner/**'      # runner config'ini değiştiren PR build tetiklemesin
+      - '.github/workflows/nginx-bastion.yml'
+      - 'deploy/nginx/**'               # ayrı workflow (nginx-bastion) handle ediyor
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Semver tag to deploy (e.g. v0.1.0). Required."
-        required: true
+      skip_build:
+        description: 'Sadece compose up -d (image build atla) — env veya config değişikliği için'
+        required: false
+        type: boolean
+        default: false
+      services:
+        description: 'Rebuild edilecek servisler (virgülle ayrı). Default: api,game-server,web'
+        required: false
         type: string
+        default: 'api,game-server,web'
+
+# Aynı anda sadece bir deploy koşsun; kuyruktakileri sıraya al, iptal etme.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 env:
-  # External route — used to push images FROM bastion to OpenShift registry
-  REGISTRY: ${{ secrets.OPENSHIFT_REGISTRY }}
-  # Internal registry — used by OCP pods to pull (cluster-internal DNS)
-  INTERNAL_REGISTRY: image-registry.openshift-image-registry.svc:5000
-  NAMESPACE: ${{ secrets.OPENSHIFT_NAMESPACE }}
-  WEB_IMAGE: nebula-web
-  API_IMAGE: nebula-api
-  GAME_IMAGE: nebula-game-server
+  COMPOSE_PROJECT_NAME: nebula-dominion
+  ENV_FILE: /opt/nebula-dominion/.env
+  COMPOSE_FILES: -f docker-compose.yml -f docker-compose.prod.yml
+  DOCKER_BUILDKIT: '1'
+  COMPOSE_DOCKER_CLI_BUILD: '1'
 
 jobs:
   deploy:
-    name: Build & Deploy to OpenShift
-    runs-on: [self-hosted, bastion]
-    timeout-minutes: 60
+    name: Build + deploy to LXC 204
+    runs-on: [self-hosted, nebula-prod]
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
-          # Tag push: github.ref = refs/tags/v* (auto). workflow_dispatch:
-          # use the required `tag` input. Either way, deploy is tag-scoped.
-          ref: ${{ github.event.inputs.tag || github.ref }}
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Set image tag
-        id: meta
+      - name: Show context
         run: |
-          echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" >> $GITHUB_OUTPUT
+          echo "Commit:    ${{ github.sha }}"
+          echo "Ref:       ${{ github.ref }}"
+          echo "Event:     ${{ github.event_name }}"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Runner:    $RUNNER_NAME"
+          echo "Skip build:  ${{ inputs.skip_build }}"
+          echo "Services:    ${{ inputs.services || 'api,game-server,web (default)' }}"
+          docker --version
+          docker compose version
 
-      # ── Wait for cluster API to be reachable ──────────────────────────────
-      # Cluster's apiserver flaps during this recovery (SNO control plane
-      # under intermittent pressure). The redhat-actions/oc-login action
-      # has no retry, so if `oc login` hits a 1-second window where the
-      # apiserver is down, the whole workflow fails. We poll the
-      # /healthz endpoint up front and only proceed once it's been
-      # returning OK for two consecutive checks (avoids racing the
-      # apiserver mid-restart).
-      - name: Wait for cluster API
+      - name: Verify .env exists + readable
         run: |
-          server="${{ secrets.OPENSHIFT_SERVER }}"
-          echo "Polling ${server}/healthz (up to 30 min, 2× consecutive OK required)…"
-          ok_streak=0
-          for i in $(seq 1 180); do
-            if curl -ksm 10 "${server}/healthz" 2>/dev/null | grep -q '^ok$'; then
-              ok_streak=$((ok_streak + 1))
-              if [ ${ok_streak} -ge 2 ]; then
-                echo "✅ Cluster healthy (attempt ${i}/180, streak=${ok_streak})"
-                exit 0
-              fi
-              echo "  attempt ${i}/180: ok (streak=${ok_streak}/2)"
-            else
-              ok_streak=0
-              [ $((i % 6)) -eq 1 ] && echo "  attempt ${i}/180: cluster API unreachable, retrying"
+          if ! test -r "$ENV_FILE"; then
+            echo "::error::Cannot read $ENV_FILE — runner needs group=nebula-runner mode=640"
+            exit 1
+          fi
+          # İçeriği dump ETME — sadece anahtar adlarını listele
+          echo "Env keys present in $ENV_FILE:"
+          awk -F= '/^[A-Z_][A-Z0-9_]*=/ {print "  "$1}' "$ENV_FILE" | sort -u
+          # Critical vars must be present (otherwise api/game-server crash on boot)
+          for required in DATABASE_URL JWT_SECRET CORS_ORIGINS NEXT_PUBLIC_API_URL NEXT_PUBLIC_GAME_SERVER_URL; do
+            if ! grep -q "^${required}=" "$ENV_FILE"; then
+              echo "::error::Missing required env var: $required"
+              exit 1
             fi
-            sleep 10
           done
-          echo "❌ Cluster API never became consistently healthy in 30 min"
-          exit 1
 
-      # ── OpenShift login ────────────────────────────────────────────────────
-      # redhat-actions/oc-login@v1 still ships with `using: node20` (no v2 or
-      # Node 24 release as of 2026-05). Force the GitHub Actions runner to
-      # execute it under Node 24 anyway — this opts in to the runtime that
-      # becomes the default on 2026-06-02 and removes the deprecation warning.
-      - name: Login to OpenShift
-        uses: redhat-actions/oc-login@v1
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-        with:
-          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
-          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
-          namespace: ${{ env.NAMESPACE }}
-          insecure_skip_tls_verify: false
-
-      # ── OpenShift in-cluster builds (no Docker on bastion) ────────────────
-      # Previously this workflow shelled out to `docker build` on the bastion
-      # runner, requiring docker-ce + buildx + the image registry route
-      # exposed externally. A cluster crash recovery exposed that whole
-      # chain as brittle: a fresh runner VM meant a fresh docker install
-      # before any deploy could succeed.
-      #
-      # Replaced with binary BuildConfigs (deploy/openshift/09-builds.tf):
-      # `oc start-build --from-dir=. --follow` uploads the checked-out
-      # working tree to a build pod inside the cluster, which runs the
-      # Dockerfile and pushes the result to the internal ImageStream.
-      # Runner needs only `oc` and `git` now.
-      #
-      # The `oc tag` step preserves the per-commit tag so historical
-      # versions remain pullable for rollback (otherwise BuildConfig only
-      # ever updates `:latest`).
-      # ── Build-and-wait helper ─────────────────────────────────────────────
-      # `oc start-build --wait` has a hard-coded 5-minute deadline for the
-      # build pod to reach Running, which expires before the binary upload
-      # even finishes when the working tree is large (the 332-PNG asset
-      # sweep alone pushes ~330 MB through the upload). We split the call
-      # in two: start the build (captures the build name via `-o name`),
-      # then `oc wait --for=condition=Complete --timeout=25m` against that
-      # explicit object. 25-min cap absorbs slow uploads + the actual
-      # build pod runtime (typically 4-6 min on this SNO).
-      - name: Define build helper
+      - name: Validate compose config
         run: |
-          cat > /tmp/build-helper.sh <<'BASH'
-          # NB: deliberately no `set -e` — start-build's connection drop is
-          # an EXPECTED, non-fatal condition. The wrapping GHA step still
-          # runs under `bash -e`, but every command below explicitly OR's
-          # to a no-op so the failure can't propagate. The helper returns
-          # non-zero ONLY when the build genuinely cannot reach Complete.
-          set -uo pipefail
+          # `config --quiet` parse eder, çıktı yok ama syntax fail varsa kırar.
+          # Bütün env interpolation'larını da resolve eder — eksik var varsa burada görünür.
+          docker compose $COMPOSE_FILES --env-file $ENV_FILE config --quiet
 
-          # build_and_wait <buildconfig-name> [<extra start-build flags...>]
-          #
-          # Robustness story: the bastion ↔ cluster API connection drops
-          # several times per build (binary upload + cluster API response).
-          # When that happens, the build is ALREADY registered on the
-          # cluster but `oc start-build`'s response is lost.
-          #
-          # Pattern:
-          #   1. Fire `oc start-build`, tolerate exit code
-          #   2. Sleep then poll BC's `.status.lastVersion` with retries
-          #      (each `oc get bc` call also tolerates network drops)
-          #   3. Once we learn the build number, `oc wait` on it explicitly
-          build_and_wait() {
-            local bc="$1"; shift
-            local ns="${NAMESPACE}"
-            echo "→ Starting build for ${bc} (uploading binary context, network drops tolerated)…"
-            # Capture stderr to a temp file so we can surface the real
-            # error message when start-build fails — diagnostics matter
-            # more than silence here.
-            local stderr_log="/tmp/${bc}-start-build.err"
-            oc start-build "${bc}" --from-dir=. -n "${ns}" "$@" >/dev/null 2>"${stderr_log}" || {
-              echo "  start-build returned non-zero. stderr tail:"
-              tail -10 "${stderr_log}" || true
-              echo "  --- continuing to look for a registered build ---"
-            }
+      - name: Build images
+        if: ${{ inputs.skip_build != true }}
+        run: |
+          SVCS="${{ inputs.services || 'api,game-server,web' }}"
+          BUILD_TARGETS=$(echo "$SVCS" | tr ',' ' ')
+          echo "Building: $BUILD_TARGETS"
+          docker compose $COMPOSE_FILES --env-file $ENV_FILE \
+            build --pull $BUILD_TARGETS
 
-            # Don't trust BC.status.lastVersion (reset by BC recreation;
-            # also lags behind the apiserver write). Instead list actual
-            # build objects sorted by creationTimestamp and take the last
-            # one for this BC. If start-build at least committed a build
-            # object before its response was lost, we'll find it here.
-            local build_name=""
-            local i
-            for i in 1 2 3 4 5 6; do
-              sleep 10
-              build_name=$(oc -n "${ns}" get builds \
-                -l openshift.io/build-config.name="${bc}" \
-                --sort-by=.metadata.creationTimestamp \
-                -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || true)
-              if [ -n "${build_name}" ]; then
-                # Skip builds older than 2 min — those are leftovers from
-                # a previous workflow run, not ours.
-                local age_iso
-                age_iso=$(oc -n "${ns}" get "build/${build_name}" \
-                  -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
-                if [ -n "${age_iso}" ]; then
-                  local now_epoch age_epoch age_sec
-                  now_epoch=$(date -u +%s)
-                  age_epoch=$(date -u -d "${age_iso}" +%s 2>/dev/null || echo "0")
-                  age_sec=$((now_epoch - age_epoch))
-                  if [ "${age_sec}" -lt 180 ]; then
-                    echo "  ← latest build for ${bc} is ${build_name} (age ${age_sec}s, attempt ${i}/6)"
-                    break
-                  fi
-                  echo "  attempt ${i}/6: latest=${build_name} but age=${age_sec}s > 180s — likely stale, retrying"
-                else
-                  echo "  attempt ${i}/6: ${build_name} timestamp unreadable — retrying"
-                fi
-              else
-                echo "  attempt ${i}/6: no builds found for bc/${bc} — retrying"
-              fi
-              build_name=""
-            done
+      - name: Apply stack (up -d)
+        run: |
+          docker compose $COMPOSE_FILES --env-file $ENV_FILE \
+            up -d --remove-orphans
 
-            if [ -z "${build_name}" ]; then
-              echo "❌ Could not find a recent build for bc/${bc} after 6 attempts"
-              echo "  Recent builds for diagnostics:"
-              oc -n "${ns}" get builds -l "openshift.io/build-config.name=${bc}" 2>/dev/null | tail -10 || true
-              return 1
+      - name: Wait for containers to become healthy/running
+        run: |
+          set -e
+          # Sıra: önce stateful (redis, minio) sonra app servisleri.
+          # game-server boot'unda migration koşar — biraz daha uzun olabilir.
+          for svc in redis minio game-server api web; do
+            cid=$(docker compose $COMPOSE_FILES --env-file $ENV_FILE ps -q $svc 2>/dev/null || true)
+            if [ -z "$cid" ]; then
+              echo "  $svc → no container (skipping)"
+              continue
             fi
-
-            build_name="build/${build_name}"
-            echo "→ Waiting for ${build_name} to reach Complete (cluster API may flap)…"
-
-            # Cluster API has been flapping during this recovery — `oc
-            # wait` can hit ServiceUnavailable mid-poll. Poll the build's
-            # status field manually in a retry loop instead. Total cap
-            # is 30 min: 180 attempts × 10s each.
-            local phase=""
-            local j
-            for j in $(seq 1 180); do
-              phase=$(oc -n "${ns}" get "${build_name}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
-              case "${phase}" in
-                Complete)
-                  echo "✅ ${build_name} Complete (attempt ${j}/180)"
-                  return 0
+            echo "Waiting for $svc..."
+            for i in $(seq 1 60); do
+              status=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{if .State.Running}}running{{else}}{{.State.Status}}{{end}}{{end}}' "$cid" 2>/dev/null || echo "unknown")
+              case "$status" in
+                healthy|running)
+                  echo "  $svc → $status (after $((i*5))s)"
+                  break
                   ;;
-                Failed|Error|Cancelled)
-                  echo "❌ ${build_name} reached terminal state ${phase}. Last 80 log lines:"
-                  oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
-                  return 1
+                starting|"")
+                  : # keep waiting
                   ;;
-                "")
-                  # API server temporarily unavailable — log once every
-                  # 6 attempts (~1 min) to avoid log spam.
-                  [ $((j % 6)) -eq 1 ] && echo "  attempt ${j}/180: API server unreachable, retrying in 10s"
-                  ;;
-                *)
-                  # Running, New, Pending — log every 6 attempts
-                  [ $((j % 6)) -eq 1 ] && echo "  attempt ${j}/180: phase=${phase}, still building"
+                unhealthy|exited|dead)
+                  echo "::error::$svc reached state $status"
+                  docker compose $COMPOSE_FILES --env-file $ENV_FILE logs --tail=120 $svc || true
+                  exit 1
                   ;;
               esac
-              sleep 10
+              sleep 5
+              if [ $i -eq 60 ]; then
+                echo "::error::$svc never became healthy after 5min (last state: $status)"
+                docker compose $COMPOSE_FILES --env-file $ENV_FILE logs --tail=120 $svc || true
+                exit 1
+              fi
             done
-
-            echo "❌ ${build_name} did not reach Complete after 30 min. Last status: ${phase}"
-            oc logs "${build_name}" -n "${ns}" --tail=80 2>/dev/null || true
-            return 1
-          }
-          export -f build_and_wait
-          BASH
-
-      - name: Build api in-cluster
-        run: |
-          source /tmp/build-helper.sh
-          build_and_wait nebula-api
-          oc tag "${NAMESPACE}/nebula-api:latest" \
-                 "${NAMESPACE}/nebula-api:${{ steps.meta.outputs.tag }}" \
-            -n "$NAMESPACE"
-
-      - name: Build game-server in-cluster
-        run: |
-          source /tmp/build-helper.sh
-          build_and_wait nebula-game-server
-          oc tag "${NAMESPACE}/nebula-game-server:latest" \
-                 "${NAMESPACE}/nebula-game-server:${{ steps.meta.outputs.tag }}" \
-            -n "$NAMESPACE"
-
-      # NEXT_PUBLIC_* must be passed as build args because Next.js inlines
-      # them into the client bundle at `next build` — runtime env vars in
-      # the standalone runner stage are too late. Empty values fall through
-      # and leave the corresponding integration silent.
-      - name: Build web in-cluster
-        run: |
-          source /tmp/build-helper.sh
-          build_and_wait nebula-web \
-            --build-arg=NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
-            --build-arg=NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
-            --build-arg=NEXT_PUBLIC_GA_ID="${{ secrets.NEXT_PUBLIC_GA_ID }}" \
-            --build-arg=NEXT_PUBLIC_FB_PIXEL_ID="${{ secrets.NEXT_PUBLIC_FB_PIXEL_ID }}" \
-            --build-arg=NEXT_PUBLIC_SENTRY_DSN="${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
-            --build-arg=NEXT_PUBLIC_SENTRY_ENV="production" \
-            --build-arg=NEXT_PUBLIC_SENTRY_RELEASE="${{ steps.meta.outputs.version }}"
-          oc tag "${NAMESPACE}/nebula-web:latest" \
-                 "${NAMESPACE}/nebula-web:${{ steps.meta.outputs.tag }}" \
-            -n "$NAMESPACE"
-
-      # ── Sync runtime config ────────────────────────────────────────────────
-      # TypeORM migrations run on api boot (DB_RUN_MIGRATIONS=true in the
-      # nebula-shared ConfigMap) so no separate migration step is required.
-      # If a destructive migration ever ships we'd add a one-off pod step
-      # here, mirroring Caliptic's `migrate up` pattern.
-
-      - name: Sync api/game-server env
-        run: |
-          # Patch live env vars on each deploy — these are CONFIG, not
-          # secrets, and we want them to drift to current values without
-          # waiting for a Terraform apply.
-          oc set env deployment/nebula-api \
-            CORS_ORIGINS="https://nebula.caliptic.com" \
-            NEXT_PUBLIC_API_URL="https://api-nebula.caliptic.com" \
-            NEXT_PUBLIC_GAME_SERVER_URL="https://game-nebula.caliptic.com" \
-            APP_VERSION="${{ steps.meta.outputs.version }}" \
-            -n "$NAMESPACE" || true
-
-          oc set env deployment/nebula-game-server \
-            APP_VERSION="${{ steps.meta.outputs.version }}" \
-            -n "$NAMESPACE" || true
-
-      # ── Rollout helper (DRY) ──────────────────────────────────────────────
-      # Earlier the 3 deploy steps just ran `oc rollout status …`; when the
-      # rollout timed out the step exited 1 with NO diagnostic info, so the
-      # GitHub Actions log showed only "error: timed out waiting for the
-      # condition" — useless for triage.  Run 26379612897 hit that with
-      # game-server stuck mid-rollout for 5 minutes and gave us nothing.
-      # The shared function below dumps pod state, recent events, and the
-      # last 200 log lines of any non-Running pod when the rollout fails,
-      # then re-raises the failure so the job still surfaces red.
-      #
-      # Timeout bumped from 300s → 600s because game-server's first boot
-      # after a fresh image runs DB schema validation + the resource-tick
-      # cron's first wake — both add ~10-30s and can push the readiness
-      # probe past 5 minutes on a cold cluster.
-      - name: Define rollout helpers
-        run: |
-          # Source-into-env idiom: write a script file and `source` it from
-          # subsequent steps.  GitHub Actions bash steps are independent
-          # shells, so we can't define a function once and reuse it; the
-          # helper has to live on disk.
-          cat > /tmp/rollout-helpers.sh <<'BASH'
-          set -euo pipefail
-
-          # rollout_with_diag <deployment-name>
-          rollout_with_diag() {
-            local dep="$1"
-            local ns="${NAMESPACE}"
-            echo "→ Waiting on rollout for ${dep} (10-minute timeout)…"
-            if oc rollout status deployment/"${dep}" -n "${ns}" --timeout=600s; then
-              echo "✅ ${dep} rolled out"
-              return 0
-            fi
-            local exit_code=$?
-            echo ""
-            echo "❌ Rollout for ${dep} FAILED — collecting diagnostics."
-            echo ""
-            echo "─── Deployment status ──────────────────────────────────"
-            oc get deployment/"${dep}" -n "${ns}" -o wide || true
-            echo ""
-            echo "─── Pods (full label match) ────────────────────────────"
-            oc get pods -n "${ns}" -l app="${dep}" -o wide || true
-            echo ""
-            echo "─── Recent events (last 25, namespace-wide) ────────────"
-            oc get events -n "${ns}" --sort-by=.lastTimestamp \
-              -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MSG:.message \
-              | tail -25 || true
-            echo ""
-            echo "─── Describe non-Ready pods ────────────────────────────"
-            local bad_pods
-            bad_pods=$(oc get pods -n "${ns}" -l app="${dep}" \
-              -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' \
-              | awk '$2!="Running"{print $1}' || true)
-            if [ -n "${bad_pods:-}" ]; then
-              for p in $bad_pods; do
-                echo "── describe pod/${p} ──"
-                oc describe pod/"${p}" -n "${ns}" | tail -60 || true
-                echo ""
-                echo "── logs pod/${p} (last 200) ──"
-                oc logs pod/"${p}" -n "${ns}" --tail=200 --all-containers=true 2>&1 || true
-                echo ""
-              done
-            else
-              # Race: pods all Running but probe still failing.  Tail
-              # logs of every replica anyway — they ran SOMETHING.
-              for p in $(oc get pods -n "${ns}" -l app="${dep}" -o name); do
-                echo "── logs ${p} (last 200) ──"
-                oc logs "${p}" -n "${ns}" --tail=200 --all-containers=true 2>&1 || true
-                echo ""
-              done
-            fi
-            echo ""
-            echo "─── End diagnostics — failing job ─────────────────────"
-            return "${exit_code}"
-          }
-
-          export -f rollout_with_diag
-          BASH
-
-      # ── Deploy api ─────────────────────────────────────────────────────────
-      - name: Deploy api
-        run: |
-          source /tmp/rollout-helpers.sh
-          if oc get deployment nebula-api -n "$NAMESPACE" &>/dev/null; then
-            oc set image deployment/nebula-api \
-              api="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-              -n "$NAMESPACE"
-            rollout_with_diag nebula-api
-          else
-            echo "Deployment nebula-api not found — run terraform apply first (initial install)"
-            exit 1
-          fi
-
-      # ── Deploy game-server ─────────────────────────────────────────────────
-      - name: Deploy game-server
-        run: |
-          source /tmp/rollout-helpers.sh
-          if oc get deployment nebula-game-server -n "$NAMESPACE" &>/dev/null; then
-            oc set image deployment/nebula-game-server \
-              game-server="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-              -n "$NAMESPACE"
-            rollout_with_diag nebula-game-server
-          else
-            echo "Deployment nebula-game-server not found — run terraform apply first (initial install)"
-            exit 1
-          fi
-
-      # ── Deploy web ─────────────────────────────────────────────────────────
-      - name: Deploy web
-        run: |
-          source /tmp/rollout-helpers.sh
-          if oc get deployment nebula-web -n "$NAMESPACE" &>/dev/null; then
-            oc set image deployment/nebula-web \
-              web="${{ env.INTERNAL_REGISTRY }}/${{ env.NAMESPACE }}/${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}" \
-              -n "$NAMESPACE"
-            rollout_with_diag nebula-web
-          else
-            echo "Deployment nebula-web not found — run terraform apply first (initial install)"
-            exit 1
-          fi
-
-      # ── Smoke test ─────────────────────────────────────────────────────────
-      # Per-host probe path — both NestJS backends 404 on `/` because they
-      # mount their routes under prefixes (api/v1 for the REST API,
-      # api for the game-server). Hit each service's documented liveness
-      # surface so the smoke test reflects actual reachability instead of
-      # a misleading 404 from the root.
-      - name: Smoke test
-        run: |
-          sleep 5
-          for entry in \
-            "nebula.caliptic.com:/" \
-            "api-nebula.caliptic.com:/api/docs" \
-            "game-nebula.caliptic.com:/api/health"; do
-            host="${entry%%:*}"
-            path="${entry#*:}"
-            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://${host}${path}" || echo "000")
-            echo "https://${host}${path} → HTTP ${STATUS}"
-            # 2xx, 3xx (redirects), and 401 (api endpoints requiring auth)
-            # are all acceptable post-deploy. 404/5xx fail the smoke test.
-            case "$STATUS" in
-              2*|3*|401|405) echo "✅ ${host} reachable" ;;
-              *) echo "❌ ${host}${path} returned ${STATUS}" ; exit 1 ;;
-            esac
           done
 
-      # ── Summary ────────────────────────────────────────────────────────────
-      - name: Deployment summary
-        if: success()
+      - name: Internal smoke test (LXC 10.10.10.40)
         run: |
-          echo "### Deployment successful :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Web:** \`${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY
-          echo "- **API:** \`${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://api-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY
-          echo "- **Game:** \`${{ env.GAME_IMAGE }}:${{ steps.meta.outputs.tag }}\` → https://game-nebula.caliptic.com" >> $GITHUB_STEP_SUMMARY
+          set -e
+          ok() { echo "PASS   $1"; }
+          fail() { echo "::error::$1"; exit 1; }
+          # web /health (Next.js sayfası, 200 dönmeli)
+          curl -fsS --max-time 15 http://10.10.10.40:3000/health > /dev/null \
+            && ok "web :3000/health"      || fail "web :3000/health failed"
+          # api OpenAPI JSON (Swagger)
+          curl -fsS --max-time 15 http://10.10.10.40:4000/api/docs-json > /dev/null \
+            && ok "api :4000/api/docs-json" || fail "api :4000/api/docs-json failed"
+          # game-server health probe
+          curl -fsS --max-time 15 http://10.10.10.40:3001/api/health/live > /dev/null \
+            && ok "game-server :3001/api/health/live" || fail "game-server health failed"
+
+      - name: Public smoke test (Cloudflare Tunnel → bastion → LXC)
+        # Bu fail ederse internal smoke geçti demektir — sorun CF tunnel
+        # veya bastion nginx tarafında. ::warning yapıyoruz, hard fail değil.
+        run: |
+          probe() {
+            local label="$1" url="$2"
+            if curl -fsS --max-time 20 "$url" > /dev/null; then
+              echo "PASS   public $label"
+            else
+              echo "::warning::public $label failed — check CF tunnel + bastion nginx"
+            fi
+          }
+          probe "web"         https://nebula.caliptic.com/health
+          probe "api"         https://api-nebula.caliptic.com/api/docs-json
+          probe "game-server" https://game-nebula.caliptic.com/api/health/live
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## Deploy result"
+            echo ""
+            echo "**Commit:** [\`$(echo ${{ github.sha }} | cut -c1-7)\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})"
+            echo "**Trigger:** \`${{ github.event_name }}\`"
+            echo "**Runner:** \`$RUNNER_NAME\`"
+            echo ""
+            echo "### Container status"
+            echo '```'
+            docker compose $COMPOSE_FILES --env-file $ENV_FILE ps 2>&1 || echo "(compose ps failed)"
+            echo '```'
+            echo ""
+            echo "### Public URLs"
+            echo "- https://nebula.caliptic.com"
+            echo "- https://api-nebula.caliptic.com/api/docs"
+            echo "- https://game-nebula.caliptic.com/api/health/live"
+          } >> "$GITHUB_STEP_SUMMARY"

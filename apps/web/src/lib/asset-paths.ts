@@ -40,6 +40,20 @@ export function buildingAsset(race: RaceKey, slug: string, age: Age = 1): string
   return `/assets/buildings/${race}/${slug}-age${age}.png`;
 }
 
+/**
+ * Original ComfyUI render with the cosmic backdrop intact (before
+ * rembg cuts it).  Lives under `_orig/` alongside the bg-removed twin.
+ * Use this for catalog / browse / detail screens where the building
+ * sits inside its own card and the kozmik backdrop reads as "intended
+ * art" rather than a halo around the silhouette.
+ *
+ * Keep `buildingAsset()` for screens that composite the building onto
+ * the iso /base scene — those need clean alpha.
+ */
+export function buildingOriginalAsset(race: RaceKey, slug: string, age: Age = 1): string {
+  return `/assets/buildings/${race}/_orig/${slug}-age${age}.png`;
+}
+
 export function tileAsset(race: RaceKey, variant: TileVariant, age: Age = 1): string {
   return `/assets/tiles/${race}/age${age}-${variant}.png`;
 }

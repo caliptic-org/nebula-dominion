@@ -23,6 +23,7 @@ import {
 } from '@/components/handoff';
 import Image from 'next/image';
 import { useNDRace } from '@/components/handoff/useNDRace';
+import { buildingOriginalAsset } from '@/lib/asset-paths';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useHudState } from '@/hooks/useHudState';
@@ -661,10 +662,12 @@ function buildCatalog(
       durationSec: backend?.buildTimeSeconds ?? 90 + i * 60,
       level: b.locked ? 0 : ownedLevel,
       backendType: mappedType ?? backend?.type,
-      // Per-age building asset; defaults to age 1 in this catalog view
-      // since the player hasn't picked a specific instance yet. The
-      // detail page uses the live tier to render the current age.
-      assetPath: b.slug ? `/assets/buildings/${race.key}/${b.slug}-age1.png` : undefined,
+      // Catalog uses the ORIGINAL render (cosmic backdrop intact) — this
+      // is a browse view where each card frames the building inside its
+      // own panel, so the kozmik backdrop reads as intended art rather
+      // than a halo.  /base composites onto the iso scene and prefers
+      // the bg-removed twin from `buildingAsset()` instead.
+      assetPath: b.slug ? buildingOriginalAsset(race.key, b.slug, 1) : undefined,
     };
   });
 }

@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { TierProgress } from './entities/tier-progress.entity';
 import { User } from '../../user/entities/user.entity';
 import { Race } from '../../user/entities/race.enum';
@@ -43,11 +43,14 @@ export interface TierRequirementsView {
 
 @Injectable()
 export class TierService {
+  private readonly logger = new Logger(TierService.name);
+
   constructor(
     @InjectRepository(TierProgress)
     private readonly progressRepo: Repository<TierProgress>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async getProgress(userId: string): Promise<TierProgressView> {
@@ -145,6 +148,44 @@ export class TierService {
       });
       progress = await this.progressRepo.save(progress);
     }
+
+    // Lazy cross-service sync: game-server's `player_levels` table is the
+    // live source of truth for XP/level (its POST /api/progression/award-xp
+    // updates it on every action), but this api's `tier_progression` table
+    // was built before that and only gets written by /tier/level-up here.
+    // Without this catch-up, UI components that read /api/v1/tier/progress
+    // (HUD level pill, /base wizard, /tier-up gate) show level 1 forever
+    // even after the player has actually grinded to level 10+.
+    //
+    // Pull-on-read avoids a cross-service event bus: we accept a slightly
+    // stale read in exchange for not coupling game-server to api. The full
+    // fix is a refactor that picks one source of truth — see the spawn-task
+    // chip from the autoplay session.
+    try {
+      const rows = await this.dataSource.query<{ current_level: number; current_age: number; current_xp: number; total_xp: number }[]>(
+        `SELECT current_level, current_age, current_xp, total_xp FROM player_levels WHERE user_id = $1 LIMIT 1`,
+        [userId],
+      );
+      const live = rows?.[0];
+      if (live && live.current_level > progress.currentLevel) {
+        // total_xp is cumulative across all levels; tier_progression.xp is the
+        // remainder above the current threshold, but for view purposes we
+        // surface the live number directly. The math reconciles because
+        // levelUp() is no longer the canonical level-up path — game-server is.
+        progress.currentLevel = live.current_level;
+        progress.currentAge = live.current_age;
+        progress.xp = String(live.current_xp);
+        progress.currentTierName = resolveTierName(live.current_level, null);
+        progress.xpToNextLevel =
+          live.current_level >= MAX_TIER_LEVEL
+            ? '0'
+            : xpRequiredForLevel(live.current_level + 1).toString();
+        await this.progressRepo.save(progress);
+      }
+    } catch (err) {
+      this.logger.warn(`player_levels sync skipped for ${userId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     return progress;
   }
 

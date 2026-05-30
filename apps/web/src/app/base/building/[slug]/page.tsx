@@ -54,6 +54,7 @@ import { useBuildingTypes } from '@/hooks/useBuildingTypes';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
+import { buildingOriginalAsset, levelToAge } from '@/lib/asset-paths';
 
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
@@ -206,11 +207,14 @@ function Inner({ slug }: { slug: string }) {
     }
   }
 
-  // Per-age building asset — falls back to age 1 until the player tier
-  // hydrates. levelToAge() lives in lib/asset-paths.ts (1..9→1, 10..18→2,
-  // etc.) and matches Hikaye Kitabı §2.1's 54-level → 6-age mapping.
-  const ageForAsset = liveLevel == null ? 1 : (liveLevel >= 46 ? 6 : liveLevel >= 37 ? 5 : liveLevel >= 28 ? 4 : liveLevel >= 19 ? 3 : liveLevel >= 10 ? 2 : 1);
-  const assetPath = `/assets/buildings/${race.key}/${slug}-age${ageForAsset}.png`;
+  // Per-age building asset using the ORIGINAL render (cosmic backdrop
+  // intact). Detail page is a browse/portrait UX consistent with the
+  // /base/build catalog — the kozmik backdrop reads as intended art
+  // inside the card, not as a halo around an iso-scene composite.
+  // levelToAge() handles the Hikaye Kitabı §2.1 54-level → 6-age clamp
+  // and falls back to age 1 when liveLevel is null/undefined.
+  const ageForAsset = levelToAge(liveLevel);
+  const assetPath = buildingOriginalAsset(race.key, slug, ageForAsset);
 
   const statusChip = tokenBuilding.locked
     ? 'KİLİTLİ'

@@ -16,3 +16,4 @@ export * from './RaceActionIcon';
 export * from './RaceWidgets';
 export * from './RaceTierBadge';
 export * from './WizardHint';
+export * from './GatedButton';

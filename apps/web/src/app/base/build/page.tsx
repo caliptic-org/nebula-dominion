@@ -10,6 +10,7 @@ import {
   Caption,
   Chip,
   Code,
+  GatedButton,
   H3,
   HUD,
   ND,
@@ -21,6 +22,7 @@ import {
   Sigil,
   raceLex,
 } from '@/components/handoff';
+import { refreshGates } from '@/lib/gates';
 import Image from 'next/image';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import { buildingOriginalAsset } from '@/lib/asset-paths';
@@ -223,6 +225,10 @@ function BuildMenuInner() {
       // mounted consumer repolls immediately without waiting for the tick.
       refreshGameResources();
       refreshBuildings();
+      // New building unlocks the next gate tier (e.g. command_center Lv 2
+      // unlocks barracks, barracks unlocks turret). Tell the gate hook to
+      // re-fetch so the catalog tiles update without a page refresh.
+      refreshGates();
     } catch (err) {
       const message =
         err instanceof FetchError
@@ -386,11 +392,21 @@ function BuildMenuInner() {
               >
                 {t('allTab')}
               </NDButton>
-              <NDButton
+              {/* Build CTA — wrapped in GatedButton so when the selected
+                  building isn't unlocked yet, the user sees a 🔒 + inline
+                  hint ("Komuta Üssü Lv 2 gerekli") and tapping pops a modal
+                  that lists every requirement instead of POSTing and
+                  bouncing off the backend with a generic toast. The gateId
+                  is derived from the canonical backendType so it matches
+                  the entries in apps/game-server/src/progression/gates.config.ts.
+                  Falls through to plain NDButton behaviour when no
+                  backendType is mapped (selected.locked tiles, etc.). */}
+              <GatedButton
                 race={race}
                 size="md"
                 style={{ flex: 2 }}
-                disabled={
+                gateId={selected?.backendType ? `base.build.${selected.backendType}` : 'base.build.command_center'}
+                forceDisabled={
                   (selected?.locked ?? false) || busy || !!selectedConstructing
                 }
                 onClick={handleStartBuild}
@@ -402,7 +418,7 @@ function BuildMenuInner() {
                     : selected
                       ? `${lex.actionVerb} ${t('startWithName', { name: selected.name })}`
                       : `${lex.actionVerb} ${t('start')}`}
-              </NDButton>
+              </GatedButton>
             </div>
           </div>
         </div>

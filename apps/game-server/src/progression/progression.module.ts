@@ -9,6 +9,8 @@ import { ProgressionConfigService } from './config/progression-config.service';
 import { ProgressionController } from './progression.controller';
 import { TutorialController } from './tutorial.controller';
 import { ProgressionGateway } from './progression.gateway';
+import { GatesController } from './gates.controller';
+import { GatesService } from './gates.service';
 import { AuthModule } from '../auth/auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 
@@ -21,8 +23,8 @@ import { ResourcesModule } from '../resources/resources.module';
     // resistance vs duplicating the provider definition.
     ResourcesModule,
   ],
-  providers: [ProgressionService, ProgressionConfigService, ProgressionGateway],
-  controllers: [ProgressionController, TutorialController],
-  exports: [ProgressionService, ProgressionConfigService],
+  providers: [ProgressionService, ProgressionConfigService, ProgressionGateway, GatesService],
+  controllers: [ProgressionController, TutorialController, GatesController],
+  exports: [ProgressionService, ProgressionConfigService, GatesService],
 })
 export class ProgressionModule {}

@@ -207,6 +207,47 @@ function Inner({ slug }: { slug: string }) {
     }
   }
 
+  // Shared upgrade handler — used by the "Yükselt" tab and by the footer's
+  // primary CTA when the building is already owned. Before this was lifted
+  // out, the footer button (labelled "İNŞA BAŞLAT · Lv N+1") was wired to
+  // handleBuild instead, so tapping it on a level-2 command center POST'd a
+  // SECOND building to /buildings, hit the backend maxPerPlayer=1 guard, and
+  // surfaced as the misleading "En fazla 1 komuta üssü inşaa edebilirsiniz"
+  // toast — never the real upgrade flow. Now both buttons call the same
+  // function and the user actually gets to lvl 3.
+  async function handleUpgrade() {
+    if (!owned) {
+      toast.info(t('toastBuildFirst'));
+      return;
+    }
+    if (!hasSession()) {
+      toast.error(t('toastLoginForUpgrade'));
+      return;
+    }
+    if (upgradingId === owned.id) return;
+    setUpgradingId(owned.id);
+    try {
+      // POST /api/buildings/:id/upgrade — game-server scales cost 1.5× per
+      // existing level and bumps the row. Production rates are recalculated
+      // server-side so the wallet trickle picks up the new tier within one
+      // tick. Wallet refresh fires immediately so the HUD pill doesn't lag
+      // the visible level bump.
+      await gameServerApi.post(`/buildings/${owned.id}/upgrade`);
+      toast.success(t('toastUpgraded', { name: tokenBuilding!.n, level: owned.level + 1 }));
+      refreshGameResources();
+    } catch (err) {
+      const msg =
+        err instanceof FetchError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : t('toastUpgradeFailed');
+      toast.error(msg);
+    } finally {
+      setUpgradingId(null);
+    }
+  }
+
   // Per-age building asset using the ORIGINAL render (cosmic backdrop
   // intact). Detail page is a browse/portrait UX consistent with the
   // /base/build catalog — the kozmik backdrop reads as intended art
@@ -263,13 +304,18 @@ function Inner({ slug }: { slug: string }) {
             race={race}
             size="md"
             full
-            disabled={(tokenBuilding.locked ?? false) || busy}
-            onClick={handleBuild}
+            disabled={
+              (tokenBuilding.locked ?? false) ||
+              (owned ? upgradingId === owned.id : busy)
+            }
+            onClick={owned ? handleUpgrade : handleBuild}
           >
-            {busy
-              ? 'GÖNDERİLİYOR…'
-              : owned
-                ? `${lex.actionVerb} BAŞLAT · Lv ${owned.level + 1}`
+            {owned
+              ? upgradingId === owned.id
+                ? 'YÜKSELTILIYOR…'
+                : `YÜKSELT · Lv ${owned.level} → ${owned.level + 1}`
+              : busy
+                ? 'GÖNDERİLİYOR…'
                 : `${lex.actionVerb} BAŞLAT`}
           </NDButton>
         </ScreenFooter>
@@ -441,38 +487,7 @@ function Inner({ slug }: { slug: string }) {
                   size="md"
                   full
                   disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id}
-                  onClick={async () => {
-                    if (!owned) {
-                      toast.info(t('toastBuildFirst'));
-                      return;
-                    }
-                    if (!hasSession()) {
-                      toast.error(t('toastLoginForUpgrade'));
-                      return;
-                    }
-                    setUpgradingId(owned.id);
-                    try {
-                      // POST /api/buildings/:id/upgrade — game-server scales
-                      // cost 1.5× per existing level and bumps the row.
-                      // Production rates are recalculated server-side so
-                      // the wallet trickle picks up the new tier within
-                      // one tick. Wallet refresh fires immediately so the
-                      // HUD pill doesn't lag the visible level bump.
-                      await gameServerApi.post(`/buildings/${owned.id}/upgrade`);
-                      toast.success(t('toastUpgraded', { name: tokenBuilding.n, level: owned.level + 1 }));
-                      refreshGameResources();
-                    } catch (err) {
-                      const msg =
-                        err instanceof FetchError
-                          ? err.message
-                          : err instanceof Error
-                            ? err.message
-                            : t('toastUpgradeFailed');
-                      toast.error(msg);
-                    } finally {
-                      setUpgradingId(null);
-                    }
-                  }}
+                  onClick={handleUpgrade}
                 >
                   {upgradingId === owned?.id
                     ? t('upgrading')

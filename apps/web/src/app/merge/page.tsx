@@ -87,7 +87,15 @@ export default function MergePage() {
   const tMerge = useTranslations('merge');
   const hud = useHudState();
   const [selected, setSelected] = useState<number[]>([]);
-  const [sourceTier, setSourceTier] = useState(3);
+  // Default sourceTier=1 because the most common shape is "fresh roster of
+  // tier-1 units the player just trained".  An effect below bumps the
+  // default to the LOWEST tier where the player owns ≥3 mergeable units
+  // the first time liveUnits arrives — so a player who's already cleared
+  // T1 will land on T2 instead of an empty T1 view.
+  const [sourceTier, setSourceTier] = useState(1);
+  // True once the auto-default effect has fired so it can't override the
+  // user's manual TIER selection on subsequent liveUnits polls.
+  const [tierAutoSet, setTierAutoSet] = useState(false);
 
   // Live unit roster — when the player has trained units of the chosen
   // source tier, render them as real merge candidates so a successful
@@ -95,6 +103,28 @@ export default function MergePage() {
   // the demo pool (8 placeholder slots) when the player has no units
   // yet so the screen still demos the merge mechanic.
   const { data: liveUnits } = useGameUnits();
+
+  // Auto-select default sourceTier on first live-roster arrival: lowest
+  // tier (1..4) where the player owns ≥ SLOT_COUNT units.  Without this
+  // the page defaulted to tier 3 and showed an empty pool / demo cards
+  // even when the player had 24 mergeable T1 marines — the source of
+  // every "birleştir butonu gelmedi" report.
+  useEffect(() => {
+    if (tierAutoSet) return;
+    if (!liveUnits || liveUnits.length === 0) return;
+    for (const t of [1, 2, 3, 4]) {
+      const have = liveUnits.filter((u) => resolveUnitTier(u.type, race) === t).length;
+      if (have >= SLOT_COUNT) {
+        setSourceTier(t);
+        setTierAutoSet(true);
+        return;
+      }
+    }
+    // No tier has ≥ SLOT_COUNT units — leave default (tier 1) so the
+    // empty-state messaging still makes sense ("Tier 1 birimin yok").
+    setTierAutoSet(true);
+  }, [liveUnits, race, tierAutoSet]);
+
   const livePool = useMemo(
     () => liveUnitsToPool(liveUnits, race, sourceTier),
     [liveUnits, race, sourceTier],
@@ -540,25 +570,34 @@ function buildPool(race: NDRace, tier: number): PoolUnit[] {
   }));
 }
 
+/* Tier resolver — backend types arrive as bare codes ('marine', 'ghost',
+ * 'sniper') without the `_tN` suffix the FE used to grep.  Look up the tier
+ * from the race-lex (nd-tokens.RACES[race].units) instead, falling back to
+ * tier 1 for unknown types (medic, drone, etc. that exist server-side but
+ * aren't in the lex yet).  Used both as the per-unit tag and as the filter
+ * predicate so the two stay in sync. */
+function resolveUnitTier(type: string, race: NDRace): number {
+  const def = race.units.find((ru) =>
+    ru.n.toLowerCase().replace(/\s+/g, '_').startsWith(type.split('_')[0]),
+  );
+  return def?.t ?? 1;
+}
+
 /* Map a live game-server PlayerUnitDto into the merge-screen PoolUnit
- * shape. Backend unit `type` codes (marine_t1, sniper_t2, ...) don't
- * match the race-lex pretty names — best-effort tier extraction via
- * the last "_tN" suffix, falls back to the slot index. */
+ * shape. Tier is sourced from the race-lex (see resolveUnitTier) so the
+ * filter actually matches the player's roster — the previous _tN regex
+ * never matched the backend's bare 'marine'/'ghost' codes, so EVERY unit
+ * collapsed to tier 1 and the /merge default of sourceTier=3 ended up
+ * filtering all 44 of test13's marines/medics/ghosts down to zero,
+ * tripping isDemoMode and rendering the demo placeholders. */
 function liveUnitsToPool(
   liveUnits: { id: string; type: string }[] | null,
   race: NDRace,
   tier: number,
 ): PoolUnit[] {
   if (!liveUnits || liveUnits.length === 0) return [];
-  // Try to match the backend type back to a race unit name (case-insensitive
-  // prefix match), else show the raw type code so the player at least sees
-  // something recognisable.
-  const tierMatch = (type: string): number => {
-    const m = type.match(/_t(\d+)/);
-    return m ? Number(m[1]) : 1;
-  };
   return liveUnits
-    .filter((u) => tierMatch(u.type) === tier)
+    .filter((u) => resolveUnitTier(u.type, race) === tier)
     .map((u) => {
       const def = race.units.find((ru) =>
         ru.n.toLowerCase().replace(/\s+/g, '_').startsWith(u.type.split('_')[0]),
@@ -566,7 +605,7 @@ function liveUnitsToPool(
       return {
         id: u.id,
         name: def?.n ?? u.type,
-        tier: tierMatch(u.type),
+        tier: resolveUnitTier(u.type, race),
       };
     });
 }

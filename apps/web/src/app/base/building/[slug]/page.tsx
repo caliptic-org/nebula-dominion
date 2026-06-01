@@ -22,7 +22,7 @@
  *   - Other actions toast until their endpoints land.
  */
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound, useRouter } from 'next/navigation';
@@ -49,7 +49,7 @@ import {
 } from '@/components/handoff';
 import { useBaseState } from '@/hooks/useBaseState';
 import { formatResource, useGameResources, refreshGameResources } from '@/hooks/useGameResources';
-import { useGameBuildings, indexBuildingsByType } from '@/hooks/useGameBuildings';
+import { useGameBuildings, indexBuildingsByType, refreshBuildings } from '@/hooks/useGameBuildings';
 import { useBuildingTypes } from '@/hooks/useBuildingTypes';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
@@ -170,6 +170,33 @@ function Inner({ slug }: { slug: string }) {
   // bulk-upgrade flows from disabling unrelated buttons.
   const [upgradingId, setUpgradingId] = useState<string | null>(null);
 
+  // Live cooldown countdown — server stores the deadline on the building
+  // row (constructionCompleteAt). Tick 1Hz only while a cooldown is in
+  // flight to avoid burning a re-render budget on every page that opens
+  // this route. The deadline survives page reloads because useGameBuildings
+  // re-fetches on mount; no localStorage layer needed.
+  const cooldownDeadline = owned?.constructionCompleteAt
+    ? new Date(owned.constructionCompleteAt).getTime()
+    : 0;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!cooldownDeadline || cooldownDeadline <= now) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [cooldownDeadline, now]);
+  // When deadline elapses, refresh the row so constructionCompleteAt clears
+  // server-side (the building row's still ACTIVE; just the deadline timer
+  // gates the next upgrade). Without this the button stays "WAIT" until the
+  // 30s poll catches up.
+  useEffect(() => {
+    if (!cooldownDeadline || cooldownDeadline > now) return;
+    refreshBuildings();
+  }, [cooldownDeadline, now]);
+  const cooldownRemainingSec = cooldownDeadline > now
+    ? Math.ceil((cooldownDeadline - now) / 1000)
+    : 0;
+  const inCooldown = cooldownRemainingSec > 0;
+
   // Recovery redirect for stale/invalid slugs — runs AFTER all hooks so
   // React's hook order stays stable across renders.  Renders null in the
   // meantime so we don't try to deref tokenBuilding below.
@@ -199,6 +226,12 @@ function Inner({ slug }: { slug: string }) {
       const positionY = Math.floor(Math.random() * 8);
       await gameServerApi.post('/buildings', { type: backendType, positionX, positionY });
       toast.success(t('toastStarted', { name: tokenBuilding?.n ?? slug, duration: buildSec }));
+      // Hydrate the live row immediately so the button can flip into
+      // countdown mode without waiting for the 30s poll window. The
+      // server's constructionCompleteAt is the source-of-truth; the
+      // button derives its disabled-state + label from that field via
+      // the cooldownRemainingSec memo below.
+      refreshBuildings();
     } catch (err) {
       const msg = err instanceof FetchError ? err.message : t('toastUnknownError');
       toast.error(msg);
@@ -231,10 +264,15 @@ function Inner({ slug }: { slug: string }) {
       // existing level and bumps the row. Production rates are recalculated
       // server-side so the wallet trickle picks up the new tier within one
       // tick. Wallet refresh fires immediately so the HUD pill doesn't lag
-      // the visible level bump.
+      // the visible level bump. Buildings refresh pulls the new row with
+      // constructionCompleteAt set — that drives the post-upgrade cooldown
+      // countdown rendered on the YÜKSELT button (server source-of-truth,
+      // no localStorage needed because useGameBuildings re-fetches on
+      // mount too — page reloads keep the same deadline visible).
       await gameServerApi.post(`/buildings/${owned.id}/upgrade`);
       toast.success(t('toastUpgraded', { name: tokenBuilding!.n, level: owned.level + 1 }));
       refreshGameResources();
+      refreshBuildings();
     } catch (err) {
       const msg =
         err instanceof FetchError
@@ -306,14 +344,16 @@ function Inner({ slug }: { slug: string }) {
             full
             disabled={
               (tokenBuilding.locked ?? false) ||
-              (owned ? upgradingId === owned.id : busy)
+              (owned ? upgradingId === owned.id || inCooldown : busy)
             }
             onClick={owned ? handleUpgrade : handleBuild}
           >
             {owned
               ? upgradingId === owned.id
                 ? 'YÜKSELTILIYOR…'
-                : `YÜKSELT · Lv ${owned.level} → ${owned.level + 1}`
+                : inCooldown
+                  ? `BEKLE · ${cooldownRemainingSec}s`
+                  : `YÜKSELT · Lv ${owned.level} → ${owned.level + 1}`
               : busy
                 ? 'GÖNDERİLİYOR…'
                 : `${lex.actionVerb} BAŞLAT`}
@@ -486,14 +526,16 @@ function Inner({ slug }: { slug: string }) {
                   race={race}
                   size="md"
                   full
-                  disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id}
+                  disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id || inCooldown}
                   onClick={handleUpgrade}
                 >
                   {upgradingId === owned?.id
                     ? t('upgrading')
-                    : owned
-                      ? t('upgradeToLevel', { level: owned.level + 1 })
-                      : t('upgradeLocked')}
+                    : inCooldown
+                      ? `BEKLE · ${cooldownRemainingSec}s`
+                      : owned
+                        ? t('upgradeToLevel', { level: owned.level + 1 })
+                        : t('upgradeLocked')}
                 </NDButton>
               </div>
             </Panel>

@@ -130,6 +130,25 @@ export class BuildingsService {
         `Building ${buildingId} is ${building.status} — must be ACTIVE before upgrading.`,
       );
     }
+    // Upgrade cooldown — if a prior upgrade hasn't elapsed yet, reject so
+    // a rapid double-tap can't level the building twice in one frame.
+    // `constructionCompleteAt` is reused here as the cooldown deadline:
+    // upgrade keeps status=ACTIVE (the building goes on producing) but
+    // sets a future completeAt so this branch blocks any second upgrade
+    // until the duration runs out. The init-build path uses the same
+    // field with status=CONSTRUCTING and isn't touched.
+    const now = new Date();
+    if (
+      building.constructionCompleteAt &&
+      building.constructionCompleteAt.getTime() > now.getTime()
+    ) {
+      const remainingSec = Math.ceil(
+        (building.constructionCompleteAt.getTime() - now.getTime()) / 1000,
+      );
+      throw new BadRequestException(
+        `Bir önceki yükseltme henüz tamamlanmadı (${remainingSec}s kaldı).`,
+      );
+    }
 
     const baseCfg = BUILDING_CONFIGS[building.type];
     const scale = Math.pow(1.5, building.level); // cost at level L → L+1
@@ -148,11 +167,23 @@ export class BuildingsService {
 
     await this.resources.deduct(playerId, upgradeCost);
 
+    // Upgrade duration — scales with level so high-tier upgrades take
+    // longer. Base = building's own buildTimeSeconds, multiplier = level
+    // (Lv 1→2 = 1× base, Lv 2→3 = 2× base, etc.). GAME_SPEED_MULTIPLIER
+    // applied via the same scaledDurationSec helper used by initial
+    // construction so a 1000× playtest collapses the cooldown to ~30ms.
+    const upgradeDurationSec = scaledDurationSec(
+      Math.max(baseCfg.buildTimeSeconds, 10) * building.level,
+    );
     building.level += 1;
+    building.constructionStartedAt = now;
+    building.constructionCompleteAt = upgradeDurationSec === 0
+      ? null
+      : new Date(now.getTime() + upgradeDurationSec * 1000);
     await this.buildingRepo.save(building);
 
     this.logger.log(
-      `Player ${playerId} upgraded ${building.type} (${buildingId}) to level ${building.level}.`,
+      `Player ${playerId} upgraded ${building.type} (${buildingId}) to level ${building.level} (cooldown ${upgradeDurationSec}s).`,
     );
 
     // Re-derive per-tick production — most building types scale output

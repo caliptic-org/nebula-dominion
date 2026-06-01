@@ -22,7 +22,7 @@ import {
   Sigil,
   raceLex,
 } from '@/components/handoff';
-import { refreshGates } from '@/lib/gates';
+import { refreshGates, useGate } from '@/lib/gates';
 import Image from 'next/image';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import { buildingOriginalAsset } from '@/lib/asset-paths';
@@ -452,6 +452,14 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => { setImgFailed(false); }, [entry.assetPath]);
   const showImage = !!entry.assetPath && !imgFailed;
+  // Gate-aware lock chip: when a tile is locked, prefer the gate's
+  // primaryHint ("Komuta Üssü Lv 2") over the generic "KİLİTLİ" copy so
+  // the player sees the actual blocker without opening the modal. Falls
+  // back to generic if the gate registry doesn't know this tile (e.g. a
+  // freshly-added building type that hasn't been added to gates.config.ts
+  // yet) — non-blocking, no broken rendering.
+  const gate = useGate(entry.backendType ? `base.build.${entry.backendType}` : '');
+  const lockHint = gate && !gate.unlocked ? gate.primaryHint : null;
 
   return (
     <button
@@ -548,7 +556,7 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
         >
           <H3 style={{ color: ND.text, fontSize: 10 }}>{entry.name}</H3>
           {entry.locked ? (
-            <Chip>{tBuild('chipLocked')}</Chip>
+            <Chip>{lockHint ?? tBuild('chipLocked')}</Chip>
           ) : entry.level > 0 ? (
             <Chip color={race.primary}>Lv {entry.level}</Chip>
           ) : (

@@ -9,6 +9,7 @@ import {
   Chip,
   Code,
   Eyebrow,
+  GatedButton,
   H3,
   HUD,
   ND,
@@ -18,6 +19,7 @@ import {
   ResIcon,
   Sigil,
 } from '@/components/handoff';
+import { refreshGates } from '@/lib/gates';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
@@ -717,19 +719,34 @@ export default function ProductionPage() {
           backdropFilter: 'blur(12px)',
           flexShrink: 0,
         }}>
-          <NDButton
+          {/* GatedButton check: each unit requires a training building (marine
+             →barracks, tank→factory, fighter→hangar, zergling→spawning_pool).
+             The gate registry maps `production.train_<unitType>` → the
+             required building, so a tap on EĞIT without owning the building
+             pops a "Kışla gerekli" modal instead of silently failing the
+             optimistic queue add. forceDisabled still drives the slot/cost
+             checks so the existing UX (KUYRUK DOLU / YETERSİZ KAYNAK) keeps
+             working alongside the gate hint. */}
+          <GatedButton
             race={race}
             size="lg"
             full
-            disabled={slotsUsed >= SLOT_TOTAL || !canAfford}
-            onClick={handleAdd}
+            gateId={`production.train_${(selectedUnit as { type?: string } | undefined)?.type ?? 'unknown'}`}
+            forceDisabled={slotsUsed >= SLOT_TOTAL || !canAfford}
+            onClick={async () => {
+              await handleAdd();
+              // Building/unit inventory may unlock new gates (e.g. having
+              // produced a unit could unlock a research path). Re-poll the
+              // gate map so consumers downstream see the update.
+              refreshGates();
+            }}
           >
             {slotsUsed >= SLOT_TOTAL
               ? 'KUYRUK DOLU'
               : !canAfford
                 ? 'YETERSİZ KAYNAK'
                 : `KUYRUĞA EKLE · ${selectedUnit?.costA ?? '0'} ${race.resourceA.name.toUpperCase()}`}
-          </NDButton>
+          </GatedButton>
           <Caption style={{ fontSize: 10, marginTop: 4, textAlign: 'center' }}>
             {PRODUCTION_VERB[race.key] ?? 'Eğit'} {count}× {selectedUnit?.name ?? '—'}
           </Caption>

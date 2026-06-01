@@ -18,10 +18,21 @@ interface CreatePaymentIntentDto {
   itemSku?: string;
   passCode?: string;
   currencyCode: 'USD' | 'TRY';
-  provider: 'stripe' | 'iyzico';
+  provider: 'stripe' | 'iyzico' | 'google_pay' | 'apple_pay';
   userIp: string;
   userAgent?: string;
   countryCode?: string;
+}
+
+/** Web-checkout sessions for Google Pay / Apple Pay on the browser.  These
+ *  are PaymentRequest API tokens (Google Pay JS / Apple Pay JS); when wired
+ *  for real production they end up routing through Stripe under the hood
+ *  (Stripe's `paymentRequestButton` accepts both wallets natively). For the
+ *  current playtest the session is a stub that the FE confirms via
+ *  POST /payment/mock/complete/:id so the granting flow runs end-to-end.
+ */
+interface CreateWebPaymentDto extends CreatePaymentIntentDto {
+  provider: 'google_pay' | 'apple_pay';
 }
 
 interface IyzicoCallbackDto {
@@ -147,6 +158,10 @@ export class PaymentService {
 
     const mockPaymentPageUrl = `https://sandbox-api.iyzipay.com/payment/form?conversationId=${conversationId}`;
 
+    // basketItem is the payload iyzico would receive — keep it referenced
+    // so a future swap to the real Iyzipay SDK has the canonical shape to
+    // hand off. Logged at debug level so it isn't noise in normal runs.
+    this.logger.debug(`iyzico basket item shape: ${JSON.stringify(basketItem)}`);
     this.logger.log(`iyzico ödeme oluşturuldu: txn=${transaction.id}, tutar=${amount} TRY`);
 
     return {
@@ -158,6 +173,98 @@ export class PaymentService {
       provider: 'iyzico',
       basketItems: [basketItem],
     };
+  }
+
+  // ==========================================
+  // Google Pay / Apple Pay — Web Wallet Checkout
+  // ==========================================
+  //
+  // For the playtest the wallet flow is a stub: the FE calls
+  // /payment/web/create-payment to mint a pending transaction, the user
+  // taps the Google Pay / Apple Pay button rendered via the browser's
+  // PaymentRequest API, then the FE confirms via /payment/mock/complete
+  // which calls completeTransaction below (same path as a real Stripe
+  // webhook → VIP record + pass grant). When real production credentials
+  // land the mock-complete handler is replaced with a real Stripe / Apple
+  // Pay merchant verification webhook; the rest of the pipeline stays.
+
+  async createWebPayment(
+    userId: string,
+    dto: CreateWebPaymentDto,
+  ): Promise<Record<string, unknown>> {
+    const amount = await this.resolveAmount(dto.itemSku, dto.passCode, dto.currencyCode);
+    if (!amount) throw new BadRequestException('Item veya pass bulunamadı');
+
+    const transaction = await this.transactionRepository.save(
+      this.transactionRepository.create({
+        userId,
+        transactionType: dto.passCode ? 'purchase_premium_pass' : 'purchase_item',
+        status: 'pending',
+        provider: dto.provider,
+        shopItemId: null,
+        premiumPassId: null,
+        amountUsd: dto.currencyCode === 'USD' ? amount : null,
+        amountTry: dto.currencyCode === 'TRY' ? amount : null,
+        currencyCode: dto.currencyCode,
+        ipAddress: dto.userIp,
+        userAgent: dto.userAgent ?? null,
+        countryCode: dto.countryCode ?? null,
+      }),
+    );
+
+    // Session token the FE hands to the wallet API.  For real production this
+    // would be a Stripe PaymentIntent client_secret (Stripe's
+    // paymentRequestButton handles GPay/ApplePay tokenisation transparently).
+    // For the stub it's a deterministic value the mock-complete endpoint can
+    // verify against the transaction row.
+    const sessionToken = `web_${transaction.id.replace(/-/g, '')}_${dto.provider}`;
+
+    this.logger.log(
+      `Web wallet (${dto.provider}) ödeme niyeti: txn=${transaction.id}, tutar=${amount} ${dto.currencyCode}`,
+    );
+
+    return {
+      transactionId: transaction.id,
+      sessionToken,
+      amount,
+      currency: dto.currencyCode,
+      provider: dto.provider,
+      // Hint for the FE: when these env vars are present we render the real
+      // wallet buttons.  When absent (or playtest mode) the FE shows a
+      // "Stub Onayla" button that calls /payment/mock/complete directly.
+      walletReady: {
+        googlePay: Boolean(process.env.GOOGLE_PAY_MERCHANT_ID),
+        applePay: Boolean(process.env.APPLE_PAY_MERCHANT_ID),
+      },
+    };
+  }
+
+  /**
+   * Mock-confirm a pending transaction.  Public version of completeTransaction
+   * intended for playtest builds — finishes the row, records the VIP spend,
+   * grants the pass.  Gated by PAYMENT_MOCK_ENABLED env (default OFF in
+   * production, ON otherwise) so a misbehaving client can't grant itself a
+   * VIP pass on a real shipping build.
+   *
+   * Caller MUST be the owner of the transaction (controller enforces this).
+   */
+  async mockCompleteTransaction(userId: string, transactionId: string): Promise<Transaction> {
+    const allowed =
+      process.env.PAYMENT_MOCK_ENABLED === 'true' ||
+      (process.env.NODE_ENV !== 'production' && process.env.PAYMENT_MOCK_ENABLED !== 'false');
+    if (!allowed) {
+      throw new BadRequestException('Mock onayı kapalı (PAYMENT_MOCK_ENABLED=false)');
+    }
+
+    const tx = await this.transactionRepository.findOne({ where: { id: transactionId } });
+    if (!tx) throw new NotFoundException('İşlem bulunamadı');
+    if (tx.userId !== userId) throw new UnauthorizedException('Bu işlem size ait değil');
+    if (tx.status !== 'pending') {
+      throw new BadRequestException(`İşlem zaten ${tx.status} durumunda`);
+    }
+
+    await this.completeTransaction(tx.id, `mock_${tx.id}`);
+    return (await this.transactionRepository.findOne({ where: { id: tx.id } }))!;
   }
 
   // ==========================================

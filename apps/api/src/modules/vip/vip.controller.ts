@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { VipService } from './vip.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -47,5 +47,27 @@ export class VipController {
   @ApiOperation({ summary: 'Kullanıcı satın alma geçmişi (telemetri)' })
   getPurchaseHistory(@Request() req: { user: { id: string } }) {
     return this.vipService.getUserPurchaseHistory(req.user.id);
+  }
+
+  /**
+   * Once-per-day VIP reward.  Free for all players (even Standard tier
+   * 0) — reward size scales with VIP level so paid tiers see a clear
+   * benefit.  20-hour cooldown to keep the claim window floating with
+   * local play time.  Maps to the FE's claimDailyVip() in useVip.ts.
+   */
+  @Post('claim-daily')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Günlük VIP ödülünü al (20 saat cooldown)' })
+  async claimDaily(@Request() req: { user: { id: string } }) {
+    const result = await this.vipService.claimDaily(req.user.id);
+    // Wire shape matches ClaimDailyWire in apps/web/src/hooks/useVip.ts —
+    // snake_case for already_claimed + next_claim_at because the FE mapper
+    // expects those keys directly.
+    return {
+      rewards: result.rewards,
+      already_claimed: result.alreadyClaimed,
+      next_claim_at: result.nextClaimAt,
+    };
   }
 }

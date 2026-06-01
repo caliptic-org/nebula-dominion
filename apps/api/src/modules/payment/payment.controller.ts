@@ -23,7 +23,9 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Payment')
-@Controller('api/v1/payment')
+// Global prefix `api/v1` is set in main.ts; declaring it here too produced
+// /api/v1/api/v1/payment/* mounts that were unreachable from the FE.
+@Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
@@ -113,6 +115,62 @@ export class PaymentController {
   ) {
     const rawBody = req.rawBody?.toString() || JSON.stringify(body);
     return this.paymentService.handleIyzicoCallback(body, rawBody);
+  }
+
+  // ------------------------------------------
+  // Web Wallet (Google Pay / Apple Pay)
+  // ------------------------------------------
+  // Front-end flow for non-mobile Nebula:
+  //   1. POST /payment/web/create-payment with {provider, itemSku|passCode}
+  //   2. FE renders Google Pay JS / Apple Pay JS button (uses sessionToken
+  //      as the PaymentRequest API client secret in production).
+  //   3. User completes the wallet sheet → FE confirms via
+  //      POST /payment/mock/complete (playtest) or via real provider
+  //      webhook (production).
+  // Both wallets route the underlying card through Stripe in production;
+  // the controller stays provider-agnostic so the same FE path serves
+  // both GPay and ApplePay without branching.
+
+  @Post('web/create-payment')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Google Pay / Apple Pay ödeme oturumu oluştur' })
+  createWebPayment(
+    @CurrentUser() currentUserId: string,
+    @Body()
+    body: {
+      itemSku?: string;
+      passCode?: string;
+      provider: 'google_pay' | 'apple_pay';
+      currencyCode?: 'USD' | 'TRY';
+    },
+    @Req() req: Request & { ip: string; headers: Record<string, string> },
+  ) {
+    return this.paymentService.createWebPayment(currentUserId, {
+      itemSku: body.itemSku,
+      passCode: body.passCode,
+      currencyCode: body.currencyCode ?? 'USD',
+      provider: body.provider,
+      userIp: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Post('mock/complete/:transactionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[Playtest] Bekleyen ödemeyi tamamla (gerçek webhook yerine)',
+    description:
+      'PAYMENT_MOCK_ENABLED env true (veya non-production) iken çalışır. Production'
+      + ' webhook hattı kurulduktan sonra disable et: PAYMENT_MOCK_ENABLED=false',
+  })
+  @ApiParam({ name: 'transactionId', description: 'Bekleyen işlem UUID' })
+  mockComplete(
+    @CurrentUser() currentUserId: string,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.paymentService.mockCompleteTransaction(currentUserId, transactionId);
   }
 
   // ------------------------------------------

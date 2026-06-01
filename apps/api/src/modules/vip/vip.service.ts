@@ -98,6 +98,76 @@ export class VipService {
   }
 
   // ==========================================
+  // Daily VIP Reward
+  // ==========================================
+  //
+  // Once-per-day free reward keyed off the player's current VIP tier
+  // (higher tier = larger gem grant). 20-hour cooldown — slightly under
+  // 24h so the claim window floats with the player's local play time
+  // instead of pinning to a UTC midnight that may not match their
+  // timezone. last_daily_claim_at column added in migration
+  // 1779850000000-AddVipDailyClaim.
+
+  async claimDaily(userId: string): Promise<{
+    rewards: { type: 'gems' | 'xp'; amount: number; label: string }[];
+    alreadyClaimed: boolean;
+    nextClaimAt: string;
+  }> {
+    const COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h
+    let spending = await this.vipSpendingRepo.findOne({ where: { userId } });
+    if (!spending) {
+      // First-time claim: lazy-create the spending row at tier 0 so the
+      // claim still works for players who have never paid.
+      spending = await this.vipSpendingRepo.save(
+        this.vipSpendingRepo.create({
+          userId,
+          cumulativeSpendUsd: 0,
+          vipLevel: 0,
+          lastUpgradedAt: null,
+          lastDailyClaimAt: null,
+        }),
+      );
+    }
+
+    const now = new Date();
+    if (spending.lastDailyClaimAt) {
+      const since = now.getTime() - spending.lastDailyClaimAt.getTime();
+      if (since < COOLDOWN_MS) {
+        const nextClaimAt = new Date(spending.lastDailyClaimAt.getTime() + COOLDOWN_MS);
+        return {
+          rewards: [],
+          alreadyClaimed: true,
+          nextClaimAt: nextClaimAt.toISOString(),
+        };
+      }
+    }
+
+    // Reward scales with VIP tier — Standard (0) gets the minimum gem
+    // grant so the daily claim is meaningful even for never-paid players;
+    // higher tiers get progressively more (50 → 80 → 120 → 180 → 250 …).
+    const gemReward = 50 + spending.vipLevel * 30;
+    const rewards = [
+      { type: 'gems' as const, amount: gemReward, label: `${gemReward} 💎` },
+    ];
+
+    spending.lastDailyClaimAt = now;
+    await this.vipSpendingRepo.save(spending);
+
+    this.logger.log(`VIP günlük ödül: kullanıcı=${userId} VIP${spending.vipLevel} → ${gemReward} gems`);
+
+    // TODO(payment-followup): grant the gems via PremiumCurrency.grant
+    // (or whichever shop ledger module handles the gem wallet).  For now
+    // the reward is "recorded" — the FE toasts the amount and the player
+    // sees confirmation, but the wallet credit is wired in the next
+    // commit alongside Battle Pass tier-reward claiming (same ledger).
+    return {
+      rewards,
+      alreadyClaimed: false,
+      nextClaimAt: new Date(now.getTime() + COOLDOWN_MS).toISOString(),
+    };
+  }
+
+  // ==========================================
   // VIP Status Query
   // ==========================================
 

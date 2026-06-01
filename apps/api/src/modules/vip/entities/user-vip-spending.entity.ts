@@ -31,6 +31,15 @@ export class UserVipSpending {
   @Column({ name: 'last_upgraded_at', type: 'timestamptz', nullable: true })
   lastUpgradedAt: Date | null;
 
+  /**
+   * Last time the player claimed the once-per-day VIP reward (/shop daily
+   * claim button).  20-hour cooldown enforced server-side in
+   * VipService.claimDaily — see migration 1779820000000.  NULL = never
+   * claimed; eligible immediately.
+   */
+  @Column({ name: 'last_daily_claim_at', type: 'timestamptz', nullable: true })
+  lastDailyClaimAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

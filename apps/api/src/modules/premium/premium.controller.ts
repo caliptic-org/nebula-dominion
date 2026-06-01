@@ -7,7 +7,9 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Premium')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/premium')
+// Global prefix `api/v1` lives in main.ts — declaring it here too made the
+// real mount /api/v1/api/v1/premium/* which 404'd every FE call. Drop it.
+@Controller('premium')
 export class PremiumController {
   constructor(private readonly premiumService: PremiumService) {}
 

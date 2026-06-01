@@ -66,11 +66,17 @@ export class AuthService {
     // in the same Postgres DB but its TypeORM entity isn't imported by
     // the api app. ON CONFLICT covers the lazy-init race where game-server
     // already created the row at first /resources read.
+    // 9 distinct $-params instead of reusing $2..$5 for both value+cap
+    // columns: post migration 1779800000000 the wallet columns are
+    // numeric(20,4) while the cap columns are bigint, and Postgres can't
+    // deduce a single type for a parameter that lands in BOTH a numeric
+    // and a bigint slot — `inconsistent types deduced for parameter $2`.
+    // One param per column dodges the inference entirely.
     const sql = `
       INSERT INTO player_resources
         (player_id, mineral, gas, energy, science,
          mineral_cap, gas_cap, energy_cap, science_cap)
-      VALUES ($1, $2, $3, $4, $5, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       ON CONFLICT (player_id) DO UPDATE SET
         mineral = EXCLUDED.mineral,
         gas     = EXCLUDED.gas,
@@ -91,6 +97,10 @@ export class AuthService {
         MAX,  // gas     == yakıt
         MAX,  // energy  == enerji
         MAX,  // science == bilim
+        MAX,  // mineral_cap
+        MAX,  // gas_cap
+        MAX,  // energy_cap
+        MAX,  // science_cap
       ]);
       this.logger.log(`yopmail playtest grant: maxed resources (10T each) for user=${userId}`);
     } catch (err) {

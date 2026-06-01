@@ -24,6 +24,7 @@ import {
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
+import { scaledXp } from '../common/game-speed';
 import { AgeTransitionEvent, EraTransitionEvent, EraTransitionPackage, LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
 import {
   EVENT_GUILD_TUTORIAL_REQUIRED,
@@ -89,7 +90,13 @@ export class ProgressionService {
     const baseAmount = XP_BASE_AMOUNTS[dto.source] ?? 0;
     const levelDef = getLevelDef(record.currentLevel);
     const multiplier = levelDef?.xpMultiplier ?? 1.0;
-    const finalAmount = Math.round(baseAmount * multiplier);
+    // GAME_SPEED_MULTIPLIER (common/game-speed.ts) scales the per-source
+    // baseAmount BEFORE the per-tier multiplier kicks in. At 1000× a
+    // CONSTRUCTION grant (80 base × tier 1.0×) lands as 80 000 XP — the
+    // player rockets through Çağ 1 → Çağ 2 in a handful of actions, which
+    // is exactly the point of the playtest knob. Default 1× = canonical.
+    const speedScaled = scaledXp(baseAmount);
+    const finalAmount = Math.round(speedScaled * multiplier);
 
     record.currentXp += finalAmount;
     record.totalXp += finalAmount;

@@ -11,6 +11,7 @@ import { BUILDING_CONFIGS } from './buildings.constants';
 import { ResourcesService } from '../resources/resources.service';
 import { EconomyService } from '../economy/economy.service';
 import { StartConstructionDto } from './dto/start-construction.dto';
+import { scaledDurationSec } from '../common/game-speed';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
@@ -57,16 +58,21 @@ export class BuildingsService {
     await this.resources.deduct(playerId, config.cost);
 
     const now = new Date();
-    const completeAt = new Date(now.getTime() + config.buildTimeSeconds * 1000);
+    // Scaled duration honours GAME_SPEED_MULTIPLIER (default 1).
+    // At 1000× a 30s build resolves in ~30ms — practically instant for
+    // playtest runs. Status decision uses the scaled value too: a build
+    // that scales to 0s skips CONSTRUCTING and lands ACTIVE outright.
+    const scaledSec = scaledDurationSec(config.buildTimeSeconds);
+    const completeAt = new Date(now.getTime() + scaledSec * 1000);
 
     const building = this.buildingRepo.create({
       playerId,
       type: dto.type,
-      status: config.buildTimeSeconds === 0 ? BuildingStatus.ACTIVE : BuildingStatus.CONSTRUCTING,
+      status: scaledSec === 0 ? BuildingStatus.ACTIVE : BuildingStatus.CONSTRUCTING,
       positionX: dto.positionX,
       positionY: dto.positionY,
       constructionStartedAt: now,
-      constructionCompleteAt: config.buildTimeSeconds === 0 ? null : completeAt,
+      constructionCompleteAt: scaledSec === 0 ? null : completeAt,
     });
 
     await this.buildingRepo.save(building);

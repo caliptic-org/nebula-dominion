@@ -165,6 +165,13 @@ services:
       RECONNECT_WINDOW_MS: ${RECONNECT_WINDOW_MS:-30000}
       MAX_ACTIONS_PER_SECOND: ${MAX_ACTIONS_PER_SECOND:-10}
       MAX_ROUND_DURATION_MS: ${MAX_ROUND_DURATION_MS:-30000}
+      # GAME_SPEED_MULTIPLIER (apps/game-server/src/common/game-speed.ts)
+      # — divides build/train durations, multiplies XP awards. Default 1×
+      # (canonical pacing). Set to 1000 in .env to rush a full Çağ 1→6
+      # flow in a few minutes for playtest runs; flip back to 1 before
+      # shipping anything to live players. Default never bypasses since
+      # the helper sanitises invalid / missing values to 1.
+      GAME_SPEED_MULTIPLIER: ${GAME_SPEED_MULTIPLIER:-1}
     depends_on:
       postgres:
         condition: service_healthy

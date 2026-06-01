@@ -18,6 +18,7 @@ import { Race } from '../matchmaking/dto/join-queue.dto';
 import { BuildingType, BuildingStatus } from '../buildings/entities/building.entity';
 import { Building } from '../buildings/entities/building.entity';
 import { ResourcesService } from '../resources/resources.service';
+import { scaledDurationSec } from '../common/game-speed';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
 import { TrainUnitDto } from './dto/train-unit.dto';
@@ -93,7 +94,10 @@ export class UnitsService {
     await this.resources.deduct(playerId, config.cost);
 
     const now = new Date();
-    const completesAt = new Date(now.getTime() + config.trainTimeSeconds * 1000);
+    // GAME_SPEED_MULTIPLIER honoured here too (see common/game-speed.ts).
+    // Pre-scaled duration drives the queue entry; the worker that flips
+    // isComplete will see completesAt <= now almost immediately at 1000×.
+    const completesAt = new Date(now.getTime() + scaledDurationSec(config.trainTimeSeconds) * 1000);
 
     const entry = this.queueRepo.create({
       playerId,

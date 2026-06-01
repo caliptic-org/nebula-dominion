@@ -40,6 +40,12 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CORS_ORIGINS: ${CORS_ORIGINS}
       REDIS_URL: redis://redis:6379
+      # Inherits the dev compose default of 1× unless prod .env overrides
+      # GAME_SPEED_MULTIPLIER. Rush-test workflow: set =1000 in
+      # /opt/nebula-dominion/.env on the LXC, `docker compose ... up -d`
+      # to restart game-server only, exercise the flow, then unset/flip
+      # back to 1 before opening to real players.
+      GAME_SPEED_MULTIPLIER: ${GAME_SPEED_MULTIPLIER:-1}
     depends_on: !override
       redis:
         condition: service_healthy

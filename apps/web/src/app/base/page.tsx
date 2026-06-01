@@ -36,6 +36,7 @@ import { refreshGameResources } from '@/hooks/useGameResources';
 import type { NDRaceLex } from '@/components/handoff/race-lex';
 import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
 import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
+import { mapBgAsset, levelToAge, type Age, type RaceKey } from '@/lib/asset-paths';
 
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
@@ -58,19 +59,6 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
  * Caliptic project assets (commit ddc7137, ticket CAL-341) that shouldn't
  * be shipped with Nebula — swapping to Nebula's own renders keeps the
  * project visually self-contained. */
-// Per-race capital building backdrop. ComfyUI sweep now ships 6-age
-// variants of every building (Hikaye Kitabı §2.1), so this static map
-// defaults each race to age 1; useBaseState's live tier could swap it
-// dynamically but the static fallback covers the pre-hydration render
-// (and guests who never have a tier).
-const BASE_BG_FALLBACK: Record<string, string> = {
-  insan:   '/assets/buildings/insan/komuta_ussu-age1.png',
-  zerg:    '/assets/buildings/zerg/kovan_cekirdegi-age1.png',
-  otomat:  '/assets/buildings/otomat/sonsuzluk_cekirdegi-age1.png',
-  canavar: '/assets/buildings/canavar/alfa_tahti-age1.png',
-  seytan:  '/assets/buildings/seytan/karanlik_taht-age1.png',
-};
-
 const QUICK_ACTION_ROUTES: Record<string, string> = {
   build:    '/base/build',
   prod:     '/base/production',
@@ -152,19 +140,14 @@ export default function BaseHomePage() {
   }, [hydrated, isFirstSession, router]);
 
   /* Age-aware backdrop: the original plan was 5 races × 6 ages of
-   * ComfyUI-generated landscape art under /assets/bases/<race>/age-<n>.png,
-   * but those files were never committed (gitignored ComfyUI output) and
-   * are no longer on disk. Until we regenerate the 30-image sweep, fall
-   * back to each race's existing illustrated sprite — they're cleaner
-   * single-figure scenes than the era landscapes but they don't 404 and
-   * keep the page from rendering with a blank backdrop. Other consumers
-   * of these sprites (battle-result, map) keep using them unchanged.
-   *
-   * Once the sweep regenerates, swap this back to the age-aware path
-   * and delete the BASE_BG_FALLBACK map below. */
-  const safeAge = Math.min(6, Math.max(1, liveAge ?? 1));
-  void safeAge; // kept for the future age-aware swap-back
-  const baseBg = BASE_BG_FALLBACK[race.key];
+   * Live-age backdrop — /assets/map/<race>/bg-age<N>.png, ships 5×6 via
+   * the ComfyUI sweep (Hikaye Kitabı §2.1 — 5 races × 6 ages). `liveAge`
+   * comes from useBaseState's tier resolution; before hydration we
+   * default to age 1 so the SSR pass paints the early-game landscape
+   * instead of a blank frame. levelToAge clamps to 1..6 — anything
+   * above level 54 (max tier) renders the age-6 endgame backdrop. */
+  const safeAge: Age = levelToAge(liveAge ?? 1);
+  const baseBg = mapBgAsset(race.key as RaceKey, safeAge);
 
   /* Story-unlock toast: when the player's `safeAge` advances past the value
    * we last surfaced, pop a chip pointing at /story-gallery. Persisted in

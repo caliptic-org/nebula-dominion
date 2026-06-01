@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Unit } from './entities/unit.entity';
 import {
   MergePreviewRequestDto,
@@ -13,6 +13,7 @@ import {
 import {
   ND_MAX_TIER,
   ND_MERGE_SLOT_COUNT,
+  ND_RACE_UNITS,
   firstUnitAtTier,
   isNDRaceKey,
   NDRaceKey,
@@ -27,11 +28,30 @@ interface ResolvedSlot {
   tier: number;
 }
 
+/** Pick a tier from a backend type code by matching against the race lex.
+ *  `marine` → Marine entry → tier 1.  `mecha_walker` → Mecha Walker → tier 3.
+ *  Unknown codes fall back to tier 1 — that matches how new server-side unit
+ *  types (medic, ghost, drone…) which haven't been added to the lex yet
+ *  behave: they're treated as starter-tier so the player can still merge
+ *  them up.  Mirror of resolveUnitTier in apps/web/src/app/merge/page.tsx. */
+function resolveTypeToTier(type: string, race: NDRaceKey): number {
+  const prefix = type.split('_')[0].toLowerCase();
+  const def = ND_RACE_UNITS[race].find((ru) =>
+    ru.name.toLowerCase().replace(/\s+/g, '_').startsWith(prefix),
+  );
+  return def?.tier ?? 1;
+}
+
 @Injectable()
 export class MergePreviewService {
   constructor(
+    // Kept around even though resolveSlot reads from player_units now —
+    // some callers may still rely on the units repo via DI signature.
+    // The actual roster query goes through the raw DataSource below.
     @InjectRepository(Unit)
     private readonly unitRepo: Repository<Unit>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async preview(
@@ -114,17 +134,26 @@ export class MergePreviewService {
     unitId: string,
   ): Promise<ResolvedSlot> {
     if (UUID_RE.test(unitId)) {
-      const unit = await this.unitRepo.findOne({
-        where: { id: unitId },
-        relations: ['game'],
-      });
+      // Player roster lives in `player_units` (game-server's schema, same DB).
+      // The api's own `units` table is for in-match battle units — a totally
+      // different concept.  Earlier this branch queried `units` and returned
+      // unitNotFound for every real player UUID because they don't exist
+      // there.  Raw SQL via the shared DataSource keeps us off cross-service
+      // entity imports while still validating ownership + sourcing tier.
+      const rows = (await this.dataSource.query(
+        `SELECT id, type, level, player_id FROM player_units WHERE id = $1 LIMIT 1`,
+        [unitId],
+      )) as Array<{ id: string; type: string; level: number; player_id: string }>;
+      const unit = rows[0];
       if (!unit) throw new NotFoundException(`Unit ${unitId} not found`);
-      if (!unit.game || unit.game.ownerId !== userId) {
+      if (unit.player_id !== userId) {
         throw new ForbiddenException(`Unit ${unitId} is not owned by caller`);
       }
-      // Real Unit entity lacks ND race/tier metadata today; fall back to the
-      // request race + level so the recipe check at least exercises the path.
-      return { unitId, race: requestRace, tier: unit.level };
+      // Backend type is bare ('marine', 'ghost', 'medic') — resolve to the
+      // lex tier rather than the unit's `level` column (which is the
+      // upgrade-level, NOT the merge-tier).
+      const tier = resolveTypeToTier(unit.type, requestRace);
+      return { unitId, race: requestRace, tier };
     }
 
     const m = PLACEHOLDER_RE.exec(unitId);

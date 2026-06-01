@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository, MoreThan } from 'typeorm';
 import { PremiumPass } from './entities/premium-pass.entity';
 import { UserPremiumPass } from './entities/user-premium-pass.entity';
 
@@ -13,6 +13,8 @@ export class PremiumService {
     private readonly passRepository: Repository<PremiumPass>,
     @InjectRepository(UserPremiumPass)
     private readonly userPassRepository: Repository<UserPremiumPass>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async getAvailablePasses() {
@@ -123,13 +125,47 @@ export class PremiumService {
       throw new NotFoundException(`Tier ${tier} için ödül tanımlanmamış`);
     }
 
+    // Credit the reward into the player's wallet BEFORE marking it as
+    // claimed — better to retry on a wallet-update failure than to mark
+    // claimed and lose the reward entirely. The reward shape supports
+    // nebulaCoins / voidCrystals / premiumGems / xp keys (battle-pass
+    // tier rewards in the existing pass definitions follow this). Anything
+    // outside that set is silently skipped so the tier still completes
+    // and the FE toast doesn't lie.
+    const reward = tierData.reward as Partial<{
+      nebulaCoins: number; voidCrystals: number; premiumGems: number; xp: number;
+    }>;
+    const coins = Math.max(0, Math.floor(Number(reward.nebulaCoins ?? 0)));
+    const crystals = Math.max(0, Math.floor(Number(reward.voidCrystals ?? 0)));
+    const gems = Math.max(0, Math.floor(Number(reward.premiumGems ?? 0)));
+    if (coins + crystals + gems > 0) {
+      // Lazy-init the wallet row (mirrors the shop service pattern) so
+      // a player who's never touched the shop still gets their first
+      // tier claim credited.
+      await this.dataSource.query(
+        `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
+           ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
+      );
+      await this.dataSource.query(
+        `UPDATE user_currency
+            SET nebula_coins  = nebula_coins  + $2,
+                void_crystals = void_crystals + $3,
+                premium_gems  = premium_gems  + $4
+          WHERE user_id = $1::uuid`,
+        [userId, coins, crystals, gems],
+      );
+    }
+
     userPass.claimedRewards = [
       ...userPass.claimedRewards,
       { tier, claimedAt: new Date(), reward: tierData.reward },
     ];
     await this.userPassRepository.save(userPass);
 
-    this.logger.log(`Tier ödülü alındı: kullanıcı=${userId}, tier=${tier}`);
+    this.logger.log(
+      `Tier ödülü alındı: kullanıcı=${userId}, tier=${tier}, +${coins} coins +${crystals} crystals +${gems} gems`,
+    );
     return tierData.reward;
   }
 

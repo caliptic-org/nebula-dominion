@@ -125,6 +125,13 @@ export class BuildingsService {
    *   - BadRequest when the building isn't ACTIVE (must be built first)
    *   - BadRequest on insufficient resources
    */
+  /** Level cap — past this, the 1.5^level cost overflows IEEE-754 around
+   *  Lv 75 and the per-tier prereq table runs out anyway.  54 matches
+   *  the story-doc max progression (Age 6 max-level HQ).  Mirror this
+   *  on the frontend `upgrade-requirements.ts` so the button greys out
+   *  before the player hits a backend rejection. */
+  private static readonly MAX_BUILDING_LEVEL = 54;
+
   async upgradeBuilding(playerId: string, buildingId: string): Promise<Building> {
     const building = await this.buildingRepo.findOne({ where: { id: buildingId, playerId } });
     if (!building) {
@@ -133,6 +140,11 @@ export class BuildingsService {
     if (building.status !== BuildingStatus.ACTIVE) {
       throw new BadRequestException(
         `Building ${buildingId} is ${building.status} — must be ACTIVE before upgrading.`,
+      );
+    }
+    if (building.level >= BuildingsService.MAX_BUILDING_LEVEL) {
+      throw new BadRequestException(
+        `Bina maks seviyeye ulaştı (Lv ${BuildingsService.MAX_BUILDING_LEVEL}).`,
       );
     }
     // Upgrade cooldown — if a prior upgrade hasn't elapsed yet, reject so

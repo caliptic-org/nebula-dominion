@@ -5,8 +5,8 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -36,9 +36,64 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(PasswordResetToken)
     private readonly resetRepo: Repository<PasswordResetToken>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
+
+  /**
+   * TEMPORARY playtest rule — accounts created with a @yopmail.com (disposable
+   * email) address start with their resource wallet pinned to the cap so
+   * a tester can jump straight into mid-game content without grinding the
+   * Çağ 1 economy. Resources written: mineral / gas / energy / science.
+   *
+   * Caps come from apps/game-server/src/resources/entities/resource.entity.ts
+   * (mineral=24000, gas=14400, energy=8400, science=999999). The row is
+   * created via UPSERT so a yopmail user who hits getOrCreate first via
+   * game-server's lazy init still gets bumped here on retry.
+   *
+   * REMOVE this branch before public launch. The yopmail check is the
+   * delete marker — grep for "isYopmail" and drop the whole helper.
+   */
+  private isYopmail(email: string): boolean {
+    return email.toLowerCase().endsWith('@yopmail.com');
+  }
+
+  private async grantMaxResources(userId: string): Promise<void> {
+    // Caps mirror the entity defaults — bump if those drift. Plain SQL
+    // UPSERT because the game-server-owned `player_resources` table sits
+    // in the same Postgres DB but its TypeORM entity isn't imported by
+    // the api app. ON CONFLICT covers the lazy-init race where game-server
+    // already created the row at first /resources read.
+    const sql = `
+      INSERT INTO player_resources
+        (player_id, mineral, gas, energy, science,
+         mineral_cap, gas_cap, energy_cap, science_cap)
+      VALUES ($1, $2, $3, $4, $5, $2, $3, $4, $5)
+      ON CONFLICT (player_id) DO UPDATE SET
+        mineral = EXCLUDED.mineral,
+        gas     = EXCLUDED.gas,
+        energy  = EXCLUDED.energy,
+        science = EXCLUDED.science
+    `;
+    try {
+      await this.dataSource.query(sql, [
+        userId,
+        24000,   // mineral cap == kredi
+        14400,   // gas cap     == yakıt
+        8400,    // energy cap  == enerji
+        999999,  // science cap == bilim
+      ]);
+      this.logger.log(`yopmail playtest grant: maxed resources for user=${userId}`);
+    } catch (err) {
+      // Non-fatal — log and let the user proceed. game-server's lazy
+      // getOrCreate still gives them the default 500/200/250/0 wallet.
+      this.logger.warn(
+        `yopmail playtest grant failed for ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   async register(dto: RegisterDto): Promise<AuthResult> {
     const existing = await this.userRepo.findOne({
@@ -57,6 +112,13 @@ export class AuthService {
       password: hashed,
     });
     await this.userRepo.save(user);
+
+    // TEMPORARY playtest rule (remove before launch) — @yopmail accounts
+    // skip the early-game resource grind so testers can immediately try
+    // late-game buildings/units without waiting on the trickle.
+    if (this.isYopmail(user.email)) {
+      await this.grantMaxResources(user.id);
+    }
 
     return this.buildAuthResult(user);
   }

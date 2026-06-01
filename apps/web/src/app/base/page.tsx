@@ -47,6 +47,45 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
   shop:     '/shop',
 };
 
+/** FE slug → BE building_type map. Duplicated from /base/build + /base/building
+ *  intentionally for now (small static map, no need to add a shared module
+ *  yet — once a 4th consumer appears we hoist it to a /lib helper). MUST stay
+ *  in sync with apps/web/src/app/base/building/[slug]/page.tsx:SLUG_TO_BACKEND_TYPE. */
+const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
+  komuta_ussu:        'command_center',
+  reaktor_modulu:     'solar_plant',
+  yakit_rafinerisi:   'gas_refinery',
+  kisla:              'barracks',
+  bilim_akademisi:    'academy',
+  subspace_anteni:    'shield_generator',
+  genetik_lab:        'factory',
+  kovan_cekirdegi:    'command_center',
+  biyokutle_havuzu:   'mineral_extractor',
+  mutasyon_cukuru:    'spawning_pool',
+  genom_tumsegi:      'hatchery',
+  yutucu_tumsek:      'shield_generator',
+  subspace_damari:    'gas_refinery',
+  sonsuzluk_cekirdegi:'command_center',
+  veri_kaynagi:       'solar_plant',
+  hesap_havuzu:       'gas_refinery',
+  montaj_hatti:       'nano_forge',
+  mantik_matrisi:     'cyber_core',
+  cihaz_hazinesi:     'quantum_reactor',
+  subspace_cozucu:    'defense_matrix',
+  alfa_tahti:         'command_center',
+  av_kampi:           'mineral_extractor',
+  vahsi_cukur:        'barracks',
+  atalar_sunagi:      'gas_refinery',
+  atalar_magarasi:    'shield_generator',
+  boyut_yarigi:       'factory',
+  karanlik_taht:      'command_center',
+  ruh_toplayici:      'gas_refinery',
+  lanet_tapinagi:     'barracks',
+  pakt_sembolu:       'academy',
+  yasak_grimoire:     'shield_generator',
+  yarik_kapisi:       'turret',
+};
+
 /* Race → /base backdrop, using each race's CAPITAL building (slot 0 of
  * race.buildings — the player's main keep). These PNGs are Nebula's own
  * ComfyUI-generated assets with the iso-platform background cleaned up,
@@ -108,12 +147,18 @@ export default function BaseHomePage() {
   const { queue: liveProductionQueue } = useBaseProductionQueue(
     commandCenterBuilding?.id ?? null,
   );
-  // Coarse slug→type fallback: when the player owns ≥1 instance of any
-  // building type, the focused slot picks the first one to surface its
-  // level. Once we share SLUG_TO_BACKEND_TYPE between /base + /base/build
-  // this becomes a precise lookup.
-  const focusedLiveBuilding = bldgIndex
-    ? Array.from(bldgIndex.values())[focusedIdx]?.[0] ?? null
+  // Precise slug → backend-type lookup. The earlier version walked the
+  // Map values by insertion order — so a focusedIdx=0 (komuta_ussu in
+  // token order) could return ANY type the backend returned first
+  // (commonly mineral_extractor). The card then showed "KOMUTA ÜSSÜ
+  // AKTİF · LV 1" while LV was actually a mineral extractor's level →
+  // detay sayfasındaki gerçek değer farklı çıkıyordu. Resolve via the
+  // shared FE-slug → BE-type table so /base + /base/build + /base/building
+  // all read the same row.
+  const focusedSlug = race.buildings[focusedIdx]?.slug;
+  const focusedBackendType = focusedSlug ? SLUG_TO_BACKEND_TYPE[focusedSlug] : null;
+  const focusedLiveBuilding = focusedBackendType && bldgIndex
+    ? bldgIndex.get(focusedBackendType)?.[0] ?? null
     : null;
 
   // First-session redirect: brand-new players are routed to the multi-step

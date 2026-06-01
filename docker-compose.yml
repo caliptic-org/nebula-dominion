@@ -191,6 +191,13 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* must be passed as build args; Next.js inlines them
+        # into the client bundle at build time. Setting them only as runtime
+        # env has no effect on the static JS shipped to browsers.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL:-http://localhost:3001}
+        NEXT_PUBLIC_GAME_SPEED_MULTIPLIER: ${NEXT_PUBLIC_GAME_SPEED_MULTIPLIER:-1}
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:
@@ -198,6 +205,10 @@ services:
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
       NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL:-http://localhost:3001}
+      # Runtime env mirror of the build arg — harmless if it disagrees
+      # (build-time value wins for client code) but keeps `printenv` honest
+      # inside the container for ops debugging.
+      NEXT_PUBLIC_GAME_SPEED_MULTIPLIER: ${NEXT_PUBLIC_GAME_SPEED_MULTIPLIER:-1}
     depends_on:
       api:
         condition: service_healthy

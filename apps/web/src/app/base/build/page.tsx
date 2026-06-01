@@ -35,6 +35,7 @@ import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
 import { hasSession } from '@/lib/session';
+import { scaledDurationSec } from '@/lib/game-speed';
 
 interface BuildEntry {
   name: string;
@@ -683,7 +684,11 @@ function buildCatalog(
       locked: b.locked,
       costA: backend?.cost.mineral ?? base,
       costB: backend?.cost.gas ?? Math.round(base * 0.35),
-      durationSec: backend?.buildTimeSeconds ?? 90 + i * 60,
+      // Display duration matches what the server actually applies —
+      // scaledDurationSec divides by NEXT_PUBLIC_GAME_SPEED_MULTIPLIER
+      // so a 1000× playtest doesn't show "30s" on a card that resolves
+      // server-side in ~30ms. Default speed (1) → unchanged display.
+      durationSec: scaledDurationSec(backend?.buildTimeSeconds ?? 90 + i * 60),
       level: b.locked ? 0 : ownedLevel,
       backendType: mappedType ?? backend?.type,
       // Catalog uses the ORIGINAL render (cosmic backdrop intact) — this

@@ -31,6 +31,7 @@ import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
 import { hasSession } from '@/lib/session';
+import { scaledDurationSec } from '@/lib/game-speed';
 import '@/styles/production-queue.css';
 
 const PRODUCTION_NAMES: Record<string, string> = {
@@ -1121,7 +1122,7 @@ function buildUnits(race: NDRace, backend: UnitConfigDto[]): UnitDef[] {
       // the "İnşa Et" button so undefined costs can't trigger a spend.
       costA: live?.cost ? fmt(live.cost.mineral) : '—',
       costB: live?.cost ? fmt(live.cost.gas) : '—',
-      durationSec: live?.trainTimeSeconds ?? 0,
+      durationSec: scaledDurationSec(live?.trainTimeSeconds ?? 0),
     };
   });
 }

@@ -60,6 +60,7 @@ import {
   canUpgrade,
   type UpgradeRequirement,
 } from '@/lib/upgrade-requirements';
+import { scaledDurationSec } from '@/lib/game-speed';
 
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
@@ -162,7 +163,13 @@ function Inner({ slug }: { slug: string }) {
 
   const costA = backendCfg?.cost.mineral ?? Math.max(slotIndex + 1, 1) * 220;
   const costB = backendCfg?.cost.gas ?? Math.round(Math.max(slotIndex + 1, 1) * 220 * 0.35);
-  const buildSec = backendCfg?.buildTimeSeconds ?? 90 + Math.max(slotIndex, 0) * 60;
+  // buildSec is the user-facing duration — divides by the game-speed
+  // multiplier so a 1000× playtest renders "anında" instead of "30s"
+  // for a build that resolves server-side in ~30ms. Default speed
+  // (1) → identical to the raw config value.
+  const buildSec = scaledDurationSec(
+    backendCfg?.buildTimeSeconds ?? 90 + Math.max(slotIndex, 0) * 60,
+  );
   const maxPerPlayer = backendCfg?.maxPerPlayer ?? 1;
   const canAfford =
     !!resources && resources.mineral >= costA && resources.gas >= costB;

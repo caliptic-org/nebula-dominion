@@ -55,9 +55,18 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL}
+        # NEXT_PUBLIC_GAME_SPEED_MULTIPLIER must also pass via build args —
+        # the FE catalog labels (buildSec, trainSec) come from static configs
+        # baked at build time, NOT the per-player deadline path. Rush-test
+        # workflow on prod LXC: set =1000 in /opt/nebula-dominion/.env,
+        # `docker compose ... build web && up -d --force-recreate web` to
+        # rebuild only the web bundle, exercise the flow, then flip back to
+        # 1 and rebuild again before opening to real players.
+        NEXT_PUBLIC_GAME_SPEED_MULTIPLIER: ${NEXT_PUBLIC_GAME_SPEED_MULTIPLIER:-1}
     ports: !override
       - '10.10.10.40:3000:3000'
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_GAME_SERVER_URL: ${NEXT_PUBLIC_GAME_SERVER_URL}
+      NEXT_PUBLIC_GAME_SPEED_MULTIPLIER: ${NEXT_PUBLIC_GAME_SPEED_MULTIPLIER:-1}

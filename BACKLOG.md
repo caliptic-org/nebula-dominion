@@ -9,37 +9,32 @@ Güncel mimari + deploy referansı için bkz: `CLAUDE.md`, `DEPLOYMENT.md`,
 
 ---
 
-## P1 — Onboarding & ilk 10 dakika (Çağ 1, Lv 1-3)
+## P1 — Onboarding & ilk 10 dakika (Çağ 1, Lv 1-3)  ✓ TAMAMLANDI
 
 Yeni oyuncunun ilk kayıt-sonrası deneyimi. "Burada ne yapayım, ne tıklayayım,
 ne kadar bekleyeyim?" sorularının cevabı.
 
-- [ ] **P1.1 Resource overflow uyarısı**. HUD'da mineral/gas/energy cap'in
-  %90+ üstüne çıkınca pill rengi kırmızıya döner + 1× toast. Şu an cap'e
-  değse bile uyarı yok, üretim kaynağı boşa gidiyor.
+- [x] **P1.1 Resource overflow uyarısı**. HUD'da mineral/gas/energy cap'in
+  %90+ üstüne çıkınca pill rengi kırmızıya döner + ⚠ prefix. (commit 34f6bbb)
   *Dosya: `apps/web/src/components/handoff/atoms.tsx:ResPill`*
 
-- [ ] **P1.2 /base scene'de construction progress**. CONSTRUCTING durumdaki
-  bina ikon üzerinde countdown timer + progress bar. /base/build kartında
-  countdown var ama ana scene'de görünmez.
+- [x] **P1.2 /base scene'de construction progress**. CONSTRUCTING durumdaki
+  bina sprite'ı üzerinde "İNŞA · Xd Ys" countdown badge + translucent veil.
+  Per-second tick, sadece constructing varken.
   *Dosya: `apps/web/src/components/handoff/RaceWidgets.tsx:BaseField`*
 
-- [ ] **P1.3 Tutorial→gates entegrasyonu**. `/tutorial` adımları statik;
-  `useGates()` ile dinamik "şu an açık olan ilk gate'in görevini ver"
-  pattern'i. Yeni oyuncu "mineral extractor inşa et" yerine "komuta üssünü
-  Lv 2'ye yükselt" görür.
-  *Dosya: `apps/web/src/lib/wizard-steps.ts`, `apps/web/src/components/hud/OnboardingFirstSession.tsx`*
+- [x] **P1.3 Wizard adımı: Komuta Üssü Lv 2 yükseltme**. `gates.config.ts`
+  barracks/factory/research_lab'i Komuta Üssü Lv 2 ardına koyuyor. Wizard'a
+  `upgrade-cmd-center-lv2` adımı eklendi, oyuncu bu bağımlılığı erken görür.
+  *Dosya: `apps/web/src/lib/wizard-steps.ts`*
 
-- [ ] **P1.4 Kozmik Yankı intro (race-select sonrası)**. Story bible
-  §1.2'de her ırk için 1 paragraf var. Race-confirm'den /base'e gitmeden
-  önce 1 sahnelik anlatı (skip'lenebilir). Zerg → "Genetik Sıçrama",
-  Otomat → "Veri Yenilenmesi", vs.
-  *Dosya: yeni `apps/web/src/app/race-confirm/intro/page.tsx` veya inline*
+- [x] **P1.4 Kozmik Yankı intro (race-confirm prologue)**. Story bible §1.2
+  her ırk için 1 paragraf. `nd-tokens.ts:RaceTheme.kozmikYanki` field +
+  `RaceConfirmClient` buildScenes ilk sahne olarak ekledi.
+  PROLOGUE_HEADER per ırk (Zerg→GENETİK SIÇRAMA, Otomat→VERİ YENİLENMESİ vs).
+  *Dosya: `apps/web/src/lib/nd-tokens.ts`, `apps/web/src/app/race-confirm/RaceConfirmClient.tsx`*
 
-- [ ] **P1.5 Bina yükseltme XP grant'i**. `BuildingsService.upgradeBuilding`
-  (level += 1 path) `awardXp({source: CONSTRUCTION})` çağrısı yok — sadece
-  yeni inşaat completion path'i var. Symmetric olmalı, aynı +80 XP toast'ı
-  yükseltmede de fire etmeli.
+- [x] **P1.5 Bina yükseltme XP grant'i**. (commit 34f6bbb)
   *Dosya: `apps/game-server/src/buildings/buildings.service.ts`*
 
 ---

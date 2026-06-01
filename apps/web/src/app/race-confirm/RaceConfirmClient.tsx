@@ -37,6 +37,14 @@ const AWAKENING_HEADER: Record<NDRaceKey, { eyebrow: string; title: string }> = 
   seytan:  { eyebrow: '· SAHNE I · ZİNCİR KIRILIR ·',    title: 'SÜRGÜN DÖNÜYOR' },
 };
 
+const PROLOGUE_HEADER: Record<NDRaceKey, { eyebrow: string; title: string }> = {
+  insan:   { eyebrow: 'PROLOG · KOZMİK YANKI',           title: 'İKİNCİ DOĞUŞ' },
+  zerg:    { eyebrow: 'PROLOG · KOZMİK YANKI',           title: 'GENETİK SIÇRAMA' },
+  otomat:  { eyebrow: '::PROLOGUE · COSMIC_ECHO',        title: 'VERİ YENİLENMESİ' },
+  canavar: { eyebrow: 'PROLOG · KOZMİK YANKI',           title: 'VAHŞİ ÇAĞRI' },
+  seytan:  { eyebrow: '· PROLOG · KOZMİK YANKI ·',       title: 'SÜRGÜNDEN DÖNÜŞ' },
+};
+
 const FINISH_CTA: Record<NDRaceKey, string> = {
   insan:   'EVRENE GİR',
   zerg:    "KOVAN'A KATIL",
@@ -62,6 +70,9 @@ function readCommittedRaceKey(): NDRaceKey | null {
 
 function buildScenes(race: NDRace): string[] {
   return [
+    // Scene 0 — Kozmik Yankı prologue (story-bible §1.2). Frames *why* the
+    // race exists in the post-event era before the player meets their HUD.
+    race.kozmikYanki,
     race.storyAct1,
     race.storyAct2,
     `"Beş ırk uyandı. Sen ${race.name} olarak yazılıyorsun. ${race.motto}."`,
@@ -97,12 +108,14 @@ export function RaceConfirmClient() {
   }, [resolvedKey]);
 
   const race = RACES[resolvedKey];
-  const header = AWAKENING_HEADER[resolvedKey];
   const scenes = useMemo(() => buildScenes(race), [race]);
   const portrait = RACE_BY_ID[resolvedKey as RaceId]?.primaryPortrait;
 
   const [sceneIndex, setSceneIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
+
+  // Prologue header on scene 0 (Kozmik Yankı), awakening header on the rest.
+  const header = sceneIndex === 0 ? PROLOGUE_HEADER[resolvedKey] : AWAKENING_HEADER[resolvedKey];
 
   const isFinalScene = sceneIndex >= scenes.length - 1;
   const finish = () => router.push(`/?race=${resolvedKey}`);

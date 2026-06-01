@@ -233,6 +233,62 @@ interface BaseFieldProps {
   /** Callback fired with the tapped building's index. When provided, building
    * shapes receive pointer events; default is non-interactive (decorative). */
   onSelect?: (idx: number) => void;
+  /** Live building rows from useGameBuildings. When provided, tiles whose
+   *  matching building is `status === 'constructing'` render a countdown
+   *  badge over the sprite so the player can see in-flight work without
+   *  navigating to /base/build. Omit (or pass null) to disable the overlay
+   *  — preview widgets in race-select don't need it. */
+  liveBuildings?: { type: string; status: string; constructionCompleteAt: string | null }[] | null;
+}
+
+/** Slug → backend BuildingType map for matching live rows to iso tiles.
+ *  Duplicated from wizard-steps.ts (which uses the same translation) — kept
+ *  local because RaceWidgets shouldn't import from /lib for a static lookup.
+ *  Stay in sync with wizard-steps.ts:SLUG_TO_BACKEND_TYPE when adding races
+ *  or buildings. */
+const SLUG_TO_BUILDING_TYPE: Record<string, string> = {
+  // insan
+  komuta_ussu:        'command_center',
+  reaktor_modulu:     'solar_plant',
+  kisla:              'barracks',
+  bilim_akademisi:    'academy',
+  subspace_anteni:    'shield_generator',
+  genetik_lab:        'factory',
+  // zerg
+  kovan_cekirdegi:    'command_center',
+  biyokutle_havuzu:   'mineral_extractor',
+  mutasyon_cukuru:    'spawning_pool',
+  genom_tumsegi:      'hatchery',
+  yutucu_tumsek:      'shield_generator',
+  // otomat
+  sonsuzluk_cekirdegi:'command_center',
+  veri_kaynagi:       'solar_plant',
+  cyber_core:         'cyber_core',
+  nano_forge:         'nano_forge',
+  defense_matrix:     'defense_matrix',
+  repair_drone_bay:   'repair_drone_bay',
+  // canavar
+  alfa_tahti:         'command_center',
+  vahsi_et_kuyusu:    'mineral_extractor',
+  // seytan
+  karanlik_taht:      'command_center',
+  ruh_kuyusu:         'mineral_extractor',
+  pakt_sembolu:       'academy',
+  yasak_grimoire:     'shield_generator',
+  yarik_kapisi:       'turret',
+};
+
+/** Convert an ISO completion timestamp to a short "Xm Ys" countdown. */
+function fmtCountdown(target: string | null, nowMs: number): string {
+  if (!target) return '…';
+  const t = Date.parse(target);
+  if (Number.isNaN(t)) return '…';
+  const rem = Math.max(0, Math.floor((t - nowMs) / 1000));
+  if (rem === 0) return 'BİTİYOR';
+  if (rem < 60) return `${rem}s`;
+  const m = Math.floor(rem / 60);
+  const s = rem % 60;
+  return `${m}d ${s}s`;
 }
 
 /** Building footprint on the iso plane — width is the building image's
@@ -246,10 +302,33 @@ export function BaseField({
   dim = 1,
   aspect = 'slice',
   onSelect,
+  liveBuildings,
 }: BaseFieldProps) {
   const palette = TILE_PALETTE[race.key];
   const buildings = BUILDING_TILES[race.key];
   const interactive = typeof onSelect === 'function';
+
+  // Tick once per second when there's at least one constructing building.
+  // useState + setInterval is overkill for a static preview (race-select),
+  // so we only spin up the timer when the overlay would actually render.
+  const hasConstructing = !!liveBuildings?.some((b) => b.status === 'constructing');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasConstructing) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [hasConstructing]);
+
+  // type → first constructing row. Multiple instances of the same type
+  // share one badge; the first match wins (most common case is exactly one).
+  const constructingByType = new Map<string, { constructionCompleteAt: string | null }>();
+  if (liveBuildings) {
+    for (const b of liveBuildings) {
+      if (b.status === 'constructing' && !constructingByType.has(b.type)) {
+        constructingByType.set(b.type, b);
+      }
+    }
+  }
 
   // Probe the per-race ground tile sprite ONCE on race change. SVG <image>
   // hrefs that 404 print a red error to devtools console; even an Image()
@@ -463,6 +542,58 @@ export function BaseField({
                 <rect x={imgX + imgW - 3} y={imgY - 3} width="6" height="6" fill={race.glow} />
               </g>
             )}
+
+            {/* Construction badge — pinned above the building when the
+             *  matching live row is `constructing`. Shows the countdown so
+             *  the player learns how long they have left without leaving
+             *  /base. Sprite still renders underneath (using the age-1 art
+             *  unconditionally — there's no per-age constructing asset);
+             *  the badge tints it grey via the rect's translucent fill. */}
+            {(() => {
+              if (!slug) return null;
+              const wantedType = SLUG_TO_BUILDING_TYPE[slug];
+              if (!wantedType) return null;
+              const live = constructingByType.get(wantedType);
+              if (!live) return null;
+              const label = fmtCountdown(live.constructionCompleteAt, nowMs);
+              const badgeW = imgW * 0.7;
+              const badgeH = 14;
+              const badgeX = tileCx - badgeW / 2;
+              const badgeY = imgY - badgeH - 2;
+              return (
+                <g pointerEvents="none">
+                  {/* Translucent veil over the sprite so the badge stands out. */}
+                  <rect
+                    x={imgX}
+                    y={imgY}
+                    width={imgW}
+                    height={imgH}
+                    fill="rgba(6,8,15,0.45)"
+                  />
+                  {/* Badge plate */}
+                  <rect
+                    x={badgeX}
+                    y={badgeY}
+                    width={badgeW}
+                    height={badgeH}
+                    fill="rgba(6,8,15,0.92)"
+                    stroke={race.primary}
+                    strokeWidth="0.8"
+                  />
+                  <text
+                    x={tileCx}
+                    y={badgeY + badgeH / 2 + 3}
+                    textAnchor="middle"
+                    fontFamily="JetBrains Mono"
+                    fontSize="8"
+                    fill={race.primary}
+                    letterSpacing="1"
+                  >
+                    İNŞA · {label}
+                  </text>
+                </g>
+              );
+            })()}
           </g>
         );
       })}
@@ -494,6 +625,9 @@ interface DraggableBaseFieldProps {
   scale?: number;
   /** Callback fired when a building tap (not a drag) lands. */
   onSelect?: (idx: number) => void;
+  /** Forwarded to BaseField. When provided, constructing buildings render
+   *  a countdown badge over the sprite. */
+  liveBuildings?: BaseFieldProps['liveBuildings'];
 }
 
 const ZOOM_MIN = 0.6;
@@ -515,6 +649,7 @@ export function DraggableBaseField({
   // into a tight viewport".
   scale = 3.2,
   onSelect,
+  liveBuildings,
 }: DraggableBaseFieldProps) {
   const [view, setView] = useState({ x: 0, y: 0, zoom: DEFAULT_ZOOM });
   const viewRef = useRef(view);
@@ -735,6 +870,7 @@ export function DraggableBaseField({
           race={race}
           focusedIdx={focusedIdx}
           aspect="meet"
+          liveBuildings={liveBuildings}
           onSelect={
             onSelect
               ? (idx) => {

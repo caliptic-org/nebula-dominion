@@ -118,6 +118,17 @@ function ownsBuildingAtSlot(ctx: WizardContext, slot: number): boolean {
   );
 }
 
+/** True when the player's command center reached `targetLevel` or higher.
+ *  Slot 0 is the command center across all races. Defaults to "done" while
+ *  buildings haven't loaded — we don't want to nag a guest who can't have
+ *  one yet. */
+function commandCenterAtLeast(ctx: WizardContext, targetLevel: number): boolean {
+  if (!ctx.buildings) return true;
+  return ctx.buildings.some(
+    (b) => b.type === 'command_center' && b.level >= targetLevel && b.status === 'active',
+  );
+}
+
 /* ── Step list ──────────────────────────────────────────────────────── */
 
 export const WIZARD_STEPS: WizardStep[] = [
@@ -143,6 +154,25 @@ export const WIZARD_STEPS: WizardStep[] = [
     ctaText: 'İnşa Et',
     priority: 1,
     isDone: (ctx) => ownsBuildingAtSlot(ctx, 1),
+  },
+
+  /* Command center Lv 2 — gates barracks/factory/research_lab unlock per
+   * apps/game-server/src/progression/gates.config.ts. Player without this
+   * step taps "Kışla" on /base/build and bounces off the gate; the wizard
+   * now nudges the upgrade explicitly so they understand the dependency.
+   * Skipped when slot 2 is already built (player figured out the chain on
+   * their own — no need to back-nag). */
+  {
+    id: 'upgrade-cmd-center-lv2',
+    title: 'Komuta Üssünü Lv 2\'ye yükselt',
+    description:
+      'Kışla / fabrika / araştırma lab gibi ileri yapılar Komuta Üssü Lv 2 ile açılır. Şu an Lv 1 olan komuta üssünü detay sayfasından yükselt.',
+    route: '/base/building/komuta_ussu',
+    focusBuildingSlot: 0,
+    ctaText: 'Yükselt',
+    priority: 1,
+    isDone: (ctx) =>
+      commandCenterAtLeast(ctx, 2) || ownsBuildingAtSlot(ctx, 2),
   },
 
   /* Base setup — slot 2 (unit production building) */

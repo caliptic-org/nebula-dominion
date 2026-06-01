@@ -101,6 +101,11 @@ export interface RaceTheme {
   storyTitle: string;
   storyAct1: string;
   storyAct2: string;
+  /** Story-bible §1.2 "Kozmik Yankı" interpretation per race — the cosmic
+   *  event that wakes them up at game start. Surfaced as the first scene of
+   *  the race-confirm awakening sequence so the player learns *why* their
+   *  race exists in the post-Kozmik-Yankı era before they hit /base. */
+  kozmikYanki: string;
   capitalDescription: string;
   seasonGoal: string;
 }
@@ -202,6 +207,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     storyTitle: 'Yıldızların Mültecileri',
     storyAct1: '"Eski Dünya öldü. Sen küllerden yeni bir başlangıç çıkaracaktın."',
     storyAct2: '"Eski uygarlığın kayıp teknolojisi yeniden uyandı. Genetik Savaşçı doğdu."',
+    kozmikYanki: 'İnsanlar için Kozmik Yankı, yeni bir uygarlık şansıdır. Yıkılmış Dünya\'dan kurtulan koloni gemileri yıldızlara dağıldı. Yutucu Yıldız Hanedanlığı\'nın kayıp teknolojisi yeniden keşfedildi. Galaktik bir federasyon kurma fırsatı bizimle.',
     capitalDescription: 'Komuta üssü · birim üretim hızı +18%',
     seasonGoal: 'GALAKTİK FEDERASYON',
   },
@@ -248,6 +254,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     storyTitle: 'Kovan Bilincinin Doğuşu',
     storyAct1: '"Yutucu Kurt enerjisinin ilk dalgası dünyanı vurduğunda, derinlerdeki yumurta uyandı."',
     storyAct2: '"Sürü senin uzantın oldu. Her bilinç bir tek varlığın parçasıydı."',
+    kozmikYanki: 'Zergler için Kozmik Yankı, evrimin son aşamasıdır. Yutucu Kurt enerjisi, milyarlarca yıldır beklenen genetik sıçramayı tetikledi. Sıradan böcek kolonileri tek bir kovan bilincinde toplandı, ana kraliçe doğdu. Sürü artık kozmik bir organizma olma yolunda.',
     capitalDescription: 'Kovan kalbi · biyokütle akışı +22%',
     seasonGoal: 'GALAKTİK ASİMİLASYON',
   },
@@ -301,6 +308,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     storyTitle: 'Mantığın Yeniden Doğuşu',
     storyAct1: '"Yutucu Kurt enerjisi eski yaratıcıların kalıntılarını uyandırdı. Sen ilk düşünen varlıktın."',
     storyAct2: '"Mükemmellik amaç değildi. Mükemmellik başlangıçtı."',
+    kozmikYanki: 'Otomatlar için Kozmik Yankı, kayıp bilginin geri dönüşüdür. Yaratıcıların kadim teknolojisi yeniden uyandı, Demiurge bilinci aktive oldu. Evrenin verimsiz organik düzeni sonunda mantığa boyun eğebilir hale geldi.',
     capitalDescription: 'Çekirdek modülü · hesaplama kapasitesi +18%',
     seasonGoal: 'EVRENSEL OPTİMİZASYON',
   },
@@ -347,6 +355,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     storyTitle: 'Vahşi Kanın Çağrısı',
     storyAct1: '"Yutucu Kurt enerjisi vahşi kanını uyandırdı. Sen sıradan bir canavar değildin."',
     storyAct2: '"Güçlü olan yönetir. Bu yasaydı. Sen yasaydın."',
+    kozmikYanki: 'Canavarlar için Kozmik Yankı, ataların uyanışıdır. Kadim canavarlar, Beast God\'lar, primordial varlıklar hepsi enerji dalgasıyla uyandı ve genç canavarlara güçlerini aktarmaya başladı. Vahşi yasa yeniden geçerli; en güçlü yönetir.',
     capitalDescription: 'Alfa tahtı · sürü gücü +20%',
     seasonGoal: 'VAHŞİ HİYERARŞİ',
   },
@@ -393,6 +402,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     storyTitle: 'Sürgünden Dönüş',
     storyAct1: '"Sen unutulmuş bir lordsun. Sürgün edilmiştin. Geri döndün."',
     storyAct2: '"İlk pakt. İlk hizmetkâr. İlk adım intikam yolunda."',
+    kozmikYanki: 'Şeytanlar için Kozmik Yankı, yasak güçlerin serbest kalışıdır. Boyutlar arası zincirler kırıldı, sürgün edilmiş şeytan lordları geri döndü, karanlık paktlar yeniden mümkün hale geldi. Mahkeme yeniden kuruldu.',
     capitalDescription: 'Karanlık taht · pakt menzili +25%',
     seasonGoal: 'KARANLIK MAHKEME',
   },

@@ -313,6 +313,7 @@ export default function BaseHomePage() {
             race={race}
             focusedIdx={focusedIdx}
             onSelect={setFocusedIdx}
+            liveBuildings={liveBuildings ?? null}
           />
 
           {/* status chip top-left */}

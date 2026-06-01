@@ -18,6 +18,8 @@ import { Race } from '../matchmaking/dto/join-queue.dto';
 import { BuildingType, BuildingStatus } from '../buildings/entities/building.entity';
 import { Building } from '../buildings/entities/building.entity';
 import { ResourcesService } from '../resources/resources.service';
+import { ProgressionService } from '../progression/progression.service';
+import { XpSource } from '../progression/config/level-config';
 import { TrainUnitDto } from './dto/train-unit.dto';
 import { MoveUnitDto } from './dto/move-unit.dto';
 
@@ -42,6 +44,7 @@ export class UnitsService {
     @InjectRepository(Building)
     private readonly buildingRepo: Repository<Building>,
     private readonly resources: ResourcesService,
+    private readonly progression: ProgressionService,
   ) {}
 
   /**
@@ -163,6 +166,23 @@ export class UnitsService {
       this.logger.log(
         `Training complete: ${entry.unitType} for player ${entry.playerId} (unit id: ${unit.id})`,
       );
+
+      // XP grant — same XpSource.CONSTRUCTION (80 base XP) as buildings.
+      // Training a unit is structurally the same kind of action: queue cost
+      // up-front, completion via cron tick, payoff a row in the player's
+      // inventory. Frontend's ProgressionToaster will surface "+80 XP —
+      // İnşa" via the user:<id> socket room. referenceId is the queue
+      // entry so awardXp's idempotency dedupes a double-sweep.
+      this.progression
+        .awardXp({
+          userId: entry.playerId,
+          source: XpSource.CONSTRUCTION,
+          referenceId: `training:${entry.id}`,
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`awardXp(training) skipped for ${entry.playerId}: ${msg}`);
+        });
     }
 
     return overdue.length;

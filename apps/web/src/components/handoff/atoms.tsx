@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ND, type NDRace, type NDResIconKind } from './nd-tokens';
 import { NebulaBg } from './Sigil';
+import { useGate } from '@/lib/gates';
 
 /* ── NotchSurface ─────────────────────────────────────────────────────────
  * clip-path + border + glow safely. Clip-path on a single element clips
@@ -1062,14 +1063,22 @@ function bottomNavGlyph(key: BottomNavKey, c: string): JSX.Element {
 }
 
 export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
-  const items: { key: BottomNavKey; label: string }[] = [
+  // Read the alliance/guild gate so the LONCA tab can render its lock chip
+  // pre-Çağ 3. Tapping a locked tab still navigates — the destination page
+  // has its own gated CTAs that explain "Çağ 3 gerekli". This is a visual
+  // hint, not an enforcement layer.
+  const guildGate = useGate('guild.join');
+  const items: { key: BottomNavKey; label: string; lockedHint?: string }[] = [
     // SAVAŞ tab removed from the primary nav and relocated to the /base
     // right-rail (next to TUGAY / TOPLA) since players reach battle
     // exclusively from the base anyway.  AYARLAR took the vacated slot
     // so settings is one tap away again instead of buried under "more".
     { key: 'base',     label: 'ÜS' },
     { key: 'map',      label: 'HARİTA' },
-    { key: 'alliance', label: 'LONCA' },
+    {
+      key: 'alliance', label: 'LONCA',
+      lockedHint: guildGate && !guildGate.unlocked ? guildGate.primaryHint ?? undefined : undefined,
+    },
     { key: 'shop',     label: 'MAĞAZA' },
     { key: 'settings', label: 'AYARLAR' },
   ];
@@ -1148,10 +1157,29 @@ export function BottomNav({ race, active = 'base', onChange }: BottomNavProps) {
                 fontSize: 9,
                 letterSpacing: '0.10em',
                 textTransform: 'uppercase',
+                opacity: it.lockedHint ? 0.5 : 1,
               }}
             >
-              {it.label}
+              {it.lockedHint ? '🔒 ' : ''}{it.label}
             </span>
+            {it.lockedHint ? (
+              <span
+                aria-hidden
+                style={{
+                  // Tiny inline hint under the label so the player learns
+                  // *what* unlocks the tab without tapping into it. ~7px,
+                  // dimmer than the label, monospaced for the brand vibe.
+                  marginTop: 1,
+                  fontFamily: ND.mono,
+                  fontSize: 7,
+                  letterSpacing: '0.06em',
+                  opacity: 0.55,
+                  color: c,
+                }}
+              >
+                {it.lockedHint}
+              </span>
+            ) : null}
           </button>
         );
       })}

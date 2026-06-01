@@ -69,14 +69,22 @@ export const GATE_RULES: Record<string, GateRule[]> = {
   'production.train_zergling':    [{ type: 'race', race: 'zerg' }, { type: 'building', buildingType: 'spawning_pool', minLevel: 1 }],
 
   // ── Çağ 2 (Yıldız Sistemi, Lv 10-18) — first cross-world features ────────
-  'map.colonize_second_planet':   [{ type: 'level', min: 12 }],   // Hikaye Kitabı 2.3 "İkiz Gezegen"
+  // Per Hikaye Kitabı §2.3 the second age is "Yıldız Sistemi Hakimiyeti".
+  // Each level name in the bible maps to a feature milestone; we surface a
+  // gate for each so the /dev/gates dashboard mirrors the lore ladder.
+  'map.satellite_deploy':         [{ type: 'level', min: 11 }],   // 2.3 "Uydu" — first orbital structure
+  'map.colonize_second_planet':   [{ type: 'level', min: 12 }],   // 2.3 "İkiz Gezegen"
+  'map.triple_system_control':    [{ type: 'level', min: 13 }],   // 2.3 "Üçlü Sistem"
   'map.asteroid_mining':          [{ type: 'level', min: 16 }],   // 2.3 "Asteroid Kuşağı"
+  'event.system_commander':       [{ type: 'level', min: 17 }],   // 2.3 "Sistem Komutanı"
 
   // ── Çağ 3 (Sektör Genişlemesi, Lv 19-27) — PvP + alliances ──────────────
   // Backend XP_SOURCE_MIN_AGE already pins PvP at age 3; mirror here so the
   // frontend can disable the buttons before submit instead of just on reject.
+  'event.first_interstellar_ship':[{ type: 'level', min: 19 }],   // 2.4 "Keşifçi" — Çağ 3 entry
   'pvp.matchmake':                [{ type: 'age', min: 3 }],
   'pvp.ranked_queue':             [{ type: 'age', min: 3 }],
+  'pvp.star_general':             [{ type: 'level', min: 26 }],   // 2.4 "Yıldız Generali / Büyük PvP zaferi"
   'guild.create':                 [{ type: 'age', min: 3 }],
   'guild.join':                   [{ type: 'age', min: 3 }],
   'guild.contribute_research':    [{ type: 'age', min: 3 }, { type: 'building', buildingType: 'research_lab', minLevel: 2 }],

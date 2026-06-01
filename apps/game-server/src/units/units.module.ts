@@ -7,12 +7,14 @@ import { UnitsController } from './units.controller';
 import { ResourcesModule } from '../resources/resources.module';
 import { AuthModule } from '../auth/auth.module';
 import { Building } from '../buildings/entities/building.entity';
+import { ProgressionModule } from '../progression/progression.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PlayerUnit, TrainingQueue, Building]),
     ResourcesModule,
     AuthModule,
+    ProgressionModule,
   ],
   providers: [UnitsService],
   controllers: [UnitsController],

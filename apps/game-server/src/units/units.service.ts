@@ -83,21 +83,42 @@ export class UnitsService {
       );
     }
 
+    // Batch size — defaults to 1, capped at 99 (DTO + DB constraint).
+    // Cost and duration scale linearly: a Marine ×5 order debits the
+    // wallet 5× and the queue row waits 5× as long before flipping
+    // complete (worker then spawns 5 marines from this single row).
+    const count = Math.max(1, Math.min(99, dto.count ?? 1));
+    const batchCost = {
+      mineral: (config.cost.mineral ?? 0) * count,
+      gas:     (config.cost.gas ?? 0) * count,
+      energy:  (config.cost.energy ?? 0) * count,
+      // science isn't part of unit training cost today but multiply
+      // defensively so future tier-5+ units that DO need science scale
+      // correctly without revisiting this branch.
+      science: ((config.cost as { science?: number }).science ?? 0) * count,
+    };
+
     // Check resources
-    const canAfford = await this.resources.canAfford(playerId, config.cost);
+    const canAfford = await this.resources.canAfford(playerId, batchCost);
     if (!canAfford) {
       throw new BadRequestException(
-        `Insufficient resources. Required: ${config.cost.mineral}M ${config.cost.gas}G ${config.cost.energy}E`,
+        `Insufficient resources. Required: ${batchCost.mineral}M ${batchCost.gas}G ${batchCost.energy}E (${count}× ${dto.unitType})`,
       );
     }
 
-    await this.resources.deduct(playerId, config.cost);
+    await this.resources.deduct(playerId, batchCost);
 
     const now = new Date();
     // GAME_SPEED_MULTIPLIER honoured here too (see common/game-speed.ts).
     // Pre-scaled duration drives the queue entry; the worker that flips
     // isComplete will see completesAt <= now almost immediately at 1000×.
-    const completesAt = new Date(now.getTime() + scaledDurationSec(config.trainTimeSeconds) * 1000);
+    // Batch duration = perUnitDuration × count so a "Marine ×5" order
+    // doesn't finish before a "Marine ×1" — the player sees the full
+    // batch as ONE queue card with a longer countdown rather than 5
+    // separate rows finishing at the same instant.
+    const completesAt = new Date(
+      now.getTime() + scaledDurationSec(config.trainTimeSeconds) * count * 1000,
+    );
 
     const entry = this.queueRepo.create({
       playerId,
@@ -106,6 +127,7 @@ export class UnitsService {
       race: config.race,
       completesAt,
       isComplete: false,
+      count,
     });
 
     await this.queueRepo.save(entry);
@@ -147,28 +169,35 @@ export class UnitsService {
       const config = UNIT_CONFIGS[entry.unitType];
       if (!config) continue;
 
-      const unit = this.unitRepo.create({
-        playerId: entry.playerId,
-        type: entry.unitType,
-        race: entry.race,
-        hp: config.hp,
-        maxHp: config.hp,
-        attack: config.attack,
-        defense: config.defense,
-        speed: config.speed,
-        positionX: 0,
-        positionY: 0,
-        abilities: config.abilities,
-        isAlive: true,
-      });
-
-      await this.unitRepo.save(unit);
+      // Spawn `entry.count` (default 1) units from this single queue row.
+      // Each unit is independent in the units table — count only tracks
+      // batch-grouping at the queue layer for cost / duration / display.
+      const spawnCount = Math.max(1, entry.count ?? 1);
+      const spawned: string[] = [];
+      for (let i = 0; i < spawnCount; i += 1) {
+        const unit = this.unitRepo.create({
+          playerId: entry.playerId,
+          type: entry.unitType,
+          race: entry.race,
+          hp: config.hp,
+          maxHp: config.hp,
+          attack: config.attack,
+          defense: config.defense,
+          speed: config.speed,
+          positionX: 0,
+          positionY: 0,
+          abilities: config.abilities,
+          isAlive: true,
+        });
+        await this.unitRepo.save(unit);
+        spawned.push(unit.id);
+      }
 
       entry.isComplete = true;
       await this.queueRepo.save(entry);
 
       this.logger.log(
-        `Training complete: ${entry.unitType} for player ${entry.playerId} (unit id: ${unit.id})`,
+        `Training complete: ${entry.unitType} ×${spawnCount} for player ${entry.playerId} (unit ids: ${spawned.join(', ')})`,
       );
 
       // XP grant — same XpSource.CONSTRUCTION (80 base XP) as buildings.

@@ -25,6 +25,11 @@ export interface TrainingQueueDto {
   completesAt: string;
   isComplete: boolean;
   createdAt: string;
+  /** Batch size — how many units this single row represents (1..99).
+   *  Backend's units.service multiplies cost + duration by this value
+   *  and the completion worker spawns `count` units when the row finishes.
+   *  Default 1 for rows from pre-migration data. */
+  count?: number;
 }
 
 interface UseTrainingQueueResult {

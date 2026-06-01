@@ -173,7 +173,11 @@ export default function ProductionPage() {
         return {
           id: row.id,
           unitName: def?.n ?? row.unitType,
-          count: 1, // backend tracks 1 row per unit; multi-batch could fold them
+          // Batch size from the backend row — see migration 1779810000000
+          // which added `count` to training_queue so a multi-add order
+          // ("Marine ×5") lives as ONE row instead of five.  Pre-migration
+          // rows have undefined → fall back to 1.
+          count: row.count ?? 1,
           tier: def?.t ?? 1,
           totalSec,
           remainingSec,
@@ -293,11 +297,16 @@ export default function ProductionPage() {
     if (hasSession() && unitType && trainingBuilding) {
       setSubmittingTrain(true);
       try {
+        // POST count alongside unitType so the backend deducts cost×count,
+        // schedules completesAt = now + (duration × count), and spawns N
+        // units when the single queue row flips complete.  Single-unit
+        // orders (count=1) still go through this branch unchanged.
         await gameServerApi.post('/units/train', {
           buildingId: trainingBuilding.id,
           unitType,
+          count,
         });
-        toast.success(`${selectedUnit.name} eğitimi başlatıldı (${total}s)`);
+        toast.success(`${selectedUnit.name} ×${count} eğitimi başlatıldı (${total}s)`);
         // Pull the canonical queue row that the backend just inserted —
         // replaces our optimistic stub with the real id + completesAt
         // so subsequent ticks stay in sync with server time.

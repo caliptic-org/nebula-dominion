@@ -30,7 +30,8 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useHudState } from '@/hooks/useHudState';
 import { useGameBuildings, refreshBuildings } from '@/hooks/useGameBuildings';
-import { refreshGameResources } from '@/hooks/useGameResources';
+import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
+import { computeUpgradeRequirements, canUpgrade } from '@/lib/upgrade-requirements';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { toast } from '@/components/handoff/Toaster';
@@ -147,13 +148,138 @@ function BuildMenuInner() {
     );
   }, [liveBuildings, selected]);
 
-  // 1-second ticker only while a countdown is showing — prevents wasted
-  // re-renders on the catalog when nothing is constructing.
+  // Best (highest-level) owned instance of the selected building. Drives
+  // the catalog-side YÜKSELT CTA: when this is non-null the player can
+  // upgrade right from /base/build without bouncing to the detail page.
+  // Matches the level the catalog chip + detail page display.
+  const selectedOwned = useMemo(() => {
+    if (!liveBuildings || !selected?.backendType) return null;
+    let best: typeof liveBuildings[number] | null = null;
+    for (const b of liveBuildings) {
+      if (b.type !== selected.backendType) continue;
+      if (b.status === 'destroyed') continue;
+      if (!best || b.level > best.level) best = b;
+    }
+    return best;
+  }, [liveBuildings, selected]);
+
+  // Upgrade-cost scaling mirrors game-server's BuildingsService.upgrade:
+  // baseCost × 1.5^currentLevel for mineral+gas, plus a flat science tax
+  // at target level ≥ 5 (targetLevel × 50 — see upgrade-requirements.ts).
+  // Computed eagerly so the YÜKSELT label can render "L 3 → 4" with a
+  // disabled state if the wallet falls short, no extra POST round-trip.
+  const upgradeCost = useMemo(() => {
+    if (!selected || !selectedOwned) return null;
+    const targetLevel = selectedOwned.level + 1;
+    return {
+      mineral: Math.round(selected.costA * Math.pow(1.5, selectedOwned.level)),
+      gas:     Math.round(selected.costB * Math.pow(1.5, selectedOwned.level)),
+      science: targetLevel >= 5 ? targetLevel * 50 : 0,
+    };
+  }, [selected, selectedOwned]);
+
+  // Live wallet — drives the "EKSİK KAYNAK" disable on the YÜKSELT CTA.
+  // Same hook /base uses; broadcast invalidation refreshes both views.
+  const { data: wallet } = useGameResources();
+
+  // HQ-Lv / science requirements computed via the shared frontend mirror
+  // of buildings.service's upgrade-requirements gate. When the backend
+  // would reject the POST, we surface the blocker text on the CTA so the
+  // player sees "Komuta Üssü Lv 3 gerekli" without firing a bad request.
+  const upgradeReqs = useMemo(() => {
+    if (!selectedOwned) return [];
+    return computeUpgradeRequirements({
+      building: {
+        type: selectedOwned.type,
+        level: selectedOwned.level,
+        status: selectedOwned.status,
+      },
+      targetLevel: selectedOwned.level + 1,
+      ownedBuildings: (liveBuildings ?? []).map((b) => ({
+        type: b.type,
+        level: b.level,
+        status: b.status,
+      })),
+      scienceBalance: wallet?.science ?? 0,
+    });
+  }, [selectedOwned, liveBuildings, wallet?.science]);
+  const upgradeReqsMet = canUpgrade(upgradeReqs);
+  const upgradeBlocker = upgradeReqs.find((r) => !r.met)?.label;
+
+  // Affordability — checked against the live wallet. Each value is treated
+  // strictly (>=) so the click never produces a backend 4xx; the user sees
+  // a disabled button + greyscale label instead of a toast bounce-off.
+  const canAffordUpgrade =
+    !!upgradeCost &&
+    !!wallet &&
+    wallet.mineral >= upgradeCost.mineral &&
+    wallet.gas     >= upgradeCost.gas &&
+    wallet.science >= upgradeCost.science;
+
+  // Upgrade cooldown — buildings.service writes constructionCompleteAt at
+  // upgrade time even though status stays 'active', so the player keeps
+  // collecting trickle while the level visually settles in. We honour the
+  // deadline as a button-disable so a double-tap can't queue a phantom
+  // upgrade ahead of the server's idempotency window.
+  const upgradeCooldownDeadline = selectedOwned?.constructionCompleteAt
+    ? new Date(selectedOwned.constructionCompleteAt).getTime()
+    : null;
+  const upgradeInCooldown =
+    upgradeCooldownDeadline != null && upgradeCooldownDeadline > Date.now();
+  const upgradeCooldownSec = upgradeInCooldown
+    ? Math.max(0, Math.ceil((upgradeCooldownDeadline! - Date.now()) / 1000))
+    : 0;
+
+  // 1-second ticker — needed for the constructing countdown AND for the
+  // post-upgrade cooldown so the BEKLE · Xs label refreshes every second.
+  // Mounts only while one of those timers is live; idle catalogs don't
+  // burn re-renders.
   useEffect(() => {
-    if (!selectedConstructing) return;
+    if (!selectedConstructing && !upgradeInCooldown) return;
     const id = window.setInterval(() => setNowTick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
-  }, [selectedConstructing]);
+  }, [selectedConstructing, upgradeInCooldown]);
+
+  // Tracks the in-flight upgrade POST so a double-tap can't fire two
+  // simultaneous requests against the same building id.
+  const [upgradingId, setUpgradingId] = useState<string | null>(null);
+  async function handleInlineUpgrade() {
+    if (!selectedOwned || !selected) return;
+    if (!hasSession()) {
+      toast.error(t('toastLoginRequired'));
+      return;
+    }
+    if (upgradeInCooldown) return;
+    if (!upgradeReqsMet) {
+      toast.error(upgradeBlocker ?? t('toastLocked'));
+      return;
+    }
+    if (!canAffordUpgrade) {
+      toast.error(t('toastRejected', { message: 'Yetersiz kaynak' }));
+      return;
+    }
+    if (upgradingId === selectedOwned.id) return;
+    setUpgradingId(selectedOwned.id);
+    try {
+      await gameServerApi.post(`/buildings/${selectedOwned.id}/upgrade`);
+      toast.success(
+        `${selected.name} Lv ${selectedOwned.level} → ${selectedOwned.level + 1}`,
+      );
+      refreshGameResources();
+      refreshBuildings();
+      refreshGates();
+    } catch (err) {
+      const message =
+        err instanceof FetchError
+          ? t('toastRejected', { message: err.message })
+          : err instanceof Error
+            ? err.message
+            : t('toastUnknownError');
+      toast.error(message);
+    } finally {
+      setUpgradingId(null);
+    }
+  }
 
   // MM:SS remaining until completion. Clamps to 0 so a finished-but-not-
   // yet-polled row reads "0:00" instead of negative seconds.
@@ -381,49 +507,80 @@ function BuildMenuInner() {
               </Caption>
             )}
 
-            {/* CTAs */}
+            {/* CTAs — replaced the old "Tümü filter reset + İnşa Et" pair
+             *  with an adaptive Detay + Yükselt/İnşa pair so the catalog
+             *  doubles as an upgrade panel (the user no longer has to
+             *  drill into /base/building/[slug] just to bump Lv N → N+1).
+             *  RaceTabs above already exposes the "Tümü" filter — the
+             *  dedicated reset button was redundant. */}
             <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              {/* Reset filter — jumps back to "Tümü" tab when the player
-               *  drilled into a sub-category and wants to see everything
-               *  again. Replaces the old "Filtre yakında" stub button that
-               *  duplicated functionality already provided by RaceTabs above. */}
+              {/* Left: DETAY → routes to the detail page when the player
+               *  wants the full breakdown (requirements list, cost table,
+               *  construction history). Disabled when nothing is selected
+               *  or the slot is still locked. */}
               <NDButton
                 race={race}
                 variant="ghost"
                 size="md"
                 style={{ flex: 1 }}
-                disabled={activeTab === 0}
-                onClick={() => setActiveTab(0)}
+                disabled={!selected || selected.locked}
+                onClick={() => {
+                  if (!selected) return;
+                  const slug = race.buildings.find((b) => b.n === selected.name)?.slug;
+                  if (slug) router.push(`/base/building/${slug}`);
+                }}
               >
-                {t('allTab')}
+                DETAY
               </NDButton>
-              {/* Build CTA — wrapped in GatedButton so when the selected
-                  building isn't unlocked yet, the user sees a 🔒 + inline
-                  hint ("Komuta Üssü Lv 2 gerekli") and tapping pops a modal
-                  that lists every requirement instead of POSTing and
-                  bouncing off the backend with a generic toast. The gateId
-                  is derived from the canonical backendType so it matches
-                  the entries in apps/game-server/src/progression/gates.config.ts.
-                  Falls through to plain NDButton behaviour when no
-                  backendType is mapped (selected.locked tiles, etc.). */}
-              <GatedButton
-                race={race}
-                size="md"
-                style={{ flex: 2 }}
-                gateId={selected?.backendType ? `base.build.${selected.backendType}` : 'base.build.command_center'}
-                forceDisabled={
-                  (selected?.locked ?? false) || busy || !!selectedConstructing
-                }
-                onClick={handleStartBuild}
-              >
-                {selectedConstructing
-                  ? t('constructing', { time: fmtRemaining(selectedConstructing.constructionCompleteAt) })
-                  : busy
-                    ? t('sending')
-                    : selected
-                      ? `${lex.actionVerb} ${t('startWithName', { name: selected.name })}`
-                      : `${lex.actionVerb} ${t('start')}`}
-              </GatedButton>
+              {/* Right: adaptive primary CTA. If the player already owns
+               *  this building → YÜKSELT (with full requirement / cost /
+               *  cooldown gating). Otherwise → İNŞA ET via the existing
+               *  GatedButton path (locked tiles, gate-framework hints).
+               *  Both halves are big-touch (size md, flex 2) so the
+               *  primary action is unambiguous on mobile. */}
+              {selectedOwned ? (
+                <NDButton
+                  race={race}
+                  size="md"
+                  style={{ flex: 2 }}
+                  disabled={
+                    upgradeInCooldown ||
+                    !upgradeReqsMet ||
+                    !canAffordUpgrade ||
+                    upgradingId === selectedOwned.id
+                  }
+                  onClick={handleInlineUpgrade}
+                >
+                  {upgradingId === selectedOwned.id
+                    ? 'YÜKSELTILIYOR…'
+                    : upgradeInCooldown
+                      ? `BEKLE · ${upgradeCooldownSec}s`
+                      : !upgradeReqsMet
+                        ? `KİLİTLİ · ${upgradeBlocker ?? 'gereksinim'}`
+                        : !canAffordUpgrade
+                          ? 'EKSİK KAYNAK'
+                          : `YÜKSELT · Lv ${selectedOwned.level} → ${selectedOwned.level + 1}`}
+                </NDButton>
+              ) : (
+                <GatedButton
+                  race={race}
+                  size="md"
+                  style={{ flex: 2 }}
+                  gateId={selected?.backendType ? `base.build.${selected.backendType}` : 'base.build.command_center'}
+                  forceDisabled={
+                    (selected?.locked ?? false) || busy || !!selectedConstructing
+                  }
+                  onClick={handleStartBuild}
+                >
+                  {selectedConstructing
+                    ? t('constructing', { time: fmtRemaining(selectedConstructing.constructionCompleteAt) })
+                    : busy
+                      ? t('sending')
+                      : selected
+                        ? `${lex.actionVerb} ${t('startWithName', { name: selected.name })}`
+                        : `${lex.actionVerb} ${t('start')}`}
+                </GatedButton>
+              )}
             </div>
           </div>
         </div>

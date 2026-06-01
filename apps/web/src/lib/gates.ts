@@ -54,7 +54,26 @@ let sLoading = false;
 let sInflight: Promise<void> | null = null;
 const sListeners = new Set<() => void>();
 
-function notify() { for (const l of sListeners) l(); }
+// Stable snapshot reference — useSyncExternalStore requires getSnapshot to
+// return THE SAME object identity unless underlying state actually changed,
+// otherwise React detects a "change" every render and infinite-loops with
+// "Maximum update depth exceeded" (React error #185). Only mutate this when
+// state actually moves; readers get a referentially stable object.
+type GateSnapshot = { data: GateMap | null; loading: boolean; error: string | null };
+let sSnapshot: GateSnapshot = { data: null, loading: false, error: null };
+
+function rebuildSnapshot() {
+  sSnapshot = { data: sData, loading: sLoading, error: sError };
+}
+
+function notify() {
+  rebuildSnapshot();
+  for (const l of sListeners) l();
+}
+
+// Server-side render snapshot is also frozen — same identity every call so
+// hydration doesn't tear.
+const SSR_SNAPSHOT: GateSnapshot = { data: null, loading: true, error: null };
 
 async function fetchGates(): Promise<void> {
   if (!hasSession()) {
@@ -89,21 +108,23 @@ async function fetchGates(): Promise<void> {
  * can call `refreshGates()` after any action that may have unlocked something
  * (built a building, levelled up, picked a race, etc.).
  */
-export function useGates(): { data: GateMap | null; loading: boolean; error: string | null } {
-  const subscribe = (cb: () => void) => {
-    sListeners.add(cb);
-    return () => { sListeners.delete(cb); };
-  };
+function subscribe(cb: () => void) {
+  sListeners.add(cb);
+  return () => { sListeners.delete(cb); };
+}
+function getSnapshot() { return sSnapshot; }
+function getServerSnapshot() { return SSR_SNAPSHOT; }
+
+export function useGates(): GateSnapshot {
   useEffect(() => {
     if (sData === null && !sLoading && sInflight === null) {
       sInflight = fetchGates();
     }
   }, []);
-  return useSyncExternalStore(
-    subscribe,
-    () => ({ data: sData, loading: sLoading, error: sError }),
-    () => ({ data: null, loading: true, error: null }),
-  );
+  // Stable references — see comment on sSnapshot above. Without these,
+  // every render produces a "new" snapshot and useSyncExternalStore
+  // bounces forever (React error #185).
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
 /** Lookup a single gate's result. Returns null until first fetch completes. */

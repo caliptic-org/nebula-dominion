@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 import { ND, type NDRace, type NDResIconKind } from './nd-tokens';
 import { NebulaBg } from './Sigil';
 
@@ -638,41 +639,55 @@ export function HUD({
         borderBottom: `1px solid ${ND.border}`,
       }}
     >
-      <NotchSurface
-        notch={6}
-        borderColor={`${race.primary}66`}
-        background={`linear-gradient(180deg, ${race.primary}28, transparent)`}
-        padding={0}
-        innerStyle={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '4px 6px 4px 4px',
-        }}
+      {/* Level pill — tapping it routes to /tier-up where the actual
+         current XP / next-level XP requirement + level-up CTA live.
+         Without this link the only path to /tier-up is the level-up-ready
+         toast that fires at 100% XP, which means players grinding from
+         lvl 2→3 with 150/900 XP had no way to see "you need 750 more"
+         without grep-ing the URL bar. Link is a no-op when already on
+         /tier-up; Next.js routing handles the redirect cheaply. */}
+      <Link
+        href="/tier-up"
+        aria-label="İlerleme detayı"
+        style={{ textDecoration: 'none', display: 'inline-block' }}
       >
-        <div
-          style={{
-            width: 22, height: 22,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: race.primary, color: '#0A0E1A',
-            fontFamily: ND.display, fontWeight: 700, fontSize: 12,
+        <NotchSurface
+          notch={6}
+          borderColor={`${race.primary}66`}
+          background={`linear-gradient(180deg, ${race.primary}28, transparent)`}
+          padding={0}
+          innerStyle={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 6px 4px 4px',
+            cursor: 'pointer',
           }}
         >
-          {level}
-        </div>
-        <div
-          style={{
-            lineHeight: 1,
-            fontFamily: ND.display,
-            fontSize: 10,
-            color: ND.text,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {levelName}
-        </div>
-      </NotchSurface>
+          <div
+            style={{
+              width: 22, height: 22,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: race.primary, color: '#0A0E1A',
+              fontFamily: ND.display, fontWeight: 700, fontSize: 12,
+            }}
+          >
+            {level}
+          </div>
+          <div
+            style={{
+              lineHeight: 1,
+              fontFamily: ND.display,
+              fontSize: 10,
+              color: ND.text,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {levelName}
+          </div>
+        </NotchSurface>
+      </Link>
       <div style={{ flex: 1 }} />
       <ResPill
         kind={race.resourceA.icon}

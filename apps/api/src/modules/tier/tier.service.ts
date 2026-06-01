@@ -194,6 +194,16 @@ export class TierService {
       progress.currentLevel === MAX_TIER_LEVEL && race
         ? resolveTierName(MAX_TIER_LEVEL, race)
         : null;
+    // Compute xpToNextLevel from the current level rather than trusting the
+    // stored column. The lazy sync only writes when state moves forward, so
+    // any time the player's level moved back (admin reset, prestige, etc.)
+    // the column lingers with a stale threshold from the higher level. The
+    // function is the source of truth — `xpRequiredForLevel(L) = 100*L²` —
+    // and it's cheap to evaluate. Cap at MAX_TIER_LEVEL with '0'.
+    const xpToNext =
+      progress.currentLevel >= MAX_TIER_LEVEL
+        ? '0'
+        : xpRequiredForLevel(progress.currentLevel + 1).toString();
     return {
       userId: progress.userId,
       currentLevel: progress.currentLevel,
@@ -201,7 +211,7 @@ export class TierService {
       currentTierName: progress.currentTierName,
       raceSpecificTierName: raceSpecific,
       xp: progress.xp,
-      xpToNextLevel: progress.xpToNextLevel,
+      xpToNextLevel: xpToNext,
       isMaxLevel: progress.currentLevel >= MAX_TIER_LEVEL,
       achievements: progress.achievements,
     };

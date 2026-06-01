@@ -153,6 +153,23 @@ export class BuildingsService {
     // with level so the wallet trickle should bump immediately.
     await this.recalculateProductionRates(playerId);
 
+    // XP grant — matches the +80 XP that completeOverdueConstructions gives
+    // for new builds. Upgrade path is instant (no CONSTRUCTING state) so we
+    // award inline rather than through the tick. referenceId uses upgrade
+    // marker + building id + new level so awardXp's idempotency dedupes a
+    // double-click without blocking legitimate later upgrades on the same
+    // building (each level produces a distinct key).
+    this.progression
+      .awardXp({
+        userId: playerId,
+        source: XpSource.CONSTRUCTION,
+        referenceId: `upgrade:${building.id}:lv${building.level}`,
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`awardXp(upgrade) skipped for ${playerId}: ${msg}`);
+      });
+
     return building;
   }
 

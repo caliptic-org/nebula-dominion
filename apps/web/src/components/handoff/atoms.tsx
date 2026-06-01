@@ -463,21 +463,45 @@ interface ResPillProps {
   ariaControls?: string;
   /** When `onClick` is set + popover is open, true marks the pill active. */
   active?: boolean;
+  /** Storage cap for this resource. When `value/cap` ≥ 0.90 the pill turns
+   *  red + adds a "⚠" prefix so the player notices before production starts
+   *  burning. Omit to disable the warning (e.g. for crystal which has no cap). */
+  cap?: number | string;
 }
-export function ResPill({ kind, value, accent, onClick, ariaControls, active }: ResPillProps) {
+export function ResPill({ kind, value, accent, onClick, ariaControls, active, cap }: ResPillProps) {
+  // Resource overflow warning: parse value + cap and check the ratio.
+  // Numbers can come in as either type — backend serializes BigInt as string
+  // for XP-like values, and the HUD passes whatever it gets verbatim. Strip
+  // commas before parseFloat so locale-formatted "12,500" doesn't truncate.
+  const numericValue = typeof value === 'number'
+    ? value
+    : parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+  const numericCap = typeof cap === 'number'
+    ? cap
+    : cap != null
+      ? parseFloat(String(cap).replace(/[^0-9.-]/g, ''))
+      : NaN;
+  const overflow = Number.isFinite(numericValue) && Number.isFinite(numericCap)
+    && numericCap > 0
+    && (numericValue / numericCap) >= 0.90;
+
+  // Red border + warning glyph at ≥90%. Override accent for the active
+  // outline too — without that the active state would still tint race-color
+  // even while overflowing, which buries the warning.
+  const warnColor = 'oklch(0.65 0.22 25)'; // race-agnostic red so it pops on any theme
   const sharedStyle: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
     padding: '4px 8px 4px 6px',
-    background: 'rgba(8, 12, 26, 0.7)',
-    border: `1px solid ${active && accent ? accent : ND.border}`,
+    background: overflow ? 'rgba(120,20,20,0.25)' : 'rgba(8, 12, 26, 0.7)',
+    border: `1px solid ${overflow ? warnColor : (active && accent ? accent : ND.border)}`,
     borderRadius: 3,
     fontFamily: ND.mono,
     fontSize: 11,
-    color: ND.text,
+    color: overflow ? warnColor : ND.text,
     letterSpacing: '0.04em',
-    transition: 'border-color 120ms ease',
+    transition: 'border-color 120ms ease, background 120ms ease, color 120ms ease',
   };
   if (onClick) {
     return (
@@ -494,15 +518,15 @@ export function ResPill({ kind, value, accent, onClick, ariaControls, active }: 
           fontSize: '11px',
         }}
       >
-        <ResIcon kind={kind} size={12} color={accent}/>
-        <span>{value}</span>
+        <ResIcon kind={kind} size={12} color={overflow ? warnColor : accent}/>
+        <span>{overflow ? '⚠ ' : ''}{value}</span>
       </button>
     );
   }
   return (
     <div style={sharedStyle}>
-      <ResIcon kind={kind} size={12} color={accent}/>
-      <span>{value}</span>
+      <ResIcon kind={kind} size={12} color={overflow ? warnColor : accent}/>
+      <span>{overflow ? '⚠ ' : ''}{value}</span>
     </div>
   );
 }
@@ -693,6 +717,7 @@ export function HUD({
       <ResPill
         kind={race.resourceA.icon}
         value={resA}
+        cap={resACap}
         accent={race.primary}
         onClick={() => toggle('A')}
         active={openSlot === 'A'}
@@ -701,6 +726,7 @@ export function HUD({
       <ResPill
         kind={race.resourceB.icon}
         value={resB}
+        cap={resBCap}
         accent={race.primary}
         onClick={() => toggle('B')}
         active={openSlot === 'B'}

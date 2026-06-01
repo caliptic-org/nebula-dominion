@@ -28,6 +28,7 @@ import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
 import { useHudState } from '@/hooks/useHudState';
 import { useGameUnits } from '@/hooks/useGameUnits';
 import { refreshGameResources } from '@/hooks/useGameResources';
+import { refreshGameUnits } from '@/hooks/useGameUnits';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
@@ -220,11 +221,63 @@ export default function MergePage() {
         `Promosyon başarılı: ${result.type.replace(/_/g, ' ')} (Tier ${sourceTier + 1})`,
       );
       refreshGameResources();
+      // Critical: refresh the unit roster so the consumed source units
+      // disappear from the pool. Without this, the player can re-tap the
+      // same 3 stale cards → backend returns "unit not found" → confusing
+      // error toast. Same pattern as refreshGameResources for the wallet.
+      refreshGameUnits();
     } catch (err) {
       // Restore selection so the player can retry without re-picking.
       setSelected(snapshot);
       const msg = err instanceof FetchError ? err.message : 'Birleştirme reddedildi';
       toast.error(msg);
+    }
+  }
+
+  // "TÜMÜNÜ BİRLEŞTİR" — loops through floor(pool/3) merges sequentially so
+  // a player sitting on 24 marines doesn't have to tap 8 times. Each call
+  // re-reads the local pool snapshot at the time of click; the post-loop
+  // refreshGameUnits() then re-syncs against the server's actual state so
+  // the next render reflects the result (e.g. 24 marines → 8 snipers, or
+  // 24 marines → 8 snipers + further-mergeable if the player wants).
+  const [mergingAll, setMergingAll] = useState(false);
+  async function performMergeAll() {
+    if (isDemoMode || mergingAll) return;
+    const batches = Math.floor(pool.length / SLOT_COUNT);
+    if (batches < 1) {
+      toast.info(`Birleştirme için en az ${SLOT_COUNT} aynı tipte birim gerekli`);
+      return;
+    }
+    setMergingAll(true);
+    let succeeded = 0;
+    let failed = 0;
+    try {
+      // Iterate over a local snapshot of the pool — pool itself updates on
+      // each refresh after a successful merge.  Process triplets from the
+      // first 3*batches entries.
+      const ids = pool.slice(0, batches * SLOT_COUNT).map((u) => u.id);
+      for (let i = 0; i < batches; i += 1) {
+        const triplet = ids.slice(i * SLOT_COUNT, i * SLOT_COUNT + SLOT_COUNT);
+        try {
+          await gameServerApi.post('/units/merge-roster', { unitIds: triplet });
+          succeeded += 1;
+        } catch (err) {
+          failed += 1;
+          // Stop on first failure — subsequent triplets may rely on the
+          // same wallet / req sequence and would just pile up errors.
+          const msg = err instanceof FetchError ? err.message : 'Birleştirme reddedildi';
+          toast.error(`Toplu birleştirme #${i + 1}: ${msg}`);
+          break;
+        }
+      }
+      if (succeeded > 0) {
+        toast.success(`Toplu birleştirme: ${succeeded} grup başarılı${failed ? ` (${failed} başarısız)` : ''}`);
+      }
+    } finally {
+      setSelected([]);
+      refreshGameResources();
+      refreshGameUnits();
+      setMergingAll(false);
     }
   }
 
@@ -545,7 +598,7 @@ export default function MergePage() {
           <NDButton race={race} variant="ghost" size="md" style={{ flex: 1 }} onClick={() => setSelected([])}>
             İPTAL
           </NDButton>
-          <NDButton race={race} size="md" style={{ flex: 2 }} disabled={!canMerge} onClick={performMerge}>
+          <NDButton race={race} size="md" style={{ flex: 2 }} disabled={!canMerge || mergingAll} onClick={performMerge}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {isDemoMode ? 'Önce birim eğit' : `${MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'} · ${COST_B}`}
               {!isDemoMode && (
@@ -557,6 +610,33 @@ export default function MergePage() {
             </span>
           </NDButton>
         </div>
+        {/* "TÜMÜNÜ BİRLEŞTİR" — power-merge button visible only when the
+         *  player has >=6 same-type units (so the multi-batch saves real
+         *  taps). Floor(pool/3) batches fire sequentially; the bottom
+         *  ghost button stays for single-step control. Disabled while
+         *  the loop is running so a double-tap can't double-fire. */}
+        {!isDemoMode && pool.length >= SLOT_COUNT * 2 && (
+          <div
+            style={{
+              padding: '0 14px 10px',
+              background: 'rgba(8,10,16,0.92)',
+              display: 'flex',
+            }}
+          >
+            <NDButton
+              race={race}
+              variant="ghost"
+              size="sm"
+              style={{ flex: 1 }}
+              disabled={mergingAll}
+              onClick={performMergeAll}
+            >
+              {mergingAll
+                ? `BİRLEŞTİRİLİYOR…`
+                : `TÜMÜNÜ BİRLEŞTİR · ${Math.floor(pool.length / SLOT_COUNT)} GRUP`}
+            </NDButton>
+          </div>
+        )}
 
         <BottomNav
           race={race}

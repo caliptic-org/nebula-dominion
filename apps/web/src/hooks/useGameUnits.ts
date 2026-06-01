@@ -50,6 +50,18 @@ interface UseGameUnitsResult {
 
 const POLL_MS = 30_000;
 
+// ── Cross-tree refresh signal ──────────────────────────────────────────────
+// Any module that mutates the roster (merge, train completion, battle
+// casualties…) can call `refreshGameUnits()` and every mounted hook picks
+// up the new list without waiting for the next 30s tick. Same pattern as
+// refreshGameResources / refreshBuildings.
+export const UNITS_REFETCH_EVENT = 'nebula:units:refetch';
+
+export function refreshGameUnits(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(UNITS_REFETCH_EVENT));
+}
+
 export function useGameUnits(): UseGameUnitsResult {
   const [data, setData] = useState<PlayerUnitDto[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +70,15 @@ export function useGameUnits(): UseGameUnitsResult {
   const [bump, setBump] = useState(0);
 
   const refresh = useCallback(() => setBump((n) => n + 1), []);
+
+  // Listen for the global refresh event so refreshGameUnits() bumps every
+  // mounted consumer even across unrelated component trees.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => setBump((n) => n + 1);
+    window.addEventListener(UNITS_REFETCH_EVENT, handler);
+    return () => window.removeEventListener(UNITS_REFETCH_EVENT, handler);
+  }, []);
 
   useEffect(() => {
     if (!hasSession()) {

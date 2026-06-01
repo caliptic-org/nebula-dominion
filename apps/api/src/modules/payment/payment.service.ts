@@ -249,11 +249,16 @@ export class PaymentService {
    * Caller MUST be the owner of the transaction (controller enforces this).
    */
   async mockCompleteTransaction(userId: string, transactionId: string): Promise<Transaction> {
-    const allowed =
-      process.env.PAYMENT_MOCK_ENABLED === 'true' ||
-      (process.env.NODE_ENV !== 'production' && process.env.PAYMENT_MOCK_ENABLED !== 'false');
+    // STRICT opt-in: explicit PAYMENT_MOCK_ENABLED=true required, no
+    // matter the NODE_ENV.  The previous "default ON when env is unset
+    // and not prod" branch let an operator flip NODE_ENV=staging and
+    // suddenly allow free pass grants — engine audit flagged it as
+    // HIGH.  Anyone running the playtest profile sets the flag
+    // explicitly via /opt/nebula-dominion/.env; staging/CI clusters
+    // that forget to set it now stay locked, fail-safe.
+    const allowed = process.env.PAYMENT_MOCK_ENABLED === 'true';
     if (!allowed) {
-      throw new BadRequestException('Mock onayı kapalı (PAYMENT_MOCK_ENABLED=false)');
+      throw new BadRequestException('Mock onayı kapalı (PAYMENT_MOCK_ENABLED!=true)');
     }
 
     const tx = await this.transactionRepository.findOne({ where: { id: transactionId } });

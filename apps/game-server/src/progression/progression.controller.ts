@@ -10,8 +10,21 @@ import { CurrentUser } from '../auth/current-user.decorator';
 export class ProgressionController {
   constructor(private readonly progressionService: ProgressionService) {}
 
+  // Ownership guard: path-param userId must match the JWT subject.  Without
+  // this, Player A could fetch Player B's progression / advance their age /
+  // read their tx history just by tweaking the URL — a privacy + sabotage
+  // hole the audit flagged as CRITICAL. The /admin/reload-config endpoint
+  // below is the only path that legitimately wants to act on another user,
+  // and it's gated by AdminRoleGuard separately.
+  private assertOwn(userId: string, currentUserId: string): void {
+    if (userId !== currentUserId) {
+      throw new ForbiddenException('Bu kullanıcının ilerlemesine erişemezsin');
+    }
+  }
+
   @Get(':userId')
-  getProgress(@Param('userId') userId: string) {
+  getProgress(@Param('userId') userId: string, @CurrentUser() currentUserId: string) {
+    this.assertOwn(userId, currentUserId);
     return this.progressionService.getProgress(userId);
   }
 
@@ -26,12 +39,14 @@ export class ProgressionController {
 
   @Post(':userId/advance-age')
   @HttpCode(HttpStatus.OK)
-  advanceAge(@Param('userId') userId: string) {
+  advanceAge(@Param('userId') userId: string, @CurrentUser() currentUserId: string) {
+    this.assertOwn(userId, currentUserId);
     return this.progressionService.advanceAge(userId);
   }
 
   @Get(':userId/transactions')
-  getTransactions(@Param('userId') userId: string) {
+  getTransactions(@Param('userId') userId: string, @CurrentUser() currentUserId: string) {
+    this.assertOwn(userId, currentUserId);
     return this.progressionService.getRecentTransactions(userId);
   }
 

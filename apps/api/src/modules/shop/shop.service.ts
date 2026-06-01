@@ -4,8 +4,8 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ShopItem } from './entities/shop-item.entity';
 import { UserInventory } from './entities/user-inventory.entity';
 
@@ -27,6 +27,8 @@ export class ShopService {
   private readonly logger = new Logger(ShopService.name);
 
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(ShopItem)
     private readonly shopItemRepository: Repository<ShopItem>,
     @InjectRepository(UserInventory)
@@ -113,37 +115,87 @@ export class ShopService {
       throw new BadRequestException('Stok yetersiz');
     }
 
-    // Stok güncelle (limited item)
-    if (item.isLimited && item.stockRemaining !== null) {
-      await this.shopItemRepository.update(item.id, {
-        stockRemaining: item.stockRemaining - quantity,
-      });
+    const totalCost = price * quantity;
+
+    // ── ECONOMY GUARD ───────────────────────────────────────────────────
+    // Wallet read + balance check + atomic deduct + stock-decrement +
+    // inventory grant all inside one transaction.  Before this commit the
+    // service decremented stock and granted the item but NEVER touched the
+    // user's wallet (engine audit flagged it as "free items, CRITICAL").
+    //
+    // user_currency row is lazy-created with all-zero balances when a
+    // user touches the shop for the first time; that lets the balance
+    // check fail cleanly with "Yetersiz bakiye" instead of NotFound.
+    const COLUMN_BY_CURRENCY: Record<string, string> = {
+      nebula_coins: 'nebula_coins',
+      void_crystals: 'void_crystals',
+      premium_gems: 'premium_gems',
+    };
+    const walletCol = COLUMN_BY_CURRENCY[dto.currencyType];
+    if (!walletCol) {
+      throw new BadRequestException(`Bilinmeyen para birimi: ${dto.currencyType}`);
     }
 
-    // Envantere ekle (ya da miktarı artır)
-    let inventoryEntry = await this.inventoryRepository.findOne({
-      where: { userId, shopItemId: item.id },
-    });
-
-    if (inventoryEntry) {
-      inventoryEntry.quantity += quantity;
-      inventoryEntry = await this.inventoryRepository.save(inventoryEntry);
-    } else {
-      inventoryEntry = await this.inventoryRepository.save(
-        this.inventoryRepository.create({
-          userId,
-          shopItemId: item.id,
-          quantity,
-          source: 'purchase',
-        }),
+    return this.dataSource.transaction(async (manager) => {
+      // Lazy-init wallet row if absent.
+      await manager.query(
+        `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
+           ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
       );
-    }
 
-    this.logger.log(
-      `Kullanıcı ${userId} satın aldı: ${item.name} (${dto.currencyType}: ${price * quantity})`,
-    );
+      // Lock the wallet row so concurrent purchases can't double-spend
+      // the same balance.
+      const rows = (await manager.query(
+        `SELECT ${walletCol} AS balance FROM user_currency
+           WHERE user_id = $1::uuid FOR UPDATE`,
+        [userId],
+      )) as Array<{ balance: number }>;
+      const balance = Number(rows[0]?.balance ?? 0);
+      if (balance < totalCost) {
+        throw new BadRequestException(
+          `Yetersiz bakiye: ${dto.currencyType} ${balance} < ${totalCost}`,
+        );
+      }
 
-    return inventoryEntry;
+      // Deduct.
+      await manager.query(
+        `UPDATE user_currency SET ${walletCol} = ${walletCol} - $2 WHERE user_id = $1::uuid`,
+        [userId, totalCost],
+      );
+
+      // Stock decrement (limited item only).
+      if (item.isLimited && item.stockRemaining !== null) {
+        await manager.update(ShopItem, item.id, {
+          stockRemaining: item.stockRemaining - quantity,
+        });
+      }
+
+      // Grant inventory entry (upsert).
+      let inventoryEntry = await manager.findOne(UserInventory, {
+        where: { userId, shopItemId: item.id },
+      });
+      if (inventoryEntry) {
+        inventoryEntry.quantity += quantity;
+        inventoryEntry = await manager.save(UserInventory, inventoryEntry);
+      } else {
+        inventoryEntry = await manager.save(
+          UserInventory,
+          manager.create(UserInventory, {
+            userId,
+            shopItemId: item.id,
+            quantity,
+            source: 'purchase',
+          }),
+        );
+      }
+
+      this.logger.log(
+        `Kullanıcı ${userId} satın aldı: ${item.name} (${dto.currencyType}: -${totalCost}, kalan: ${balance - totalCost})`,
+      );
+
+      return inventoryEntry;
+    });
   }
 
   async getUserInventory(userId: string, category?: string) {

@@ -46,7 +46,7 @@ export class AllianceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Yeni ittifak kur' })
   create(@Request() req: any, @Body() dto: CreateAllianceDto) {
-    return this.allianceService.create(req.user.sub, dto);
+    return this.allianceService.create(req.user.id, dto);
   }
 
   @Post('join')
@@ -54,7 +54,7 @@ export class AllianceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'İttifaka katıl' })
   join(@Request() req: any, @Body() dto: JoinAllianceDto) {
-    return this.allianceService.join(req.user.sub, dto.allianceId);
+    return this.allianceService.join(req.user.id, dto.allianceId);
   }
 
   @Delete('leave')
@@ -62,7 +62,7 @@ export class AllianceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'İttifaktan ayrıl' })
   leave(@Request() req: any) {
-    return this.allianceService.leave(req.user.sub);
+    return this.allianceService.leave(req.user.id);
   }
 
   @Get(':id/members')
@@ -85,7 +85,7 @@ export class AllianceController {
     @Param('userId', ParseUUIDPipe) targetUserId: string,
     @Query('role') role: AllianceRole,
   ) {
-    return this.allianceService.promoteMember(req.user.sub, allianceId, targetUserId, role);
+    return this.allianceService.promoteMember(req.user.id, allianceId, targetUserId, role);
   }
 
   @Delete(':id/members/:userId')
@@ -99,7 +99,7 @@ export class AllianceController {
     @Param('id', ParseUUIDPipe) allianceId: string,
     @Param('userId', ParseUUIDPipe) targetUserId: string,
   ) {
-    return this.allianceService.kickMember(req.user.sub, allianceId, targetUserId);
+    return this.allianceService.kickMember(req.user.id, allianceId, targetUserId);
   }
 
   @Post('wars')
@@ -107,7 +107,7 @@ export class AllianceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Başka bir ittifaka savaş ilan et' })
   declareWar(@Request() req: any, @Body() dto: DeclareWarDto) {
-    return this.allianceService.declareWar(req.user.sub, dto);
+    return this.allianceService.declareWar(req.user.id, dto);
   }
 
   @Get(':id/wars')
@@ -134,6 +134,6 @@ export class AllianceController {
     @Param('id', ParseUUIDPipe) allianceId: string,
     @Body() dto: DepositResourcesDto,
   ) {
-    return this.allianceService.deposit(req.user.sub, allianceId, dto);
+    return this.allianceService.deposit(req.user.id, allianceId, dto);
   }
 }

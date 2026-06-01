@@ -5,8 +5,8 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Alliance } from './entities/alliance.entity';
 import { AllianceMember, AllianceRole } from './entities/alliance-member.entity';
 import { AllianceWar, WarStatus } from './entities/alliance-war.entity';
@@ -26,6 +26,8 @@ export class AllianceService {
     private readonly warRepo: Repository<AllianceWar>,
     @InjectRepository(AllianceStorage)
     private readonly storageRepo: Repository<AllianceStorage>,
+    @InjectDataSource()
+    private readonly allianceDataSource: DataSource,
   ) {}
 
   async create(userId: string, dto: CreateAllianceDto): Promise<Alliance> {
@@ -186,18 +188,56 @@ export class AllianceService {
     const storage = await this.storageRepo.findOne({ where: { allianceId } });
     if (!storage) throw new NotFoundException('İttifak deposu bulunamadı');
 
-    const totalAfter = Number(storage.minerals) + (dto.minerals ?? 0) + Number(storage.energy) + (dto.energy ?? 0);
+    const mineralsAmt = dto.minerals ?? 0;
+    const energyAmt = dto.energy ?? 0;
+    if (mineralsAmt < 0 || energyAmt < 0) {
+      throw new BadRequestException('Negatif kaynak deposu reddedildi');
+    }
+    if (mineralsAmt === 0 && energyAmt === 0) {
+      throw new BadRequestException('En az bir kaynak girilmeli');
+    }
+
+    const totalAfter = Number(storage.minerals) + mineralsAmt + Number(storage.energy) + energyAmt;
     if (totalAfter > Number(storage.capacity)) {
       throw new BadRequestException('Depo kapasitesi aşıldı');
     }
 
-    storage.minerals = Number(storage.minerals) + (dto.minerals ?? 0);
-    storage.energy = Number(storage.energy) + (dto.energy ?? 0);
-    storage.updatedAt = new Date();
+    // ── ECONOMY GUARD ───────────────────────────────────────────────────
+    // Before this commit, deposit credited the alliance storage and bumped
+    // member contribution but NEVER deducted from the player's own wallet
+    // — free alliance funding. Engine audit flagged HIGH. player_resources
+    // lives in game-server's schema, same DB — raw SQL with row-level lock
+    // keeps the deduct atomic against trickle-tick contention.
+    return this.allianceDataSource.transaction(async (manager) => {
+      const balRows = (await manager.query(
+        `SELECT mineral, energy FROM player_resources
+           WHERE player_id = $1::uuid FOR UPDATE`,
+        [userId],
+      )) as Array<{ mineral: number; energy: number }>;
+      const bal = balRows[0];
+      if (!bal) {
+        throw new BadRequestException('Oyuncu cüzdanı bulunamadı');
+      }
+      if (Number(bal.mineral) < mineralsAmt || Number(bal.energy) < energyAmt) {
+        throw new BadRequestException(
+          `Yetersiz kaynak: mineral ${bal.mineral}/${mineralsAmt}, enerji ${bal.energy}/${energyAmt}`,
+        );
+      }
 
-    member.contribution += (dto.minerals ?? 0) + (dto.energy ?? 0);
-    await this.memberRepo.save(member);
+      await manager.query(
+        `UPDATE player_resources
+            SET mineral = mineral - $2, energy = energy - $3
+          WHERE player_id = $1::uuid`,
+        [userId, mineralsAmt, energyAmt],
+      );
 
-    return this.storageRepo.save(storage);
+      storage.minerals = Number(storage.minerals) + mineralsAmt;
+      storage.energy = Number(storage.energy) + energyAmt;
+      storage.updatedAt = new Date();
+
+      member.contribution += mineralsAmt + energyAmt;
+      await manager.save(member);
+      return manager.save(storage);
+    });
   }
 }

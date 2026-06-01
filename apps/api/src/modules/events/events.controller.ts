@@ -65,7 +65,7 @@ export class EventsController {
   @ApiOperation({ summary: 'Etkinliğe katıl (auth gerekli)' })
   @ApiParam({ name: 'id', description: 'Etkinlik UUID' })
   join(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
-    return this.eventsService.join(id, req.user.sub);
+    return this.eventsService.join(id, req.user.id);
   }
 
   @Get(':id/rewards')

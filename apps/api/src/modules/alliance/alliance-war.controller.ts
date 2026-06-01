@@ -31,7 +31,7 @@ export class AllianceWarController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Hedef ittifaka savaş ilan et' })
   declareWar(@Request() req: any, @Body() dto: DeclareWarDto) {
-    return this.warService.declareWar(req.user.sub, dto.targetAllianceId);
+    return this.warService.declareWar(req.user.id, dto.targetAllianceId);
   }
 
   @Get(':allianceId')

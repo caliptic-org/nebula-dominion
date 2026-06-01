@@ -59,6 +59,18 @@ export class UnitsService {
     if (!config) {
       throw new BadRequestException(`Unknown unit type: ${dto.unitType}`);
     }
+    // Defense-in-depth: merge-only units (Sniper/Mecha/Genetic/Captain) have
+    // trainable=false in UNIT_CONFIGS. The frontend filters them out via
+    // getUnitConfigsByRace, but if anything bypasses that path (a stale
+    // bundle, a direct curl, etc.) we'd otherwise let it through to the
+    // INSERT and hit "invalid input value for enum training_queue_unit_type_enum"
+    // — a 500 with a leaky SQL stack. Clean 400 here keeps the error
+    // honest and the DB enum unbothered.
+    if (config.trainable === false) {
+      throw new BadRequestException(
+        `${dto.unitType} eğitilemez — sadece birleştirme ile elde edilir (Promosyon Töreni).`,
+      );
+    }
 
     // Validate building exists and belongs to this player
     const building = await this.buildingRepo.findOne({

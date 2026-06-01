@@ -41,6 +41,11 @@ export interface UnitConfig {
   requiredBuilding: BuildingType;
   abilities: string[];
   description: string;
+  /** When false, this unit can only be acquired via /units/merge-roster.
+   *  /base/production filters these out so the player can't tap "EĞIT" on
+   *  a merge-only result and bounce off a 500. Defaults to true (legacy
+   *  units stay trainable without touching every entry). */
+  trainable?: boolean;
 }
 
 export interface RaceBonus {
@@ -150,6 +155,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     requiredBuilding: BuildingType.BARRACKS,
     abilities: ['precision_shot', 'long_range'],
     description: 'Elite marksman promoted from three Marines. Long-range, low cooldown.',
+    trainable: false,
   },
   [UnitType.ENGINEER]: {
     type: UnitType.ENGINEER,
@@ -163,6 +169,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     requiredBuilding: BuildingType.BARRACKS,
     abilities: ['repair', 'turret_deploy'],
     description: 'Alternative T2 promotion — field engineer with repair + turret support.',
+    trainable: false,
   },
   [UnitType.MECHA_WALKER]: {
     type: UnitType.MECHA_WALKER,
@@ -176,6 +183,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     requiredBuilding: BuildingType.BARRACKS,
     abilities: ['stomp', 'plasma_cannon'],
     description: 'Pilot-driven mech promoted from three Snipers. Heavy frame, high alpha.',
+    trainable: false,
   },
   [UnitType.GENETIC_WARRIOR]: {
     type: UnitType.GENETIC_WARRIOR,
@@ -189,6 +197,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     requiredBuilding: BuildingType.BARRACKS,
     abilities: ['gene_rage', 'regen', 'leap_strike'],
     description: 'Gene-tailored super soldier. Three Mecha Walker pilots fused into one chassis.',
+    trainable: false,
   },
   [UnitType.CAPTAIN]: {
     type: UnitType.CAPTAIN,
@@ -202,6 +211,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     requiredBuilding: BuildingType.BARRACKS,
     abilities: ['rally_cry', 'tactical_overlay', 'orbital_strike'],
     description: 'Field captain. Three Genetic Warriors promoted; commands the strike force.',
+    trainable: false,
   },
 
   // ─── Zerg Units ─────────────────────────────────────────────────────────────
@@ -261,7 +271,14 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
 
 /** Returns UNIT_CONFIGS for a given race only */
 export function getUnitConfigsByRace(race: Race): UnitConfig[] {
-  return Object.values(UNIT_CONFIGS).filter((cfg) => cfg.race === race);
+  // Exclude merge-only units (trainable=false) so /base/production doesn't
+  // render Sniper/Mecha/Genetic/Captain cards that, when tapped, would 500
+  // on `invalid enum value training_queue_unit_type_enum: "sniper"` (these
+  // were added to player_units_type_enum for merge inserts but never to
+  // training_queue's enum, intentionally — they're not trainable).
+  return Object.values(UNIT_CONFIGS).filter(
+    (cfg) => cfg.race === race && cfg.trainable !== false,
+  );
 }
 
 /**

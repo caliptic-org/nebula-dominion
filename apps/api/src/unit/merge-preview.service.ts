@@ -47,10 +47,33 @@ export class MergePreviewService {
       return this.fail(dto, ['merge.error.duplicateUnit']);
     }
 
+    // Catch resolveSlot's NotFound / Forbidden throws and turn them into
+    // a `canMerge: false` verdict instead of bubbling out as a 404 / 403.
+    // The merge screen polls this endpoint speculatively (every time slot
+    // selection changes), so a malformed or stale unitId is a normal
+    // verdict — "this recipe doesn't merge" — not an error condition.
+    // Without this, a single bad slot id forced the whole screen into a
+    // toast bounce-off with no explanation.
     const resolved: ResolvedSlot[] = [];
+    const resolveReasons: string[] = [];
     for (const slot of dto.slots) {
-      const r = await this.resolveSlot(userId, dto.race, slot.unitId);
-      resolved.push(r);
+      try {
+        const r = await this.resolveSlot(userId, dto.race, slot.unitId);
+        resolved.push(r);
+      } catch (err) {
+        if (err instanceof NotFoundException) {
+          resolveReasons.push('merge.error.unitNotFound');
+        } else if (err instanceof ForbiddenException) {
+          resolveReasons.push('merge.error.unitNotOwned');
+        } else {
+          throw err;
+        }
+      }
+    }
+    if (resolveReasons.length > 0) {
+      // Dedup so 3 missing slots render as one reason chip, not three.
+      const reasons = Array.from(new Set(resolveReasons));
+      return this.fail(dto, reasons);
     }
 
     const reasons: string[] = [];

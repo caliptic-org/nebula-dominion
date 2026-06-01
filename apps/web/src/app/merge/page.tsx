@@ -513,8 +513,13 @@ function buildPool(race: NDRace, tier: number): PoolUnit[] {
   // tier for the player. Renders 8 visual slots so the layout doesn't
   // collapse, but each carries the same race-flavoured unit name.
   const base = race.units.find((u) => u.t === tier)?.n ?? race.units[0].n;
+  // Placeholder ID shape `<race>-<tier>-<suffix>` matches the backend's
+  // PLACEHOLDER_RE in merge-preview.service.ts so the demo slots resolve
+  // without hitting the "Unit not found" 404 path. The prior format
+  // `demo-${race}-${tier}-${i}` started with the literal `demo-` which the
+  // regex parsed as `race=demo`, falling through to the not-found branch.
   return Array.from({ length: 8 }, (_, i) => ({
-    id: `demo-${race.key}-${tier}-${i}`,
+    id: `${race.key}-${tier}-demo${i}`,
     name: base,
     tier,
   }));

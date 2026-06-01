@@ -100,30 +100,57 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
       }}
     >
       {bgImage && (
-        // Landscape sits beneath the SVG so the race-tinted gradient still
-        // paints on top. cover + center matches the previous /base layout
-        // exactly; mask fades the bottom 30% so the iso-tilemap's own
-        // ground gradient doesn't double up against the photo horizon.
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${bgImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            opacity: 0.85,
-            // Horizon mask: show the ComfyUI landscape only in the top ~45%
-            // of the screen, then fade hard to transparent by 60%. /base
-            // renders an iso tilemap below this band — the photo acts as
-            // a distant sky/skyline above the player's playable ground.
-            WebkitMaskImage:
-              'linear-gradient(to bottom, black 0%, black 45%, transparent 60%)',
-            maskImage:
-              'linear-gradient(to bottom, black 0%, black 45%, transparent 60%)',
-            pointerEvents: 'none',
-          }}
-        />
+        <>
+          {/* Sharp landscape, anchored to the TOP of the frame with full
+           *  horizontal coverage. Previously we used `background-size: cover`,
+           *  which scaled the photo up to fill height in narrow viewports and
+           *  hid the left/right edges off-screen. `100% auto` width-fits
+           *  instead — the entire panorama is visible, the image just falls
+           *  short of full height in tall viewports (mobile portrait) and
+           *  that empty band is where the iso tilemap takes over below. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${bgImage})`,
+              backgroundSize: '100% auto',
+              backgroundPosition: 'center top',
+              backgroundRepeat: 'no-repeat',
+              opacity: 0.85,
+              // Mask fade extended a touch (60→80%) so the cutoff lands
+              // softer; the blur band below dissolves the hard edge fully.
+              WebkitMaskImage:
+                'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
+              maskImage:
+                'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Soft-blur band: same photo re-rendered with a mild blur, then
+           *  masked to a thin strip right where the sharp layer fades. This
+           *  is the "altından çok az blur" finish — the photo doesn't end
+           *  with a hard mask edge anymore, it dissolves through a blurred
+           *  intermediate before the iso tilemap takes over. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${bgImage})`,
+              backgroundSize: '100% auto',
+              backgroundPosition: 'center top',
+              backgroundRepeat: 'no-repeat',
+              opacity: 0.55,
+              filter: 'blur(3px)',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, transparent 50%, black 65%, black 72%, transparent 82%)',
+              maskImage:
+                'linear-gradient(to bottom, transparent 50%, black 65%, black 72%, transparent 82%)',
+              pointerEvents: 'none',
+            }}
+          />
+        </>
       )}
       <svg
         width="100%"

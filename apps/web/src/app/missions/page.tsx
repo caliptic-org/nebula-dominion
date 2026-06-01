@@ -255,7 +255,13 @@ export default function MissionsPage() {
         {tab === 'achievement' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {ACHIEVEMENTS.map(a => (
-              <AchievementCard key={a.id} achievement={a} race={race} />
+              <AchievementCard
+                key={a.id}
+                achievement={a}
+                race={race}
+                persistedClaims={persistedClaims}
+                onClaimed={markClaimedLocally}
+              />
             ))}
           </div>
         )}
@@ -506,8 +512,57 @@ function MissionCard({
   );
 }
 
-function AchievementCard({ achievement, race }: { achievement: Achievement; race: NDRace }) {
+function AchievementCard({
+  achievement,
+  race,
+  persistedClaims,
+  onClaimed,
+}: {
+  achievement: Achievement;
+  race: NDRace;
+  persistedClaims: Set<string>;
+  onClaimed: (missionId: string) => void;
+}) {
   const a = achievement;
+  const [claiming, setClaiming] = useState(false);
+  const alreadyClaimed = persistedClaims.has(a.id);
+  const canClaim = a.unlocked && !alreadyClaimed && !claiming;
+
+  async function handleClaimAchievement() {
+    if (!canClaim) return;
+    setClaiming(true);
+    try {
+      // Re-use the canonical /daily-engagement/claim endpoint — missionType
+      // 'achievement' maps to XpSource.ACHIEVEMENT (500 XP) server-side
+      // (see DailyEngagementService.MISSION_TYPE_TO_XP_SOURCE).
+      const res = await api.post<{
+        claimed: boolean;
+        alreadyClaimed: boolean;
+        rewards: { gold?: number; gems?: number; xp?: number };
+        walletCredited: boolean;
+        xpGranted: boolean;
+      }>('/daily-engagement/claim', {
+        missionId: a.id,
+        missionType: 'achievement',
+        // No reward payload — achievement XP is granted on the server
+        // via the XpSource.ACHIEVEMENT base amount, no wallet credit.
+        reward: {},
+      });
+      onClaimed(a.id);
+      refreshGameResources();
+      if (res.alreadyClaimed) {
+        toast.info('Bu başarım zaten alındı');
+        return;
+      }
+      toast.success(`Başarım kazanıldı: ${a.title} (+500 XP)`);
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'Ödül alınamadı';
+      toast.error(msg);
+    } finally {
+      setClaiming(false);
+    }
+  }
+
   return (
     <Panel
       race={race}
@@ -515,19 +570,32 @@ function AchievementCard({ achievement, race }: { achievement: Achievement; race
         padding: 10,
         opacity: a.unlocked ? 1 : 0.55,
         borderColor: a.unlocked ? (a.legendary ? race.primary : ND.borderHi) : ND.border,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Code>{a.unlocked ? (a.legendary ? '★' : '◆') : '🔒'}</Code>
+        <Code>{alreadyClaimed ? '✓' : a.unlocked ? (a.legendary ? '★' : '◆') : '🔒'}</Code>
         <div style={{ fontFamily: ND.display, fontSize: 12, color: a.legendary && a.unlocked ? race.primary : ND.text }}>
           {a.title}
         </div>
       </div>
-      <Caption style={{ fontSize: 10, marginTop: 4 }}>{a.description}</Caption>
+      <Caption style={{ fontSize: 10 }}>{a.description}</Caption>
       {!a.unlocked && a.progress !== undefined && a.progress > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <Bar value={a.progress} color={race.primary} height={4} />
-        </div>
+        <Bar value={a.progress} color={race.primary} height={4} />
+      )}
+      {a.unlocked && (
+        <NDButton
+          race={race}
+          size="sm"
+          variant={alreadyClaimed ? 'ghost' : 'primary'}
+          disabled={!canClaim}
+          onClick={handleClaimAchievement}
+          style={{ marginTop: 4, alignSelf: 'flex-start' }}
+        >
+          {alreadyClaimed ? 'Alındı' : claiming ? 'Alınıyor...' : '+500 XP Al'}
+        </NDButton>
       )}
     </Panel>
   );

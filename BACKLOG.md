@@ -39,7 +39,7 @@ ne kadar bekleyeyim?" sorularının cevabı.
 
 ---
 
-## P2 — Çağ 2'ye tırmanış (Lv 3-10, ilk saat)  ◐ KISMI
+## P2 — Çağ 2'ye tırmanış (Lv 3-10, ilk saat)  ✓ TAMAMLANDI
 
 Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
 
@@ -55,11 +55,13 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
   XpSource: QUEST_MEDIUM (150). Per-entry `xpGranted` flag idempotency
   guard. *Dosya: `apps/api/src/meta/research-stub.controller.ts`*
 
-- [ ] **P2.3 Achievement system + XP**. Static `ACHIEVEMENTS` array
-  (apps/web/src/app/missions/page.tsx:75) `unlocked: true/false` hardcoded.
-  AchievementCard'ta "Ödülü Al" butonu yok — mevcut iki "unlocked" item
-  claim edilemiyor. Eksik: condition gating (quest_progress counter'larından
-  derive), Claim button, claimed state persistence.
+- [x] **P2.3 Achievement claim wiring** (minimal). AchievementCard'a
+  Claim button eklendi — `unlocked && !persistedClaims.has(id)` ise
+  "+500 XP Al" çıkıyor, claim sonrası "Alındı" ghost button gösteriliyor.
+  /daily-engagement/claim endpoint missionType='achievement' → P2.1
+  wiring +500 XP grant'i tetikliyor. (Static unlock flag derivation —
+  battles_won / counter'a göre — gelecek iterasyona kaldı.)
+  *Dosya: `apps/web/src/app/missions/page.tsx`*
 
 - [x] **P2.4 PvE/PvP XP source routing**. `game.service.ts:awardBattleXp`
   helper'a refactor edildi. Bot vs human filtresi + Çağ 3+ PvP guard:

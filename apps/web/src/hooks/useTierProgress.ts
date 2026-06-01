@@ -9,6 +9,7 @@ import {
   type TierRequirementsView,
 } from '@/lib/tier-api';
 import { FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
 
 interface UseTierProgressResult {
   progress: TierProgressView | null;
@@ -23,9 +24,18 @@ interface UseTierProgressResult {
 
 /**
  * Loads tier state from /tier/progress + /tier/requirements + /tier/levels.
- * Falls back gracefully when the user is unauthenticated (e.g. demo route):
- * the static 54-level catalog still loads so the page renders something
- * useful instead of an empty error state.
+ *
+ * Guest mode (no JWT in storage): the hook short-circuits — no fetches
+ * fire, no console 401 noise. Returns null progress + empty levels +
+ * `loading=false` so guarded screens render a "Giriş Yap" empty state
+ * instead of a half-loaded HUD.
+ *
+ * Without this guard, every visit to /missions / /base / /shop fires
+ * three /tier/* calls that all 401 (Chrome's devtools prints
+ * "Failed to load resource: 401" for each one — can't be suppressed
+ * from JS). Production playtest run-2 surfaced this as the dominant
+ * source of console noise; fixed in the autonomous browser playtest
+ * fix-loop.
  */
 export function useTierProgress(): UseTierProgressResult {
   const [progress, setProgress] = useState<TierProgressView | null>(null);
@@ -35,6 +45,16 @@ export function useTierProgress(): UseTierProgressResult {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // Guest guard — see header comment. Resolving immediately keeps any
+    // `if (loading) return <Spinner/>` paths from blocking the screen.
+    if (!hasSession()) {
+      setLoading(false);
+      setError(null);
+      setProgress(null);
+      setRequirements(null);
+      setLevels([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     const results = await Promise.allSettled([

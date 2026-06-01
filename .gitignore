@@ -21,3 +21,13 @@ deploy/drone-db-data/
 # agents. The runtime locks and cleans them up; nothing inside should
 # ever be checked into the main repo history.
 .claude/worktrees/
+
+# npx skills CLI artifacts — installed skills + lockfile are per-developer
+# tooling, not shipped to prod. .agents/skills/ mirrors .claude/skills/
+# for Cursor/Copilot interop; both live outside source control.
+.agents/
+.claude/skills/
+.claude/playtest-runs/
+.claude/scheduled_tasks.lock
+.claude/nd-story.txt
+skills-lock.json

@@ -283,73 +283,79 @@ export default function MergePage() {
           </Panel>
         </div>
 
-        {/* Success rate */}
-        <div style={{ padding: '10px 14px 0' }}>
-          <Panel race={race} style={{ padding: 12 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: 8,
-                gap: 12,
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Eyebrow color={race.primary}>BAŞARI ORANI</Eyebrow>
-                <Code>
-                  T{sourceTier} → T{promotedTier} · {promotedName.toUpperCase()}
-                </Code>
+        {/* Success rate — only renders once the player has actually picked
+         *  at least one slot.  Before that the %78 base rate is meaningless
+         *  and the big panel dominates the screen for no value.  Slot row
+         *  itself carries the "0/3 SLOT" affordance, no need to duplicate it
+         *  in a separate hero card. */}
+        {selected.length > 0 && (
+          <div style={{ padding: '10px 14px 0' }}>
+            <Panel race={race} style={{ padding: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  marginBottom: 8,
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Eyebrow color={race.primary}>BAŞARI ORANI</Eyebrow>
+                  <Code>
+                    T{sourceTier} → T{promotedTier} · {promotedName.toUpperCase()}
+                  </Code>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span
+                    aria-label={`Başarı oranı yüzde ${projectedRate}`}
+                    style={{
+                      fontFamily: ND.display,
+                      fontSize: 26,
+                      fontWeight: 700,
+                      color: canMerge ? risk.color : ND.textDim,
+                      letterSpacing: '0.04em',
+                      textShadow: canMerge ? `0 0 12px ${risk.color}66` : undefined,
+                      lineHeight: 1,
+                    }}
+                  >
+                    %{projectedRate}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: ND.mono,
+                      fontSize: 9,
+                      color: canMerge ? risk.color : ND.textMute,
+                      letterSpacing: '0.12em',
+                    }}
+                  >
+                    {canMerge ? risk.label : `${selected.length}/${SLOT_COUNT} SLOT`}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span
-                  aria-label={`Başarı oranı yüzde ${projectedRate}`}
-                  style={{
-                    fontFamily: ND.display,
-                    fontSize: 26,
-                    fontWeight: 700,
-                    color: canMerge ? risk.color : ND.textDim,
-                    letterSpacing: '0.04em',
-                    textShadow: canMerge ? `0 0 12px ${risk.color}66` : undefined,
-                    lineHeight: 1,
-                  }}
-                >
-                  %{projectedRate}
-                </span>
-                <span
-                  style={{
-                    fontFamily: ND.mono,
-                    fontSize: 9,
-                    color: canMerge ? risk.color : ND.textMute,
-                    letterSpacing: '0.12em',
-                  }}
-                >
-                  {canMerge ? risk.label : `${selected.length}/${SLOT_COUNT} SLOT`}
-                </span>
+              <Bar
+                value={projectedRate}
+                max={100}
+                color={canMerge ? risk.color : race.primaryDim}
+                height={8}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: 6,
+                  fontFamily: ND.mono,
+                  fontSize: 9,
+                  color: ND.textMute,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                <span>TABAN %{successRate}</span>
+                <span>%{projectedRate} / %{successRate}</span>
               </div>
-            </div>
-            <Bar
-              value={projectedRate}
-              max={100}
-              color={canMerge ? risk.color : race.primaryDim}
-              height={8}
-            />
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginTop: 6,
-                fontFamily: ND.mono,
-                fontSize: 9,
-                color: ND.textMute,
-                letterSpacing: '0.08em',
-              }}
-            >
-              <span>TABAN %{successRate}</span>
-              <span>%{projectedRate} / %{successRate}</span>
-            </div>
-          </Panel>
-        </div>
+            </Panel>
+          </div>
+        )}
 
         {/* Source pool */}
         <div style={{ padding: '14px 14px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -439,30 +445,39 @@ export default function MergePage() {
           </div>
         </div>
 
-        {/* Demo-mode banner — surfaces when the player has no real T-N units
-          *  of the selected source tier.  Without this, the page renders the
-          *  same 8 placeholder slots for everyone and clicking "Birleştir"
-          *  fires a backend POST with demo-* ids that gets rejected with a
-          *  generic "Birleştirme reddedildi" toast — a confusing first
-          *  impression.  The button itself is hard-gated via canMerge so the
-          *  POST can never actually fire in demo mode. */}
+        {/* Demo-mode hint — used to be a dashed-border panel sandwiched
+         *  between the pool and the CTA.  That was visually heavy for what
+         *  is really a "no units yet, train first" nudge.  Now collapsed to
+         *  a thin inline strip with a single underlined CTA link — same
+         *  information, ~24px tall instead of ~90px, no dashed borders
+         *  competing with the slot row outlines.  The Birleştir button is
+         *  still hard-gated by canMerge so the demo path can never POST. */}
         {isDemoMode && (
-          <div style={{
-            padding: '10px 14px',
-            background: `linear-gradient(180deg, ${race.primaryDim}26, transparent)`,
-            borderTop: `1px dashed ${race.primary}`,
-            borderBottom: `1px dashed ${race.primary}`,
-          }}>
-            <Eyebrow color={race.primary}>ÖNİZLEME MODU</Eyebrow>
-            <Caption style={{ marginTop: 4 }}>
+          <div
+            style={{
+              padding: '8px 14px 4px',
+              fontFamily: ND.mono,
+              fontSize: 10,
+              color: ND.textDim,
+              letterSpacing: '0.04em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ color: race.primary, letterSpacing: '0.10em' }}>ÖNİZLEME ·</span>
+            <span>
               {authenticated
-                ? `Henüz Tier ${sourceTier} birimin yok — önce `
-                : 'Birleştirmek için '}
-              <Link href={authenticated ? '/base/production' : '/login'} style={{ color: race.primary, textDecoration: 'underline' }}>
-                {authenticated ? 'birim eğit' : 'giriş yap'}
-              </Link>
-              {authenticated ? ', ardından buradan birleştirebilirsin.' : '. Aşağıdaki kart düzeni mekaniği gösterir.'}
-            </Caption>
+                ? `Tier ${sourceTier} birimin yok —`
+                : 'Birleştirmek için'}
+            </span>
+            <Link
+              href={authenticated ? '/base/production' : '/login'}
+              style={{ color: race.primary, textDecoration: 'underline' }}
+            >
+              {authenticated ? 'birim eğit' : 'giriş yap'}
+            </Link>
           </div>
         )}
 

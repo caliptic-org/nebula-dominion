@@ -1,4 +1,8 @@
 import { CHARACTER_ASSETS } from './assets';
+import { toFrontendRace, type BackendRace } from './race-api';
+// Re-export so legacy importers (`import { BackendRace } from './formation-api'`)
+// keep building. New code should import from race-api directly.
+export type { BackendRace };
 import type {
   RaceKey,
   UnitClass,
@@ -67,7 +71,12 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
 
-export type BackendRace = 'human' | 'zerg' | 'droid' | 'creature' | 'demon';
+/* BackendRace is the canonical enum from race-api.ts (matches the BE DB
+ * CHECK constraint `human | zerg | automaton | beast | demon`). Earlier
+ * versions of this file declared a parallel type with `droid` / `creature`
+ * — both wrong: the backend never emits those values, so every unit fell
+ * through the RACE_MAP lookup and rendered as 'insan'. Fixed in P5.3.
+ * Always import from race-api so the FE↔BE boundary has one source. */
 
 export interface BackendUnit {
   id: string;
@@ -90,12 +99,17 @@ export interface BackendUnit {
 
 // ─── Mapping helpers ──────────────────────────────────────────────────────────
 
+/* Use the shared toFrontendRace from race-api.ts so otomat/canavar mapping
+ * stays consistent between formation, profile, race-select. The local
+ * RACE_MAP wrapper kept its old `Record<BackendRace, RaceKey>` shape for
+ * call-sites that still grab it directly; new code should call
+ * toFrontendRace() instead. */
 const RACE_MAP: Record<BackendRace, RaceKey> = {
-  human:    'insan',
-  zerg:     'zerg',
-  droid:    'otomat',
-  creature: 'canavar',
-  demon:    'seytan',
+  human:     'insan',
+  zerg:      'zerg',
+  automaton: 'otomat',
+  beast:     'canavar',
+  demon:     'seytan',
 };
 
 /** Mirror of backend's server-authoritative formula in formations.service.ts */

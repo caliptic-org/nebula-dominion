@@ -14,13 +14,13 @@ export class HttpJwtGuard implements CanActivate {
 
     try {
       const payload = this.jwtService.verify(token) as { sub: string; email?: string; username?: string };
-      // Normalize the user shape so downstream code is decoupled from the
-      // JWT claim layout. The api mints tokens with `sub` (standard JWT
-      // subject claim), but controllers + decorators here read
-      // `request.user.id` / `request.user.userId`. Without this mirror, every
-      // authed route on game-server resolves currentUserId to '' and silently
-      // 403s with "Cannot award XP to another user" (and similar friends).
-      request['user'] = { ...payload, id: payload.sub, userId: payload.sub };
+      // Store the JWT payload verbatim. All downstream readers go through
+      // CurrentUser (apps/game-server/src/auth/current-user.decorator.ts)
+      // which reads payload.sub — the standard JWT subject claim the api
+      // mints. Earlier versions of this guard mirrored sub into id+userId
+      // as a defensive shim while controllers were inconsistent; that
+      // mirror is gone now (P5.4) so every reader follows the same path.
+      request['user'] = payload;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

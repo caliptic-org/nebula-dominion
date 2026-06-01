@@ -1,13 +1,7 @@
-import { Controller, Get, UseGuards, ExecutionContext, createParamDecorator } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
 import { GatesService } from './gates.service';
-
-const CurrentUserId = createParamDecorator(
-  (_d: unknown, ctx: ExecutionContext): string => {
-    const req = ctx.switchToHttp().getRequest<{ user?: { id?: string; userId?: string; sub?: string } }>();
-    return (req.user?.id ?? req.user?.userId ?? req.user?.sub ?? '') as string;
-  },
-);
+import { CurrentUser } from '../auth/current-user.decorator';
 
 /**
  * GET /api/gates
@@ -29,7 +23,7 @@ export class GatesController {
   constructor(private readonly gates: GatesService) {}
 
   @Get()
-  async getGates(@CurrentUserId() userId: string) {
+  async getGates(@CurrentUser() userId: string) {
     return this.gates.evaluateAll(userId);
   }
 }

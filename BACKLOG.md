@@ -147,17 +147,30 @@ Geliştirme hızı + sistem stabilitesi için.
   ensureProgress`). Doğru çözüm: tier_progression'ı view'a çevir
   (`CREATE VIEW ... AS SELECT FROM player_levels`).
 
-- [ ] **P5.2 `buildings_type_enum` source-of-truth**. api 8 değer,
-  game-server 12 değer, üretim 20. Game-server domain owner — api'nin
-  enum'unu game-server set'iyle re-create.
+- [x] **P5.2 `buildings_type_enum` source-of-truth**. api'nin TS
+  BuildingType enum'u game-server'in 16-değerli canonical set'iyle
+  birleştirildi (mineral_extractor, gas_refinery, solar_plant, academy,
+  factory, spawning_pool, hatchery + 5 Çağ 2 building). Legacy api-only
+  değerler (mine, refinery, hangar, research_lab) back-compat için
+  korundu. DB enum migration `1779635000000` ile zaten geniş — sadece
+  TS hizalama yapıldı, schema değişimi yok.
+  *Dosya: `apps/api/src/building/entities/building.entity.ts`*
 
-- [ ] **P5.3 Race enum normalize**. FE 'insan/zerg/otomat/canavar/seytan',
-  BE 'human/zerg/automaton/beast/demon'. `FE_TO_BE` çeviri tablosu sıkıntıyı
-  saklıyor. Tek normalizeli set'e geç.
+- [x] **P5.3 Race enum normalize (drift fix)**. `formation-api.ts`
+  yanlış kanonik isimler kullanıyordu — `droid`/`creature` (backend hiç
+  emit etmez), `automaton`/`beast` yerine. Otomat ve canavar unit'leri
+  RACE_MAP'te bulunamadığı için tüm formation API responses'ta 'insan'
+  fallback'e düşüyordu (sessiz bug). race-api.ts'in canonical
+  `BackendRace` type'ı + corrected RACE_MAP entry'leriyle replace edildi.
+  *Dosya: `apps/web/src/lib/formation-api.ts`*
 
-- [ ] **P5.4 JWT shape standardize**. api `sub` claim mint ediyor,
-  game-server `HttpJwtGuard` `id`/`userId` arıyor. Halihazırda guard'da
-  normalize (commit e93c10a) defansif hack. Tüm services'i `sub` okumaya geç.
+- [x] **P5.4 JWT shape standardize**. `HttpJwtGuard`'daki `id`+`userId`
+  defensive mirror'ı kaldırıldı. `progression.controller.ts` ve
+  `gates.controller.ts`'teki local `CurrentUser`/`CurrentUserId`
+  decorator'ları shared `auth/current-user.decorator.ts` (sub-only)
+  imp'iyle replace edildi. Şimdi tek bir read path: `request.user.sub`.
+  *Dosya: `apps/game-server/src/auth/http-jwt.guard.ts`,
+  `apps/game-server/src/progression/{progression,gates}.controller.ts`*
 
 - [ ] **P5.5 Single-source-of-truth migration runner**. Şu an iki yer:
   `infrastructure/docker/init-db.sql` + game-server typeorm-migrations.

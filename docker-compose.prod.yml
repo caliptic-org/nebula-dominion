@@ -21,6 +21,11 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CORS_ORIGINS: ${CORS_ORIGINS}
       REDIS_URL: redis://redis:6379
+      # Internal game-server URL — Docker DNS resolves `game-server` to the
+      # sibling container's IP. Used by DailyEngagementService for wallet
+      # credit + progression XP grant on mission claim. Override in .env via
+      # GAME_SERVER_INTERNAL_URL if game-server moves off the compose stack.
+      GAME_SERVER_URL: ${GAME_SERVER_INTERNAL_URL:-http://game-server:3001}
       MINIO_ENDPOINT: minio
       MINIO_USE_SSL: 'false'
     depends_on: !override

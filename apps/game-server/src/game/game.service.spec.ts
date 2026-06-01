@@ -126,6 +126,16 @@ function buildService(): {
 
   const progressionMock = {
     awardXp: jest.fn().mockResolvedValue(undefined),
+    // getProgress is read by awardBattleXp() in the PvP path to pick
+    // PVP_* vs PVE_* XP sources based on the player's age. Default to
+    // Çağ 1 so the test exercises the PVE_* fallback unless explicitly
+    // overridden in a specific spec.
+    getProgress: jest.fn().mockResolvedValue({
+      userId: 'mock', age: 1, level: 1, tier: 0, badgeTier: 'bronze',
+      currentXp: 0, totalXp: 0, xpToNextLevel: 100, xpProgressPercent: 0,
+      unlockedContent: [], tierBonusMultiplier: 1, isMaxLevel: false,
+      canAdvanceAge: false,
+    }),
   };
 
   const configMock: Partial<ConfigService> = {
@@ -516,7 +526,7 @@ describe('GameService — PvE bot anti-cheat bypass', () => {
       { validate: antiCheatValidate } as any,
       new EventEmitter2(),
       { get: jest.fn().mockImplementation((_k: string, def: any) => def) } as any,
-      { awardXp: jest.fn().mockResolvedValue(undefined) } as any,
+      { awardXp: jest.fn().mockResolvedValue(undefined), getProgress: jest.fn().mockResolvedValue({ age: 1 }) } as any,
       { findRecipe: jest.fn().mockReturnValue(null), merge: jest.fn(), mutate: jest.fn().mockReturnValue(null), getAvailableMutationsForUnit: jest.fn().mockReturnValue([]) } as any,
       { notify: jest.fn() } as any,
     );

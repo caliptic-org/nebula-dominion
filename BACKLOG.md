@@ -39,30 +39,38 @@ ne kadar bekleyeyim?" sorularının cevabı.
 
 ---
 
-## P2 — Çağ 2'ye tırmanış (Lv 3-10, ilk saat)
+## P2 — Çağ 2'ye tırmanış (Lv 3-10, ilk saat)  ◐ KISMI
 
 Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
 
-- [ ] **P2.1 Daily mission claim XP**. `XP_BASE_AMOUNTS.DAILY_MISSION = 200`
-  ama `apps/web/src/app/missions/page.tsx` claim flow'unun backend handler'ı
-  awardXp çağırmıyor. Mission ödülüne ek olarak XP grant'i ekle.
+- [x] **P2.1 Daily mission claim XP**. `DailyEngagementService.creditXp`
+  helper'ı eklendi; mission claim'i game-server'ın
+  `POST /api/progression/award-xp` endpoint'ine fan-out yapıyor.
+  MissionType → XpSource haritası: daily/weekly → DAILY_MISSION (200),
+  achievement → ACHIEVEMENT (500), story → EVENT (300).
+  *Dosya: `apps/api/src/modules/daily-engagement/daily-engagement.service.ts`*
 
-- [ ] **P2.2 Research complete XP**. Research nodes complete olunca XP
-  almıyor. Research timer + completion handler'ında awardXp çağrısı.
-  *Dosya: `apps/game-server/src/research` (varsa) veya yeni endpoint*
+- [x] **P2.2 Research complete XP**. `ResearchStubController.me()` lazy
+  state promotion path'inde, ilk completion'da awardXp fan-out fires.
+  XpSource: QUEST_MEDIUM (150). Per-entry `xpGranted` flag idempotency
+  guard. *Dosya: `apps/api/src/meta/research-stub.controller.ts`*
 
-- [ ] **P2.3 Achievement system + XP**. `XP_BASE_AMOUNTS.ACHIEVEMENT = 500`
-  en yüksek tek tetik. Şu an achievement tracking yok. Önemli milestone'lar
-  (Lv 10 first age-up, 5 bina, 10 unit, ilk zafer, vs.) achievement
-  table'ına yazılmalı + XP grant'i.
+- [ ] **P2.3 Achievement system + XP**. Static `ACHIEVEMENTS` array
+  (apps/web/src/app/missions/page.tsx:75) `unlocked: true/false` hardcoded.
+  AchievementCard'ta "Ödülü Al" butonu yok — mevcut iki "unlocked" item
+  claim edilemiyor. Eksik: condition gating (quest_progress counter'larından
+  derive), Claim button, claimed state persistence.
 
-- [ ] **P2.4 PvE/PvP XP source routing**. `game.service.ts:475` zaten
-  BATTLE_WIN/LOSS award ediyor ama yeni PVP_WIN/LOSS source'lar var ve
-  Çağ 3+ gate'li. Game-end sırasında çağa göre doğru XpSource'a route et.
+- [x] **P2.4 PvE/PvP XP source routing**. `game.service.ts:awardBattleXp`
+  helper'a refactor edildi. Bot vs human filtresi + Çağ 3+ PvP guard:
+  age >= 3 → PVP_WIN/LOSS (200/50), aksi halde PVE_WIN/LOSS (150/30).
+  Bot user_id'leri (`bot:*` prefix) skip ediliyor.
+  *Dosya: `apps/game-server/src/game/game.service.ts`*
 
-- [ ] **P2.5 Level-up celebration animasyonu**. Şu an sadece toast.
-  Full-screen race-tinted particle burst + level number scale-up + "+1 LVL"
-  ribbon. `LevelUpModal.tsx` var ama mature değil.
+- [x] **P2.5 Level-up celebration animasyonu**. LevelUpModal'a 12-particle
+  radial burst (CSS-only, `--angle` per-index) + "Lv N → Lv N+1" ribbon
+  eklendi. `previousLevel` prop optional, default `newLevel - 1`.
+  prefers-reduced-motion guard. *Dosya: `apps/web/src/components/progression/LevelUpModal.tsx`*
 
 ---
 

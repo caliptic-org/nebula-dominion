@@ -23,7 +23,24 @@ export interface ClaimResult {
   alreadyClaimed: boolean;
   rewards: ClaimRewardDto;
   walletCredited: boolean;
+  /** Whether the progression XP grant fired on game-server. False either
+   *  because the mission paid no XP, the player's JWT was missing, or the
+   *  HTTP call to game-server failed (logged, non-fatal). */
+  xpGranted: boolean;
 }
+
+/** Map a mission-claim's missionType to the progression XpSource enum used
+ *  by game-server. Kept in sync with apps/game-server/src/progression/config/level-config.ts:XpSource.
+ *  This mapping decides which base XP amount + per-day cap the grant uses —
+ *  daily/weekly hit the highest-weight bucket (35% target), achievements use
+ *  the rare-high-impact bucket (500 XP base), and story missions reuse the
+ *  EVENT bucket (300 XP). */
+const MISSION_TYPE_TO_XP_SOURCE: Record<MissionType, string> = {
+  daily:       'daily_mission',
+  weekly:      'daily_mission',
+  achievement: 'achievement',
+  story:       'event',
+};
 
 @Injectable()
 export class DailyEngagementService {
@@ -83,6 +100,7 @@ export class DailyEngagementService {
         alreadyClaimed: true,
         rewards: existing.rewardJson ?? {},
         walletCredited: false,
+        xpGranted: false,
       };
     }
 
@@ -114,6 +132,7 @@ export class DailyEngagementService {
             alreadyClaimed: true,
             rewards: existingRow?.rewardJson ?? {},
             walletCredited: false,
+            xpGranted: false,
           };
         }
       }
@@ -129,9 +148,27 @@ export class DailyEngagementService {
       walletCredited = await this.creditWallet(authorization, reward);
     }
 
+    // Progression XP grant — fires the +XP / level_up socket toast and
+    // counts toward Lv/Çağ progression on game-server. Independent of the
+    // wallet credit above (which writes raw resource numbers); this writes
+    // an xp_transactions row and recomputes player_level. We grant XP even
+    // when the mission's payload.xp is 0 because the *act of completing*
+    // the mission is the XP source — the wallet payload is a separate gold
+    // / gems concept. Missions with truly no progression value (e.g. a
+    // future "free re-roll") should opt out via a new missionType.
+    let xpGranted = false;
+    if (authorization) {
+      xpGranted = await this.creditXp({
+        authorization,
+        userId,
+        missionId,
+        missionType,
+      });
+    }
+
     this.logger.log(
       `Mission claimed user=${userId} mission=${missionId} type=${missionType} ` +
-        `reward=${JSON.stringify(record.rewardJson)} walletCredited=${walletCredited}`,
+        `reward=${JSON.stringify(record.rewardJson)} walletCredited=${walletCredited} xpGranted=${xpGranted}`,
     );
 
     return {
@@ -139,6 +176,7 @@ export class DailyEngagementService {
       alreadyClaimed: false,
       rewards: record.rewardJson ?? {},
       walletCredited,
+      xpGranted,
     };
   }
 
@@ -190,6 +228,80 @@ export class DailyEngagementService {
     } catch (err) {
       this.logger.warn(
         `game-server battle-reward fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * POST the progression XP grant to game-server. Fires the standard
+   * award-xp pipeline (xp_transactions row + player_level recompute +
+   * Socket.io `xp_gained` / `level_up` event). The referenceId is the
+   * missionId so subsequent re-tries see a duplicate-key on game-server's
+   * idempotency check (xp_transactions has UNIQUE(user_id, source,
+   * reference_id)).
+   *
+   * Returns true on 2xx; never throws — XP grant must not roll back the
+   * DB claim row, which is the auditable record.
+   */
+  private async creditXp(args: {
+    authorization: string;
+    userId: string;
+    missionId: string;
+    missionType: MissionType;
+  }): Promise<boolean> {
+    const { authorization, userId, missionId, missionType } = args;
+    const source = MISSION_TYPE_TO_XP_SOURCE[missionType];
+    if (!source) {
+      this.logger.warn(`No XpSource mapping for missionType=${missionType}`);
+      return false;
+    }
+
+    const baseUrl = (
+      process.env.GAME_SERVER_URL || 'http://localhost:5000'
+    ).replace(/\/+$/, '');
+    const url = `${baseUrl}/api/progression/award-xp`;
+
+    const body = {
+      userId,
+      source,
+      referenceId: `mission:${missionId}`,
+    };
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 3000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authorization,
+        },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        // 409 = already granted (XP transactions are idempotent on
+        // (user, source, reference)); treat as benign so re-tap of a
+        // claimed mission doesn't surface as an error to the player.
+        if (res.status === 409) {
+          this.logger.debug(
+            `award-xp duplicate (already granted) user=${userId} mission=${missionId}`,
+          );
+          return true;
+        }
+        this.logger.warn(
+          `game-server award-xp non-2xx ${res.status} body=${text.slice(0, 200)}`,
+        );
+        return false;
+      }
+      return true;
+    } catch (err) {
+      this.logger.warn(
+        `game-server award-xp fetch failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       return false;
     } finally {

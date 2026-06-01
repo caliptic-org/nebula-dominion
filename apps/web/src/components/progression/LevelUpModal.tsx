@@ -5,15 +5,49 @@ import { LevelUpPayload, UNLOCK_LABELS, TIER_NAMES } from '@/types/progression';
 
 interface LevelUpModalProps {
   payload: LevelUpPayload;
+  /** Optional level *before* the level-up — when provided, renders a
+   *  "Lv N → Lv N+1" ribbon so the player sees the delta, not just the
+   *  new number. Defaults to `newLevel - 1` if unset. */
+  previousLevel?: number;
   onClose: () => void;
 }
 
-export function LevelUpModal({ payload, onClose }: LevelUpModalProps) {
+/** Polar burst — 12 radial particles spawned around the level number for the
+ *  first ~600ms after mount. Pure CSS animation via per-index `--angle` and
+ *  staggered delay; no JS animation loop. */
+const BURST_PARTICLES = Array.from({ length: 12 }, (_, i) => i);
+
+export function LevelUpModal({ payload, previousLevel, onClose }: LevelUpModalProps) {
   const { newLevel, age, tier, rewards, newUnlocks } = payload;
+  const prevLevel = previousLevel ?? Math.max(1, newLevel - 1);
 
   return (
     <div className="level-up-overlay" onClick={onClose}>
       <div className="level-up-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Radial particle burst behind the number. pointer-events:none so
+         *  the close-overlay click still works through them. */}
+        <div className="level-up-burst" aria-hidden>
+          {BURST_PARTICLES.map((i) => (
+            <span
+              key={i}
+              className="level-up-particle"
+              style={{
+                ['--angle' as string]: `${(i * 360) / BURST_PARTICLES.length}deg`,
+                ['--delay' as string]: `${i * 20}ms`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Delta ribbon — "Lv N → Lv N+1" pinned above the title. The arrow
+         *  delivers the level-up payoff in one glance even before the player
+         *  registers the giant number below. */}
+        <div className="level-up-ribbon" aria-hidden>
+          <span className="level-up-ribbon-prev">Lv {prevLevel}</span>
+          <span className="level-up-ribbon-arrow">→</span>
+          <span className="level-up-ribbon-next">Lv {newLevel}</span>
+        </div>
+
         <p className="level-up-title">Seviye Atladın!</p>
 
         <div className="level-up-number">{newLevel}</div>

@@ -113,6 +113,10 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-nebula-dominion-dev-refresh-secret-32}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Internal game-server URL — used by DailyEngagementService.creditWallet
+      # and creditXp to fan-out mission claims into wallet + XP grants on
+      # game-server. The service name resolves via Docker's internal DNS.
+      GAME_SERVER_URL: ${GAME_SERVER_INTERNAL_URL:-http://game-server:3001}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}

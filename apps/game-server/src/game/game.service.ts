@@ -470,11 +470,19 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Game over: room=${room.id} winner=${winnerId} loser=${loserId}`);
 
-    // Award XP asynchronously — fire-and-forget so it doesn't block game response
-    Promise.all([
-      this.progression.awardXp({ userId: winnerId, source: XpSource.BATTLE_WIN, referenceId: room.id }),
-      this.progression.awardXp({ userId: loserId, source: XpSource.BATTLE_LOSS, referenceId: room.id }),
-    ]).catch((err) => this.logger.error(`Failed to award battle XP: ${err.message}`));
+    // Award XP asynchronously — fire-and-forget so it doesn't block game response.
+    //
+    // Source routing (matches story-bible progression mix targets):
+    //   PvE match  (one side is `bot:*`)  → human gets PVE_WIN / PVE_LOSS
+    //   PvP match  (both human, Çağ 3+)  → PVP_WIN / PVP_LOSS
+    //   PvP match  (both human, Çağ 1-2) → fall back to PVE_*  (PvP source
+    //     is gated to age 3+ by XP_SOURCE_MIN_AGE; passing it pre-Çağ 3
+    //     silently noops — that would mean Çağ 1-2 PvP grants zero XP, so
+    //     we deliberately use PVE_* instead so early skirmishes still pay)
+    //
+    // Bots themselves never level up — `bot:*` userIds have no
+    // player_level row and awardXp would create a phantom one. Skip them.
+    void this.awardBattleXp({ winnerId, loserId, roomId: room.id, isPvE });
 
     // QUEST PROGRESS HOOK — battle.won
     // Bump the winner's `battles_won` counter on the api missions side.
@@ -492,6 +500,56 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
 
   private opponentOf(room: GameRoom, userId: string): string {
     return Object.keys(room.players).find((id) => id !== userId)!;
+  }
+
+  /** Resolve per-player battle XP source by age + PvE/PvP, then fan out. See
+   *  the call-site comment block in finishGame for the routing matrix. Kept
+   *  as an async helper so the call-site can `void` it without ceremony. */
+  private async awardBattleXp(args: {
+    winnerId: string;
+    loserId: string;
+    roomId: string;
+    isPvE: boolean;
+  }): Promise<void> {
+    const { winnerId, loserId, roomId, isPvE } = args;
+    const humans: { userId: string; isWinner: boolean }[] = [];
+    if (!winnerId.startsWith(BOT_USER_ID_PREFIX)) {
+      humans.push({ userId: winnerId, isWinner: true });
+    }
+    if (!loserId.startsWith(BOT_USER_ID_PREFIX)) {
+      humans.push({ userId: loserId, isWinner: false });
+    }
+
+    try {
+      await Promise.all(
+        humans.map(async ({ userId, isWinner }) => {
+          let source: XpSource;
+          if (isPvE) {
+            source = isWinner ? XpSource.PVE_WIN : XpSource.PVE_LOSS;
+          } else {
+            // PvP match — only counts as PVP_* if the player is Çağ 3+;
+            // sub-Çağ-3 PvP still pays out via the PvE bucket so early
+            // engagement isn't penalised.
+            const progress = await this.progression.getProgress(userId);
+            const isAge3Plus = progress.age >= 3;
+            if (isAge3Plus) {
+              source = isWinner ? XpSource.PVP_WIN : XpSource.PVP_LOSS;
+            } else {
+              source = isWinner ? XpSource.PVE_WIN : XpSource.PVE_LOSS;
+            }
+          }
+          await this.progression.awardXp({
+            userId,
+            source,
+            referenceId: roomId,
+          });
+        }),
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to award battle XP: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   private findUnit(room: GameRoom, userId: string, unitId: string): UnitState | undefined {

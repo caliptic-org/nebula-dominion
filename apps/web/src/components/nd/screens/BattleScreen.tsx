@@ -783,9 +783,15 @@ function UnitMarker({ unit, color, flipped }: { unit: Combatant; color: string; 
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          clipPath: 'polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px)',
+          // Mirror the clipPath via swapping the cut corner — flipped sides
+          // get a top-right notch instead of top-left. Previously we used
+          // `transform: scaleX(-1)` on the whole tier badge, which dragged
+          // the text label along and printed "TI" / "ST" mirror-glyphs on
+          // the enemy side. Text stays upright now, only the chamfer flips.
+          clipPath: flipped
+            ? 'polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)'
+            : 'polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px)',
           boxShadow: `0 0 12px ${color}55`,
-          transform: flipped ? 'scaleX(-1)' : undefined,
         }}
       >
         T{unit.tier}

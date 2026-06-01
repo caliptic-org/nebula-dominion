@@ -56,13 +56,27 @@ const POOL_LABEL: Record<NDRaceKey, string> = {
   seytan:  'BAĞLI RUHLAR',
 };
 
-const MERGE_HINT: Record<NDRaceKey, string> = {
-  insan:   'Üç tier-3 askeri promosyon töreniyle bir tier-4 kaptan unvanı verirsin.',
-  zerg:    'Üç larva evrim çukurunda eriyip yeni bir mutasyon formu doğurur. Genetik kazanım kalıcıdır.',
-  otomat:  'Üç modülü tek bir yüksek-versiyon yapıya derler. Komponent compatibility ::OK ise birleşir.',
-  canavar: 'Alfa, üç küçük canavarı yiyerek bir üst beden formuna yükselir. Yamyamlık vahşi yasadır.',
-  seytan:  'Üç ruhu pakt mührüyle bağlayıp daha büyük bir varlığı çağırırsın. Ruh borçludur.',
-};
+/* Hint is now built dynamically per (race, sourceTier) instead of being a
+ * hardcoded "tier-3 → tier-4" sentence regardless of what the player is
+ * actually merging.  Previously the insan hint always said "Üç tier-3
+ * askeri…" even when the player was on the T1→T2 tab — confusing first
+ * impression for new players who only have Marines. */
+function mergeHint(race: NDRaceKey, sourceTier: number): string {
+  const tgt = sourceTier + 1;
+  switch (race) {
+    case 'zerg':
+      return `Üç tier-${sourceTier} larva evrim çukurunda eriyip bir tier-${tgt} mutasyon formu doğurur.`;
+    case 'otomat':
+      return `Üç tier-${sourceTier} modülü tek bir tier-${tgt} yüksek-versiyon yapıya derler.`;
+    case 'canavar':
+      return `Alfa, üç tier-${sourceTier} küçük canavarı yiyerek bir tier-${tgt} beden formuna yükselir.`;
+    case 'seytan':
+      return `Üç tier-${sourceTier} ruhu pakt mührüyle bağlayıp bir tier-${tgt} büyük varlığı çağırırsın.`;
+    case 'insan':
+    default:
+      return `Üç tier-${sourceTier} birim promosyon töreniyle bir tier-${tgt} üst unvana yükselir.`;
+  }
+}
 
 const SLOT_COUNT = 3;
 const COST_B = 200;
@@ -273,7 +287,7 @@ export default function MergePage() {
 
         {/* Hint */}
         <div style={{ padding: '12px 14px 0' }}>
-          <Caption>{MERGE_HINT[race.key as NDRaceKey] ?? MERGE_HINT.insan}</Caption>
+          <Caption>{mergeHint(race.key as NDRaceKey, sourceTier)}</Caption>
         </div>
 
         {/* Merge ritual canvas */}

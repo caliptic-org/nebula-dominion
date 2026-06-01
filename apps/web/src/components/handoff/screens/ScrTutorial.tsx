@@ -44,7 +44,7 @@ interface TutCopy {
 
 const TUT_COPY: Record<NDRace['key'], Record<number, TutCopy>> = {
   insan: {
-    1: { accent: 'I. UYANIŞ',          title: 'HOŞ GELDİN KOMUTAN',     body: 'Eski Dünya öldü. Sen küllerden yeni bir başlangıç çıkaracaksın. Yıldızlar bekliyor.', cta: 'BAŞLAT',         hint: 'Federation seni bekler.' },
+    1: { accent: 'I. UYANIŞ',          title: 'HOŞ GELDİN KOMUTAN',     body: 'Eski Dünya öldü. Sen küllerden yeni bir başlangıç çıkaracaksın. Yıldızlar bekliyor.', cta: 'BAŞLAT',         hint: 'Federasyon seni bekler.' },
     2: { accent: 'II. İLK İNŞA',       title: 'KOMUTA ÜSSÜNÜ KUR',      body: 'Reaktör Modülü inşa et. Enerji üretmen lazım. Sağdaki "İNŞA" butonuna dokun.',     cta: 'İNŞA ET',        hint: '-200 Kredi · 60sn süre' },
     3: { accent: 'III. İLK BİRİM',     title: 'İLK MARINE\'INI EĞİT',   body: 'Kışlanda piyade üret. 4 birim ile başlıyorsun. Üretim kuyruğuna ekle.',             cta: 'EĞİT',           hint: '-80 Kredi · 24sn süre' },
     4: { accent: 'IV. İLK SALDIRI',    title: 'KOMŞU SİSTEMİ FETHET',   body: 'Galaksi haritasında işaretli düşman üssünü seç ve filonu gönder. İlk zaferin yakın.', cta: 'SALDIR',       hint: 'Zafer ihtimali %68' },

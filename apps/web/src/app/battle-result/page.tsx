@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BattleResultScreen, type BattleResultData, type BattleOutcome } from '@/components/nd/screens';
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
@@ -107,18 +107,33 @@ function makeMockData(outcome: BattleOutcome, raceKey: NDRaceKey): BattleResultD
 
 function Inner() {
   const params = useSearchParams();
+  const router = useRouter();
   const raceParam = params.get('race');
   const outcome: BattleOutcome = params.get('outcome') === 'defeat' ? 'defeat' : 'victory';
+  const hasOutcomeParam = params.get('outcome') !== null;
   const { race, setRace } = useRaceTheme();
 
   // Read the sessionStorage stash once on mount.  null when player navigates
   // here directly without going through /battle (e.g. a deep-link from a
-  // dev page), in which case we fall back to the legacy mock numbers so the
-  // screen layout still demos.
+  // dev page).  `stashLoaded` flips true after the initial read; before that
+  // a null stash is "unknown" rather than "definitely no battle ran".
   const [stash, setStash] = useState<StashedResult | null>(null);
+  const [stashLoaded, setStashLoaded] = useState(false);
   useEffect(() => {
     setStash(readBattleStash());
+    setStashLoaded(true);
   }, []);
+
+  // Honest empty-state: if the player landed here with NO stash AND NO
+  // outcome query param, they never actually fought. Rendering the mock
+  // "48 yok edilen · MVP Genetic Warrior · +4.8K XP" is a lie that the
+  // earlier audit flagged. Bounce to /battle-prep instead.
+  useEffect(() => {
+    if (!stashLoaded) return;
+    if (stash) return;                  // real result, show it
+    if (hasOutcomeParam) return;        // deep-link demo path stays
+    router.replace('/battle-prep');
+  }, [stashLoaded, stash, hasOutcomeParam, router]);
 
   useEffect(() => {
     if (!raceParam) return;

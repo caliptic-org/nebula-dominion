@@ -49,7 +49,20 @@ interface GameEvent {
  * will arrive as ISO strings from the server and this constant goes away.
  * Picking a fixed point in 2026 keeps the "in 2 days" / "in 5 days"
  * relative offsets readable without re-rendering on the clock. */
-const now = new Date('2026-05-24T12:00:00Z').getTime();
+// Hour-aligned "now" so events render with countdowns that count down
+// instead of staying stuck at 00:00:00:00 (the previous hardcoded
+// 2026-05-24 anchor put every demo endDate in the past once the calendar
+// advanced past it). Rounding to the hour boundary keeps SSR-vs-client
+// markup byte-identical inside a single hour — hydration mismatch only
+// kicks in on a tab open right at :59:59 → :00:00 transition.
+//
+// When real backend events land, this whole `now` + EVENTS const goes
+// away; the catalog will be live-fetched and dates arrive as ISO strings.
+const now = (() => {
+  const ms = Date.now();
+  const HOUR = 3600_000;
+  return Math.floor(ms / HOUR) * HOUR;
+})();
 
 const EVENTS: GameEvent[] = [
   {

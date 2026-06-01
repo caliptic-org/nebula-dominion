@@ -579,8 +579,14 @@ function BuildMenuInner() {
                     : busy
                       ? t('sending')
                       : selected
-                        ? `${lex.actionVerb} ${t('startWithName', { name: selected.name })}`
-                        : `${lex.actionVerb} ${t('start')}`}
+                        // lex.actionVerb ("İNŞA", "MUTASYON", etc.) is race-flavor
+                        // and already the action verb — stop concatenating the
+                        // localized "BAŞLAT/START" after it, which produced
+                        // "İNŞA START · Komuta Üssü" mixed-language strings on
+                        // EN-locale sessions.  Single localized template now
+                        // keeps the language consistent.
+                        ? `${lex.actionVerb} · ${selected.name}`
+                        : lex.actionVerb}
                 </GatedButton>
               )}
             </div>

@@ -466,9 +466,16 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
               // "Gold" tab the visible price was gold but the POST debited
               // gems — looked like a scam.  Now we use the same useGem flag
               // the card already computed so the request matches the display.
+              //
+              // FURTHER BUG: backend's shop.controller expects `currencyType`
+              // with values `nebula_coins | void_crystals | premium_gems`,
+              // not `currency: gem | gold`.  Param name + value mismatch was
+              // 422'ing every purchase silently ("henüz hazır" toast). Map
+              // gem→premium_gems, gold→nebula_coins so the request shape
+              // matches the controller contract.
               await api.post('/shop/purchase', {
                 sku: product.id,
-                currency: useGem ? 'gem' : 'gold',
+                currencyType: useGem ? 'premium_gems' : 'nebula_coins',
               });
               toast.success(`${product.name} alındı`);
               // Wallet just changed — pop the HUD without waiting for poll.
@@ -595,7 +602,7 @@ function VipSection({
                     return;
                   }
                   try {
-                    await api.post('/shop/purchase', { sku: `vip_${p.id}`, currency: 'gem' });
+                    await api.post('/shop/purchase', { sku: `vip_${p.id}`, currencyType: 'premium_gems' });
                     toast.success(`VIP ${p.label} satın alındı`);
                   } catch (err) {
                     const msg = err instanceof FetchError ? err.message : 'Yükseltme başarısız';
@@ -746,7 +753,7 @@ function BattlePassSection({ race }: { race: NDRace }) {
             return;
           }
           try {
-            await api.post('/shop/purchase', { sku: 'battle_pass_premium', currency: 'gem' });
+            await api.post('/shop/purchase', { sku: 'battle_pass_premium', currencyType: 'premium_gems' });
             toast.success(tShop('premiumActivated'));
           } catch (err) {
             const msg = err instanceof FetchError ? err.message : tShop('premiumFailed');

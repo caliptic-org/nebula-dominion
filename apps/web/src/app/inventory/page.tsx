@@ -483,7 +483,11 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
     if (!liveTarget) { toast.error(tInventory('trainFirst')); return; }
     setUpgrading(true);
     try {
-      const upgraded = await gameServerApi.post<PlayerUnitDto>(`/v1/units/${liveTarget.id}/upgrade`);
+      // gameServerApi already prefixes with /api/ — the previous /v1/ here
+      // produced /api/v1/units/.../upgrade which game-server doesn't expose
+      // (it uses /api/units/:id/upgrade). 404'd silently with the misleading
+      // "henüz hazır değil" toast.
+      const upgraded = await gameServerApi.post<PlayerUnitDto>(`/units/${liveTarget.id}/upgrade`);
       const newLevel = (upgraded as PlayerUnitDto & { level?: number }).level ?? unit.level + 1;
       toast.success(`${unit.name} Lv ${newLevel}'e yükseltildi`);
       onUpgraded();

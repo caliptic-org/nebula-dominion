@@ -21,7 +21,10 @@ import { DepositResourcesDto } from './dto/deposit-resources.dto';
 import { AllianceRole } from './entities/alliance-member.entity';
 
 @ApiTags('Alliance')
-@Controller('api/v1/alliances')
+// Global prefix `api/v1` is set in main.ts via setGlobalPrefix; declaring it
+// here too produced a literal /api/v1/api/v1/alliances/* mount where the FE's
+// api.post('/alliances/join') silently 404'd ("henüz hazır" toast).
+@Controller('alliances')
 export class AllianceController {
   constructor(private readonly allianceService: AllianceService) {}
 

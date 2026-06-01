@@ -12,6 +12,11 @@ import { ResourcesService } from '../resources/resources.service';
 import { EconomyService } from '../economy/economy.service';
 import { StartConstructionDto } from './dto/start-construction.dto';
 import { scaledDurationSec } from '../common/game-speed';
+import {
+  computeUpgradeRequirements,
+  canUpgrade,
+  describeBlockers,
+} from './upgrade-requirements';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
@@ -150,18 +155,54 @@ export class BuildingsService {
       );
     }
 
+    // Tier-progression prerequisite check — HQ-driven gating so the
+    // player can't tap "YÜKSELT" 9 times in a row on the command center
+    // and reach the cap with nothing else built. Diğer binalar HQ'yu
+    // geçemez, HQ kendisi yardımcı binaların seviyesine bağlı.
+    // Frontend mirror'ı aynı fonksiyonu çağırır, aynı label çıkar.
+    const targetLevel = building.level + 1;
+    const ownedBuildings = await this.buildingRepo.find({
+      where: { playerId },
+    });
+    const resourceSnap = await this.resources.getSnapshot(playerId);
+    const requirements = computeUpgradeRequirements({
+      building: {
+        type: building.type,
+        level: building.level,
+        status: building.status,
+      },
+      targetLevel,
+      ownedBuildings: ownedBuildings.map((b) => ({
+        type: b.type,
+        level: b.level,
+        status: b.status,
+      })),
+      scienceBalance: resourceSnap.science,
+    });
+    if (!canUpgrade(requirements)) {
+      throw new BadRequestException(
+        `Yükseltme şartları eksik: ${describeBlockers(requirements)}`,
+      );
+    }
+
     const baseCfg = BUILDING_CONFIGS[building.type];
     const scale = Math.pow(1.5, building.level); // cost at level L → L+1
+    // Lv 5+ upgrade'lerinde bilim de düşülür — computeUpgradeRequirements
+    // ile aynı formül: targetLevel × 50. Cost objesinin science alanını
+    // ResourcesService.deduct artık honour ediyor.
+    const scienceCost = targetLevel >= 5 ? targetLevel * 50 : 0;
     const upgradeCost = {
       mineral: Math.round(baseCfg.cost.mineral * scale),
       gas: Math.round(baseCfg.cost.gas * scale),
       energy: Math.round(baseCfg.cost.energy * scale),
+      science: scienceCost,
     };
 
     const canAfford = await this.resources.canAfford(playerId, upgradeCost);
     if (!canAfford) {
+      const sciencePart = scienceCost > 0 ? ` ${scienceCost}◈` : '';
       throw new BadRequestException(
-        `Insufficient resources. Required: ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E`,
+        `Insufficient resources. Required: ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E${sciencePart}`,
       );
     }
 

@@ -55,6 +55,11 @@ import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
 import { buildingOriginalAsset, levelToAge } from '@/lib/asset-paths';
+import {
+  computeUpgradeRequirements,
+  canUpgrade,
+  type UpgradeRequirement,
+} from '@/lib/upgrade-requirements';
 
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
@@ -196,6 +201,26 @@ function Inner({ slug }: { slug: string }) {
     ? Math.ceil((cooldownDeadline - now) / 1000)
     : 0;
   const inCooldown = cooldownRemainingSec > 0;
+
+  // Upgrade prerequisite check — mirror of the backend gate so the UI can
+  // tell the player *why* the YÜKSELT button is disabled before they tap
+  // and eat a 400. Recomputed on every render off the live row + science
+  // wallet, no memoization needed (cheap O(n)). When owned is null, we
+  // pass an empty placeholder so the hook order stays stable.
+  const upgradeRequirements: UpgradeRequirement[] = owned
+    ? computeUpgradeRequirements({
+        building: { type: owned.type, level: owned.level, status: owned.status },
+        targetLevel: owned.level + 1,
+        ownedBuildings: (liveBuildings ?? []).map((b) => ({
+          type: b.type,
+          level: b.level,
+          status: b.status,
+        })),
+        scienceBalance: resources?.science ?? 0,
+      })
+    : [];
+  const requirementsMet = canUpgrade(upgradeRequirements);
+  const unmetReqLabels = upgradeRequirements.filter((r) => !r.met).map((r) => r.label);
 
   // Recovery redirect for stale/invalid slugs — runs AFTER all hooks so
   // React's hook order stays stable across renders.  Renders null in the
@@ -344,7 +369,9 @@ function Inner({ slug }: { slug: string }) {
             full
             disabled={
               (tokenBuilding.locked ?? false) ||
-              (owned ? upgradingId === owned.id || inCooldown : busy)
+              (owned
+                ? upgradingId === owned.id || inCooldown || !requirementsMet
+                : busy)
             }
             onClick={owned ? handleUpgrade : handleBuild}
           >
@@ -353,7 +380,9 @@ function Inner({ slug }: { slug: string }) {
                 ? 'YÜKSELTILIYOR…'
                 : inCooldown
                   ? `BEKLE · ${cooldownRemainingSec}s`
-                  : `YÜKSELT · Lv ${owned.level} → ${owned.level + 1}`
+                  : !requirementsMet
+                    ? `KİLİTLİ · ${unmetReqLabels[0] ?? 'Şartlar Eksik'}`
+                    : `YÜKSELT · Lv ${owned.level} → ${owned.level + 1}`
               : busy
                 ? 'GÖNDERİLİYOR…'
                 : `${lex.actionVerb} BAŞLAT`}
@@ -521,21 +550,74 @@ function Inner({ slug }: { slug: string }) {
                   ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceA.name} + ${Math.round(costB * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceB.name} ile yükseltebilirsin.`
                   : 'Bu slot henüz inşa edilmemiş. Önce yapımı başlat, sonra seviyeleri buradan görürsün.'}
               </Caption>
+
+              {/* Requirement checklist — backend'in computeUpgradeRequirements
+               *  mirror'ı. Her şartın yanında ✓ (yeşil) ya da ✗ (kırmızı)
+               *  görünür. Oyuncu burada "neden YÜKSELT butonu kilitli"
+               *  sorusuna anında cevap bulur — backend 400 toast'unu
+               *  beklemek zorunda kalmaz. */}
+              {owned && upgradeRequirements.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <Caption style={{ fontSize: 10, marginBottom: 6 }}>
+                    GEREKSİNİMLER (Lv {owned.level + 1})
+                  </Caption>
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}
+                  >
+                    {upgradeRequirements.map((r, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '4px 8px',
+                          background: r.met ? `${ND.ok}14` : `${ND.danger}14`,
+                          border: `1px solid ${r.met ? ND.ok : ND.danger}55`,
+                          borderRadius: 4,
+                          fontSize: 11,
+                        }}
+                      >
+                        <span style={{ color: r.met ? ND.ok : ND.danger, fontWeight: 700 }}>
+                          {r.met ? '✓' : '✗'}
+                        </span>
+                        <span style={{ color: ND.text }}>{r.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div style={{ marginTop: 12 }}>
                 <NDButton
                   race={race}
                   size="md"
                   full
-                  disabled={!owned || tokenBuilding.locked || upgradingId === owned?.id || inCooldown}
+                  disabled={
+                    !owned ||
+                    tokenBuilding.locked ||
+                    upgradingId === owned?.id ||
+                    inCooldown ||
+                    !requirementsMet
+                  }
                   onClick={handleUpgrade}
                 >
                   {upgradingId === owned?.id
                     ? t('upgrading')
                     : inCooldown
                       ? `BEKLE · ${cooldownRemainingSec}s`
-                      : owned
-                        ? t('upgradeToLevel', { level: owned.level + 1 })
-                        : t('upgradeLocked')}
+                      : !requirementsMet
+                        ? `KİLİTLİ · ${unmetReqLabels[0] ?? 'Şartlar eksik'}`
+                        : owned
+                          ? t('upgradeToLevel', { level: owned.level + 1 })
+                          : t('upgradeLocked')}
                 </NDButton>
               </div>
             </Panel>

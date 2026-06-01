@@ -152,7 +152,14 @@ export class ResourcesService {
 
   async canAfford(playerId: string, cost: ResourceCost): Promise<boolean> {
     const snap = await this.getSnapshot(playerId);
-    return snap.mineral >= cost.mineral && snap.gas >= cost.gas && snap.energy >= cost.energy;
+    if (snap.mineral < cost.mineral) return false;
+    if (snap.gas     < cost.gas)     return false;
+    if (snap.energy  < cost.energy)  return false;
+    // Science is opt-in on ResourceCost (Lv 5+ building upgrades start
+    // charging it). Older call-sites omit the field; only enforce when
+    // explicitly set.
+    if (cost.science && snap.science < cost.science) return false;
+    return true;
   }
 
   async grant(
@@ -206,10 +213,12 @@ export class ResourcesService {
   async deduct(playerId: string, cost: ResourceCost): Promise<ResourceSnapshot> {
     const resource = await this.getOrCreate(playerId);
 
+    const scienceCost = cost.science ?? 0;
     if (
       Number(resource.mineral) < cost.mineral ||
       Number(resource.gas) < cost.gas ||
-      Number(resource.energy) < cost.energy
+      Number(resource.energy) < cost.energy ||
+      Number(resource.science) < scienceCost
     ) {
       throw new Error(`Insufficient resources for player ${playerId}`);
     }
@@ -217,12 +226,17 @@ export class ResourcesService {
     resource.mineral = Number(resource.mineral) - cost.mineral;
     resource.gas = Number(resource.gas) - cost.gas;
     resource.energy = Number(resource.energy) - cost.energy;
+    if (scienceCost > 0) {
+      resource.science = Number(resource.science) - scienceCost;
+    }
 
     await this.resourceRepo.save(resource);
     const snapshot = this.toSnapshot(resource);
     await this.setCache(playerId, snapshot);
 
-    this.logger.debug(`Deducted resources for player ${playerId}: -${cost.mineral}M -${cost.gas}G -${cost.energy}E`);
+    this.logger.debug(
+      `Deducted resources for player ${playerId}: -${cost.mineral}M -${cost.gas}G -${cost.energy}E -${scienceCost}◈`,
+    );
     return snapshot;
   }
 

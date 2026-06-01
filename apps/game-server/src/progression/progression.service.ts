@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, Repository, MoreThan } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PlayerLevel } from './entities/player-level.entity';
 import { XpTransaction } from './entities/xp-transaction.entity';
@@ -42,6 +42,8 @@ export class ProgressionService {
     private readonly xpTxRepo: Repository<XpTransaction>,
     @InjectRepository(EraPackage)
     private readonly eraPackageRepo: Repository<EraPackage>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly emitter: EventEmitter2,
     private readonly progressionConfigService: ProgressionConfigService,
   ) {}
@@ -166,6 +168,31 @@ export class ProgressionService {
 
     if (record.currentAge >= MAX_AGE) {
       throw new BadRequestException(`Player is already at the maximum age (${MAX_AGE}).`);
+    }
+
+    // Building-tier gate: XP alone isn't enough — the player's keep
+    // (komuta üssü / command_center) must be at the current age's
+    // max level too, so they can't farm XP from missions and skip the
+    // build economy. Mirror of the per-building upgrade prerequisites:
+    // diğer binalar HQ'yu geçemez, dolayısıyla HQ = en yüksek bina
+    // seviyesi. Çağ 2'ye geçmek için HQ Lv 9, Çağ 3 için Lv 18, ...
+    //
+    // Raw query because progression module doesn't depend on the
+    // buildings module (would introduce a circular dep — buildings
+    // already depends on progression for awardXp).
+    const hqRows = await this.dataSource.query<{ level: number }[]>(
+      `SELECT level FROM player_buildings
+        WHERE player_id = $1
+          AND type     = 'command_center'
+          AND status   = 'active'
+        ORDER BY level DESC LIMIT 1`,
+      [userId],
+    );
+    const hqLevel = hqRows?.[0]?.level ?? 0;
+    if (hqLevel < maxLevel) {
+      throw new BadRequestException(
+        `Komuta Üssü Lv ${maxLevel} gerekli (şu an Lv ${hqLevel}). XP yeterli ama yapılar yetişmedi.`,
+      );
     }
 
     const existing = await this.eraPackageRepo.findOne({

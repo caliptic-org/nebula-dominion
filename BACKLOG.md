@@ -85,9 +85,12 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
   iskeleti var, gerçek metinler eksik. Çağ 1→2 ile başla (Zerg: Kovan
   Bilincinin Doğuşu).
 
-- [ ] **P3.2 /shop tab unlock UI**. `shop.consumables` her zaman açık,
-  `shop.cosmetics` Lv 5, `shop.premium_skins` Çağ 2, `shop.race_specific_items`
-  Çağ 3. Tab başlığında 🔒 + tab içine girince GatedButton modal.
+- [x] **P3.2 /shop tab unlock UI**. `TAB_GATE` map'i shop tab'larını
+  gates.config.ts entry'lerine bağlıyor: genel→null, etkinlik→shop.cosmetics
+  (Lv 5+), vip→shop.premium_skins (Çağ 2+), gecis→shop.race_specific_items
+  (Çağ 3+), lonca→guild.create (Çağ 3+). Kilitli tab'ta 🔒 prefix +
+  opacity 0.55 + tap toast (primaryHint). `useGates()` ile reactive.
+  *Dosya: `apps/web/src/app/shop/page.tsx`*
 
 - [ ] **P3.3 Commander unlock animation**. `commander.tier2/3/4` gate'leri
   zaten var. Çağ geçişi anında otomatik unlock modal + portrait reveal,

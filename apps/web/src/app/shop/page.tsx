@@ -28,6 +28,7 @@ import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
 import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useVipStatus } from '@/hooks/useVip';
+import { useGates, gateAllows } from '@/lib/gates';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
@@ -112,6 +113,18 @@ const TAB_LABEL: Record<Tab, string> = {
   gecis: 'Savaş Geçişi',
 };
 
+/** Tab → gate-id map. Null = always-open. Each gate id matches an entry in
+ *  apps/game-server/src/progression/gates.config.ts. Tabs whose gate evaluates
+ *  to `unlocked: false` render with a 🔒 prefix and route taps to a toast
+ *  showing the primaryHint instead of switching tabs. */
+const TAB_GATE: Record<Tab, string | null> = {
+  genel:    null,                          // shop.consumables = always
+  etkinlik: 'shop.cosmetics',              // Lv 5+
+  vip:      'shop.premium_skins',          // Çağ 2+
+  gecis:    'shop.race_specific_items',    // Çağ 3+
+  lonca:    'guild.create',                // Çağ 3+ (alias for guild access)
+};
+
 const TAG_COLOR: Record<Tag, string> = {
   new: ND.ok,
   best: ND.warn,
@@ -193,6 +206,23 @@ function ShopPageInner() {
   const playerVipLevel = vipStatus?.vipLevel ?? GUEST_VIP_LEVEL;
   const playerVipXp = vipStatus?.currentXp ?? GUEST_VIP_XP;
 
+  // Live gate state — drives the lock icon + tab-tap modal. While the gate
+  // fetch is in flight we render every tab as unlocked (optimistic) so the
+  // first paint never disables a tab that's actually open.
+  const { data: gatesMap } = useGates();
+  function isTabLocked(t: Tab): boolean {
+    const gateId = TAB_GATE[t];
+    if (!gateId) return false;
+    const gate = gatesMap?.[gateId] ?? null;
+    return !gateAllows(gate);
+  }
+  function tabLockHint(t: Tab): string {
+    const gateId = TAB_GATE[t];
+    if (!gateId) return '';
+    const gate = gatesMap?.[gateId];
+    return gate?.primaryHint ?? 'Bu sekme henüz açık değil';
+  }
+
   const visible = useMemo(() => {
     if (tab === 'vip') return [] as ShopProduct[];
     if (tab === 'gecis') return [] as ShopProduct[];
@@ -242,16 +272,29 @@ function ShopPageInner() {
       <div role="tablist" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, padding: '12px 16px 0' }}>
         {(Object.keys(TAB_LABEL) as Tab[]).map(t => {
           const on = tab === t;
+          const locked = isTabLocked(t);
           return (
             <button
               key={t}
               role="tab"
               aria-selected={on}
+              aria-disabled={locked}
               type="button"
-              onClick={() => setTab(t)}
-              style={tabStyle(on, race)}
+              onClick={() => {
+                if (locked) {
+                  toast.info(tabLockHint(t));
+                  return;
+                }
+                setTab(t);
+              }}
+              style={{
+                ...tabStyle(on, race),
+                opacity: locked ? 0.55 : 1,
+                cursor: locked ? 'not-allowed' : 'pointer',
+              }}
+              title={locked ? tabLockHint(t) : undefined}
             >
-              {TAB_LABEL[t]}
+              {locked ? '🔒 ' : ''}{TAB_LABEL[t]}
             </button>
           );
         })}

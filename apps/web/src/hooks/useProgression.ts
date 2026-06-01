@@ -37,7 +37,16 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProgressionEvent[]>([]);
   const socketRef = useRef<Socket | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+  // Progression module lives on game-server, NOT the api service. Earlier
+  // versions of this hook hit `${NEXT_PUBLIC_API_URL}/progression/:id`
+  // which resolved to api-nebula.caliptic.com/progression/:id → 404 every
+  // single time (api has /tier/* not /progression/*). Switched to
+  // game-server's URL + /api/progression/:id path. Also passes the JWT
+  // because the route is HttpJwtGuard-protected — without it we'd get
+  // 401 instead of 404 (still wrong but less obviously so).
+  const gameServerBase = (
+    process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? 'http://localhost:3001'
+  ).replace(/\/+$/, '');
 
   const fetchProgress = useCallback(async () => {
     if (!userId) {
@@ -45,12 +54,19 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
       return;
     }
     try {
-      const res = await fetch(`${apiBase}/progression/${userId}`);
+      // Read token from the same storage key the rest of the app uses.
+      // Without auth this 401s; we treat that as "no progression yet"
+      // and leave progress null so guarded screens render gracefully.
+      const token = typeof window !== 'undefined'
+        ? window.localStorage.getItem('accessToken')
+        : null;
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${gameServerBase}/api/progression/${userId}`, { headers });
       if (res.ok) setProgress(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [userId, apiBase]);
+  }, [userId, gameServerBase]);
 
   useEffect(() => {
     fetchProgress();

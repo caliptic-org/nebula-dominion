@@ -176,7 +176,7 @@ export function useVipStatus() {
   const fetchStatus = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const wire = await api.get<VipStatusWire>('/api/vip/status');
+      const wire = await api.get<VipStatusWire>('/vip/status');
       setState({ data: mapStatus(wire), loading: false, error: null });
     } catch (err) {
       setState({ data: null, loading: false, error: errorMessage(err, 'VIP durumu yüklenemedi') });
@@ -211,7 +211,7 @@ export function useVipPlans() {
   const fetchPlans = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const wire = await api.get<VipPlanWire[]>('/api/vip/plans');
+      const wire = await api.get<VipPlanWire[]>('/vip/plans');
       setState({ data: wire.map(mapPlan), loading: false, error: null });
     } catch (err) {
       setState({ data: null, loading: false, error: errorMessage(err, 'Planlar yüklenemedi') });
@@ -231,7 +231,7 @@ export function useVipPlans() {
 }
 
 export async function claimDailyVip(): Promise<ClaimDailyResult> {
-  const wire = await api.post<ClaimDailyWire>('/api/vip/claim-daily');
+  const wire = await api.post<ClaimDailyWire>('/vip/claim-daily');
   return {
     rewards: wire.rewards.map(mapReward),
     alreadyClaimed: wire.already_claimed,
@@ -240,7 +240,7 @@ export async function claimDailyVip(): Promise<ClaimDailyResult> {
 }
 
 export async function purchaseVip(planId: string): Promise<{ checkoutUrl: string }> {
-  const wire = await api.post<PurchaseWire>('/api/vip/purchase', { plan_id: planId });
+  const wire = await api.post<PurchaseWire>('/vip/purchase', { plan_id: planId });
   return { checkoutUrl: wire.checkout_url };
 }
 

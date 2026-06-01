@@ -106,7 +106,7 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
 
 ---
 
-## P4 — Çağ 3+ multiplayer layer (Lv 19+)
+## P4 — Çağ 3+ multiplayer layer (Lv 19+)  ✓ TAMAMLANDI
 
 PvP / lonca / endgame içerikleri buradan başlar.
 
@@ -117,11 +117,24 @@ PvP / lonca / endgame içerikleri buradan başlar.
   (`apps/web/src/app/tier-up/page.tsx:18`). API contract'ında da var
   (`lib/tier-api.ts:25`). End-to-end zaten çalışıyor.
 
-- [ ] **P4.2 Battle replay sistemi**. `battle_history` tablosu var ama
-  replay yolu yok. /battle-result log dump'tan replay'e dönüşmeli.
+- [x] **P4.2 Battle replay sistemi**. Yeni `/replay/[id]` route
+  oluşturuldu — `GET /battles/:id` stub'undan log array'ini çekiyor +
+  tur-by-tur scrubbable timeline (oynat/duraklat/jump-to-turn).
+  Per-turn winProb + reward summary final card. Profile'daki HistoryRow
+  artık link, "İZLE ›" CTA gösteriyor.
+  Caveat: api battles stub in-memory (container restart → replay 404).
+  Persistent BattleModule landıktan sonra DB-backed log'a swap'lanır,
+  UI değişmez.
+  *Dosya: `apps/web/src/app/replay/[id]/page.tsx`*
 
-- [ ] **P4.3 Achievement gallery**. /profile'a "Başarımlar" tab — kazanılan
-  500 XP'lik tetikler görünür hale gelmeli.
+- [x] **P4.3 Achievement gallery in /profile**. /profile başarımlar tab'ı
+  iki bölüm: **KAZANILMIŞ BAŞARIMLAR** (canlı claim state, +500 XP
+  achievement'lar, `lib/achievements.ts` shared catalog, summary chip'ler
+  + per-row Alındı/+500 XP/Kilitli durumu, /missions deep-link) ve
+  **SEZON MADALYALARI** (legacy dekoratif, gameplay'i etkilemiyor).
+  ACHIEVEMENTS array'i `apps/web/src/lib/achievements.ts`'ye taşındı —
+  /missions ve /profile aynı source-of-truth'tan beslenir.
+  *Dosya: `apps/web/src/lib/achievements.ts`, `apps/web/src/app/profile/page.tsx`*
 
 ---
 

@@ -27,6 +27,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { refreshGameResources } from '@/hooks/useGameResources';
 import { toast } from '@/components/handoff/Toaster';
 import { api, FetchError } from '@/lib/api';
+import { ACHIEVEMENTS, type Achievement } from '@/lib/achievements';
 
 type Tab = 'story' | 'daily' | 'weekly' | 'achievement';
 type State = 'active' | 'completed' | 'locked';
@@ -51,15 +52,6 @@ interface Mission {
   chapter?: number;
 }
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  unlocked: boolean;
-  legendary?: boolean;
-  progress?: number;
-}
-
 const MISSIONS: Mission[] = [
   { id: 'story-1', title: "Nebula'nın Uyanışı", description: 'İlk üssünü kur ve komutanını seç.', state: 'completed', progress: 100, progressLabel: '1/1', rewards: [{ label: 'Kaynak', amount: 5000 }, { label: 'XP', amount: 1200 }], category: 'story', difficulty: 'kolay', chapter: 1 },
   { id: 'story-2', title: 'İlk Kan', description: 'Yakındaki düşman üssüne saldır ve ilk savaş zaferini kazan.', state: 'active', progress: 60, progressLabel: '3/5', rewards: [{ label: 'Kaynak', amount: 8000 }, { label: 'XP', amount: 2500 }], category: 'story', difficulty: 'orta', chapter: 1 },
@@ -70,15 +62,6 @@ const MISSIONS: Mission[] = [
   { id: 'daily-3', title: 'Araştırmacı Zihni', description: '1 teknoloji araştırması tamamla.', state: 'active', progress: 0, progressLabel: '0/1', timeLeft: '14s 23d', rewards: [{ label: 'Enerji', amount: 1000 }], category: 'daily', difficulty: 'kolay' },
   { id: 'weekly-1', title: 'Savaş Makinesi', description: 'Bu hafta 15 düşman birimi yok et.', state: 'active', progress: 47, progressLabel: '7/15', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 15000 }, { label: 'XP', amount: 10000 }], category: 'weekly', difficulty: 'zor' },
   { id: 'weekly-2', title: 'İmparatorluk İnşacısı', description: 'Bu hafta 5 yeni yapı inşa et.', state: 'active', progress: 80, progressLabel: '4/5', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 10000 }, { label: 'XP', amount: 6000 }], category: 'weekly', difficulty: 'orta' },
-];
-
-const ACHIEVEMENTS: Achievement[] = [
-  { id: 'ach-1', title: 'İlk Kan', description: 'İlk savaş zaferini kazan', unlocked: true },
-  { id: 'ach-2', title: 'Kaynak Efendisi', description: '100.000 mineral topla', unlocked: true },
-  { id: 'ach-3', title: 'Savaş Tanrısı', description: '1000 düşman birimi yok et', unlocked: false, legendary: true, progress: 34 },
-  { id: 'ach-4', title: 'Kaşif', description: "Haritanın %50'sini keşfet", unlocked: false, progress: 62 },
-  { id: 'ach-5', title: 'Diplomat', description: '3 farklı ırkla ittifak kur', unlocked: false, progress: 33 },
-  { id: 'ach-6', title: 'Teknoloji Dehası', description: "Tüm tech tree'yi tamamla", unlocked: false, legendary: true, progress: 0 },
 ];
 
 const DIFFICULTY_COLOR: Record<Difficulty, string> = {

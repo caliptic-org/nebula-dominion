@@ -25,6 +25,11 @@ import { useBaseState } from '@/hooks/useBaseState';
 import { useGameResources } from '@/hooks/useGameResources';
 import { useActiveBuffs } from '@/hooks/useActiveBuffs';
 import { useBattleHistory, deriveBattleStats } from '@/hooks/useBattleHistory';
+import { useMissionClaims } from '@/hooks/useMissions';
+import {
+  ACHIEVEMENTS as CLAIMABLE_ACHIEVEMENTS,
+  summariseAchievements,
+} from '@/lib/achievements';
 
 type Tab = 'stats' | 'achievements' | 'history';
 
@@ -206,6 +211,16 @@ export default function ProfilePage() {
   const earned = ACHIEVEMENTS.filter(a => a.earned).length;
   const totalPower = profile.power;
 
+  // Live achievement claim state — wired into the canonical achievement
+  // catalog (apps/web/src/lib/achievements.ts) shared with /missions. The
+  // "Kazanılmış Başarımlar" section below derives counts from this set so
+  // the bar reflects real +500 XP claims, not the legacy decorative ACHIEVEMENTS.
+  const { claimed: claimedAchievementIds } = useMissionClaims();
+  const achievementSummary = useMemo(
+    () => summariseAchievements(claimedAchievementIds),
+    [claimedAchievementIds],
+  );
+
   return (
     <Screen race={race} style={{ height: '100dvh' }}>
       {/* Header */}
@@ -383,35 +398,127 @@ export default function ProfilePage() {
         )}
 
         {tab === 'achievements' && (
-          <Panel race={race}>
-            <div style={panelHeader()}>
-              <Eyebrow color={race.primary}>BAŞARIMLAR</Eyebrow>
-              <Code>{earned}/{ACHIEVEMENTS.length}</Code>
-            </div>
-            <div style={{ padding: 12 }}>
-              <Bar value={Math.round((earned / ACHIEVEMENTS.length) * 100)} color={race.primary} label="TAMAMLAMA" trailing={`%${Math.round((earned / ACHIEVEMENTS.length) * 100)}`} />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
-                {ACHIEVEMENTS.map(a => (
-                  <div
-                    key={a.id}
-                    style={{
-                      padding: 10,
-                      border: `1px solid ${a.earned ? (a.legendary ? race.primary : ND.borderHi) : ND.border}`,
-                      borderRadius: 4,
-                      background: a.earned ? (a.legendary ? `${race.primary}10` : 'transparent') : 'rgba(255,255,255,0.02)',
-                      opacity: a.earned ? 1 : 0.55,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Code>{a.earned ? (a.legendary ? '★' : '◆') : '🔒'}</Code>
-                      <div style={{ fontFamily: ND.display, fontSize: 12, color: a.legendary ? race.primary : ND.text }}>{a.label}</div>
-                    </div>
-                    {a.detail && <Caption style={{ fontSize: 10, marginTop: 4 }}>{a.detail}</Caption>}
-                  </div>
-                ))}
+          <>
+            {/* Kazanılmış Başarımlar — gerçek claim state'i (P2.3 + P4.3).
+             *  /daily-engagement/claim üzerinden +500 XP almış (or claimable)
+             *  achievement'ları listeler. Her satır /missions'a deep-link.
+             *  Statik decorative medaller (ACHIEVEMENTS) aşağıda kalıyor. */}
+            <Panel race={race}>
+              <div style={panelHeader()}>
+                <Eyebrow color={race.primary}>KAZANILMIŞ BAŞARIMLAR</Eyebrow>
+                <Code>{achievementSummary.claimed}/{achievementSummary.total}</Code>
               </div>
-            </div>
-          </Panel>
+              <div style={{ padding: 12 }}>
+                <Bar
+                  value={
+                    achievementSummary.total > 0
+                      ? Math.round((achievementSummary.claimed / achievementSummary.total) * 100)
+                      : 0
+                  }
+                  color={race.primary}
+                  label="TAMAMLAMA"
+                  trailing={
+                    achievementSummary.total > 0
+                      ? `%${Math.round((achievementSummary.claimed / achievementSummary.total) * 100)}`
+                      : '%0'
+                  }
+                />
+                {/* Summary chips: claimed / claimable / locked */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                  <Chip color={ND.ok}>{achievementSummary.claimed} alındı</Chip>
+                  {achievementSummary.claimable > 0 && (
+                    <Chip color={ND.warn}>{achievementSummary.claimable} alınabilir</Chip>
+                  )}
+                  <Chip color={ND.textDim}>{achievementSummary.locked} kilitli</Chip>
+                </div>
+                {/* Achievement list with per-row claim state */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                  {CLAIMABLE_ACHIEVEMENTS.map(a => {
+                    const isClaimed = claimedAchievementIds.has(a.id);
+                    const isClaimable = a.unlocked && !isClaimed;
+                    const isLocked = !a.unlocked;
+                    return (
+                      <Link
+                        key={a.id}
+                        href="/missions?tab=achievement"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '32px 1fr auto',
+                          gap: 8,
+                          padding: 10,
+                          border: `1px solid ${
+                            isClaimed
+                              ? ND.ok
+                              : isClaimable
+                                ? (a.legendary ? race.primary : ND.borderHi)
+                                : ND.border
+                          }`,
+                          borderRadius: 4,
+                          background: isClaimed
+                            ? 'rgba(68,255,136,0.06)'
+                            : isClaimable
+                              ? `${race.primary}08`
+                              : 'rgba(255,255,255,0.02)',
+                          opacity: isLocked ? 0.55 : 1,
+                          alignItems: 'center',
+                          textDecoration: 'none',
+                          color: 'inherit',
+                        }}
+                      >
+                        <Code style={{ fontSize: 16 }}>
+                          {isClaimed ? '✓' : isClaimable ? (a.legendary ? '★' : '◆') : '🔒'}
+                        </Code>
+                        <div>
+                          <div style={{ fontFamily: ND.display, fontSize: 12, color: a.legendary && !isLocked ? race.primary : ND.text }}>
+                            {a.title}
+                          </div>
+                          <Caption style={{ fontSize: 10 }}>{a.description}</Caption>
+                        </div>
+                        <Code style={{ fontSize: 10, color: isClaimed ? ND.ok : isClaimable ? race.primary : ND.textDim }}>
+                          {isClaimed ? 'ALINDI' : isClaimable ? '+500 XP' : 'KİLİTLİ'}
+                        </Code>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </Panel>
+
+            {/* Legacy decorative medals — kept for visual variety until the
+             *  claimable catalog above grows. These never gate gameplay; they
+             *  show off long-tail tags ("Elmas Sezon", "Hız Tanrısı") that
+             *  ride on the cosmetic side. When 2× ACHIEVEMENTS sections feels
+             *  noisy, retire this in favour of the live one alone. */}
+            <Panel race={race} style={{ marginTop: 12 }}>
+              <div style={panelHeader()}>
+                <Eyebrow color={race.primary}>SEZON MADALYALARI</Eyebrow>
+                <Code>{earned}/{ACHIEVEMENTS.length}</Code>
+              </div>
+              <div style={{ padding: 12 }}>
+                <Bar value={Math.round((earned / ACHIEVEMENTS.length) * 100)} color={race.primary} label="TAMAMLAMA" trailing={`%${Math.round((earned / ACHIEVEMENTS.length) * 100)}`} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
+                  {ACHIEVEMENTS.map(a => (
+                    <div
+                      key={a.id}
+                      style={{
+                        padding: 10,
+                        border: `1px solid ${a.earned ? (a.legendary ? race.primary : ND.borderHi) : ND.border}`,
+                        borderRadius: 4,
+                        background: a.earned ? (a.legendary ? `${race.primary}10` : 'transparent') : 'rgba(255,255,255,0.02)',
+                        opacity: a.earned ? 1 : 0.55,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Code>{a.earned ? (a.legendary ? '★' : '◆') : '🔒'}</Code>
+                        <div style={{ fontFamily: ND.display, fontSize: 12, color: a.legendary ? race.primary : ND.text }}>{a.label}</div>
+                      </div>
+                      {a.detail && <Caption style={{ fontSize: 10, marginTop: 4 }}>{a.detail}</Caption>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Panel>
+          </>
         )}
 
         {tab === 'history' && (() => {
@@ -611,14 +718,17 @@ function formatBattleWhen(when: string): string {
 function HistoryRow({ entry, race }: { entry: HistoryEntry; race: NDRace }) {
   const color = entry.result === 'win' ? ND.ok : ND.danger;
   return (
-    <div
+    <Link
+      href={`/replay/${entry.id}`}
       style={{
         display: 'grid',
-        gridTemplateColumns: '64px 1fr auto',
+        gridTemplateColumns: '64px 1fr auto 56px',
         gap: 8,
         padding: '10px 12px',
         borderBottom: `1px solid ${ND.border}`,
         alignItems: 'center',
+        textDecoration: 'none',
+        color: 'inherit',
       }}
     >
       <div>
@@ -638,6 +748,9 @@ function HistoryRow({ entry, race }: { entry: HistoryEntry; race: NDRace }) {
         </div>
         <Caption style={{ fontSize: 9 }}>{entry.unit}</Caption>
       </div>
-    </div>
+      <div style={{ textAlign: 'right' }}>
+        <Code style={{ color: race.primary, fontSize: 10 }}>İZLE ›</Code>
+      </div>
+    </Link>
   );
 }

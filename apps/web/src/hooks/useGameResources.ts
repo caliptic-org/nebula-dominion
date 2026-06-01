@@ -194,10 +194,21 @@ export function useGameResources(): UseGameResourcesResult {
   };
 }
 
-/** Compact 12,480 → "12,480" / 1,234,567 → "1.2M" formatter for the HUD. */
+/** Compact resource formatter for the HUD.
+ *  12,480 → "12,480"
+ *  1.2 M  → "1.2M"
+ *  3.4 B  → "3.4B"
+ *  10 T   → "10T"   (yopmail playtest accounts get 10^13 — without the
+ *                    T scale they used to render as the literal
+ *                    "10000000.0M" string, which surfaced on /base/production
+ *                    HUD pills and looked like a hydration bug.)
+ *  Beyond T we exponential-notate to avoid silly strings like "10000T". */
 export function formatResource(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000_000_000_000) return `${(n / 1e15).toExponential(1)}`;
+  if (n >= 1_000_000_000_000) return `${(n / 1e12).toFixed(1).replace(/\.0$/, '')}T`;
+  if (n >= 1_000_000_000) return `${(n / 1e9).toFixed(1).replace(/\.0$/, '')}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
   if (n >= 10_000) return `${(n / 1000).toFixed(0)}K`;
   return Number(n).toLocaleString();
 }

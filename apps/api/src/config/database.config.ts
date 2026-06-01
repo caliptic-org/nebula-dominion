@@ -18,6 +18,14 @@ export const databaseConfig: TypeOrmModuleOptions = {
     __dirname + '/../database/migrations/*{.ts,.js}',
     __dirname + '/../../database/migrations/*{.ts,.js}',
   ],
+  // Auto-run pending migrations on api boot — mirrors game-server's
+  // DB_RUN_MIGRATIONS behaviour.  Without this, migrations added under
+  // src/database/migrations/ are committed to git but never applied on
+  // prod, surfacing as "column X does not exist" 500s the first time a
+  // service touches the new schema (e.g. VipService.getVipStatus after
+  // AddVipDailyClaim landed).  Idempotent — TypeORM tracks executed
+  // migrations in the `migrations` table.
+  migrationsRun: true,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,

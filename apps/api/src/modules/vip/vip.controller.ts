@@ -4,7 +4,11 @@ import { VipService } from './vip.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('VIP')
-@Controller('api/v1/vip')
+// Path is just 'vip' — NestJS adds the global 'api/v1' prefix in main.ts.
+// Earlier value 'api/v1/vip' double-prefixed to /api/v1/api/v1/vip, which
+// 404'd every call. Surfaced by autonomous browser playtest run-4 once the
+// frontend stopped passing the same redundant prefix from its end.
+@Controller('vip')
 export class VipController {
   constructor(private readonly vipService: VipService) {}
 

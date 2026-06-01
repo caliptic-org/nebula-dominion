@@ -74,9 +74,23 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
 
   useEffect(() => {
     if (!userId) return;
+    // transports: socket.io's default is ['polling', 'websocket'] —
+    // polling first then upgrade to WS. Earlier this hook hardcoded
+    // ['websocket'] (skip polling, go straight to upgrade) which is
+    // faster on a clean stack BUT fails outright when the WS upgrade
+    // path is blocked. On prod, Cloudflare Tunnel → bastion nginx →
+    // LXC reverse-proxy chain isn't passing the Upgrade header
+    // through cleanly for /socket.io/ — polling probe returns a sid
+    // happily, WS probe gets dropped before the handshake completes.
+    // Result: every page mount spammed "WebSocket is closed before
+    // the connection is established" into the console. Including
+    // polling in the transport list gives socket.io a working fall-
+    // back so the warning goes away and event delivery still works
+    // (just over HTTP long-poll instead of WS). Surfaced by the
+    // run-5 autonomous playtest.
     const socket = io(`${process.env.NEXT_PUBLIC_GAME_SERVER_URL}/game`, {
       auth: { userId },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
     });
     socketRef.current = socket;
 

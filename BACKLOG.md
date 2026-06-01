@@ -110,11 +110,12 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
 
 PvP / lonca / endgame içerikleri buradan başlar.
 
-- [ ] **P4.1 Race-specific Tier 9 (Lv 54) unvanları**. Story bible §2.8:
-  Zerg → Yutucu Kraliçe, Otomat → Sonsuz Mantık Demiurge, Canavar →
-  Primordial Canavar Tanrı, İnsan → Yutucu Yıldız Varisi, Şeytan → Sonsuz
-  Karanlık Hükümdar. `resolveTierName(54, race)` zaten parametre kabul
-  ediyor; mapping'i wire et.
+- [x] **P4.1 Race-specific Tier 9 (Lv 54) unvanları** (zaten yapılı).
+  `RACE_TIER9_NAMES` (apps/api/src/user/entities/race.enum.ts) tüm 5 ırka
+  string mapping veriyor. `resolveTierName(54, race)` → race-specific isim.
+  Frontend `/tier-up` zaten `raceSpecificTierName` field'ı kullanıyor
+  (`apps/web/src/app/tier-up/page.tsx:18`). API contract'ında da var
+  (`lib/tier-api.ts:25`). End-to-end zaten çalışıyor.
 
 - [ ] **P4.2 Battle replay sistemi**. `battle_history` tablosu var ama
   replay yolu yok. /battle-result log dump'tan replay'e dönüşmeli.

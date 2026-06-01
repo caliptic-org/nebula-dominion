@@ -492,11 +492,13 @@ function BuildMenuInner() {
                   entry={entry}
                   selected={selected?.name === entry.name}
                   onSelect={() => {
+                    // Card tap is a SELECT only — bottom CTA bar handles
+                    // both navigation ("DETAY" → /base/building/[slug]) and
+                    // action ("YÜKSELT" / "İNŞA ET"). Previously the card
+                    // auto-routed to the detail page, which made the bottom
+                    // buttons useless: by the time the player saw them, the
+                    // page had already jumped away.
                     setSelectedName(entry.name);
-                    // Card tap routes to the detail page — quicker than
-                    // selecting and then hitting "İnşa Et" again.
-                    const slug = race.buildings.find((b) => b.n === entry.name)?.slug;
-                    if (slug) router.push(`/base/building/${slug}`);
                   }}
                 />
               ))}

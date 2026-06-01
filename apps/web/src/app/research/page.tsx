@@ -10,6 +10,7 @@ import {
   Panel,
   Bar,
   Eyebrow,
+  GatedButton,
   H2,
   H3,
   Caption,
@@ -671,11 +672,17 @@ function DetailPanel({ node, nodes, race, onClose, onResearch, onCancel }: Detai
                 </div>
               )}
 
-              {/* Action */}
+              {/* Action — gated by `research.basic` (research_lab Lv 1). If
+                 the player taps without a research lab, the backend would
+                 400 with "araştırma binası yok"; the gate surfaces this
+                 inline before the request goes out. Per-node tier (basic
+                 vs advanced vs subspace) is a future migration — keep the
+                 simplest gate for now so the most common blocker (no lab
+                 at all) is captured. */}
               {node.state === 'available' && (
-                <NDButton race={race} full size="md" onClick={() => onResearch(node.id)}>
+                <GatedButton race={race} full size="md" gateId="research.basic" onClick={() => onResearch(node.id)}>
                   Araştırmayı Başlat
-                </NDButton>
+                </GatedButton>
               )}
               {node.state === 'researching' && (
                 <NDButton variant="danger" full size="md" onClick={() => onCancel(node.id)}>

@@ -21,6 +21,7 @@ import {
   Caption,
   Chip,
   Code,
+  GatedButton,
   NDButton,
   BottomNav,
   toast,
@@ -336,14 +337,20 @@ export default function AlliancePage() {
                     <Code style={{ color: ND.textDim }}>
                       {a.memberCount ?? '?'} üye
                     </Code>
-                    <NDButton
+                    {/* Joining an alliance is Çağ 3+ gameplay per the
+                       story bible. Pre-age-3 players see the row but the
+                       chip exposes "Çağ 3 gerekli" inline + a tap modal,
+                       instead of letting them tap and bounce off the
+                       backend guard. */}
+                    <GatedButton
                       race={race}
                       variant="outline"
-                      disabled={joiningId === a.id}
+                      gateId="guild.join"
+                      forceDisabled={joiningId === a.id}
                       onClick={() => handleJoin({ id: a.id, name: a.name })}
                     >
                       {joiningId === a.id ? 'Katılıyor…' : 'Katıl'}
-                    </NDButton>
+                    </GatedButton>
                   </div>
                 ))}
               </div>
@@ -456,14 +463,15 @@ export default function AlliancePage() {
             {projectedWars.map((w) => (
               <WarCard key={w.id} war={w} myRace={race} />
             ))}
-            <NDButton
+            <GatedButton
               race={race}
               full
               variant="primary"
+              gateId="alliance.war.declare"
               onClick={() => setWarModalOpen(true)}
             >
               İttifak Savaşı Bildir
-            </NDButton>
+            </GatedButton>
           </>
         )}
 

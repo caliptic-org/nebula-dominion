@@ -12,6 +12,8 @@ import { ResourcesService } from '../resources/resources.service';
 import { EconomyService } from '../economy/economy.service';
 import { StartConstructionDto } from './dto/start-construction.dto';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
+import { ProgressionService } from '../progression/progression.service';
+import { XpSource } from '../progression/config/level-config';
 
 @Injectable()
 export class BuildingsService {
@@ -23,6 +25,7 @@ export class BuildingsService {
     private readonly resources: ResourcesService,
     private readonly economyService: EconomyService,
     private readonly questProgress: QuestProgressNotifier,
+    private readonly progression: ProgressionService,
   ) {}
 
   async startConstruction(playerId: string, dto: StartConstructionDto): Promise<Building> {
@@ -208,6 +211,33 @@ export class BuildingsService {
         'buildings_built',
         `building:${building.id}`,
       );
+    }
+
+    // XP grant — XpSource.CONSTRUCTION (80 base XP per the level-config).
+    // Fires via ProgressionService.awardXp which (a) writes player_levels,
+    // (b) emits the 'progression.xp_gained' EventEmitter event that the
+    // ProgressionGateway forwards to the socket room `user:${userId}`,
+    // (c) the global <ProgressionToaster /> on the frontend renders the
+    // "+80 XP — İnşa" toast. Without this hook the player taps İnşa
+    // Başlat, watches the timer count down, sees the building turn ACTIVE,
+    // and gets… nothing. The XP_BASE_AMOUNTS table promised 80 XP per
+    // construction, this is where the promise is kept.
+    //
+    // Errors are swallowed — building completion already succeeded above,
+    // and the XP grant is non-critical (player can level up via other
+    // sources). Just log so a misconfigured ProgressionService doesn't
+    // pin the tick.
+    for (const building of overdue) {
+      this.progression
+        .awardXp({
+          userId: building.playerId,
+          source: XpSource.CONSTRUCTION,
+          referenceId: `building:${building.id}`,
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`awardXp(construction) skipped for ${building.playerId}: ${msg}`);
+        });
     }
 
     return overdue.length;

@@ -6,9 +6,10 @@ import { BuildingsController } from './buildings.controller';
 import { ResourcesModule } from '../resources/resources.module';
 import { AuthModule } from '../auth/auth.module';
 import { EconomyModule } from '../economy/economy.module';
+import { ProgressionModule } from '../progression/progression.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Building]), ResourcesModule, AuthModule, EconomyModule],
+  imports: [TypeOrmModule.forFeature([Building]), ResourcesModule, AuthModule, EconomyModule, ProgressionModule],
   providers: [BuildingsService],
   controllers: [BuildingsController],
   exports: [BuildingsService],

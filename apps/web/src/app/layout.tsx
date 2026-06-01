@@ -8,6 +8,7 @@ import { GAScript } from '@/components/analytics/GAScript';
 import { FBPixel } from '@/components/analytics/FBPixel';
 import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 import { Toaster } from '@/components/handoff/Toaster';
+import { ProgressionToaster } from '@/components/ProgressionToaster';
 import { htmlLangMap, type Locale } from '@/i18n/config';
 import '@/styles/globals.css';
 import '@/styles/nd-handoff.css';
@@ -53,6 +54,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <FBPixel />
         <PageViewTracker />
         <Toaster />
+        {/* ProgressionToaster subscribes to the player's socket room for
+           xp_gained + level_up events and surfaces a toast on each. Sits
+           below <Toaster /> so it can use the same toast bus. Side-effect
+           only — renders null. */}
+        <ProgressionToaster />
         <div className="hud-scan-beam" aria-hidden="true" />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <NDTweaksProvider>

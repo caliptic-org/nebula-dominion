@@ -159,7 +159,18 @@ function Inner({ slug }: { slug: string }) {
   const ownedList = liveBuildings && backendType
     ? indexBuildingsByType(liveBuildings).get(backendType) ?? []
     : [];
-  const owned = ownedList[0] ?? null;
+  // Pick the HIGHEST-level instance when the player owns multiple of the
+  // same type. Previously we took `ownedList[0]` (insertion order from
+  // indexBuildingsByType, which trails game-server's response order). That
+  // diverged from /base/build's catalog chip — which now also picks the
+  // max level — and from the player's mental model of "their" refinery.
+  // Picking max here keeps the two views aligned on the same Lv N, and
+  // upgrades target the highest tier (the most expensive next step).
+  const owned =
+    ownedList.reduce<typeof ownedList[number] | null>(
+      (best, b) => (!best || b.level > best.level ? b : best),
+      null,
+    ) ?? null;
 
   const costA = backendCfg?.cost.mineral ?? Math.max(slotIndex + 1, 1) * 220;
   const costB = backendCfg?.cost.gas ?? Math.round(Math.max(slotIndex + 1, 1) * 220 * 0.35);

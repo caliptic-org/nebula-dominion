@@ -41,6 +41,10 @@ interface BuildEntry {
   name: string;
   desc: string;
   locked: boolean;
+  /** Optional explanation surfaced when the chip falls back to the locked
+   *  state — currently HQ-level requirement for the advanced slots (6, 7).
+   *  Lower priority than the gate framework's primaryHint when both apply. */
+  lockHint?: string;
   costA: number;
   costB: number;
   durationSec: number;
@@ -456,11 +460,13 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
   // Gate-aware lock chip: when a tile is locked, prefer the gate's
   // primaryHint ("Komuta Üssü Lv 2") over the generic "KİLİTLİ" copy so
   // the player sees the actual blocker without opening the modal. Falls
-  // back to generic if the gate registry doesn't know this tile (e.g. a
-  // freshly-added building type that hasn't been added to gates.config.ts
-  // yet) — non-blocking, no broken rendering.
+  // back to entry.lockHint (HQ-level threshold computed in buildCatalog
+  // for the advanced slots 6,7), then to the generic chip text when no
+  // hint source has anything to say — keeps the chip honest even if the
+  // gate registry doesn't know about a freshly-added building type yet.
   const gate = useGate(entry.backendType ? `base.build.${entry.backendType}` : '');
-  const lockHint = gate && !gate.unlocked ? gate.primaryHint : null;
+  const lockHint =
+    (gate && !gate.unlocked ? gate.primaryHint : null) ?? entry.lockHint ?? null;
 
   return (
     <button
@@ -656,6 +662,20 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
  *
  * `ownedBuildings` feeds real per-building levels so the "Lv N" chip
  * on each catalog card matches the level shown on the detail page. */
+// HQ-level thresholds for the two "advanced" race slots (index 6 + 7 across
+// every race entry in nd-tokens). Mirrors the static `locked: true` flags but
+// resolves DYNAMICALLY so the slot opens when the player has actually built
+// up — instead of staying locked forever like the old hardcoded version did.
+// Slot 6 = "kadim güç" tier (subspace_anteni / yutucu_tumsek / cihaz_hazinesi
+// / atalar_magarasi) → HQ Lv 3.  Slot 7 = "Tier-4 birim" tier (genetik_lab /
+// subspace_damari / subspace_cozucu / boyut_yarigi) → HQ Lv 4. Keeps the
+// frontend honest about prerequisites; the buildings.service backend
+// upgrade-requirements still does the authoritative gate at construction time.
+const ADVANCED_SLOT_HQ_THRESHOLD: Record<number, number> = {
+  6: 3,
+  7: 4,
+};
+
 function buildCatalog(
   race: NDRace,
   backendTypes: BuildingTypeDto[],
@@ -665,11 +685,23 @@ function buildCatalog(
   const byType = new Map<string, BuildingTypeDto>();
   backendTypes.forEach((t) => byType.set(t.type, t));
 
-  // Index owned active/constructing buildings by type for O(1) level lookup.
+  // Index owned active/constructing buildings by type, KEEPING THE HIGHEST
+  // LEVEL when the player has multiple instances of the same type.  The
+  // previous `Map.set` last-write-wins meant a freshly-built Lv 1 instance
+  // would overwrite the existing Lv 3 instance's value depending on backend
+  // response order — and produced the "neden kendiliğinden lvl atlıyorlar"
+  // illusion in the catalog where the chip "flickered" between the two
+  // instances' levels.  Detail page also uses the highest-level instance
+  // now (see `bestOwnedInstance`), so the two views agree.
   const ownedByType = new Map<string, number>();
   for (const ob of ownedBuildings) {
-    if (ob.status !== 'destroyed') ownedByType.set(ob.type, ob.level);
+    if (ob.status === 'destroyed') continue;
+    const prev = ownedByType.get(ob.type) ?? 0;
+    if (ob.level > prev) ownedByType.set(ob.type, ob.level);
   }
+
+  // HQ level drives the dynamic-lock check on advanced slots (6, 7).
+  const hqLevel = ownedByType.get('command_center') ?? 0;
 
   return race.buildings.map((b, i) => {
     const mappedType = b.slug ? SLUG_TO_BACKEND_TYPE[b.slug] : undefined;
@@ -678,10 +710,24 @@ function buildCatalog(
     // Use the real owned-building level if the player has one; otherwise 0
     // (the chip renders "YENİ" for 0 — see the JSX below the catalog list).
     const ownedLevel = mappedType ? (ownedByType.get(mappedType) ?? 0) : 0;
+
+    // Static `locked: true` slots open when HQ reaches the threshold for
+    // that slot index.  Below threshold → still locked + show the HQ-Lv
+    // requirement so the player knows what to upgrade.  Above threshold →
+    // fully unlocked, normal build/upgrade flow.
+    const requiredHq = ADVANCED_SLOT_HQ_THRESHOLD[i];
+    const dynamicallyLocked =
+      b.locked && requiredHq != null ? hqLevel < requiredHq : b.locked;
+    const lockHint =
+      b.locked && requiredHq != null && hqLevel < requiredHq
+        ? `Komuta Üssü Lv ${requiredHq} gerekli (şu an Lv ${hqLevel})`
+        : undefined;
+
     return {
       name: b.n,
       desc: b.t,
-      locked: b.locked,
+      locked: dynamicallyLocked,
+      lockHint,
       costA: backend?.cost.mineral ?? base,
       costB: backend?.cost.gas ?? Math.round(base * 0.35),
       // Display duration matches what the server actually applies —
@@ -689,7 +735,7 @@ function buildCatalog(
       // so a 1000× playtest doesn't show "30s" on a card that resolves
       // server-side in ~30ms. Default speed (1) → unchanged display.
       durationSec: scaledDurationSec(backend?.buildTimeSeconds ?? 90 + i * 60),
-      level: b.locked ? 0 : ownedLevel,
+      level: dynamicallyLocked ? 0 : ownedLevel,
       backendType: mappedType ?? backend?.type,
       // Catalog uses the ORIGINAL render (cosmic backdrop intact) — this
       // is a browse view where each card frames the building inside its

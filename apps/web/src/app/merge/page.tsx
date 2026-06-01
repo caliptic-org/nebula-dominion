@@ -193,10 +193,18 @@ export default function MergePage() {
     setSelected([]);
     try {
       const ids = snapshot.map((idx) => pool[idx]?.id).filter(Boolean);
-      await gameServerApi.post('/units/merge', { unitIds: ids, targetTier: sourceTier + 1 });
-      toast.success(`Birleştirme başarılı: ${ids.length} birim Tier ${sourceTier + 1}'e yükseltildi`);
-      // Merge consumes resources server-side — pop the HUD without waiting
-      // for the 5s poll tick.
+      // /units/merge-roster is the base-level promotion endpoint added
+      // in this commit — separate from /units/merge which requires a
+      // roomId for in-match merging. Consumes 3 same-type roster units
+      // and spawns 1 next-tier unit per MERGE_RECIPES (Marine → Sniper →
+      // Mecha Walker → Genetic Warrior → Captain for İnsan).
+      const result = await gameServerApi.post<{ type: string; id: string }>(
+        '/units/merge-roster',
+        { unitIds: ids },
+      );
+      toast.success(
+        `Promosyon başarılı: ${result.type.replace(/_/g, ' ')} (Tier ${sourceTier + 1})`,
+      );
       refreshGameResources();
     } catch (err) {
       // Restore selection so the player can retry without re-picking.

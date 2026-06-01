@@ -2,11 +2,19 @@ import { Race } from '../../matchmaking/dto/join-queue.dto';
 import { BuildingType } from '../../buildings/entities/building.entity';
 
 export enum UnitType {
-  // Human
+  // Human — original 4 (training catalog)
   MARINE = 'marine',
   MEDIC = 'medic',
   SIEGE_TANK = 'siege_tank',
   GHOST = 'ghost',
+  // Human — merge chain (T2..T5, see /merge "Promosyon Töreni"). Cannot be
+  // trained directly; only acquired by merging 3× units one tier below in
+  // the apps/web/src/lib/nd-tokens.ts insan units lex.
+  SNIPER = 'sniper',                 // T2 (merge of 3× Marine)
+  ENGINEER = 'engineer',             // T2 (alternative T2)
+  MECHA_WALKER = 'mecha_walker',     // T3 (merge of 3× Sniper)
+  GENETIC_WARRIOR = 'genetic_warrior', // T4 (merge of 3× Mecha Walker)
+  CAPTAIN = 'captain',               // T5 (merge of 3× Genetic Warrior)
   // Zerg
   ZERGLING = 'zergling',
   HYDRALISK = 'hydralisk',
@@ -122,6 +130,80 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     description: 'Covert operative with high damage and cloaking. Fragile but lethal.',
   },
 
+  // ─── Human Merge-Chain Units (T2..T5) ───────────────────────────────────────
+  // These cannot be trained directly. The `cost` and `trainTimeSeconds` are
+  // provided so the entity-level FK relations stay consistent, but the
+  // training service rejects them (see PRODUCTION_BUILDINGS guard). The
+  // `requiredBuilding` is set to BARRACKS for shape — irrelevant for merge
+  // results because the merge endpoint constructs the row directly.
+  // Stats follow a +60% per tier ramp from Marine baseline (60 hp / 12 atk /
+  // 5 def) so the promotion ladder feels meaningful in combat math.
+  [UnitType.SNIPER]: {
+    type: UnitType.SNIPER,
+    race: Race.HUMAN,
+    hp: 96,
+    attack: 28,
+    defense: 6,
+    speed: 2,
+    cost: { mineral: 0, gas: 0, energy: 0 },
+    trainTimeSeconds: 0,
+    requiredBuilding: BuildingType.BARRACKS,
+    abilities: ['precision_shot', 'long_range'],
+    description: 'Elite marksman promoted from three Marines. Long-range, low cooldown.',
+  },
+  [UnitType.ENGINEER]: {
+    type: UnitType.ENGINEER,
+    race: Race.HUMAN,
+    hp: 96,
+    attack: 16,
+    defense: 14,
+    speed: 2,
+    cost: { mineral: 0, gas: 0, energy: 0 },
+    trainTimeSeconds: 0,
+    requiredBuilding: BuildingType.BARRACKS,
+    abilities: ['repair', 'turret_deploy'],
+    description: 'Alternative T2 promotion — field engineer with repair + turret support.',
+  },
+  [UnitType.MECHA_WALKER]: {
+    type: UnitType.MECHA_WALKER,
+    race: Race.HUMAN,
+    hp: 154,
+    attack: 45,
+    defense: 12,
+    speed: 2,
+    cost: { mineral: 0, gas: 0, energy: 0 },
+    trainTimeSeconds: 0,
+    requiredBuilding: BuildingType.BARRACKS,
+    abilities: ['stomp', 'plasma_cannon'],
+    description: 'Pilot-driven mech promoted from three Snipers. Heavy frame, high alpha.',
+  },
+  [UnitType.GENETIC_WARRIOR]: {
+    type: UnitType.GENETIC_WARRIOR,
+    race: Race.HUMAN,
+    hp: 246,
+    attack: 72,
+    defense: 24,
+    speed: 3,
+    cost: { mineral: 0, gas: 0, energy: 0 },
+    trainTimeSeconds: 0,
+    requiredBuilding: BuildingType.BARRACKS,
+    abilities: ['gene_rage', 'regen', 'leap_strike'],
+    description: 'Gene-tailored super soldier. Three Mecha Walker pilots fused into one chassis.',
+  },
+  [UnitType.CAPTAIN]: {
+    type: UnitType.CAPTAIN,
+    race: Race.HUMAN,
+    hp: 394,
+    attack: 115,
+    defense: 38,
+    speed: 3,
+    cost: { mineral: 0, gas: 0, energy: 0 },
+    trainTimeSeconds: 0,
+    requiredBuilding: BuildingType.BARRACKS,
+    abilities: ['rally_cry', 'tactical_overlay', 'orbital_strike'],
+    description: 'Field captain. Three Genetic Warriors promoted; commands the strike force.',
+  },
+
   // ─── Zerg Units ─────────────────────────────────────────────────────────────
   [UnitType.ZERGLING]: {
     type: UnitType.ZERGLING,
@@ -199,3 +281,27 @@ export function applyRaceBonuses(cfg: UnitConfig): UnitConfig & { effectiveStats
     },
   };
 }
+
+/**
+ * Base-level "Promosyon Töreni" merge recipes — source type → result type.
+ *
+ * Mirrors the FE lex tier ladder (apps/web/src/lib/nd-tokens.ts insan
+ * units). One row per "3× same type ⇒ 1× next-tier" relationship.  Mixed
+ * types (e.g. Marine + Medic + Ghost) aren't in the table — the mergeRoster
+ * service enforces same-type-only to keep this concise.
+ *
+ * Currently insan-only. Other races' merge chains land in follow-up
+ * commits once their lex unit types are added to UnitType + UNIT_CONFIGS
+ * (and the player_units_type_enum migration extends to cover them).
+ */
+export const MERGE_RECIPES: Partial<Record<UnitType, UnitType>> = {
+  // İnsan promosyon ladder: Marine → Sniper → Mecha Walker → Genetic
+  // Warrior → Captain.  Medic / Siege Tank / Ghost are sidegrade variants
+  // without merge results in the current lex — adding them is just a row
+  // here once a tier mapping is decided.
+  [UnitType.MARINE]:           UnitType.SNIPER,
+  [UnitType.SNIPER]:           UnitType.MECHA_WALKER,
+  [UnitType.ENGINEER]:         UnitType.MECHA_WALKER,
+  [UnitType.MECHA_WALKER]:     UnitType.GENETIC_WARRIOR,
+  [UnitType.GENETIC_WARRIOR]:  UnitType.CAPTAIN,
+};

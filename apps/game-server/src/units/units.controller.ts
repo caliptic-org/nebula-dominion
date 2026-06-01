@@ -8,12 +8,21 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { IsArray, ArrayMinSize, ArrayMaxSize, IsUUID } from 'class-validator';
 import { UnitsService } from './units.service';
 import { TrainUnitDto } from './dto/train-unit.dto';
 import { MoveUnitDto } from './dto/move-unit.dto';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Race } from '../matchmaking/dto/join-queue.dto';
+
+class MergeRosterDto {
+  @IsArray()
+  @ArrayMinSize(3)
+  @ArrayMaxSize(3)
+  @IsUUID('4', { each: true })
+  unitIds!: string[];
+}
 
 @Controller('units')
 export class UnitsController {
@@ -60,5 +69,20 @@ export class UnitsController {
   @Get('configs/:race')
   getConfigsForRace(@Param('race') race: Race) {
     return this.units.getRaceUnitConfigs(race);
+  }
+
+  /**
+   * POST /api/units/merge-roster
+   * Base-level "Promosyon Töreni" merge — consumes 3 roster units of the
+   * same tier + race and spawns 1 unit at the next tier.  Separate from
+   * the in-match `/units/merge` endpoint in GameModule (which requires a
+   * roomId for live-battle merging).  See merge.recipes.ts for the
+   * source-type → result-type mapping.
+   */
+  @Post('merge-roster')
+  @UseGuards(HttpJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  async mergeRoster(@CurrentUser() userId: string, @Body() dto: MergeRosterDto) {
+    return this.units.mergeRoster(userId, dto.unitIds);
   }
 }

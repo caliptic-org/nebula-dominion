@@ -11,6 +11,7 @@ import { TrainingQueue } from './entities/training-queue.entity';
 import {
   UnitType,
   UNIT_CONFIGS,
+  MERGE_RECIPES,
   getUnitConfigsByRace,
   applyRaceBonuses,
 } from './constants/race-configs.constants';
@@ -295,5 +296,113 @@ export class UnitsService {
   getRaceUnitConfigs(race: Race) {
     const configs = getUnitConfigsByRace(race);
     return configs.map(applyRaceBonuses);
+  }
+
+  /**
+   * Base-level "Promosyon Töreni" merge.  Consumes 3 same-type roster
+   * units → spawns 1 next-tier unit per the MERGE_RECIPES table.
+   *
+   * Validation:
+   *   - exactly 3 unitIds, all alive, all owned by caller
+   *   - all the same type (no mixing across types — keeps the recipe table
+   *     simple; FE already enforces same-tier slot picks but BE is the
+   *     authoritative gate)
+   *   - source type appears in MERGE_RECIPES (i.e. there IS a next tier)
+   *
+   * Effect:
+   *   - DELETE the 3 source rows
+   *   - INSERT 1 new row with result type + result tier's UNIT_CONFIG stats
+   *
+   * Returns the freshly-spawned PlayerUnit so the FE can route to its
+   * detail page or refresh the inventory.
+   */
+  async mergeRoster(playerId: string, unitIds: string[]): Promise<PlayerUnit> {
+    if (unitIds.length !== 3) {
+      throw new BadRequestException('Birleştirme için tam 3 birim seçilmeli.');
+    }
+    if (new Set(unitIds).size !== unitIds.length) {
+      throw new BadRequestException('Aynı birim birden çok slotta seçilemez.');
+    }
+
+    const units = await this.unitRepo.findByIds(unitIds);
+    if (units.length !== 3) {
+      throw new NotFoundException('Bir veya daha fazla birim bulunamadı.');
+    }
+    for (const u of units) {
+      if (u.playerId !== playerId) {
+        throw new BadRequestException(`Birim ${u.id} sana ait değil.`);
+      }
+      if (!u.isAlive) {
+        throw new BadRequestException(`Birim ${u.id} canlı değil; birleştirilemez.`);
+      }
+    }
+
+    // Same-type guard.  MERGE_RECIPES keys by source type, so mixed types
+    // would need a much bigger lookup table — defer that until the
+    // alternate-tier-2 (Sniper vs Engineer) branching feature actually
+    // lands.  For now: same-type-only is the canonical "Promosyon".
+    const sourceType = units[0].type;
+    if (!units.every((u) => u.type === sourceType)) {
+      throw new BadRequestException('Birleştirme için 3 aynı tip birim gerekli.');
+    }
+
+    const resultType = MERGE_RECIPES[sourceType];
+    if (!resultType) {
+      throw new BadRequestException(
+        `${sourceType} için bir üst tier yok — bu tip merge zincirinin tepesinde.`,
+      );
+    }
+
+    const resultConfig = UNIT_CONFIGS[resultType];
+    if (!resultConfig) {
+      throw new BadRequestException(
+        `Sonuç birimi config'i (${resultType}) backend'de tanımlı değil.`,
+      );
+    }
+
+    // Delete source units then insert the result in one logical step.
+    // No explicit transaction — TypeORM's repo ops are auto-committed and
+    // a partial failure here would leave at most a missing-result row,
+    // which a retry fixes. (If we move to a stricter accounting flow we
+    // can wrap this in dataSource.transaction.)
+    await this.unitRepo.remove(units);
+
+    const spawned = this.unitRepo.create({
+      playerId,
+      type: resultType,
+      race: units[0].race,
+      hp: resultConfig.hp,
+      maxHp: resultConfig.hp,
+      attack: resultConfig.attack,
+      defense: resultConfig.defense,
+      speed: resultConfig.speed,
+      positionX: 0,
+      positionY: 0,
+      abilities: resultConfig.abilities,
+      isAlive: true,
+      level: 1,
+    });
+    const saved = await this.unitRepo.save(spawned);
+
+    this.logger.log(
+      `Roster merge: player=${playerId} 3× ${sourceType} → 1× ${resultType} (id=${saved.id})`,
+    );
+
+    // XP grant — merging is a meaningful progression action.  Reuse
+    // XpSource.CONSTRUCTION (80 base XP) so the player sees the same
+    // "+80 XP — Birleştirme" toast they get from training.  referenceId
+    // dedupes a double-click.
+    this.progression
+      .awardXp({
+        userId: playerId,
+        source: XpSource.CONSTRUCTION,
+        referenceId: `merge:${saved.id}`,
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`awardXp(merge) skipped for ${playerId}: ${msg}`);
+      });
+
+    return saved;
   }
 }

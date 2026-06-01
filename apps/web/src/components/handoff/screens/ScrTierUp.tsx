@@ -202,7 +202,19 @@ export function ScrTierUp({
           )}
 
           {/* Animated age ladder — race-tinted with cascading reveal */}
-          <AgeLadder race={race} currentAge={currentAge} currentLevel={currentLevel} />
+          <AgeLadder
+            race={race}
+            currentAge={currentAge}
+            currentLevel={currentLevel}
+            xpPercent={xpPercent}
+            xpLabel={xpLabel}
+          />
+
+          {/* XP sources panel — "hangi aksiyon ne kadar XP veriyor" — pulled
+             from game-server XP_BASE_AMOUNTS verbatim so the table never
+             drifts from the actual reward economy. Hidden when player is
+             already at max level since there's nothing left to earn. */}
+          {!isMaxLevel && <XpSourcesPanel race={race} currentAge={currentAge} />}
 
           {/* 54-level serpentine path */}
           <div style={{ marginTop: 28 }}>
@@ -327,10 +339,14 @@ function AgeLadder({
   race,
   currentAge,
   currentLevel,
+  xpPercent = 0,
+  xpLabel,
 }: {
   race: NDRace;
   currentAge: number;
   currentLevel: number;
+  xpPercent?: number;
+  xpLabel?: string;
 }) {
   const [reveal, setReveal] = useState(0);
 
@@ -400,24 +416,131 @@ function AgeLadder({
                 LV {age.range[0]}–{age.range[1]}
                 {isCurrent ? ` · şu an LV ${currentLevel}` : ''}
               </Caption>
+              {/* XP progress bar — only the current age card shows actual XP
+                  toward the next level. Replaces the old decorative 2px
+                  gradient stripe at bottom which looked like an empty XP
+                  bar to players and caused "neden boş görünüyor" reports.
+                  Past ages show a full bar (chip already says BİTTİ);
+                  locked ages show no bar (KİLİT chip is enough). */}
               {isCurrent && (
-                <div
-                  aria-hidden
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: -1,
-                    height: 2,
-                    background: `linear-gradient(90deg, transparent, ${race.primary}, transparent)`,
-                    boxShadow: `0 0 10px ${race.glow}`,
-                  }}
-                />
+                <div style={{ marginTop: 10 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: 4,
+                      fontFamily: ND.mono,
+                      fontSize: 9,
+                      color: ND.textDim,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    <span>Sonraki Lv</span>
+                    {xpLabel && <span style={{ color: race.primary }}>{xpLabel}</span>}
+                  </div>
+                  <div
+                    style={{
+                      height: 6,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${ND.border}`,
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: `${Math.max(0, Math.min(100, xpPercent))}%`,
+                        background: `linear-gradient(90deg, ${race.primary}88, ${race.primary})`,
+                        boxShadow: `0 0 8px ${race.glow}`,
+                        transition: 'width 600ms cubic-bezier(0.32, 0.72, 0, 1)',
+                      }}
+                    />
+                  </div>
+                </div>
               )}
             </Panel>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * XP source table — pulled from game-server XP_BASE_AMOUNTS in
+ * apps/game-server/src/progression/config/level-config.ts. Lists every action
+ * the player can take + the base XP it grants, with a note when a source is
+ * still locked behind a higher age (PvP, guild activity start at Çağ 3).
+ *
+ * NOT a backend fetch on purpose — these are economy constants that change
+ * via the progression config in source code, not at runtime. Keeping them
+ * in a static table here means the modal is instant and works offline.
+ */
+function XpSourcesPanel({ race, currentAge }: { race: NDRace; currentAge: number }) {
+  const sources: { key: string; label: string; xp: number; minAge?: number; note?: string }[] = [
+    { key: 'achievement',   label: 'Başarım kazan',         xp: 500 },
+    { key: 'event',         label: 'Etkinlik tamamla',      xp: 300 },
+    { key: 'daily_mission', label: 'Günlük görev',          xp: 200 },
+    { key: 'pvp_win',       label: 'PvP zaferi',            xp: 200, minAge: 3 },
+    { key: 'pve_win',       label: 'PvE zaferi',            xp: 150 },
+    { key: 'guild_activity',label: 'Lonca aktivitesi',      xp: 100, minAge: 3 },
+    { key: 'construction',  label: 'Bina inşa et / yükselt',xp: 80 },
+    { key: 'pvp_loss',      label: 'PvP yenilgisi',         xp: 50,  minAge: 3 },
+    { key: 'pve_loss',      label: 'PvE yenilgisi',         xp: 30 },
+  ];
+  return (
+    <div style={{ marginTop: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <H3 style={{ color: ND.text }}>XP KAYNAKLARI</H3>
+        <Code>BİR AKSİYON</Code>
+      </div>
+      <Panel style={{ padding: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {sources.map((s) => {
+            const locked = s.minAge !== undefined && currentAge < s.minAge;
+            return (
+              <div
+                key={s.key}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  padding: '6px 8px',
+                  background: locked ? 'rgba(255,80,80,0.04)' : 'rgba(255,255,255,0.04)',
+                  borderLeft: `3px solid ${locked ? '#ff7777' : race.primary}`,
+                  borderRadius: 4,
+                  opacity: locked ? 0.55 : 1,
+                }}
+              >
+                <span style={{ fontFamily: ND.display, fontSize: 12, color: ND.text }}>
+                  {locked ? '🔒 ' : ''}{s.label}
+                  {locked && s.minAge ? (
+                    <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 6 }}>Çağ {s.minAge}+</span>
+                  ) : null}
+                </span>
+                <span
+                  style={{
+                    fontFamily: ND.mono,
+                    fontSize: 12,
+                    color: race.primary,
+                    fontWeight: 600,
+                  }}
+                >
+                  +{s.xp} XP
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <Caption style={{ marginTop: 8, fontSize: 10 }}>
+          Komutan + tier bonusları taban değeri çarpar. Lv 3 için 900 XP, Lv 10
+          (Çağ 2) için 10.000 XP gerek — kademe büyüdükçe aksiyon başına
+          oranı korunur.
+        </Caption>
+      </Panel>
     </div>
   );
 }

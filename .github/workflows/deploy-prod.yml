@@ -195,6 +195,18 @@ jobs:
           probe "api"         https://api-nebula.caliptic.com/api/docs-json
           probe "game-server" https://game-nebula.caliptic.com/api/health/live
 
+      - name: Host disk cleanup
+        # Always runs (even when smoke tests fail) so disk pressure can't
+        # block the NEXT deploy.  Best-effort: failures inside the script
+        # don't fail the workflow — `|| true` swallows the exit code.
+        # Frees the biggest dynamic offenders: stale BuildKit cache (~1-2 GB
+        # per web build), unreferenced images from prior deploys, runner
+        # _temp scratch, and old .env.bak-* files.
+        # Manual ad-hoc run on the LXC: bash infrastructure/scripts/nebula-cleanup.sh
+        if: always()
+        run: |
+          bash infrastructure/scripts/nebula-cleanup.sh || true
+
       - name: Step summary
         if: always()
         run: |

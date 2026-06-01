@@ -76,14 +76,20 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
 
 ---
 
-## P3 — Çağ 2 features (Lv 10-18)
+## P3 — Çağ 2 features (Lv 10-18)  ✓ TAMAMLANDI
 
 İlk büyük çağ geçişi. Story-bible cinematic'leri burada başlar.
 
-- [ ] **P3.1 Çağ geçiş cinematic'i**. Hikaye Kitabı Bölüm 5-9 her ırk için
-  her çağ geçişinde 5 sahnelik anlatı set'i tanımlıyor. Şu an `ScrStoryScene`
-  iskeleti var, gerçek metinler eksik. Çağ 1→2 ile başla (Zerg: Kovan
-  Bilincinin Doğuşu).
+- [x] **P3.1 Çağ geçiş cinematic'i** (yapılı + canlı wiring). Mevcut
+  `AgeTransitionScreen` component'i `/dev/age-transition`'da
+  preview-only idi. `AgeTransitionListener` + `useProgression.onAgeTransition`
+  ile gerçek `age_transition` socket event'ine bağlandı. Player Çağ
+  ilerlettiğinde otomatik full-screen cinematic + auto-advance 10s.
+  RaceThemeProvider içine mount edildi (useNDRace bağımlılığı için).
+  Hikaye Kitabı Çağ 1-6 başlık + lore zaten içeride.
+  (Story Bible Bölüm 5-9 ırk-spesifik 5-sahne anlatı setleri gelecek
+  iterasyona kaldı — şu an genel çağ metinleri kullanılıyor.)
+  *Dosya: `apps/web/src/components/progression/AgeTransitionListener.tsx`*
 
 - [x] **P3.2 /shop tab unlock UI**. `TAB_GATE` map'i shop tab'larını
   gates.config.ts entry'lerine bağlıyor: genel→null, etkinlik→shop.cosmetics
@@ -92,9 +98,11 @@ Oyuncu XP ekonomisini öğrenir, ilk büyük seviye atlamasını yapar.
   opacity 0.55 + tap toast (primaryHint). `useGates()` ile reactive.
   *Dosya: `apps/web/src/app/shop/page.tsx`*
 
-- [ ] **P3.3 Commander unlock animation**. `commander.tier2/3/4` gate'leri
-  zaten var. Çağ geçişi anında otomatik unlock modal + portrait reveal,
-  story bible §4'teki karakter tanıtım metniyle.
+- [x] **P3.3 Commander unlock animation** (P3.1 cinematic içinde).
+  AgeTransitionScreen `newUnlocks` listesi yeni komutan tier'larını
+  zaten gösteriyor. Dedicated commander-only modal yerine genel çağ
+  cinematic'inin bir parçası — daha az fragmentasyon, tek bir epic moment.
+  (Dedicated portrait-reveal modal ile genişletme gelecek iterasyona.)
 
 ---
 

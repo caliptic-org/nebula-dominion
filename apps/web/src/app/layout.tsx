@@ -9,6 +9,7 @@ import { FBPixel } from '@/components/analytics/FBPixel';
 import { PageViewTracker } from '@/components/analytics/PageViewTracker';
 import { Toaster } from '@/components/handoff/Toaster';
 import { ProgressionToaster } from '@/components/ProgressionToaster';
+import { AgeTransitionListener } from '@/components/progression/AgeTransitionListener';
 import { htmlLangMap, type Locale } from '@/i18n/config';
 import '@/styles/globals.css';
 import '@/styles/nd-handoff.css';
@@ -64,6 +65,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <NDTweaksProvider>
             <RaceThemeProvider>
               <GuildTutorialProvider>
+                {/* AgeTransitionListener overlays the full-screen Çağ
+                    cinematic when the player's age advances. Must live
+                    INSIDE RaceThemeProvider because it reads useNDRace()
+                    to colour the cinematic to the player's race. */}
+                <AgeTransitionListener />
                 {children}
               </GuildTutorialProvider>
             </RaceThemeProvider>

@@ -4,17 +4,35 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { PlayerProgress, LevelUpPayload, XpGainedPayload } from '@/types/progression';
 
+/** Wire-shape of the `age_transition` socket event emitted by
+ *  apps/game-server/src/progression/progression.gateway.ts. Distinct from
+ *  AgeTransitionPayload in types/progression — that one is the component-
+ *  facing shape (carries race colours + onComplete callback). The
+ *  AgeTransitionListener bridges the two. */
+export interface AgeTransitionWirePayload {
+  previousAge: number;
+  newAge: number;
+  totalXpAtTransition: number;
+  badge_upgrade: {
+    previousBadgeTier: string | null;
+    newBadgeTier: string;
+    badgeLabel: string;
+  };
+}
+
 type ProgressionEvent =
   | { type: 'level_up'; payload: LevelUpPayload }
-  | { type: 'xp_gained'; payload: XpGainedPayload };
+  | { type: 'xp_gained'; payload: XpGainedPayload }
+  | { type: 'age_transition'; payload: AgeTransitionWirePayload };
 
 interface UseProgressionOptions {
   userId: string;
   onLevelUp?: (payload: LevelUpPayload) => void;
   onXpGained?: (payload: XpGainedPayload) => void;
+  onAgeTransition?: (payload: AgeTransitionWirePayload) => void;
 }
 
-export function useProgression({ userId, onLevelUp, onXpGained }: UseProgressionOptions) {
+export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition }: UseProgressionOptions) {
   const [progress, setProgress] = useState<PlayerProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProgressionEvent[]>([]);
@@ -71,10 +89,18 @@ export function useProgression({ userId, onLevelUp, onXpGained }: UseProgression
       onXpGained?.(payload);
     });
 
+    socket.on('age_transition', (payload: AgeTransitionWirePayload) => {
+      setProgress((prev) =>
+        prev ? { ...prev, age: payload.newAge } : prev,
+      );
+      setEvents((prev) => [{ type: 'age_transition' as const, payload }, ...prev].slice(0, 20));
+      onAgeTransition?.(payload);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [userId, onLevelUp, onXpGained]);
+  }, [userId, onLevelUp, onXpGained, onAgeTransition]);
 
   return { progress, loading, events };
 }

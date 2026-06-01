@@ -28,49 +28,58 @@ export class Resource {
    * Was previously 100/50/100 which trapped new players who needed
    * 150 mineral + 50 gas to even build a barracks — chicken-and-egg
    * since nothing trickles passively before the first building lands. */
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 500 })
+  // numeric(20,4) accommodates Lv 54 upgrade costs (≈10^12) without
+  // overflow. Migration 1779800000000 widened the columns on existing
+  // rows; entity defaults match the schema.
+  @Column({ type: 'numeric', precision: 20, scale: 4, default: 500 })
   mineral: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 200 })
+  @Column({ type: 'numeric', precision: 20, scale: 4, default: 200 })
   gas: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 250 })
+  @Column({ type: 'numeric', precision: 20, scale: 4, default: 250 })
   energy: number;
 
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 0 })
+  @Column({ type: 'numeric', precision: 20, scale: 4, default: 0 })
   population: number;
 
   /** Science points — earned from battles + garrisoned relay/colony/mine nodes */
-  @Column({ type: 'numeric', precision: 12, scale: 4, default: 0 })
+  @Column({ type: 'numeric', precision: 20, scale: 4, default: 0 })
   science: number;
 
-  /** Storage caps — recalculated when the player advances to a new age */
-  @Column({ name: 'mineral_cap', default: 24000 })
+  /** Storage caps — bigint so Lv 54 wallets can hold trillions.
+   *  Default 10T (10_000_000_000_000) across all four playable currencies
+   *  so the cap never gates a tester during a playtest pass. Per-age
+   *  rebalancing can drop these per row if real-economy tuning needs it
+   *  later; the default is the safe ceiling. */
+  @Column({ name: 'mineral_cap', type: 'bigint', default: 10000000000000 })
   mineralCap: number;
 
-  @Column({ name: 'gas_cap', default: 14400 })
+  @Column({ name: 'gas_cap', type: 'bigint', default: 10000000000000 })
   gasCap: number;
 
-  @Column({ name: 'energy_cap', default: 8400 })
+  @Column({ name: 'energy_cap', type: 'bigint', default: 10000000000000 })
   energyCap: number;
 
-  @Column({ name: 'population_cap', default: 5000 })
+  @Column({ name: 'population_cap', type: 'bigint', default: 5000 })
   populationCap: number;
 
-  @Column({ name: 'science_cap', default: 999999 })
+  @Column({ name: 'science_cap', type: 'bigint', default: 10000000000000 })
   scienceCap: number;
 
-  /** Net production per tick (30 s) — stored as float for precision, derived from active buildings */
-  @Column({ name: 'mineral_per_tick', type: 'numeric', precision: 10, scale: 4, default: 0 })
+  /** Net production per tick (30 s) — stored as float for precision, derived from active buildings.
+   *  Widened to numeric(20,4) alongside the amount columns so Lv 54 multi-
+   *  building stacks don't overflow when production rates are recomputed. */
+  @Column({ name: 'mineral_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
   mineralPerTick: number;
 
-  @Column({ name: 'gas_per_tick', type: 'numeric', precision: 10, scale: 4, default: 0 })
+  @Column({ name: 'gas_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
   gasPerTick: number;
 
-  @Column({ name: 'energy_per_tick', type: 'numeric', precision: 10, scale: 4, default: 0 })
+  @Column({ name: 'energy_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
   energyPerTick: number;
 
-  @Column({ name: 'population_per_tick', type: 'numeric', precision: 10, scale: 4, default: 0 })
+  @Column({ name: 'population_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
   populationPerTick: number;
 
   /** Updated by resource ticks and offline accumulation — used to compute missed production on login */

@@ -78,14 +78,21 @@ export class AuthService {
         science = EXCLUDED.science
     `;
     try {
+      // 10T (10 trillion) across all four currencies. Matches the new
+      // entity cap defaults from migration 1779800000000-ExpandResource
+      // Capacity which widened the wallet to numeric(20,4) so Lv 54
+      // upgrade costs (≈10^12) actually fit. Below that cap the tester
+      // can chain dozens of late-game purchases without ever waiting on
+      // the trickle.
+      const MAX = 10_000_000_000_000;  // 10T
       await this.dataSource.query(sql, [
         userId,
-        24000,   // mineral cap == kredi
-        14400,   // gas cap     == yakıt
-        8400,    // energy cap  == enerji
-        999999,  // science cap == bilim
+        MAX,  // mineral == kredi
+        MAX,  // gas     == yakıt
+        MAX,  // energy  == enerji
+        MAX,  // science == bilim
       ]);
-      this.logger.log(`yopmail playtest grant: maxed resources for user=${userId}`);
+      this.logger.log(`yopmail playtest grant: maxed resources (10T each) for user=${userId}`);
     } catch (err) {
       // Non-fatal — log and let the user proceed. game-server's lazy
       // getOrCreate still gives them the default 500/200/250/0 wallet.

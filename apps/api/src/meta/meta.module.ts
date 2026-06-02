@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LeaderboardStubController } from './leaderboard-stub.controller';
 import { MissionsStubController } from './missions-stub.controller';
-import { CommandersStubController } from './commanders-stub.controller';
+// CommandersStubController removed — replaced by game-server's real
+// CommandersModule (DB-backed roster + level/XP + bonus engine).
+// See apps/game-server/src/commanders/. FE useCommanders now hits
+// /api/commanders on game-nebula.caliptic.com instead of api-nebula.
 import { TargetStubController } from './target-stub.controller';
 import { BattlesStubController, BattlePrepStubController } from './battles-stub.controller';
 import { ChatStubController } from './chat-stub.controller';
@@ -26,7 +29,6 @@ import { QuestProgressModule } from '../modules/quest-progress/quest-progress.mo
   controllers: [
     LeaderboardStubController,
     MissionsStubController,
-    CommandersStubController,
     TargetStubController,
     BattlesStubController,
     BattlePrepStubController,

@@ -20,6 +20,7 @@ import {
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
+import { CommandersService } from '../commanders/commanders.service';
 
 @Injectable()
 export class BuildingsService {
@@ -32,7 +33,24 @@ export class BuildingsService {
     private readonly economyService: EconomyService,
     private readonly questProgress: QuestProgressNotifier,
     private readonly progression: ProgressionService,
+    private readonly commanders: CommandersService,
   ) {}
+
+  /** Resolve the player's active commander bonus once and return safe
+   *  multipliers for cost + speed. Centralised so startConstruction and
+   *  upgradeBuilding speak the same defensive clamps (95% max
+   *  discount / faster — at L30 with stacked race-bonuses the raw value
+   *  could otherwise overflow to 0 cost or instant build). */
+  private async resolveBuildModifiers(playerId: string): Promise<{
+    costMul: number;
+    speedMul: number;
+  }> {
+    const cmd = await this.commanders.getActiveBonus(playerId);
+    return {
+      costMul: Math.max(0.05, 1 + (cmd.buildCostMultiplier ?? 0)),
+      speedMul: Math.max(0.05, 1 + (cmd.buildSpeedMultiplier ?? 0)),
+    };
+  }
 
   async startConstruction(playerId: string, dto: StartConstructionDto): Promise<Building> {
     const config = BUILDING_CONFIGS[dto.type];
@@ -53,21 +71,33 @@ export class BuildingsService {
       throw new BadRequestException(`Position (${dto.positionX}, ${dto.positionY}) is already occupied.`);
     }
 
-    const canAfford = await this.resources.canAfford(playerId, config.cost);
+    const { costMul, speedMul } = await this.resolveBuildModifiers(playerId);
+    const adjustedCost = {
+      mineral: Math.round((config.cost.mineral ?? 0) * costMul),
+      gas: Math.round((config.cost.gas ?? 0) * costMul),
+      energy: Math.round((config.cost.energy ?? 0) * costMul),
+      science: Math.round(((config.cost as { science?: number }).science ?? 0) * costMul),
+    };
+    const canAfford = await this.resources.canAfford(playerId, adjustedCost);
     if (!canAfford) {
       throw new BadRequestException(
-        `Insufficient resources. Required: ${config.cost.mineral}M ${config.cost.gas}G ${config.cost.energy}E`,
+        `Insufficient resources. Required: ${adjustedCost.mineral}M ${adjustedCost.gas}G ${adjustedCost.energy}E`,
       );
     }
 
-    await this.resources.deduct(playerId, config.cost);
+    await this.resources.deduct(playerId, adjustedCost);
 
     const now = new Date();
     // Scaled duration honours GAME_SPEED_MULTIPLIER (default 1).
     // At 1000× a 30s build resolves in ~30ms — practically instant for
     // playtest runs. Status decision uses the scaled value too: a build
     // that scales to 0s skips CONSTRUCTING and lands ACTIVE outright.
-    const scaledSec = scaledDurationSec(config.buildTimeSeconds);
+    // Commander buildSpeedMultiplier folds in here (e.g. Aurelius L1
+    // -22% → speedMul 0.78 → 22% faster).
+    const scaledSec = Math.max(
+      0,
+      Math.round(scaledDurationSec(config.buildTimeSeconds) * speedMul),
+    );
     const completeAt = new Date(now.getTime() + scaledSec * 1000);
 
     const building = this.buildingRepo.create({
@@ -203,16 +233,22 @@ export class BuildingsService {
     // ile aynı formül: targetLevel × 50. Cost objesinin science alanını
     // ResourcesService.deduct artık honour ediyor.
     const scienceCost = targetLevel >= 5 ? targetLevel * 50 : 0;
+    // Commander buildCostMultiplier applies to upgrades too. Without this
+    // an active Malphas / Aurelius / Lokhode discount would only help
+    // first-time construction; players would feel the bonus disappear
+    // the moment they tried to upgrade.
+    const { costMul: upgradeCostMul, speedMul: upgradeSpeedMul } =
+      await this.resolveBuildModifiers(playerId);
     const upgradeCost = {
-      mineral: Math.round(baseCfg.cost.mineral * scale),
-      gas: Math.round(baseCfg.cost.gas * scale),
-      energy: Math.round(baseCfg.cost.energy * scale),
-      science: scienceCost,
+      mineral: Math.round(baseCfg.cost.mineral * scale * upgradeCostMul),
+      gas: Math.round(baseCfg.cost.gas * scale * upgradeCostMul),
+      energy: Math.round(baseCfg.cost.energy * scale * upgradeCostMul),
+      science: Math.round(scienceCost * upgradeCostMul),
     };
 
     const canAfford = await this.resources.canAfford(playerId, upgradeCost);
     if (!canAfford) {
-      const sciencePart = scienceCost > 0 ? ` ${scienceCost}◈` : '';
+      const sciencePart = upgradeCost.science > 0 ? ` ${upgradeCost.science}◈` : '';
       throw new BadRequestException(
         `Insufficient resources. Required: ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E${sciencePart}`,
       );
@@ -225,8 +261,13 @@ export class BuildingsService {
     // (Lv 1→2 = 1× base, Lv 2→3 = 2× base, etc.). GAME_SPEED_MULTIPLIER
     // applied via the same scaledDurationSec helper used by initial
     // construction so a 1000× playtest collapses the cooldown to ~30ms.
-    const upgradeDurationSec = scaledDurationSec(
-      Math.max(baseCfg.buildTimeSeconds, 10) * building.level,
+    // Commander buildSpeedMultiplier reduces it further.
+    const upgradeDurationSec = Math.max(
+      0,
+      Math.round(
+        scaledDurationSec(Math.max(baseCfg.buildTimeSeconds, 10) * building.level) *
+          upgradeSpeedMul,
+      ),
     );
     building.level += 1;
     building.constructionStartedAt = now;
@@ -379,6 +420,21 @@ export class BuildingsService {
         gasPerTick     += legacyCfg.production.gasPerTick;
         energyPerTick  += legacyCfg.production.energyPerTick - legacyCfg.energyConsumptionPerTick;
       }
+    }
+
+    // ── Commander resource production bonus ─────────────────────────
+    // Prime, Ulrek, Kthala give a flat % to all extracted resources.
+    // Applied as the LAST step so it multiplies the sum across all
+    // buildings (correct economic behaviour — an active Prime
+    // at L10 gives +14.5% to TOTAL mineral output, not +10% per
+    // mineral building). Population is unaffected by commander
+    // bonuses today; it tracks active worker assignments.
+    const cmd = await this.commanders.getActiveBonus(playerId);
+    const prodMul = 1 + (cmd.resourceProductionMultiplier ?? 0);
+    if (prodMul !== 1) {
+      mineralPerTick = Math.round(mineralPerTick * prodMul);
+      gasPerTick     = Math.round(gasPerTick * prodMul);
+      energyPerTick  = Math.round(energyPerTick * prodMul);
     }
 
     await this.resources.updateRates(playerId, {

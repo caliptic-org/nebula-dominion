@@ -22,6 +22,7 @@ import { GuildsModule } from './guilds/guilds.module';
 import { UnitsModule } from './units/units.module';
 import { GalaxyMapModule } from './map/galaxy-map.module';
 import { QuestProgressModule } from './quest-progress/quest-progress.module';
+import { CommandersModule } from './commanders/commanders.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { QuestProgressModule } from './quest-progress/quest-progress.module';
     UnitsModule,
     GalaxyMapModule,
     QuestProgressModule,
+    CommandersModule,
   ],
 })
 export class AppModule {}

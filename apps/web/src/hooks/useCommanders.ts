@@ -1,11 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { toBackendRace } from '@/lib/race-api';
+import { useCallback, useEffect, useState } from 'react';
 import type { NDRaceKey } from '@/components/handoff/nd-tokens';
+import { hasSession } from '@/lib/session';
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '') + '/api/v1';
+const GAME_SERVER_BASE = (
+  process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? 'http://localhost:3001'
+).replace(/\/+$/, '');
+
+/** Bonus shape mirrors game-server's CommanderBonus. All values are
+ *  multipliers (0.12 = +12%, -0.18 = -18% / faster / cheaper). */
+export interface CommanderBonusView {
+  damageMultiplier?: number;
+  defenseMultiplier?: number;
+  hpMultiplier?: number;
+  resourceProductionMultiplier?: number;
+  trainSpeedMultiplier?: number;
+  buildSpeedMultiplier?: number;
+  scienceMultiplier?: number;
+  trainCostMultiplier?: number;
+  buildCostMultiplier?: number;
+}
 
 export interface CommanderDto {
   id: string;
@@ -13,48 +28,97 @@ export interface CommanderDto {
   title: string;
   race: 'insan' | 'zerg' | 'otomat' | 'canavar' | 'seytan';
   level: number;
+  xp: number;
+  xpToNext: number;
   tier: 'BAŞ KOMUTAN' | 'TIER 2' | 'TIER 3' | 'TIER 4' | 'TIER 5';
   skill: string;
+  /** Whether the player has unlocked this commander (player_commanders row
+   *  exists with unlocked_at != null). The 4th-tier slot starts locked
+   *  until a quest/age gate flips it. */
   unlocked: boolean;
+  /** True when this commander is the player's currently-selected one. */
+  isActive: boolean;
+  /** True when there's a player_commanders row at all (locked or not). */
+  owned: boolean;
   portrait: string;
+  /** Pre-computed bonus at the player's current level — saves the FE from
+   *  rebuilding the level-scale math. */
+  bonusAtLevel: CommanderBonusView;
 }
 
-/* Race-specific commander roster. Comes from the meta stub controller —
- * mirrors `RACES[race].commanders` for now but lets the UI round-trip the
- * data so it can swap to a real player-progression backend later. */
+/**
+ * Race-specific commander roster from game-server.
+ *
+ * Was previously hitting api's meta stub (`/api/v1/commanders`) which
+ * returned a static catalog with hard-coded levels and an in-memory
+ * active-commander store that vanished on container restart. Now backed
+ * by `player_commanders` table + bonus engine (commit introducing
+ * CommandersModule on game-server).
+ *
+ * Guest mode: the endpoint requires JWT, so unauthenticated callers
+ * short-circuit to empty roster + loading=false. ScrCommanders falls
+ * back to its static lex in that case.
+ */
 export function useCommanders(race: NDRaceKey | null) {
   const [commanders, setCommanders] = useState<CommanderDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchRoster = useCallback(async () => {
+    if (!hasSession()) {
+      setLoading(false);
+      setCommanders([]);
+      return;
+    }
     setLoading(true);
-    // `null` fetches the full 20-commander roster across all races. Useful for
-    // the /commanders gallery where client-side filtering toggles between
-    // races without re-fetching. The FE-to-BE race-key adapter would convert
-    // 'insan' → 'human', but the meta stub speaks local keys, so we pass the
-    // local key directly.
-    void toBackendRace;
-    const url = race
-      ? `${API_BASE}/commanders?race=${encodeURIComponent(race)}`
-      : `${API_BASE}/commanders`;
-    fetch(url)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as CommanderDto[];
-        if (!cancelled) setCommanders(Array.isArray(data) ? data : []);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+    try {
+      const token = window.localStorage.getItem('accessToken');
+      const url = race
+        ? `${GAME_SERVER_BASE}/api/commanders?race=${encodeURIComponent(race)}`
+        : `${GAME_SERVER_BASE}/api/commanders`;
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-    return () => {
-      cancelled = true;
-    };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as CommanderDto[];
+      setCommanders(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, [race]);
 
-  return { commanders, loading, error };
+  useEffect(() => {
+    void fetchRoster();
+  }, [fetchRoster]);
+
+  const activate = useCallback(
+    async (commanderId: string) => {
+      if (!hasSession()) return;
+      const token = window.localStorage.getItem('accessToken');
+      const res = await fetch(
+        `${GAME_SERVER_BASE}/api/commanders/${commanderId}/activate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        const raw = Array.isArray(body.message) ? body.message.join(' · ') : body.message;
+        throw new Error(raw || `Aktive edilemedi: ${res.status}`);
+      }
+      // Refetch so isActive flips on the right row and any FE consumers
+      // (HUD chip, /base bonus pill) see the new active state.
+      await fetchRoster();
+    },
+    [fetchRoster],
+  );
+
+  return { commanders, loading, error, activate, refresh: fetchRoster };
 }

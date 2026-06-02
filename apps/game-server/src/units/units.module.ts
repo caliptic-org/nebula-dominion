@@ -8,6 +8,7 @@ import { ResourcesModule } from '../resources/resources.module';
 import { AuthModule } from '../auth/auth.module';
 import { Building } from '../buildings/entities/building.entity';
 import { ProgressionModule } from '../progression/progression.module';
+import { CommandersModule } from '../commanders/commanders.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ProgressionModule } from '../progression/progression.module';
     ResourcesModule,
     AuthModule,
     ProgressionModule,
+    CommandersModule,
   ],
   providers: [UnitsService],
   controllers: [UnitsController],

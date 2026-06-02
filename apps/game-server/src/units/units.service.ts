@@ -22,6 +22,7 @@ import { ResourcesService } from '../resources/resources.service';
 import { scaledDurationSec } from '../common/game-speed';
 import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
+import { CommandersService } from '../commanders/commanders.service';
 import { TrainUnitDto } from './dto/train-unit.dto';
 import { MoveUnitDto } from './dto/move-unit.dto';
 
@@ -47,6 +48,7 @@ export class UnitsService {
     private readonly buildingRepo: Repository<Building>,
     private readonly resources: ResourcesService,
     private readonly progression: ProgressionService,
+    private readonly commanders: CommandersService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -103,14 +105,27 @@ export class UnitsService {
     // wallet 5× and the queue row waits 5× as long before flipping
     // complete (worker then spawns 5 marines from this single row).
     const count = Math.max(1, Math.min(99, dto.count ?? 1));
+
+    // ── Commander bonus ─────────────────────────────────────────────
+    // trainCostMultiplier: negative = discount (Azurath: -0.20 → -20%).
+    // trainSpeedMultiplier: negative = faster (Reyes: -0.18 → -18% time).
+    // Read once per train call; fan out to cost + duration below.
+    const cmdBonus = await this.commanders.getActiveBonus(playerId);
+    const costMul = 1 + (cmdBonus.trainCostMultiplier ?? 0);
+    const speedMul = 1 + (cmdBonus.trainSpeedMultiplier ?? 0);
+    // Clamp so a freak high-level Tier-5 commander can't take a cost to
+    // <= 0 or duration to negative. Floor at 5% of base (95% max discount).
+    const safeCostMul = Math.max(0.05, costMul);
+    const safeSpeedMul = Math.max(0.05, speedMul);
+
     const batchCost = {
-      mineral: (config.cost.mineral ?? 0) * count,
-      gas:     (config.cost.gas ?? 0) * count,
-      energy:  (config.cost.energy ?? 0) * count,
+      mineral: Math.round((config.cost.mineral ?? 0) * count * safeCostMul),
+      gas:     Math.round((config.cost.gas ?? 0) * count * safeCostMul),
+      energy:  Math.round((config.cost.energy ?? 0) * count * safeCostMul),
       // science isn't part of unit training cost today but multiply
       // defensively so future tier-5+ units that DO need science scale
       // correctly without revisiting this branch.
-      science: ((config.cost as { science?: number }).science ?? 0) * count,
+      science: Math.round(((config.cost as { science?: number }).science ?? 0) * count * safeCostMul),
     };
 
     // Check resources
@@ -132,7 +147,9 @@ export class UnitsService {
     // batch as ONE queue card with a longer countdown rather than 5
     // separate rows finishing at the same instant.
     const completesAt = new Date(
-      now.getTime() + scaledDurationSec(config.trainTimeSeconds) * count * 1000,
+      now.getTime() +
+        Math.max(0, Math.round(scaledDurationSec(config.trainTimeSeconds) * count * safeSpeedMul)) *
+          1000,
     );
 
     const entry = this.queueRepo.create({

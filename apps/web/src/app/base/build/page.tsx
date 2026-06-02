@@ -30,7 +30,7 @@ import type { NDRace } from '@/components/handoff/nd-tokens';
 import { useBuildingTypes, type BuildingTypeDto } from '@/hooks/useBuildingTypes';
 import { useHudState } from '@/hooks/useHudState';
 import { useGameBuildings, refreshBuildings } from '@/hooks/useGameBuildings';
-import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
+import { useGameResources, formatResource, refreshGameResources } from '@/hooks/useGameResources';
 import { computeUpgradeRequirements, canUpgrade } from '@/lib/upgrade-requirements';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
@@ -383,7 +383,7 @@ function BuildMenuInner() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
-          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
+          science={hud.science !== undefined ? formatResource(Math.floor(hud.science)) : undefined}
         />
 
         <div

@@ -77,4 +77,10 @@ export const gameServerApi = {
 
   delete: <T>(path: string, opts?: RequestOptions) =>
     request<T>(path, { ...opts, method: 'DELETE' }),
+
+  /** Advance the player to the next age. game-server-side gate checks
+   *  command_center.level >= getMaxLevel(currentAge) before transitioning.
+   *  Throws BadRequest if the HQ isn't high enough (with Turkish message). */
+  advanceAge: <T = unknown>(userId: string) =>
+    request<T>(`/progression/${userId}/advance-age`, { method: 'POST' }),
 };

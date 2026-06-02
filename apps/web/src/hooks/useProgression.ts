@@ -36,6 +36,7 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
   const [progress, setProgress] = useState<PlayerProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProgressionEvent[]>([]);
+  const [advancing, setAdvancing] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   // Progression module lives on game-server, NOT the api service. Earlier
   // versions of this hook hit `${NEXT_PUBLIC_API_URL}/progression/:id`
@@ -132,5 +133,33 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
     };
   }, [userId, onLevelUp, onXpGained, onAgeTransition]);
 
-  return { progress, loading, events };
+  const advanceAge = useCallback(async () => {
+    if (!userId || advancing) return;
+    setAdvancing(true);
+    try {
+      const token =
+        typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null;
+      const headers: HeadersInit = token
+        ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        : { 'Content-Type': 'application/json' };
+      const res = await fetch(
+        `${gameServerBase}/api/progression/${userId}/advance-age`,
+        { method: 'POST', headers },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        const raw = Array.isArray(body.message) ? body.message.join(' · ') : body.message;
+        throw new Error(raw || `Çağ geçişi reddedildi: ${res.status}`);
+      }
+      // Backend returns { progress, eraPackage }. Refetch the progress
+      // DTO via the canonical endpoint so canAdvanceAge / xpToNextLevel /
+      // unlockedContent all land in one shape rather than spreading the
+      // shallow merge across two divergent shapes.
+      await fetchProgress();
+    } finally {
+      setAdvancing(false);
+    }
+  }, [userId, gameServerBase, fetchProgress, advancing]);
+
+  return { progress, loading, events, advanceAge, advancing, refresh: fetchProgress };
 }

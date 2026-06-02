@@ -584,9 +584,35 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
         }}
       >
         <div style={{ display: 'flex', gap: 8, maxWidth: 720, margin: '0 auto' }}>
-          <NDButton race={race} variant="primary" size="lg" full onClick={handleEngage} disabled={filled === 0}>
-            SAVAŞA GİR ⚔
-          </NDButton>
+          {/* SAVAŞA GİR — three states with progressively clearer affordance:
+              1. liveUnits == [] → no army; show "BİRİM ÜRET" routing to
+                 /base/production (audit #13). The disabled-but-present button
+                 looked enabled in Playwright + force-click reports.
+              2. filled === 0 → button visible but disabled with "GRİDE EN
+                 AZ 1 BİRİM" text so the gating reason is obvious.
+              3. filled > 0 → primary CTA. */}
+          {liveUnits != null && liveUnits.length === 0 ? (
+            <NDButton
+              race={race}
+              variant="primary"
+              size="lg"
+              full
+              onClick={() => router.push('/base/production')}
+            >
+              BİRİM ÜRET →
+            </NDButton>
+          ) : (
+            <NDButton
+              race={race}
+              variant="primary"
+              size="lg"
+              full
+              onClick={handleEngage}
+              disabled={filled === 0}
+            >
+              {filled === 0 ? 'GRİDE EN AZ 1 BİRİM' : 'SAVAŞA GİR ⚔'}
+            </NDButton>
+          )}
         </div>
       </footer>
     </div>

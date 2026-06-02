@@ -3,7 +3,7 @@
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { ResourceField } from '@/lib/nd-tokens';
 import { useTierProgress } from './useTierProgress';
-import { useGameResources, type ResourceSnapshotDto } from './useGameResources';
+import { useGameResources, formatResource, type ResourceSnapshotDto } from './useGameResources';
 
 const HUD_PLACEHOLDER = '—';
 
@@ -42,7 +42,11 @@ function formatAmount(amount: number | undefined | null): string {
   if (amount === undefined || amount === null || !Number.isFinite(amount)) {
     return HUD_PLACEHOLDER;
   }
-  return Math.floor(amount).toLocaleString();
+  // Delegate to the shared formatResource() so the /base HUD pills and the
+  // /base/production / /base/building pills speak the same scale. Without
+  // this the /base/build HUD rendered "10,000,000,000,000" while every
+  // other surface showed "10T" — the verification agent caught the drift.
+  return formatResource(Math.floor(amount));
 }
 
 /** Pick the right snapshot value for a race-themed slot.

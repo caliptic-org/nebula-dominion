@@ -32,7 +32,7 @@ import { useBaseState } from '@/hooks/useBaseState';
 import { useGameBuildings, indexBuildingsByType, type PlayerBuildingDto } from '@/hooks/useGameBuildings';
 import { useHudState } from '@/hooks/useHudState';
 import { useBaseProductionQueue } from '@/hooks/useBaseProductionQueue';
-import { refreshGameResources } from '@/hooks/useGameResources';
+import { formatResource, refreshGameResources } from '@/hooks/useGameResources';
 import type { NDRaceLex } from '@/components/handoff/race-lex';
 import { ShortcutButtons } from '@/components/hud/ShortcutButtons';
 import { UnitProductionQueue } from '@/components/hud/UnitProductionQueue';
@@ -255,7 +255,7 @@ export default function BaseHomePage() {
           resA={hud.resA}
           resB={hud.resB}
           crystal={hud.crystal}
-          science={hud.science !== undefined ? Math.floor(hud.science).toLocaleString() : undefined}
+          science={hud.science !== undefined ? formatResource(Math.floor(hud.science)) : undefined}
           resAPerTick={hud.resAPerTick}
           resBPerTick={hud.resBPerTick}
           crystalPerTick={hud.crystalPerTick}

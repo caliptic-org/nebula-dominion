@@ -31,6 +31,15 @@ interface ScrTierUpProps {
   canLevelUp?: boolean;
   onLevelUp?: () => void;
   onRefresh?: () => void;
+  /** True when player has hit max level of current age and another age
+   *  exists. Drives the "Çağ N'ye Geç" CTA. */
+  canAdvanceAge?: boolean;
+  /** Click handler — calls game-server's POST /progression/:id/advance-age.
+   *  Backend enforces command_center Lv >= ageMax; on failure the rejection
+   *  message is surfaced through `advanceError`. */
+  onAdvanceAge?: () => Promise<void> | void;
+  advancing?: boolean;
+  advanceError?: string | null;
   levelNames?: Record<number, string>;
   notice?: string;
   noticeKind?: 'info' | 'warn';
@@ -50,6 +59,10 @@ export function ScrTierUp({
   canLevelUp = false,
   onLevelUp,
   onRefresh,
+  canAdvanceAge = false,
+  onAdvanceAge,
+  advancing = false,
+  advanceError = null,
   levelNames,
   notice,
   noticeKind = 'info',
@@ -174,7 +187,26 @@ export function ScrTierUp({
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-              {!isMaxLevel && onLevelUp && (
+              {/* ÇAĞ GEÇ button takes priority over SEVİYE YÜKSELT when both
+                  are possible — at max-level-of-age, level-up is a no-op
+                  (api's /tier/level-up bumps a vestigial mirror table) while
+                  advance-age is the real gameplay transition with new
+                  unlocks + era catch-up package. The button surface stays
+                  consistent (race-coloured solid) so the player doesn't
+                  have to learn two affordances. */}
+              {canAdvanceAge && onAdvanceAge && (
+                <NDButton
+                  race={race}
+                  size="md"
+                  onClick={() => {
+                    void onAdvanceAge();
+                  }}
+                  disabled={advancing}
+                >
+                  {advancing ? 'ÇAĞ GEÇİLİYOR…' : `ÇAĞ ${currentLevel >= 9 ? Math.floor((currentLevel - 1) / 9) + 2 : 2}'YE GEÇ`}
+                </NDButton>
+              )}
+              {!isMaxLevel && onLevelUp && !canAdvanceAge && (
                 <NDButton
                   race={race}
                   size="md"
@@ -190,6 +222,11 @@ export function ScrTierUp({
                 </NDButton>
               )}
             </div>
+            {advanceError && (
+              <Caption style={{ marginTop: 10, color: ND.warn }}>
+                ⚠ {advanceError}
+              </Caption>
+            )}
           </Panel>
 
           {notice && (

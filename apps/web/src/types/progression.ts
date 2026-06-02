@@ -40,6 +40,11 @@ export interface PlayerProgress {
   unlockedContent: ContentUnlock[];
   tierBonusMultiplier: number;
   isMaxLevel: boolean;
+  /** True when player has hit max level of current age and another age
+   *  exists. FE surfaces this as a "Çağ N'ye Geç" CTA → POST
+   *  /api/progression/:id/advance-age. The endpoint enforces the HQ
+   *  level gate (command_center.level >= ageMax) on its own. */
+  canAdvanceAge: boolean;
 }
 
 export interface LevelUpPayload {

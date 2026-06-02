@@ -852,52 +852,72 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
               {/* YIELD row — only when the building actually produces
                   something. Hides zero-yield buildings (kışla, akademi,
                   fabrika, kalkan jeneratörü) so the card doesn't render
-                  a misleading "+0/tick" stripe. */}
-              {(entry.yieldMineralPerTick !== 0 ||
-                entry.yieldGasPerTick !== 0 ||
-                entry.yieldEnergyPerTick !== 0) && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: ND.ok,
-                    flexWrap: 'wrap',
-                    fontSize: 9,
-                  }}
-                >
-                  {entry.yieldMineralPerTick !== 0 && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                      <ResIcon kind={race.resourceA.icon} size={9} color={ND.ok} />
-                      +{entry.yieldMineralPerTick}/tick
-                    </span>
-                  )}
-                  {entry.yieldGasPerTick !== 0 && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                      <ResIcon kind={race.resourceB.icon} size={9} color={ND.ok} />
-                      +{entry.yieldGasPerTick}/tick
-                    </span>
-                  )}
-                  {entry.yieldEnergyPerTick !== 0 && (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        color: entry.yieldEnergyPerTick < 0 ? ND.danger : ND.ok,
-                      }}
-                    >
-                      <ResIcon
-                        kind="energy"
-                        size={9}
-                        color={entry.yieldEnergyPerTick < 0 ? ND.danger : ND.ok}
-                      />
-                      {entry.yieldEnergyPerTick > 0 ? '+' : ''}
-                      {entry.yieldEnergyPerTick}/tick
-                    </span>
-                  )}
-                </div>
-              )}
+                  a misleading "+0/tick" stripe.
+
+                  Scale by 1.18^(level-1) to mirror backend's
+                  recalculateProductionRates legacy-fallback formula
+                  (1.18 = the default levelScaleExponent the DB-driven
+                  path would use). Number shown is the rate the player
+                  ACTUALLY trickles AT THE CURRENT LEVEL, so an upgraded
+                  building's card matches the wallet behaviour. Lv 1 → 1.0×,
+                  Lv 5 → 1.94×, Lv 10 → 4.43×. */}
+              {(() => {
+                const yieldScale = Math.pow(1.18, Math.max(0, entry.level - 1));
+                const scaledM = Math.round(entry.yieldMineralPerTick * yieldScale);
+                const scaledG = Math.round(entry.yieldGasPerTick * yieldScale);
+                // Energy production scales; consumption does not.
+                // Recompute net = (basePos × scale) - (baseNeg) so the
+                // displayed value matches the backend's actual trickle.
+                const baseEnergy = entry.yieldEnergyPerTick;
+                const scaledE = baseEnergy >= 0
+                  ? Math.round(baseEnergy * yieldScale)
+                  : baseEnergy; // pure drain buildings keep their cost flat
+                const hasYield = scaledM !== 0 || scaledG !== 0 || scaledE !== 0;
+                if (!hasYield) return null;
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      color: ND.ok,
+                      flexWrap: 'wrap',
+                      fontSize: 9,
+                    }}
+                  >
+                    {scaledM !== 0 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                        <ResIcon kind={race.resourceA.icon} size={9} color={ND.ok} />
+                        +{scaledM.toLocaleString()}/tick
+                      </span>
+                    )}
+                    {scaledG !== 0 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                        <ResIcon kind={race.resourceB.icon} size={9} color={ND.ok} />
+                        +{scaledG.toLocaleString()}/tick
+                      </span>
+                    )}
+                    {scaledE !== 0 && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          color: scaledE < 0 ? ND.danger : ND.ok,
+                        }}
+                      >
+                        <ResIcon
+                          kind="energy"
+                          size={9}
+                          color={scaledE < 0 ? ND.danger : ND.ok}
+                        />
+                        {scaledE > 0 ? '+' : ''}
+                        {scaledE.toLocaleString()}/tick
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

@@ -414,11 +414,33 @@ export class BuildingsService {
         energyPerTick     += econRates.netEnergyPerTick;
         populationPerTick += econRates.populationPerTick;
       } else {
-        // Fallback to legacy constants when economy config is missing for this building type
+        // ── LEVEL SCALING IN LEGACY FALLBACK ────────────────────────
+        // economy_building_configs table was created in migration
+        // 1714723200000 but never seeded in production. With an empty
+        // DB the previous code path returned the FLAT base per-tick
+        // rate regardless of building.level — so upgrading a building
+        // from Lv 1 to Lv 10 only ever made it MORE EXPENSIVE without
+        // changing what it produced. Players reported "üs gelişim
+        // hesaplarında hata olabilirmi" because it's a real bug:
+        // upgrade cost scaled 1.5^level, yield did not scale at all.
+        //
+        // Apply the same 1.18^(level-1) scaling the DB-driven path
+        // uses, so until economy_building_configs is properly seeded
+        // (deferred — separate seed migration) the fallback at least
+        // gives the player the intended +18% per-level gain.
+        // Lv 1 → 1.0× · Lv 5 → 1.94× · Lv 10 → 4.43× · Lv 20 → 24×
         const legacyCfg = BUILDING_CONFIGS[building.type];
-        mineralPerTick += legacyCfg.production.mineralPerTick;
-        gasPerTick     += legacyCfg.production.gasPerTick;
-        energyPerTick  += legacyCfg.production.energyPerTick - legacyCfg.energyConsumptionPerTick;
+        const legacyScale = Math.pow(1.18, Math.max(0, building.level - 1));
+        mineralPerTick += Math.round(legacyCfg.production.mineralPerTick * legacyScale);
+        gasPerTick     += Math.round(legacyCfg.production.gasPerTick * legacyScale);
+        // Energy: only the production side scales. Consumption stays
+        // flat — a Lv 10 factory still drains the same power but
+        // outputs more, which lines up with how upgrades feel in
+        // real-time strategy genre conventions.
+        energyPerTick  += Math.round(
+          legacyCfg.production.energyPerTick * legacyScale -
+            legacyCfg.energyConsumptionPerTick,
+        );
       }
     }
 

@@ -21,6 +21,7 @@ import {
 } from '@/components/handoff';
 import { Analytics } from '@/lib/analytics';
 import { useGameUnits, groupUnitsByType } from '@/hooks/useGameUnits';
+import { useActiveCommander } from '@/hooks/useActiveCommander';
 
 /* ───────────────────────── Roster & formation model ───────────────────────── */
 
@@ -583,6 +584,11 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
           backdropFilter: 'blur(10px)',
         }}
       >
+        {/* Active commander chip — surfaces who's about to take the
+            field plus their headline bonus so the player can verify
+            "Voss → +12% damage" before tapping SAVAŞA GİR. Hidden when
+            no commander is active (UX cue to head to /commanders). */}
+        <ActiveCommanderBanner race={race} />
         <div style={{ display: 'flex', gap: 8, maxWidth: 720, margin: '0 auto' }}>
           {/* SAVAŞA GİR — three states with progressively clearer affordance:
               1. liveUnits == [] → no army; show "BİRİM ÜRET" routing to
@@ -615,6 +621,58 @@ export function BattlePrepScreen({ targetId, forcedRace, projectedOutcome, liveF
           )}
         </div>
       </footer>
+    </div>
+  );
+}
+
+/** Small chip showing the active commander's portrait + level + skill.
+ *  Sits above SAVAŞA GİR so the player verifies bonuses before engaging.
+ *  When no commander is active, prompts a one-liner to set one. */
+function ActiveCommanderBanner({ race }: { race: NDRace }) {
+  const { data: active } = useActiveCommander();
+  if (!active) {
+    return (
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto 8px',
+          padding: '6px 10px',
+          fontFamily: ND.mono,
+          fontSize: 10,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: ND.textDim,
+          textAlign: 'center',
+          border: `1px dashed ${ND.border}`,
+        }}
+      >
+        Aktif komutan yok — /commanders'tan birini seç
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        maxWidth: 720,
+        margin: '0 auto 8px',
+        padding: '4px 10px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        background: `${race.primary}14`,
+        border: `1px solid ${race.primary}55`,
+        fontFamily: ND.mono,
+        fontSize: 10,
+        letterSpacing: '0.06em',
+      }}
+    >
+      <span style={{ color: race.primary, fontWeight: 700 }}>⚔ {active.name}</span>
+      <span style={{ color: ND.textDim }}>·</span>
+      <span style={{ color: ND.textDim }}>LV {active.level}</span>
+      <span style={{ color: ND.textDim }}>·</span>
+      <span style={{ color: ND.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {active.title ?? active.tier}
+      </span>
     </div>
   );
 }

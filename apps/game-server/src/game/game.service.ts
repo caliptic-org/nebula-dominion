@@ -11,6 +11,7 @@ import { ProgressionService } from '../progression/progression.service';
 import { XpSource } from '../progression/config/level-config';
 import { MergeService } from './merge/merge.service';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
+import { CommandersService } from '../commanders/commanders.service';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 const GRID_WIDTH = 8;
@@ -63,6 +64,7 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     private readonly progression: ProgressionService,
     private readonly mergeService: MergeService,
     private readonly questProgress: QuestProgressNotifier,
+    private readonly commanders: CommandersService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
   }
@@ -142,9 +144,24 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     if (!target) return fail('Target unit not found');
     if (attacker.actionUsed) return fail('Unit already acted this turn');
 
+    // ── Commander combat bonus ──────────────────────────────────────
+    // Attacker's damageMultiplier amplifies outgoing damage. Target's
+    // defenseMultiplier amplifies their defense stat for THIS hit (we
+    // don't persist the defense bump — it's a runtime modifier, not a
+    // stored stat). Both default to 0 (no commander → NO_BONUS).
+    // Bots (`bot:` prefix) have no player_commanders rows; getActiveBonus
+    // returns NO_BONUS so they fight at base stats — that's correct,
+    // PvE bots shouldn't carry commander progression.
+    const [attackerCmd, targetCmd] = await Promise.all([
+      this.commanders.getActiveBonus(userId),
+      this.commanders.getActiveBonus(opponentId),
+    ]);
+    const dmgMul = 1 + (attackerCmd.damageMultiplier ?? 0);
+    const defMul = 1 + (targetCmd.defenseMultiplier ?? 0);
+    const effectiveDefense = Math.max(0, target.defense * defMul);
     const isCrit = Math.random() < 0.15;
-    const baseDamage = Math.max(1, attacker.attack - target.defense);
-    const damage = isCrit ? Math.round(baseDamage * 1.75) : baseDamage;
+    const baseDamage = Math.max(1, attacker.attack * dmgMul - effectiveDefense);
+    const damage = isCrit ? Math.round(baseDamage * 1.75) : Math.round(baseDamage);
     target.hp -= damage;
     attacker.actionUsed = true;
 
@@ -543,6 +560,21 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
             source,
             referenceId: roomId,
           });
+          // ── Commander XP award ──────────────────────────────────
+          // Winner gets +100 (≈ 2 battles to L2, ~16 battles to L5,
+          // ~150 to L10). Loser gets +30 — partial credit so a
+          // grinding-against-bots loop still progresses, just slower
+          // than the win path. CommandersService.awardXp internally
+          // cascades multi-level-ups if the grant overflows xpToNext.
+          // Errors swallowed because progression already succeeded
+          // and this is a "nice to have" on top.
+          this.commanders
+            .awardXp(userId, isWinner ? 100 : 30)
+            .catch((err) => {
+              this.logger.warn(
+                `Commander XP award skipped for ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
         }),
       );
     } catch (err) {

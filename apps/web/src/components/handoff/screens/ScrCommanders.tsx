@@ -317,8 +317,20 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
             })}
           </div>
 
-          {/* Card grid + detail panel */}
+          {/* Card grid + detail panel.
+              On DESKTOP: the inner grid splits into [cards | detail] two
+              columns; each side scrolls independently via overflowY:auto.
+              On MOBILE (≤768px): the grid collapses to a single column
+              (cards then detail stacked) and the OUTER wrapper becomes
+              the scroll container — section/aside overflow goes back to
+              `visible` so the document-flow content height drives the
+              scroll. Before this fix the inner grid had auto-sized rows
+              and the outer root had overflow:hidden, so taller-than-
+              viewport mobile content was silently clipped — page felt
+              "stuck", couldn't reach the lower commander cards or the
+              detail panel's bottom buttons. */}
           <div
+            className="commanders-grid-wrapper"
             style={{
               flex: 1,
               display: 'grid',
@@ -336,6 +348,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
               className="commanders-layout"
             >
               <section
+                className="commanders-cards"
                 style={{
                   padding: '18px 16px 32px',
                   overflowY: 'auto',
@@ -396,8 +409,20 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
           }
           :global([data-testid='scr-commanders']) .commanders-detail {
             width: 100% !important;
+            min-width: 0 !important;
             border-left: none !important;
             border-top: 1px solid ${ND.border};
+            overflow: visible !important;
+          }
+          :global([data-testid='scr-commanders']) .commanders-cards {
+            overflow: visible !important;
+          }
+          /* Outer wrapper takes over scrolling on mobile — both sections
+             flow normally, the total height = card grid + detail panel,
+             and this container scrolls the whole thing. */
+          :global([data-testid='scr-commanders']) .commanders-grid-wrapper {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
           }
         }
       `}</style>

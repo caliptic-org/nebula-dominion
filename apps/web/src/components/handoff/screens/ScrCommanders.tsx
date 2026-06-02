@@ -21,7 +21,8 @@ import {
   type NDRaceCmdr,
   type NDRaceKey,
 } from '@/components/handoff';
-import { api, FetchError } from '@/lib/api';
+import { FetchError } from '@/lib/api';
+import { gameServerApi } from '@/lib/game-server-api';
 import { useActiveCommander } from '@/hooks/useActiveCommander';
 
 const RACE_KEYS: NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
@@ -939,7 +940,11 @@ function CommanderDetailActions({
             }
           };
           try {
-            await api.post(`/commanders/${entry.id}/activate`);
+            // game-server hosts the real /commanders module (was an api
+            // meta-stub before; that was removed in the commander-system
+            // commit). gameServerApi handles JWT + retries against
+            // game-nebula.caliptic.com automatically.
+            await gameServerApi.post(`/commanders/${entry.id}/activate`);
             writeCache();
             toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
             onActivated?.();

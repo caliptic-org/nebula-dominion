@@ -12,20 +12,15 @@ import {
   XP_SOURCE_MIN_AGE,
   getLevelDef,
   getMaxLevel,
-  getFirstLevel,
   getFirstLevelForAge,
   getAgeTierBadge,
-  AgeTierBadge,
-  AGE_BADGE_LABELS,
   MAX_AGE,
   MAX_LEVEL,
-  ContentUnlock,
   ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
-import { scaledXp } from '../common/game-speed';
-import { AgeTransitionEvent, EraTransitionEvent, EraTransitionPackage, LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
+import { EraTransitionEvent, EraTransitionPackage, LevelUpEvent, PlayerProgressDto, XpGainedEvent } from './dto/player-progress.dto';
 import {
   EVENT_GUILD_TUTORIAL_REQUIRED,
   GUILD_TUTORIAL_XP_THRESHOLD,
@@ -92,13 +87,15 @@ export class ProgressionService {
     const baseAmount = XP_BASE_AMOUNTS[dto.source] ?? 0;
     const levelDef = getLevelDef(record.currentLevel);
     const multiplier = levelDef?.xpMultiplier ?? 1.0;
-    // GAME_SPEED_MULTIPLIER (common/game-speed.ts) scales the per-source
-    // baseAmount BEFORE the per-tier multiplier kicks in. At 1000× a
-    // CONSTRUCTION grant (80 base × tier 1.0×) lands as 80 000 XP — the
-    // player rockets through Çağ 1 → Çağ 2 in a handful of actions, which
-    // is exactly the point of the playtest knob. Default 1× = canonical.
-    const speedScaled = scaledXp(baseAmount);
-    const finalAmount = Math.round(speedScaled * multiplier);
+    // ── ECONOMY GUARD ────────────────────────────────────────────────
+    // GAME_SPEED_MULTIPLIER is for SPEEDING UP TIMERS, not multiplying
+    // the XP per action. Previously scaledXp(80) at 1000× returned
+    // 80 000 — a single training jumped the player from Lv 1 past Çağ
+    // 4. With 1000× pacing the player already completes 1000× more
+    // actions per wall-clock hour, which naturally compounds XP at the
+    // intended rate. Double-counting (×1000 timers AND ×1000 XP) made
+    // Lv 54 reachable in ~12 trains. Fix: XP is fixed per source.
+    const finalAmount = Math.round(baseAmount * multiplier);
 
     record.currentXp += finalAmount;
     record.totalXp += finalAmount;
@@ -338,49 +335,17 @@ export class ProgressionService {
         continue;
       }
 
-      // Player is at max level of current age — check for age transition
-      if (record.currentAge < MAX_AGE) {
-        const previousAge = record.currentAge;
-        const previousBadgeTier = getAgeTierBadge(previousAge);
-        record.currentAge += 1;
-        record.currentLevel = getFirstLevel(record.currentAge);
-        // currentXp carries over as starting XP for the new age's first level
-
-        const newBadgeTier = getAgeTierBadge(record.currentAge);
-        const newDef = getLevelDef(record.currentLevel);
-        if (newDef) {
-          record.currentTier = newDef.tier;
-
-          const newUnlocks = newDef.unlocks.filter(
-            (u) => !record.unlockedContent.includes(u),
-          );
-          if (newUnlocks.length > 0) {
-            record.unlockedContent = [...record.unlockedContent, ...newUnlocks];
-          }
-        }
-
-        const transitionEvent: AgeTransitionEvent = {
-          userId: record.userId,
-          previousAge,
-          newAge: record.currentAge,
-          totalXpAtTransition: record.totalXp,
-          badge_upgrade: {
-            previousBadgeTier: previousBadgeTier !== newBadgeTier ? previousBadgeTier : null,
-            newBadgeTier,
-            badgeLabel: AGE_BADGE_LABELS[newBadgeTier],
-          },
-        };
-        this.emitter.emit('progression.age_transition', transitionEvent);
-
-        this.logger.log(
-          `Age transition: user=${record.userId} age=${previousAge}→${record.currentAge} badge=${newBadgeTier} totalXp=${record.totalXp}`,
-        );
-
-        leveledUp = true;
-        // Continue loop to process any level-ups within the new age
-        continue;
-      }
-
+      // ── ECONOMY GUARD ──────────────────────────────────────────────
+      // Player hit max level of current age — STAY HERE. Previously
+      // this branch auto-advanced age (incremented currentAge, reset
+      // level, granted unlocks) — which bypassed advanceAge()'s
+      // building-tier gate. A determined player could farm CONSTRUCTION
+      // XP (training/building/merging) and cascade through Çağ
+      // 1→2→3→4→5→6 without ever upgrading their Komuta Üssü past
+      // Lv 1. That's how the user reached Lv 54 with no buildings.
+      // Fix: surplus XP banks at maxLevel; FE shows canAdvanceAge=true;
+      // player presses "Çağ N'ye Geç" → advanceAge() endpoint runs the
+      // HQ gate; if HQ Lv < ageMax, transition refused.
       break;
     }
 

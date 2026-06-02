@@ -292,23 +292,62 @@ export default function MergePage() {
 
     setMergingAll(true);
     let succeeded = 0;
+    let skippedNoChain = 0;
     let failed = 0;
+    // Track unit-type codes we've already learned are merge-chain-tops
+    // so subsequent triplets of the SAME type don't re-issue POSTs that
+    // we know will 400. Marine → Sniper → Mecha → Genetic → Captain is
+    // the only chain on İnsan today — Medic/Ghost/Siege Tank are
+    // standalone (no MERGE_RECIPES entry), so a roster with [3 Medic,
+    // 6 Ghost] should silently skip ALL their triplets and toast a
+    // concise summary instead of throwing 5 separate errors.
+    const skippedTypes = new Set<string>();
     try {
       for (let i = 0; i < tripletPlan.length; i += 1) {
+        const triplet = tripletPlan[i];
+        // Look up this triplet's type via the pool (first id always exists
+        // because tripletPlan was built from pool). Skip cheaply if we
+        // already know this type is non-mergeable.
+        const code = pool.find((u) => u.id === triplet[0])?.code ?? '';
+        if (skippedTypes.has(code)) {
+          skippedNoChain += 1;
+          continue;
+        }
         try {
-          await gameServerApi.post('/units/merge-roster', { unitIds: tripletPlan[i] });
+          await gameServerApi.post('/units/merge-roster', { unitIds: triplet });
           succeeded += 1;
         } catch (err) {
+          const msg = err instanceof FetchError ? err.message : '';
+          // BE phrase for "no next tier" — surface as a skipped count
+          // rather than a hard failure. Mark the type so the rest of its
+          // triplets don't even attempt.
+          if (msg.includes('tepesinde') || msg.includes('üst tier yok')) {
+            skippedTypes.add(code);
+            skippedNoChain += 1;
+            continue;
+          }
+          // Genuine failure (insufficient resources, validation, etc) —
+          // stop the batch so the player sees the actual problem rather
+          // than a cascade of identical errors.
           failed += 1;
-          // Stop on first failure — subsequent triplets may rely on the
-          // same wallet / req sequence and would just pile up errors.
-          const msg = err instanceof FetchError ? err.message : 'Birleştirme reddedildi';
-          toast.error(`Toplu birleştirme #${i + 1}: ${msg}`);
+          const display = msg || 'Birleştirme reddedildi';
+          toast.error(`Toplu birleştirme #${i + 1}: ${display}`);
           break;
         }
       }
+      // Summary toast — only fires when something happened the player
+      // should know about. Pure "all skipped" cases get a softer info
+      // message because it's not really a failure, just nothing to do.
       if (succeeded > 0) {
-        toast.success(`Toplu birleştirme: ${succeeded} grup başarılı${failed ? ` (${failed} başarısız)` : ''}`);
+        const suffix =
+          skippedNoChain > 0
+            ? ` (${skippedNoChain} birleştirilemez tip atlandı)`
+            : failed > 0
+              ? ` (${failed} başarısız)`
+              : '';
+        toast.success(`Toplu birleştirme: ${succeeded} grup başarılı${suffix}`);
+      } else if (skippedNoChain > 0 && failed === 0) {
+        toast.info(`Bu birim tipleri birleştirilemez — merge zincirinin tepesinde`);
       }
     } finally {
       setSelected([]);

@@ -42,7 +42,7 @@ export class CommandersController {
   @Get()
   @UseGuards(HttpJwtGuard)
   async list(@Req() req: any, @Query('race') race?: string) {
-    const userId: string = req.user?.id;
+    const userId: string = req.user?.sub;
     return this.service.listForPlayer(userId, normalizeRace(race));
   }
 
@@ -53,7 +53,7 @@ export class CommandersController {
   @Get('me/active')
   @UseGuards(HttpJwtGuard)
   async getActive(@Req() req: any) {
-    const userId: string = req.user?.id;
+    const userId: string = req.user?.sub;
     const active = await this.service.getActive(userId);
     return active ?? null;
   }
@@ -65,7 +65,7 @@ export class CommandersController {
   @Post(':id/activate')
   @UseGuards(HttpJwtGuard)
   async activate(@Req() req: any, @Param('id') id: string) {
-    const userId: string = req.user?.id;
+    const userId: string = req.user?.sub;
     return this.service.activate(userId, id);
   }
 
@@ -77,7 +77,7 @@ export class CommandersController {
   @Post(':id/award-xp')
   @UseGuards(HttpJwtGuard)
   async awardXp(@Req() req: any, @Body() body: { amount: number }) {
-    const userId: string = req.user?.id;
+    const userId: string = req.user?.sub;
     const amount = Math.max(0, Math.floor(body.amount ?? 0));
     return this.service.awardXp(userId, amount);
   }

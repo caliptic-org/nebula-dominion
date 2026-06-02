@@ -1,23 +1,40 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api, FetchError } from '@/lib/api';
+import { gameServerApi } from '@/lib/game-server-api';
+import { FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
 
 /* Player's currently-activated commander from `GET /commanders/me/active`.
  *
+ * SOURCE OF TRUTH: game-server (`/api/commanders/me/active`). Previously
+ * hit api's now-removed CommandersStubController on /api/v1/commanders/me/active
+ * which 404s post-CommandersModule migration. Switched to gameServerApi so
+ * the hook tracks player_commanders rows just like useCommanders does.
+ *
  * Returns `null` for guests AND for authenticated players who haven't
- * picked one yet (the stub responds 404 in that case — we translate the
- * 404 to a null state so the consumer renders the "no active commander"
- * variant without throwing).
+ * picked one yet (the BE responds with `null` body in that case — we
+ * pass it straight through so the consumer renders the "no active
+ * commander" variant without throwing).
  *
  * Exposes a `refresh()` so the /commanders screen can re-fetch after a
  * successful POST :id/activate without waiting for the next mount. */
 
+/** Shape matches game-server's CommanderView returned from
+ *  GET /api/commanders/me/active. Field set is a superset of the legacy
+ *  api stub shape — older consumers reading `commanderId` continue to
+ *  work because the new endpoint also exposes `id` (catalog id) which
+ *  is the same string. */
 export interface ActiveCommanderDto {
-  commanderId: string;
-  activatedAt: string;
+  id: string;
   name: string;
+  title: string;
+  race: string;
+  tier: string;
+  level: number;
+  /** Legacy alias kept so old call sites referencing this field still
+   *  compile. Same value as `id`. */
+  commanderId?: string;
 }
 
 interface UseActiveCommanderResult {
@@ -48,22 +65,19 @@ export function useActiveCommander(): UseActiveCommanderResult {
 
     let cancelled = false;
     setLoading(true);
-    api
-      .get<ActiveCommanderDto>('/commanders/me/active')
+    gameServerApi
+      .get<ActiveCommanderDto | null>('/commanders/me/active')
       .then((json) => {
         if (!cancelled) {
-          setData(json);
+          // Game-server returns null when no commander is active; map to
+          // null state without treating it as a failure. Backfill the
+          // legacy `commanderId` alias so any older call site still works.
+          setData(json ? { ...json, commanderId: json.id } : null);
           setError(null);
         }
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof FetchError && err.status === 404) {
-          // No active commander yet — not an error from the UI's POV.
-          setData(null);
-          setError(null);
-          return;
-        }
         if (err instanceof FetchError && err.status === 401) {
           setAuthenticated(false);
           setData(null);

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, FetchError } from '@/lib/api';
+import { hasSession } from '@/lib/session';
 
 // ── Wire-format types (snake_case, matching backend) ─────────────────────────
 
@@ -174,6 +175,15 @@ export function useVipStatus() {
   });
 
   const fetchStatus = useCallback(async () => {
+    // Guard: don't fire the auth-only endpoint without a token. Without
+    // this gate the hook hit /vip/status on EVERY route mount (because
+    // VipBadge is in the layout shell) and got 401 → console spam +
+    // wasted requests every navigation. Now it short-circuits to the
+    // "no VIP" empty state for guests.
+    if (!hasSession()) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const wire = await api.get<VipStatusWire>('/vip/status');

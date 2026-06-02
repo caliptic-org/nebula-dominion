@@ -27,7 +27,11 @@ import { UseItemDto, SellItemDto } from './dto/use-sell-item.dto';
 @ApiTags('Inventory')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/inventory')
+// Global prefix `api/v1` lives in main.ts. Declaring `api/inventory`
+// here mounted routes at `/api/v1/api/inventory/*` — every FE call to
+// `/api/v1/inventory/*` 404'd silently. Match the alliance/shop/payment
+// fix pattern: drop the `api/` prefix here.
+@Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 

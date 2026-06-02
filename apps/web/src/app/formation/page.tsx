@@ -1,44 +1,44 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FormationScreenND } from '@/components/formation/FormationScreenND';
 import { getAccessToken } from '@/lib/session';
 
-/* The formation backend wants a UUID. We decode it from the live JWT (sub
- * claim is the user's UUID) instead of using a hardcoded demo id — which
- * was previously causing 404s on /units/player/<demo> for every visit.
- * Falls back to the demo id only when there's no session at all, so guest
- * navigation still doesn't crash. */
-const DEMO_PLAYER_ID = '00000000-0000-4000-8000-000000000001';
-
-function playerIdFromToken(): string {
+/* Resolves the player's UUID from the JWT `sub` claim. Used by the
+ * formation backend to look up saved formations. Auth-only screen —
+ * unauthenticated visitors redirect to /login rather than firing
+ * /formations?playerId=00000000-...-001 with a placeholder UUID
+ * (which produced 401 spam on every navigation per the prod audit). */
+function playerIdFromToken(): string | null {
   const token = getAccessToken();
-  if (!token) return DEMO_PLAYER_ID;
+  if (!token) return null;
   try {
     const payload = token.split('.')[1];
-    if (!payload) return DEMO_PLAYER_ID;
-    // JWT payload is base64url; pad if needed.
+    if (!payload) return null;
     const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
     const json = JSON.parse(
       typeof atob === 'function' ? atob(padded.replace(/-/g, '+').replace(/_/g, '/')) : '',
     ) as { sub?: string };
-    return json.sub ?? DEMO_PLAYER_ID;
+    return json.sub ?? null;
   } catch {
-    return DEMO_PLAYER_ID;
+    return null;
   }
 }
 
 export default function FormationPage() {
-  // Hold null until after mount so the FormationScreenND's first render (and
-  // its initial fetches against /units/player/:id) only fires AFTER we've
-  // resolved the real user UUID from the JWT. Avoids the double-fetch +
-  // 404 the previous version caused (demo id → real id → both fetched).
-  /* MERGE: kept HEAD's JWT-resolved playerId on top of remote's ND
-   * component (FormationScreenND). */
+  const router = useRouter();
   const [playerId, setPlayerId] = useState<string | null>(null);
   useEffect(() => {
-    setPlayerId(playerIdFromToken());
-  }, []);
+    const id = playerIdFromToken();
+    if (!id) {
+      // No session → bounce to login instead of letting the inner
+      // component fire authenticated fetches with a placeholder UUID.
+      router.replace('/login?next=/formation');
+      return;
+    }
+    setPlayerId(id);
+  }, [router]);
   if (!playerId) return null;
   return <FormationScreenND playerId={playerId} />;
 }

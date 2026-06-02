@@ -704,33 +704,14 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
               />
             </Panel>
 
-            {/* Commanders */}
-            <Panel race={race} style={{ padding: 14 }}>
-              <SectionHeader
-                title="Komutanlar"
-                trailing={`${filledCmds}/${MAX_COMMANDERS}`}
-                race={race}
-                hint="Sürükle-bırak · listeden seç · slot’a dokun"
-              />
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                {commanderSlots.map((slot, i) => (
-                  <NDCommanderSlot
-                    key={slot.id}
-                    commander={slot.commander}
-                    slotId={slot.id}
-                    index={i}
-                    pendingCommander={pendingCmd}
-                    onDrop={handleCommanderDrop}
-                    onSlotClick={handleCommanderSlotClick}
-                  />
-                ))}
-              </div>
-            </Panel>
-
-            {/* Formation grid */}
+            {/* Formation grid (Kadro) — moved ABOVE the Commanders panel
+                per user feedback. Birim kadrosu the primary battle
+                composition, so it should be the first thing the player
+                sees after the power readout. Commanders are buffs on top
+                of that composition, secondary in the visual hierarchy. */}
             <Panel race={race} glow style={{ padding: 14 }}>
               <SectionHeader
-                title={`Formasyon ${filledSlots}/${TOTAL_UNIT_SLOTS}`}
+                title={`Kadro ${filledSlots}/${TOTAL_UNIT_SLOTS}`}
                 race={race}
                 hint={hasPending ? 'Slot seç → yerleştir' : 'Sürükle-bırak veya listeden seç'}
               />
@@ -770,6 +751,30 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
                     </div>
                   );
                 })}
+              </div>
+            </Panel>
+
+            {/* Commanders — moved BELOW the Kadro panel per user request.
+                Buff layer on top of the unit composition. */}
+            <Panel race={race} style={{ padding: 14 }}>
+              <SectionHeader
+                title="Komutanlar"
+                trailing={`${filledCmds}/${MAX_COMMANDERS}`}
+                race={race}
+                hint="Sürükle-bırak · listeden seç · slot’a dokun"
+              />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {commanderSlots.map((slot, i) => (
+                  <NDCommanderSlot
+                    key={slot.id}
+                    commander={slot.commander}
+                    slotId={slot.id}
+                    index={i}
+                    pendingCommander={pendingCmd}
+                    onDrop={handleCommanderDrop}
+                    onSlotClick={handleCommanderSlotClick}
+                  />
+                ))}
               </div>
             </Panel>
 

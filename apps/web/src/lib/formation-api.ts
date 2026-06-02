@@ -213,8 +213,75 @@ async function callOr404<T>(path: string, fallback: T, init?: RequestInit): Prom
   }
 }
 
-export async function fetchPlayerUnits(playerId: string): Promise<BackendUnit[]> {
-  return callOr404<BackendUnit[]>(`${API}/units/player/${encodeURIComponent(playerId)}`, []);
+/** Game-server's PlayerUnit shape from GET /api/units (auth). The actual
+ *  unit roster lives in game-server's player_units table, NOT api's. The
+ *  previous implementation hit api's /units/player/:id which never
+ *  existed — every visit silently 404'd and the formation panel
+ *  rendered empty. */
+interface GameServerUnit {
+  id: string;
+  playerId: string;
+  type: string;
+  race: string;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  abilities: string[];
+  isAlive: boolean;
+  level: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const GAME_SERVER_BASE = (
+  process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? 'http://localhost:3001'
+).replace(/\/+$/, '');
+
+export async function fetchPlayerUnits(_playerId: string): Promise<BackendUnit[]> {
+  // game-server reads the userId from the JWT — `_playerId` arg is kept
+  // for API signature compatibility but not sent on the wire.
+  const token =
+    typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null;
+  if (!token) return [];
+  try {
+    const res = await fetch(`${GAME_SERVER_BASE}/api/units`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as GameServerUnit[];
+    return rows.map((u): BackendUnit => ({
+      id: u.id,
+      playerId: u.playerId,
+      // Display name: snake_case → Title Case so 'siege_tank' → 'Siege Tank'.
+      // The roster panel already does its own race-flavoured override
+      // via unitToSlotUnit so this is just the safe-fallback label.
+      name: u.type
+        .split('_')
+        .map((w) => (w[0]?.toUpperCase() ?? '') + w.slice(1))
+        .join(' '),
+      race: u.race as BackendRace,
+      tierLevel: u.level ?? 1,
+      attack: u.attack,
+      defense: u.defense,
+      hp: u.hp,
+      maxHp: u.maxHp,
+      speed: u.speed,
+      abilities: u.abilities ?? [],
+      // Merge metadata isn't tracked on player_units (merge happens
+      // through MERGE_RECIPES which DELETEs sources + INSERTs result;
+      // the result row has no parent pointers). Set to neutral defaults
+      // so the consumer code doesn't break on undefined.
+      mergeCount: 0,
+      parentUnitIds: [],
+      isActive: u.isAlive,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchTemplates(): Promise<FormationTemplate[]> {

@@ -249,43 +249,43 @@ export default function MergePage() {
     }
   }
 
-  // "TÜMÜNÜ BİRLEŞTİR" — groups the pool BY TYPE first, then triplets each
-  // group. Previously chunked by raw index so a mixed pool ([Marine,
-  // Marine, Medic, Ghost, Marine, ...]) sent [Marine, Marine, Medic] as
-  // the first triplet → BE rejected "Birleştirme için 3 aynı tip birim
-  // gerekli". Now: 4 Marines + 3 Medics + 2 Ghosts → 1 Marine merge
-  // (3 of 4 spent, 1 left over) + 1 Medic merge (all 3 spent) + 0 Ghost
-  // merges (only 2, below SLOT_COUNT threshold). Stable iteration order
-  // is preserved by `Map` keyed insertion order for predictable user-
-  // facing toast / progress.
-  const [mergingAll, setMergingAll] = useState(false);
-  async function performMergeAll() {
-    if (isDemoMode || mergingAll) return;
-
-    // Group by backend code. Map preserves insertion order so the first
-    // type the player owns gets processed first — matches the visual pool
-    // ordering (which renders in roster-fetch order).
+  // "TÜMÜNÜ BİRLEŞTİR" planning — pre-compute the type-aware triplet plan
+  // ONCE per pool change, then use the SAME plan for both the button
+  // label ("X GRUP") and the action handler. Prevents the previous
+  // drift where the label counted raw `pool.length / 3` while the
+  // handler chunked by index — a mixed pool would show "3 GRUP" and
+  // then 400 on the first POST because [Marine, Marine, Medic] isn't a
+  // valid same-type triplet.
+  //
+  // Example outputs:
+  //   4 Marine + 3 Medic + 2 Ghost → [[m,m,m], [med,med,med]]  ⇒ 2 GRUP
+  //                                  (Ghost ignored: only 2, < SLOT_COUNT)
+  //                                  (4th Marine ignored: leftover)
+  //   44 Marine                    → 14 triplets ⇒ 14 GRUP
+  //                                  (2 leftover Marines)
+  //   2 Marine + 2 Medic           → []                        ⇒ 0 GRUP
+  //                                  (button hidden)
+  const tripletPlan = useMemo<string[][]>(() => {
     const groups = new Map<string, string[]>();
     for (const u of pool) {
       const arr = groups.get(u.code);
       if (arr) arr.push(u.id);
       else groups.set(u.code, [u.id]);
     }
-
-    // Flatten into a list of triplets. Drops trailing leftovers — a
-    // group with 7 units yields 2 triplets and leaves 1 unit alone
-    // (user can still merge it manually after the type evolves up the
-    // chain). Skip groups with < SLOT_COUNT entirely so the toast count
-    // is honest about what was actually attempted.
-    const triplets: string[][] = [];
+    const out: string[][] = [];
     for (const ids of groups.values()) {
       const usable = Math.floor(ids.length / SLOT_COUNT);
       for (let i = 0; i < usable; i += 1) {
-        triplets.push(ids.slice(i * SLOT_COUNT, i * SLOT_COUNT + SLOT_COUNT));
+        out.push(ids.slice(i * SLOT_COUNT, i * SLOT_COUNT + SLOT_COUNT));
       }
     }
+    return out;
+  }, [pool]);
 
-    if (triplets.length === 0) {
+  const [mergingAll, setMergingAll] = useState(false);
+  async function performMergeAll() {
+    if (isDemoMode || mergingAll) return;
+    if (tripletPlan.length === 0) {
       toast.info(`Birleştirme için en az ${SLOT_COUNT} aynı tipte birim gerekli`);
       return;
     }
@@ -294,9 +294,9 @@ export default function MergePage() {
     let succeeded = 0;
     let failed = 0;
     try {
-      for (let i = 0; i < triplets.length; i += 1) {
+      for (let i = 0; i < tripletPlan.length; i += 1) {
         try {
-          await gameServerApi.post('/units/merge-roster', { unitIds: triplets[i] });
+          await gameServerApi.post('/units/merge-roster', { unitIds: tripletPlan[i] });
           succeeded += 1;
         } catch (err) {
           failed += 1;
@@ -653,12 +653,14 @@ export default function MergePage() {
             </span>
           </NDButton>
         </div>
-        {/* "TÜMÜNÜ BİRLEŞTİR" — power-merge button visible only when the
-         *  player has >=6 same-type units (so the multi-batch saves real
-         *  taps). Floor(pool/3) batches fire sequentially; the bottom
-         *  ghost button stays for single-step control. Disabled while
-         *  the loop is running so a double-tap can't double-fire. */}
-        {!isDemoMode && pool.length >= SLOT_COUNT * 2 && (
+        {/* "TÜMÜNÜ BİRLEŞTİR" — power-merge button visible only when there
+         *  is at least one actual same-type triplet to fire. tripletPlan
+         *  is the SoT — the label and the action both consume it, so a
+         *  mixed pool with no valid triplets hides the button entirely
+         *  (avoids the prior 400 "3 aynı tip birim gerekli" toast loop
+         *  where the label encouraged the click but no same-type chunk
+         *  could be assembled). */}
+        {!isDemoMode && tripletPlan.length > 0 && (
           <div
             style={{
               padding: '0 14px 10px',
@@ -676,7 +678,7 @@ export default function MergePage() {
             >
               {mergingAll
                 ? `BİRLEŞTİRİLİYOR…`
-                : `TÜMÜNÜ BİRLEŞTİR · ${Math.floor(pool.length / SLOT_COUNT)} GRUP`}
+                : `TÜMÜNÜ BİRLEŞTİR · ${tripletPlan.length} GRUP`}
             </NDButton>
           </div>
         )}

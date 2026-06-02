@@ -136,7 +136,7 @@ export class FormationsController {
       },
     },
   })
-  save(@Request() req: { user: { id: string } }, @Body() body: FormationInput) {
+  async save(@Request() req: { user: { id: string } }, @Body() body: FormationInput) {
     const userId = req.user.id;
     const list = FORMATIONS.get(userId) ?? [];
     const updatedAt = new Date().toISOString();
@@ -144,6 +144,7 @@ export class FormationsController {
     // Upsert: id supplied + existing row → replace in place; otherwise
     // create a fresh row with a server-generated id.
     const existingIdx = body.id ? list.findIndex((f) => f.id === body.id) : -1;
+    const previous = existingIdx >= 0 ? list[existingIdx] : null;
     const record = {
       id: body.id || uid(),
       name: body.name,
@@ -167,7 +168,41 @@ export class FormationsController {
     }
     FORMATIONS.set(userId, list);
 
-    return { saved: true, formation: record };
+    // Compute server-authoritative power so the FE doesn't have to
+    // immediately re-debounce a /formations/power call after save —
+    // the displayed GÜÇ stays stable. Stale-slot dropping is safe here:
+    // FormationsService skips referenced units/commanders the caller
+    // doesn't own (deleted mid-edit, etc.).
+    const power = await this.formationsService.calculatePower(
+      userId,
+      record.unitSlots,
+      record.commanderSlots,
+    );
+
+    // Return shape mirrors the FE Formation type
+    // (apps/web/src/components/formation/types.ts). The previous shape
+    // wrapped the record under `{ saved, formation }` which made the
+    // FE try to iterate `response.unitSlots` (undefined on the wrapper)
+    // and crash with "e is not iterable" on every save. Per REST,
+    // POST/PUT on a resource returns the resource.
+    return {
+      id: record.id,
+      playerId: userId,
+      name: record.name,
+      unitSlots: record.unitSlots,
+      commanderSlots: record.commanderSlots,
+      templateId: record.templateId ?? null,
+      // Preserve the previous "active" flags across an update so the
+      // chip on the saved-list keeps highlighting the right row. New
+      // formations default to inactive — the player explicitly activates
+      // via the separate POST /formations/:id/activate flow.
+      isLastActive: (previous as { isLastActive?: boolean } | null)?.isLastActive ?? false,
+      isActive: (previous as { isActive?: boolean } | null)?.isActive ?? false,
+      totalPower: power.totalPower,
+      createdAt:
+        (previous as { createdAt?: string } | null)?.createdAt ?? updatedAt,
+      updatedAt,
+    };
   }
 
   /** PUT /formations/:id — explicit update endpoint (same logic as POST upsert). */

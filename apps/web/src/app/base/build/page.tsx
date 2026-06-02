@@ -46,8 +46,21 @@ interface BuildEntry {
    *  state — currently HQ-level requirement for the advanced slots (6, 7).
    *  Lower priority than the gate framework's primaryHint when both apply. */
   lockHint?: string;
+  /** Base cost (Lv 0 → Lv 1). Card derives next-level cost from this
+   *  via `base × 1.5^level` — same formula the backend's upgradeBuilding
+   *  uses. Keeps the card display synced with what the player will
+   *  actually pay on click. */
   costA: number;
   costB: number;
+  /** Per-tick yield at base level. Multiplied by a level scale factor
+   *  client-side for display. Server-side EconomyService applies the
+   *  authoritative scaling (basePerHour × levelScaleExponent^(level-1));
+   *  we replicate a simpler linear approximation here so the card can
+   *  signal "build this, get +15M/tick" without depending on a separate
+   *  fetch. 0 = building doesn't produce that resource. */
+  yieldMineralPerTick: number;
+  yieldGasPerTick: number;
+  yieldEnergyPerTick: number;
   durationSec: number;
   level: number;
   /** Backend type code (COMMAND_CENTER, MINERAL_EXTRACTOR…) when matched. */
@@ -768,27 +781,126 @@ function BuildingCard({ race, entry, selected, onSelect }: BuildingCardProps) {
 
         <Caption style={{ fontSize: 10, marginTop: 2 }}>{entry.desc}</Caption>
 
-        <div
-          style={{
-            marginTop: 6,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontFamily: ND.mono,
-            fontSize: 10,
-            color: race.primary,
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <ResIcon kind={race.resourceA.icon} size={11} color={race.primary} />
-            {entry.costA}
-          </span>
-          <span aria-hidden style={{ color: ND.textMute }}>·</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <ResIcon kind={race.resourceB.icon} size={11} color={race.primary} />
-            {entry.costB}
-          </span>
-        </div>
+        {/* COST row — shows what the next click will actually cost:
+            - At Lv 0 (not built): base construction cost (M / G).
+            - At Lv N>0: upgrade cost = base × 1.5^N + science when N≥4
+              (targetLevel = N+1, science gate kicks in at targetLevel≥5).
+            Mirrors backend's upgradeBuilding formula in
+            apps/game-server/src/buildings/buildings.service.ts so the
+            displayed price matches the actual debit on click.
+
+            The "Lv N → N+1" prefix only appears when the player owns
+            the building; the YENİ branch keeps the visual quiet so the
+            catalog browse view stays clean. */}
+        {(() => {
+          const targetLevel = entry.level + 1;
+          const scale = Math.pow(1.5, entry.level);
+          const nextCostA = Math.round(entry.costA * scale);
+          const nextCostB = Math.round(entry.costB * scale);
+          const scienceCost = targetLevel >= 5 ? targetLevel * 50 : 0;
+          return (
+            <div
+              style={{
+                marginTop: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3,
+                fontFamily: ND.mono,
+                fontSize: 10,
+              }}
+            >
+              {entry.level > 0 && (
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: ND.textDim,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Lv {entry.level} → {targetLevel}
+                </div>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color: race.primary,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <ResIcon kind={race.resourceA.icon} size={11} color={race.primary} />
+                  {nextCostA.toLocaleString()}
+                </span>
+                <span aria-hidden style={{ color: ND.textMute }}>·</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <ResIcon kind={race.resourceB.icon} size={11} color={race.primary} />
+                  {nextCostB.toLocaleString()}
+                </span>
+                {scienceCost > 0 && (
+                  <>
+                    <span aria-hidden style={{ color: ND.textMute }}>·</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <ResIcon kind="science" size={11} color={race.primary} />
+                      {scienceCost.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
+              {/* YIELD row — only when the building actually produces
+                  something. Hides zero-yield buildings (kışla, akademi,
+                  fabrika, kalkan jeneratörü) so the card doesn't render
+                  a misleading "+0/tick" stripe. */}
+              {(entry.yieldMineralPerTick !== 0 ||
+                entry.yieldGasPerTick !== 0 ||
+                entry.yieldEnergyPerTick !== 0) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    color: ND.ok,
+                    flexWrap: 'wrap',
+                    fontSize: 9,
+                  }}
+                >
+                  {entry.yieldMineralPerTick !== 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      <ResIcon kind={race.resourceA.icon} size={9} color={ND.ok} />
+                      +{entry.yieldMineralPerTick}/tick
+                    </span>
+                  )}
+                  {entry.yieldGasPerTick !== 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      <ResIcon kind={race.resourceB.icon} size={9} color={ND.ok} />
+                      +{entry.yieldGasPerTick}/tick
+                    </span>
+                  )}
+                  {entry.yieldEnergyPerTick !== 0 && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        color: entry.yieldEnergyPerTick < 0 ? ND.danger : ND.ok,
+                      }}
+                    >
+                      <ResIcon
+                        kind="energy"
+                        size={9}
+                        color={entry.yieldEnergyPerTick < 0 ? ND.danger : ND.ok}
+                      />
+                      {entry.yieldEnergyPerTick > 0 ? '+' : ''}
+                      {entry.yieldEnergyPerTick}/tick
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Panel>
     </button>
   );
@@ -923,6 +1035,16 @@ function buildCatalog(
       lockHint,
       costA: backend?.cost.mineral ?? base,
       costB: backend?.cost.gas ?? Math.round(base * 0.35),
+      yieldMineralPerTick: backend?.production.mineralPerTick ?? 0,
+      yieldGasPerTick: backend?.production.gasPerTick ?? 0,
+      // Net energy = production - consumption. Negative for buildings
+      // that DRAIN the grid (factories, shield generators); positive
+      // for power plants. The card surface only colours positive as
+      // "yield" and negative as "drain" so the player can spot a
+      // power-hungry building before they accept the upgrade.
+      yieldEnergyPerTick:
+        (backend?.production.energyPerTick ?? 0) -
+        (backend?.energyConsumptionPerTick ?? 0),
       // Display duration matches what the server actually applies —
       // scaledDurationSec divides by NEXT_PUBLIC_GAME_SPEED_MULTIPLIER
       // so a 1000× playtest doesn't show "30s" on a card that resolves

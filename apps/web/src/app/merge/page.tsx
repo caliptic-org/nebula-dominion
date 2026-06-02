@@ -249,32 +249,54 @@ export default function MergePage() {
     }
   }
 
-  // "TÜMÜNÜ BİRLEŞTİR" — loops through floor(pool/3) merges sequentially so
-  // a player sitting on 24 marines doesn't have to tap 8 times. Each call
-  // re-reads the local pool snapshot at the time of click; the post-loop
-  // refreshGameUnits() then re-syncs against the server's actual state so
-  // the next render reflects the result (e.g. 24 marines → 8 snipers, or
-  // 24 marines → 8 snipers + further-mergeable if the player wants).
+  // "TÜMÜNÜ BİRLEŞTİR" — groups the pool BY TYPE first, then triplets each
+  // group. Previously chunked by raw index so a mixed pool ([Marine,
+  // Marine, Medic, Ghost, Marine, ...]) sent [Marine, Marine, Medic] as
+  // the first triplet → BE rejected "Birleştirme için 3 aynı tip birim
+  // gerekli". Now: 4 Marines + 3 Medics + 2 Ghosts → 1 Marine merge
+  // (3 of 4 spent, 1 left over) + 1 Medic merge (all 3 spent) + 0 Ghost
+  // merges (only 2, below SLOT_COUNT threshold). Stable iteration order
+  // is preserved by `Map` keyed insertion order for predictable user-
+  // facing toast / progress.
   const [mergingAll, setMergingAll] = useState(false);
   async function performMergeAll() {
     if (isDemoMode || mergingAll) return;
-    const batches = Math.floor(pool.length / SLOT_COUNT);
-    if (batches < 1) {
+
+    // Group by backend code. Map preserves insertion order so the first
+    // type the player owns gets processed first — matches the visual pool
+    // ordering (which renders in roster-fetch order).
+    const groups = new Map<string, string[]>();
+    for (const u of pool) {
+      const arr = groups.get(u.code);
+      if (arr) arr.push(u.id);
+      else groups.set(u.code, [u.id]);
+    }
+
+    // Flatten into a list of triplets. Drops trailing leftovers — a
+    // group with 7 units yields 2 triplets and leaves 1 unit alone
+    // (user can still merge it manually after the type evolves up the
+    // chain). Skip groups with < SLOT_COUNT entirely so the toast count
+    // is honest about what was actually attempted.
+    const triplets: string[][] = [];
+    for (const ids of groups.values()) {
+      const usable = Math.floor(ids.length / SLOT_COUNT);
+      for (let i = 0; i < usable; i += 1) {
+        triplets.push(ids.slice(i * SLOT_COUNT, i * SLOT_COUNT + SLOT_COUNT));
+      }
+    }
+
+    if (triplets.length === 0) {
       toast.info(`Birleştirme için en az ${SLOT_COUNT} aynı tipte birim gerekli`);
       return;
     }
+
     setMergingAll(true);
     let succeeded = 0;
     let failed = 0;
     try {
-      // Iterate over a local snapshot of the pool — pool itself updates on
-      // each refresh after a successful merge.  Process triplets from the
-      // first 3*batches entries.
-      const ids = pool.slice(0, batches * SLOT_COUNT).map((u) => u.id);
-      for (let i = 0; i < batches; i += 1) {
-        const triplet = ids.slice(i * SLOT_COUNT, i * SLOT_COUNT + SLOT_COUNT);
+      for (let i = 0; i < triplets.length; i += 1) {
         try {
-          await gameServerApi.post('/units/merge-roster', { unitIds: triplet });
+          await gameServerApi.post('/units/merge-roster', { unitIds: triplets[i] });
           succeeded += 1;
         } catch (err) {
           failed += 1;
@@ -673,6 +695,14 @@ interface PoolUnit {
   id: string;
   name: string;
   tier: number;
+  /** Backend unit-type code (e.g. 'marine', 'medic', 'ghost'). The
+   *  authoritative grouping key for "merge same type" logic — display
+   *  `name` can be race-flavoured / aliased while `code` is what the
+   *  game-server MergeService keys MERGE_RECIPES against. Demo pool
+   *  rows synthesise this from the placeholder id prefix so the
+   *  group-and-chunk loop in performMergeAll still partitions cleanly
+   *  without the BE round-trip. */
+  code: string;
 }
 
 function buildPool(race: NDRace, tier: number): PoolUnit[] {
@@ -686,10 +716,17 @@ function buildPool(race: NDRace, tier: number): PoolUnit[] {
   // without hitting the "Unit not found" 404 path. The prior format
   // `demo-${race}-${tier}-${i}` started with the literal `demo-` which the
   // regex parsed as `race=demo`, falling through to the not-found branch.
+  // Demo pool entries all share the same synthesized code (lowercased
+  // race+tier marker) so the by-code grouping in performMergeAll lumps
+  // them into a single bucket and the merge-all loop produces clean
+  // triplets even on the placeholder data — useful when QA toggles
+  // /merge for a guest session.
+  const demoCode = `${race.key}_t${tier}_demo`;
   return Array.from({ length: 8 }, (_, i) => ({
     id: `${race.key}-${tier}-demo${i}`,
     name: base,
     tier,
+    code: demoCode,
   }));
 }
 
@@ -729,6 +766,7 @@ function liveUnitsToPool(
         id: u.id,
         name: def?.n ?? u.type,
         tier: resolveUnitTier(u.type, race),
+        code: u.type,
       };
     });
 }

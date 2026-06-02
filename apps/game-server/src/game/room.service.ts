@@ -89,6 +89,22 @@ const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUs
     { type: 'artillery', hp: 20, maxHp: 20, attack: 20, defense: 2, speed: 1 },
     { type: 'nano-drone', hp: 15, maxHp: 15, attack: 7, defense: 3, speed: 6 },
   ],
+  // BEAST / DEMON come from api's race.enum but don't have race-specific
+  // starting rosters yet. Mirror the Human template so a Canavar / Şeytan
+  // player who matchmakes doesn't crash on undefined-deref. Replace these
+  // with race-themed starter units when the lore + assets land.
+  [Race.BEAST]: [
+    { type: 'soldier', hp: 30, maxHp: 30, attack: 8, defense: 5, speed: 3 },
+    { type: 'soldier', hp: 30, maxHp: 30, attack: 8, defense: 5, speed: 3 },
+    { type: 'mage', hp: 20, maxHp: 20, attack: 15, defense: 2, speed: 2 },
+    { type: 'archer', hp: 25, maxHp: 25, attack: 10, defense: 3, speed: 4 },
+  ],
+  [Race.DEMON]: [
+    { type: 'soldier', hp: 30, maxHp: 30, attack: 8, defense: 5, speed: 3 },
+    { type: 'soldier', hp: 30, maxHp: 30, attack: 8, defense: 5, speed: 3 },
+    { type: 'mage', hp: 20, maxHp: 20, attack: 15, defense: 2, speed: 2 },
+    { type: 'archer', hp: 25, maxHp: 25, attack: 10, defense: 3, speed: 4 },
+  ],
 };
 
 export const AGE_2_AUTOMATON_UNITS: Omit<UnitState, 'id' | 'position' | 'actionUsed'>[] = [

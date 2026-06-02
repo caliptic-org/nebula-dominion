@@ -4,8 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, LessThanOrEqual, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, FindOptionsWhere, LessThanOrEqual, Repository } from 'typeorm';
 import { PlayerUnit } from './entities/player-unit.entity';
 import { TrainingQueue } from './entities/training-queue.entity';
 import {
@@ -47,6 +47,8 @@ export class UnitsService {
     private readonly buildingRepo: Repository<Building>,
     private readonly resources: ResourcesService,
     private readonly progression: ProgressionService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -336,69 +338,77 @@ export class UnitsService {
       throw new BadRequestException('Aynı birim birden çok slotta seçilemez.');
     }
 
-    const units = await this.unitRepo.findByIds(unitIds);
-    if (units.length !== 3) {
-      throw new NotFoundException('Bir veya daha fazla birim bulunamadı.');
-    }
-    for (const u of units) {
-      if (u.playerId !== playerId) {
-        throw new BadRequestException(`Birim ${u.id} sana ait değil.`);
+    // Wrap the find-validate-delete-insert in a single transaction so a
+    // mid-flight failure can't leave the player short 3 units with no
+    // result spawned.  Replaces the previous "no transaction, retry fixes
+    // it" trade-off comment — engine audit flagged MEDIUM, but the user
+    // loses the merge cost AND the source units on a partial failure
+    // which is worse than the simple retry case.
+    // findBy { id: In(...) } is the TypeORM 0.3 form for the deprecated
+    // findByIds — kept simple via the manager.findBy call below.
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const txUnitRepo = manager.getRepository(PlayerUnit);
+      const units = await txUnitRepo
+        .createQueryBuilder('u')
+        .setLock('pessimistic_write')
+        .where('u.id IN (:...ids)', { ids: unitIds })
+        .getMany();
+      if (units.length !== 3) {
+        throw new NotFoundException('Bir veya daha fazla birim bulunamadı.');
       }
-      if (!u.isAlive) {
-        throw new BadRequestException(`Birim ${u.id} canlı değil; birleştirilemez.`);
+      for (const u of units) {
+        if (u.playerId !== playerId) {
+          throw new BadRequestException(`Birim ${u.id} sana ait değil.`);
+        }
+        if (!u.isAlive) {
+          throw new BadRequestException(`Birim ${u.id} canlı değil; birleştirilemez.`);
+        }
       }
-    }
 
-    // Same-type guard.  MERGE_RECIPES keys by source type, so mixed types
-    // would need a much bigger lookup table — defer that until the
-    // alternate-tier-2 (Sniper vs Engineer) branching feature actually
-    // lands.  For now: same-type-only is the canonical "Promosyon".
-    const sourceType = units[0].type;
-    if (!units.every((u) => u.type === sourceType)) {
-      throw new BadRequestException('Birleştirme için 3 aynı tip birim gerekli.');
-    }
+      // Same-type guard.  MERGE_RECIPES keys by source type, so mixed
+      // types would need a much bigger lookup table — defer that until
+      // the alternate-tier-2 (Sniper vs Engineer) branching feature
+      // actually lands.  For now: same-type-only is the canonical
+      // "Promosyon".
+      const sourceType = units[0].type;
+      if (!units.every((u) => u.type === sourceType)) {
+        throw new BadRequestException('Birleştirme için 3 aynı tip birim gerekli.');
+      }
+      const resultType = MERGE_RECIPES[sourceType];
+      if (!resultType) {
+        throw new BadRequestException(
+          `${sourceType} için bir üst tier yok — bu tip merge zincirinin tepesinde.`,
+        );
+      }
+      const resultConfig = UNIT_CONFIGS[resultType];
+      if (!resultConfig) {
+        throw new BadRequestException(
+          `Sonuç birimi config'i (${resultType}) backend'de tanımlı değil.`,
+        );
+      }
 
-    const resultType = MERGE_RECIPES[sourceType];
-    if (!resultType) {
-      throw new BadRequestException(
-        `${sourceType} için bir üst tier yok — bu tip merge zincirinin tepesinde.`,
+      await txUnitRepo.remove(units);
+      const spawned = txUnitRepo.create({
+        playerId,
+        type: resultType,
+        race: units[0].race,
+        hp: resultConfig.hp,
+        maxHp: resultConfig.hp,
+        attack: resultConfig.attack,
+        defense: resultConfig.defense,
+        speed: resultConfig.speed,
+        positionX: 0,
+        positionY: 0,
+        abilities: resultConfig.abilities,
+        isAlive: true,
+        level: 1,
+      });
+      const result = await txUnitRepo.save(spawned);
+      this.logger.log(
+        `Roster merge: player=${playerId} 3× ${sourceType} → 1× ${resultType} (id=${result.id})`,
       );
-    }
-
-    const resultConfig = UNIT_CONFIGS[resultType];
-    if (!resultConfig) {
-      throw new BadRequestException(
-        `Sonuç birimi config'i (${resultType}) backend'de tanımlı değil.`,
-      );
-    }
-
-    // Delete source units then insert the result in one logical step.
-    // No explicit transaction — TypeORM's repo ops are auto-committed and
-    // a partial failure here would leave at most a missing-result row,
-    // which a retry fixes. (If we move to a stricter accounting flow we
-    // can wrap this in dataSource.transaction.)
-    await this.unitRepo.remove(units);
-
-    const spawned = this.unitRepo.create({
-      playerId,
-      type: resultType,
-      race: units[0].race,
-      hp: resultConfig.hp,
-      maxHp: resultConfig.hp,
-      attack: resultConfig.attack,
-      defense: resultConfig.defense,
-      speed: resultConfig.speed,
-      positionX: 0,
-      positionY: 0,
-      abilities: resultConfig.abilities,
-      isAlive: true,
-      level: 1,
+      return result;
     });
-    const saved = await this.unitRepo.save(spawned);
-
-    this.logger.log(
-      `Roster merge: player=${playerId} 3× ${sourceType} → 1× ${resultType} (id=${saved.id})`,
-    );
 
     // XP grant — merging is a meaningful progression action.  Reuse
     // XpSource.CONSTRUCTION (80 base XP) so the player sees the same

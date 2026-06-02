@@ -111,12 +111,30 @@ export class AllianceService {
     role: AllianceRole,
   ): Promise<AllianceMember> {
     const requester = await this.memberRepo.findOne({ where: { userId: requesterId, allianceId } });
-    if (!requester || requester.role !== AllianceRole.LEADER && requester.role !== AllianceRole.OFFICER) {
+    if (!requester || (requester.role !== AllianceRole.LEADER && requester.role !== AllianceRole.OFFICER)) {
       throw new ForbiddenException('Yeterli yetkiniz yok');
     }
 
     const target = await this.memberRepo.findOne({ where: { userId: targetUserId, allianceId } });
     if (!target) throw new NotFoundException('Üye bulunamadı');
+
+    // Officer-to-Leader is a coup; only the current Leader can hand off
+    // leadership.  Engine audit flagged this MEDIUM. The Leader→handoff
+    // path should also demote the old Leader to Officer to maintain the
+    // single-Leader invariant — but that's a multi-row write best done
+    // as a separate "transferLeadership" endpoint; for now the guard
+    // just rejects officer-initiated Leader promotions outright.
+    if (role === AllianceRole.LEADER && requester.role !== AllianceRole.LEADER) {
+      throw new ForbiddenException('Sadece lider yeni lider tayin edebilir');
+    }
+    // Officers can't reduce/promote other Officers or the Leader either —
+    // only Leader can manage Officer ranks.  Members are fair game.
+    if (
+      requester.role === AllianceRole.OFFICER &&
+      (target.role === AllianceRole.LEADER || target.role === AllianceRole.OFFICER)
+    ) {
+      throw new ForbiddenException('Officer rütbesini sadece lider değiştirebilir');
+    }
 
     target.role = role;
     return this.memberRepo.save(target);

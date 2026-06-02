@@ -78,6 +78,24 @@ export const RACE_BONUSES: Record<Race, RaceBonus> = {
     speedMult: 0.90,
     trainingTimeMult: 1.10,
   },
+  // BEAST + DEMON ship with HUMAN-mirror defaults — they're playable
+  // race choices via api's race.enum but don't have their own combat
+  // multipliers tuned yet. Picking neutral values keeps PvP queueable
+  // until the balance pass for these races lands.
+  [Race.BEAST]: {
+    attackMult: 1.0,
+    defenseMult: 1.0,
+    hpMult: 1.0,
+    speedMult: 1.0,
+    trainingTimeMult: 1.0,
+  },
+  [Race.DEMON]: {
+    attackMult: 1.0,
+    defenseMult: 1.0,
+    hpMult: 1.0,
+    speedMult: 1.0,
+    trainingTimeMult: 1.0,
+  },
 };
 
 export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
@@ -321,4 +339,11 @@ export const MERGE_RECIPES: Partial<Record<UnitType, UnitType>> = {
   [UnitType.ENGINEER]:         UnitType.MECHA_WALKER,
   [UnitType.MECHA_WALKER]:     UnitType.GENETIC_WARRIOR,
   [UnitType.GENETIC_WARRIOR]:  UnitType.CAPTAIN,
+  // Zerg evrim zinciri — UnitType enum'da hâlihazırda bulunan değerleri
+  // kullanır.  Zergling (T1) → Hydralisk (T2) → Ultralisk (T3) → Queen
+  // (T4). Lex'te Beyin Kurt T5 var ama backend UnitType'ında yok; o
+  // tier'a çıkıldığında migration + UNIT_CONFIGS gerekli (defer).
+  [UnitType.ZERGLING]:         UnitType.HYDRALISK,
+  [UnitType.HYDRALISK]:        UnitType.ULTRALISK,
+  [UnitType.ULTRALISK]:        UnitType.QUEEN,
 };

@@ -39,9 +39,19 @@ interface ScrCommandersProps {
     title: string;
     race: NDRaceKey;
     level: number;
+    /** XP toward next level. Backend reports this as a number after
+     *  bigint-to-number conversion. */
+    xp?: number;
+    /** XP needed to reach next level (0 at L30). */
+    xpToNext?: number;
     tier: string;
     skill: string;
     unlocked: boolean;
+    /** True when this commander is currently active for the player.
+     *  Backend's source of truth for the AKTİF badge — supersedes the
+     *  hook-level useActiveCommander() polling that still runs as
+     *  fallback for guest-mode demos. */
+    isActive?: boolean;
   }>;
 }
 
@@ -49,6 +59,11 @@ interface CommanderEntry extends NDRaceCmdr {
   race: NDRace;
   id: string;
   locked: boolean;
+  /** Optional XP fields — populated only when live data flowed in via
+   *  liveCommanders (game-server). Static lex fallback leaves them
+   *  undefined and the XP bar is suppressed. */
+  xp?: number;
+  xpToNext?: number;
 }
 
 /* Map RACES commander names to the existing commanders/data.ts ID so the
@@ -119,7 +134,12 @@ function rosterFromLive(
       skill: c.skill,
       race,
       id: mappedId ?? c.id,
-      locked: !c.unlocked || c.level === 0,
+      // Live data drives the lock from `unlocked` field; level=0 = not
+      // unlocked yet (player_commanders row missing). Bonus / level
+      // bar suppressed for locked entries.
+      locked: !c.unlocked,
+      xp: c.xp,
+      xpToNext: c.xpToNext,
     };
   });
 }
@@ -686,6 +706,51 @@ function CommanderDetail({
             </Chip>
             {locked && <Chip color={ND.danger}>KİLİTLİ</Chip>}
           </div>
+          {/* XP progress — surfaces the commander's grind toward the next
+              level. Only shown when live data carries xpToNext (static lex
+              fallback has no XP semantics). Hidden at max level (xpToNext=0)
+              so it doesn't look like an empty bar staring back. */}
+          {!locked && entry.xpToNext !== undefined && entry.xpToNext > 0 && entry.xp !== undefined && (
+            <div style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 4,
+                  fontFamily: ND.mono,
+                  fontSize: 10,
+                  color: ND.textDim,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                <span>SONRAKİ LV</span>
+                <span style={{ color: race.primary }}>
+                  {entry.xp.toLocaleString()} / {entry.xpToNext.toLocaleString()} XP
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 6,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${ND.border}`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: `${Math.max(0, Math.min(100, Math.round((entry.xp / entry.xpToNext) * 100)))}%`,
+                    background: `linear-gradient(90deg, ${race.primary}88, ${race.primary})`,
+                    boxShadow: `0 0 8px ${race.glow}`,
+                    transition: 'width 600ms cubic-bezier(0.32, 0.72, 0, 1)',
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <H2
             style={{
               color: ND.text,

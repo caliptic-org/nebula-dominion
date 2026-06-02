@@ -223,7 +223,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
         }}
       />
 
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
         {/* Header */}
         <header
           style={{
@@ -270,6 +270,18 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
           style={{
             position: 'relative',
             flex: 1,
+            // ── ROOT SCROLL FIX ─────────────────────────────────────
+            // Live audit caught the actual bug: <main> rendered at
+            // 1534px against an 800px viewport because flex:1 alone
+            // doesn't constrain a flex item to its parent's available
+            // space — the item's default `min-height: auto` makes it
+            // grow to fit its CONTENT (1534px of cards + detail).
+            // Outer's overflow:hidden then silently clipped the
+            // overflow, hiding the bottom row of cards and the detail
+            // panel's CTAs. minHeight:0 lets main shrink to flex:1's
+            // allotment, which then bounds .commanders-grid-wrapper
+            // and finally lets section.overflowY:auto trigger.
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
           }}

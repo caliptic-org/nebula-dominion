@@ -91,6 +91,12 @@ interface UnitDef {
   costA: string;
   costB: string;
   durationSec: number;
+  /** Snake-case backend type matched to this card. Drives the train POST.
+   *  When undefined, the card represents a merge-only or unreleased unit
+   *  and should NOT be rendered — buildUnits filters them out. Kept
+   *  optional in the interface so consumers don't have to non-null-assert
+   *  in fallback / mock paths. */
+  backendType?: string;
 }
 
 export default function ProductionPage() {
@@ -256,13 +262,32 @@ export default function ProductionPage() {
     if (slotsUsed >= SLOT_TOTAL) return;
     if (!canAfford) return;
     if (submittingTrain) return;
+    // Belt-and-suspenders: if a card somehow slipped through buildUnits
+    // without a backendType (e.g. data lag during initial mount, or
+    // public-endpoint failure), reject the add with a clear toast instead
+    // of falling into the optimistic-only path that LOOKS like training
+    // started but never POSTs anywhere.
+    if (hasSession() && !selectedUnit.backendType) {
+      toast.error(`${selectedUnit.name} eğitime hazır değil — birleştirme ile elde edilir`);
+      return;
+    }
 
     // Try the real backend flow first (POST /units/train). Falls back to
     // the optimistic local queue if the player isn't authed or the
     // backend can't accept the train order — that keeps the demo
     // playable without a fully-wired training pipeline.
-    const backendCfg = backendUnits[(selectedUnit as typeof selectedUnit & { origIdx?: number })?.origIdx ?? selected];
-    const unitType = backendCfg?.type;
+    //
+    // ── Lookup-by-NAME instead of INDEX ─────────────────────────────
+    // selectedUnit.backendType is resolved at buildUnits() time via
+    // backendByName map, so we don't have to re-index `backendUnits[i]`
+    // here. This is the fix for the silent-skip bug where clicking
+    // "Genetic Warrior" did nothing (origIdx=4, backendUnits[4]=undefined
+    // after the trainable filter shrank backend) — and worse, clicking
+    // "Mecha Walker" trained a Ghost (origIdx=3 → backendUnits[3]=Ghost
+    // after filter). buildUnits now also hides cards with no backend
+    // match, so `backendType` should always be defined when we land here.
+    const unitType = selectedUnit.backendType;
+    const backendCfg = backendUnits.find((c) => c.type === unitType);
     const reqBuilding = (backendCfg as { requiredBuilding?: string } | undefined)?.requiredBuilding;
     const trainingBuilding =
       liveBuildings && reqBuilding
@@ -1121,19 +1146,68 @@ function EmptySlot({ race, index }: { race: NDRace; index: number }) {
 
 function buildUnits(race: NDRace, backend: UnitConfigDto[]): UnitDef[] {
   const fmt = (n: number) => n.toLocaleString();
-  return race.units.slice(0, 5).map((u, i) => {
-    const live = backend[i];
-    return {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '_');
+
+  // Index backend by normalized type ('mecha_walker' → cfg). Lets us match
+  // a lex entry like "Mecha Walker" to its live config without depending on
+  // ARRAY ORDER. Previously buildUnits did `race.units.slice(0, 5)` paired
+  // with `backend[i]` — after the trainable-filter shrank backend to only
+  // canonical trainable units (Marine/Medic/Siege Tank/Ghost for İnsan),
+  // lex[1] "Sniper" ended up paired with backend[1] "Medic", lex[3]
+  // "Mecha Walker" paired with backend[3] "Ghost", lex[4] "Genetic Warrior"
+  // paired with backend[4] = undefined. User saw "Genetic Warrior" card,
+  // clicked train, optimistic queue popped, but handleAdd's POST silently
+  // skipped because unitType was undefined → no unit ever spawned in DB.
+  // ALSO: clicking "Mecha Walker" actually trained a Ghost.
+  const backendByName = new Map<string, UnitConfigDto>();
+  for (const cfg of backend) {
+    backendByName.set(norm(String(cfg.type ?? '')), cfg);
+  }
+
+  // First pass: walk the lex (gives canonical race-flavoured ordering) and
+  // emit a card ONLY when the lex name matches a live backend config.
+  // Merge-only chain units (Sniper, Engineer, Mecha Walker, Genetic
+  // Warrior, Captain) have no backend entry after the trainable filter —
+  // skip them entirely. The merge-flow gates them through /merge instead.
+  const cards: UnitDef[] = [];
+  const usedTypes = new Set<string>();
+  for (const u of race.units) {
+    const live = backendByName.get(norm(u.n));
+    if (!live) continue; // merge-only or not-yet-released — hide the card
+    usedTypes.add(norm(String(live.type)));
+    cards.push({
       name: u.n,
-      tier: live?.tier ?? u.t,
-      // No more hardcoded fallback rows — show "—" until the public
-      // /api/units/configs/:race endpoint resolves. canAfford guards
-      // the "İnşa Et" button so undefined costs can't trigger a spend.
-      costA: live?.cost ? fmt(live.cost.mineral) : '—',
-      costB: live?.cost ? fmt(live.cost.gas) : '—',
-      durationSec: scaledDurationSec(live?.trainTimeSeconds ?? 0),
-    };
-  });
+      tier: live.tier ?? u.t,
+      costA: live.cost ? fmt(live.cost.mineral) : '—',
+      costB: live.cost ? fmt(live.cost.gas) : '—',
+      durationSec: scaledDurationSec(live.trainTimeSeconds ?? 0),
+      backendType: String(live.type),
+    });
+  }
+
+  // Second pass: surface backend units that DON'T appear in the race lex
+  // (e.g. İnsan has Medic, Ghost, Siege Tank — flavour-canonical names not
+  // in the promotion ladder). Without this pass, the player would never
+  // see them on /base/production. Mirrors the second-pass fix shipped on
+  // /inventory in commit eb41c70 — same lex/backend asymmetry, same fix.
+  for (const cfg of backend) {
+    const typeKey = norm(String(cfg.type ?? ''));
+    if (usedTypes.has(typeKey)) continue;
+    const prettyName = typeKey
+      .split('_')
+      .map((w) => (w[0]?.toUpperCase() ?? '') + w.slice(1))
+      .join(' ');
+    cards.push({
+      name: prettyName,
+      tier: cfg.tier ?? 1,
+      costA: cfg.cost ? fmt(cfg.cost.mineral) : '—',
+      costB: cfg.cost ? fmt(cfg.cost.gas) : '—',
+      durationSec: scaledDurationSec(cfg.trainTimeSeconds ?? 0),
+      backendType: String(cfg.type),
+    });
+  }
+
+  return cards;
 }
 
 // buildInitialQueue removed — the queue now hydrates from the live

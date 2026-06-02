@@ -122,12 +122,22 @@ function commanderId(race: NDRace, cmdr: NDRaceCmdr): string {
 function buildRoster(): CommanderEntry[] {
   return RACE_KEYS.flatMap((k) => {
     const race = RACES[k];
-    return race.commanders.map<CommanderEntry>((c) => ({
-      ...c,
-      race,
-      id: commanderId(race, c),
-      locked: c.skill === 'KİLİT' || c.lv === 0,
-    }));
+    return race.commanders.map<CommanderEntry>((c) => {
+      const id = commanderId(race, c);
+      return {
+        ...c,
+        race,
+        id,
+        locked: c.skill === 'KİLİT' || c.lv === 0,
+        // Portrait path is deterministic from race + id (same as backend
+        // CommanderCatalogEntry.portrait). Static lex didn't carry it
+        // because the field is new; deriving here keeps the gallery
+        // showing real PNGs even when the live API hasn't responded /
+        // failed / user is browsing other races' cards (which won't be
+        // in player_commanders so they never reach rosterFromLive).
+        portrait: `/assets/characters/${k}/${id}.png`,
+      };
+    });
   });
 }
 

@@ -8,10 +8,17 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
 import { CommandersService } from './commanders.service';
 import { CommanderRace } from './commanders.constants';
+
+// NOTE: @nestjs/swagger is NOT a dependency of game-server (only api uses
+// it for its public docs surface). The original draft of this controller
+// decorated each route with @ApiOperation / @ApiTags / @ApiBearerAuth —
+// which failed the CI build with "Cannot find module '@nestjs/swagger'".
+// Game-server isn't part of the Swagger docs surface (api hosts that at
+// /api/docs), so the decorators were purely informational; dropping them
+// is a no-op for runtime behaviour.
 
 const ALLOWED_RACES = new Set(['insan', 'zerg', 'otomat', 'canavar', 'seytan']);
 
@@ -20,7 +27,6 @@ function normalizeRace(v: string | undefined): CommanderRace | null {
   return ALLOWED_RACES.has(v) ? (v as CommanderRace) : null;
 }
 
-@ApiTags('commanders')
 @Controller('commanders')
 export class CommandersController {
   constructor(private readonly service: CommandersService) {}
@@ -35,9 +41,6 @@ export class CommandersController {
    */
   @Get()
   @UseGuards(HttpJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "List the player's commander roster (race-optional filter)" })
-  @ApiQuery({ name: 'race', required: false, enum: ['insan', 'zerg', 'otomat', 'canavar', 'seytan'] })
   async list(@Req() req: any, @Query('race') race?: string) {
     const userId: string = req.user?.id;
     return this.service.listForPlayer(userId, normalizeRace(race));
@@ -49,8 +52,6 @@ export class CommandersController {
    */
   @Get('me/active')
   @UseGuards(HttpJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get the player's active commander (null when none)" })
   async getActive(@Req() req: any) {
     const userId: string = req.user?.id;
     const active = await this.service.getActive(userId);
@@ -63,8 +64,6 @@ export class CommandersController {
    */
   @Post(':id/activate')
   @UseGuards(HttpJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Activate one of the player\'s unlocked commanders' })
   async activate(@Req() req: any, @Param('id') id: string) {
     const userId: string = req.user?.id;
     return this.service.activate(userId, id);
@@ -77,8 +76,6 @@ export class CommandersController {
    */
   @Post(':id/award-xp')
   @UseGuards(HttpJwtGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Manually award XP to the player\'s active commander (debug)' })
   async awardXp(@Req() req: any, @Body() body: { amount: number }) {
     const userId: string = req.user?.id;
     const amount = Math.max(0, Math.floor(body.amount ?? 0));

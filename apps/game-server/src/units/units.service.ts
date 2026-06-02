@@ -206,13 +206,24 @@ export class UnitsService {
       // batch-grouping at the queue layer for cost / duration / display.
       const spawnCount = Math.max(1, entry.count ?? 1);
       const spawned: string[] = [];
+      // ── Commander hpMultiplier ─────────────────────────────────────
+      // Korova (+20% L1, locked T5) — apply at spawn time so the unit's
+      // persisted HP / maxHp reflects the bonus from the moment it lands
+      // in the roster. Read once per queue entry; one player owns one
+      // commander so the same multiplier applies to all units in the
+      // batch. Mid-battle changes to active commander don't retro-apply
+      // (units keep the HP they spawned with — same convention as
+      // upgradeUnit() which writes stats at upgrade time).
+      const cmdBonus = await this.commanders.getActiveBonus(entry.playerId);
+      const hpMul = 1 + (cmdBonus.hpMultiplier ?? 0);
+      const spawnHp = Math.round(config.hp * hpMul);
       for (let i = 0; i < spawnCount; i += 1) {
         const unit = this.unitRepo.create({
           playerId: entry.playerId,
           type: entry.unitType,
           race: entry.race,
-          hp: config.hp,
-          maxHp: config.hp,
+          hp: spawnHp,
+          maxHp: spawnHp,
           attack: config.attack,
           defense: config.defense,
           speed: config.speed,

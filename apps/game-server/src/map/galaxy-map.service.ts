@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GalaxyNodeGarrison } from './galaxy-map.entity';
+import { CommandersService } from '../commanders/commanders.service';
 
 /** Income rates per 30-second tick when a node is garrisoned by a player. */
 const NODE_INCOME: Record<string, { mineral: number; gas: number; science: number }> = {
@@ -25,6 +26,7 @@ export class GalaxyMapService {
   constructor(
     @InjectRepository(GalaxyNodeGarrison)
     private readonly garrisonRepo: Repository<GalaxyNodeGarrison>,
+    private readonly commanders: CommandersService,
   ) {}
 
   /** List all garrisons for a player. */
@@ -92,6 +94,26 @@ export class GalaxyMapService {
       existing.gas     += rates.gas;
       existing.science += rates.science;
       totals.set(garrison.userId, existing);
+    }
+
+    // ── Commander scienceMultiplier ─────────────────────────────────
+    // Chen (+22% L1) and Lo-Khode (+30% L1, locked) bump science gain
+    // from garrisoned nodes. Applied as a per-player final pass over
+    // the aggregated totals so the multiplier hits the SUM (not each
+    // node), mirroring how resourceProductionMultiplier works in
+    // BuildingsService. Other commanders' science values stay flat.
+    for (const result of totals.values()) {
+      try {
+        const bonus = await this.commanders.getActiveBonus(result.userId);
+        const mul = 1 + (bonus.scienceMultiplier ?? 0);
+        if (mul !== 1) {
+          result.science = Math.round(result.science * mul);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `scienceMultiplier lookup skipped for ${result.userId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     // Update lastIncomeAt for all processed garrisons in bulk

@@ -126,9 +126,18 @@ export class CommandersService {
     if (!catalog) throw new NotFoundException('Komutan bulunamadı');
 
     await this.dataSource.transaction(async (manager) => {
-      const repo = manager.getRepository(PlayerCommander);
+      // ── CONCURRENCY GUARD ────────────────────────────────────────
+      // Two tabs flipping different commanders in parallel could both
+      // pass the "ownership + unlock" check, then both clear-then-set,
+      // and the partial unique index would race against itself. Lock
+      // the player's rows for the duration of the transaction so the
+      // second activate blocks until the first commits.
+      await manager.query(
+        `SELECT id FROM player_commanders WHERE user_id = $1::uuid FOR UPDATE`,
+        [userId],
+      );
 
-      // Verify ownership + unlock status before flipping anything.
+      const repo = manager.getRepository(PlayerCommander);
       const row = await repo.findOne({ where: { userId, commanderId } });
       if (!row) {
         throw new ForbiddenException('Bu komutan rosterında değil');
@@ -137,22 +146,19 @@ export class CommandersService {
         throw new BadRequestException('Bu komutan henüz kilitli');
       }
 
-      // Clear current active, then flip this one to active. Two
-      // statements so the partial unique index doesn't reject a brief
-      // "both active" intermediate state.
-      await repo
-        .createQueryBuilder()
-        .update(PlayerCommander)
-        .set({ isActive: false })
-        .where('userId = :userId AND isActive = true', { userId })
-        .execute();
-
-      await repo
-        .createQueryBuilder()
-        .update(PlayerCommander)
-        .set({ isActive: true })
-        .where('id = :id', { id: row.id })
-        .execute();
+      // Single atomic UPDATE: flip target row to TRUE, every other row
+      // for this user to FALSE in one statement. CASE WHEN keeps the
+      // partial unique index satisfied at every observable point — no
+      // intermediate "both active" state can be seen by another tx
+      // because the row-level lock above serialises us.
+      await manager.query(
+        `UPDATE player_commanders
+            SET is_active = (id = $2::uuid),
+                updated_at = NOW()
+          WHERE user_id = $1::uuid
+            AND (is_active = TRUE OR id = $2::uuid)`,
+        [userId, row.id],
+      );
     });
 
     this.logger.log(`Commander activated: user=${userId} commander=${commanderId}`);

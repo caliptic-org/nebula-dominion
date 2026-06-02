@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FormationsController } from './formations.controller';
+import { FormationsService } from './formations.service';
 
 /* Minimal Formations module stub.
  *
@@ -8,11 +9,15 @@ import { FormationsController } from './formations.controller';
  * api yet. Without them the screen would 404 three times on every visit,
  * showing the swallowed empty-state but logging noisy network errors.
  *
- * This stub returns empty collections + a static template list so the
- * screen renders cleanly and the network tab stays quiet. When the real
- * formation persistence ships, swap the controller body for the service.
+ * The list/save/template endpoints still use the in-memory store on the
+ * controller; FormationsService is currently only responsible for
+ * `POST /formations/power` (server-authoritative power calc that reads
+ * the game-server-owned `player_units` + `player_commanders` tables
+ * via raw SQL). When the real formation persistence ships, the list /
+ * save endpoints move into the service too.
  */
 @Module({
   controllers: [FormationsController],
+  providers: [FormationsService],
 })
 export class FormationsModule {}

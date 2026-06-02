@@ -20,6 +20,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { FormationsService } from './formations.service';
 
 interface SlotInput {
   /** Grid index 0..N-1, where N = rows * cols */
@@ -83,6 +84,8 @@ function uid(): string {
 @ApiBearerAuth()
 @Controller('formations')
 export class FormationsController {
+  constructor(private readonly formationsService: FormationsService) {}
+
   /** GET /formations?playerId=X&page=1&limit=50 — paginated saved formations. */
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -191,6 +194,72 @@ export class FormationsController {
     FORMATIONS.set(
       req.user.id,
       list.filter((f) => f.id !== id),
+    );
+  }
+
+  /**
+   * POST /formations/power — server-authoritative power calculation.
+   *
+   * The /formation screen calls this debounced after each slot edit so
+   * the displayed "GÜÇ" badge confirms (and overrides) the optimistic
+   * local sum. The endpoint reads `player_units` and `player_commanders`
+   * directly (same Postgres DB, owned by game-server) and only counts
+   * slots whose referenced unit/commander the caller actually owns —
+   * stale refs from a deleted unit silently drop from the breakdown.
+   *
+   * Placed BEFORE the `:id` routes above (specifically `update` / `remove`
+   * which match `:id` for PUT/DELETE) is unnecessary here because
+   * `/power` is a POST and the only POST on this controller besides
+   * the unparameterized `save()`. Nest's method+path matcher would
+   * never confuse them. Kept near the bottom of the route block
+   * alongside the other one-off endpoints.
+   */
+  @Post('power')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Compute server-authoritative formation power' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        playerId: {
+          type: 'string',
+          description: 'Ignored — server uses authenticated caller. Kept for FE API parity.',
+        },
+        unitSlots: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              unitId: { type: 'string' },
+              position: { type: 'number' },
+            },
+          },
+        },
+        commanderSlots: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              commanderId: { type: 'string' },
+              position: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async calculatePower(
+    @Request() req: { user: { id: string } },
+    @Body() body: {
+      unitSlots?: Array<{ unitId: string; position?: number }>;
+      commanderSlots?: Array<{ commanderId: string; position?: number }>;
+    },
+  ) {
+    return this.formationsService.calculatePower(
+      req.user.id,
+      body.unitSlots,
+      body.commanderSlots,
     );
   }
 

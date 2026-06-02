@@ -328,55 +328,38 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
           </div>
 
           {/* Card grid + detail panel.
-              On DESKTOP: the inner grid splits into [cards | detail] two
-              columns; each side scrolls independently via overflowY:auto.
-              On MOBILE (≤768px): the grid collapses to a single column
-              (cards then detail stacked) and the OUTER wrapper becomes
-              the scroll container — section/aside overflow goes back to
-              `visible` so the document-flow content height drives the
-              scroll. Before this fix the inner grid had auto-sized rows
-              and the outer root had overflow:hidden, so taller-than-
-              viewport mobile content was silently clipped — page felt
-              "stuck", couldn't reach the lower commander cards or the
-              detail panel's bottom buttons. */}
+              Layout strategy (rewritten — earlier flex+nested-grid
+              attempts couldn't bound the section's height on either
+              desktop OR mobile because the gridAutoRows:1fr made the
+              inner grid fill its parent exactly, so overflow:visible
+              children couldn't push the wrapper's scroll height past
+              its own bounded height):
+
+              - Single flex container, NO nested grid wrapper.
+              - Desktop default: row flex (cards | aside side-by-side).
+                Wrapper overflow:hidden, both children scroll independently.
+              - Mobile media query: flex-direction:column. Wrapper
+                overflow-y:auto. Children `flex:none` so they don't
+                stretch — they take their content's natural height.
+                Wrapper's content (sum of children) exceeds its bounded
+                height → scroll engages. */}
           <div
             className="commanders-grid-wrapper"
             style={{
               flex: 1,
               minHeight: 0,
-              // SoT fix: was display:grid with no row sizing, so the
-              // inner grid (commanders-layout) sized to content and
-              // exceeded the bounded parent → section.overflowY:auto
-              // never triggered → outer overflow:hidden silently
-              // clipped the bottom of the cards/detail. Switched to a
-              // flex container so the inner layout fills the available
-              // height (flex:1 + minHeight:0 below) and the section/
-              // aside's overflowY:auto bounds against THAT.
               display: 'flex',
+              overflow: 'hidden',
             }}
           >
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                minWidth: 0,
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, auto)',
-                gridAutoRows: '1fr',
-                gap: 0,
-                alignItems: 'stretch',
-              }}
-              className="commanders-layout"
-            >
               <section
                 className="commanders-cards"
                 style={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 0,
                   padding: '18px 16px 32px',
                   overflowY: 'auto',
-                  // minHeight:0 lets grid item shrink below intrinsic
-                  // content height — without this the section is
-                  // content-tall and overflowY:auto never fires.
-                  minHeight: 0,
                 }}
               >
                 {visible.length === 0 ? (
@@ -423,32 +406,34 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                   onActivated={refreshActive}
                 />
               </aside>
-            </div>
           </div>
         </main>
       </div>
 
       <style jsx>{`
         @media (max-width: 768px) {
-          :global([data-testid='scr-commanders']) .commanders-layout {
-            grid-template-columns: minmax(0, 1fr) !important;
+          /* Switch from row-flex (cards | aside) to column-flex (cards over
+             aside) and hand scroll authority to the wrapper. flex:none on
+             children prevents them from filling the wrapper's bounded
+             height — they instead take their natural content height, so
+             the sum exceeds the wrapper and overflow-y:auto engages. */
+          :global([data-testid='scr-commanders']) .commanders-grid-wrapper {
+            flex-direction: column !important;
+            overflow: hidden !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          :global([data-testid='scr-commanders']) .commanders-cards {
+            flex: none !important;
+            overflow: visible !important;
           }
           :global([data-testid='scr-commanders']) .commanders-detail {
+            flex: none !important;
             width: 100% !important;
             min-width: 0 !important;
             border-left: none !important;
             border-top: 1px solid ${ND.border};
             overflow: visible !important;
-          }
-          :global([data-testid='scr-commanders']) .commanders-cards {
-            overflow: visible !important;
-          }
-          /* Outer wrapper takes over scrolling on mobile — both sections
-             flow normally, the total height = card grid + detail panel,
-             and this container scrolls the whole thing. */
-          :global([data-testid='scr-commanders']) .commanders-grid-wrapper {
-            overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch;
           }
         }
       `}</style>

@@ -127,9 +127,24 @@ export default function MergePage() {
   useEffect(() => {
     if (tierAutoSet) return;
     if (!liveUnits || liveUnits.length === 0) return;
-    for (const t of [1, 2, 3, 4]) {
+    // Tier 5 (Captain) is the top of the Insan ladder — included here so
+    // a player who's chain-merged all the way up still has their roster
+    // surface on /merge. Previously [1..4] hid Captain entirely; the
+    // /merge tier selector also gets T1 + T5 below.
+    for (const t of [1, 2, 3, 4, 5]) {
       const have = liveUnits.filter((u) => resolveUnitTier(u.type, race) === t).length;
       if (have >= SLOT_COUNT) {
+        setSourceTier(t);
+        setTierAutoSet(true);
+        return;
+      }
+    }
+    // No tier has ≥ SLOT_COUNT units — but pick the highest tier the
+    // player owns ≥1 of so a player sitting on a lone Captain still
+    // sees it in the pool (read-only — needs 3 for the merge to fire).
+    for (const t of [5, 4, 3, 2, 1]) {
+      const have = liveUnits.filter((u) => resolveUnitTier(u.type, race) === t).length;
+      if (have >= 1) {
         setSourceTier(t);
         setTierAutoSet(true);
         return;
@@ -467,7 +482,13 @@ export default function MergePage() {
           <Eyebrow color={race.primary}>{POOL_LABEL[race.key as NDRaceKey] ?? POOL_LABEL.insan}</Eyebrow>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Code>TIER</Code>
-            {[2, 3, 4].map((t) => {
+            {/* Tier selector covers the full Insan/Zerg promotion ladder
+             *  (T1..T5). Previously only T2/T3/T4 were visible — a Captain-
+             *  laden roster had nowhere to display its top-tier units.
+             *  T5 has no merge result (MERGE_RECIPES top), so /merge with
+             *  T5 selected is read-only; that's fine — the slot row still
+             *  shows the Captain card. */}
+            {[1, 2, 3, 4, 5].map((t) => {
               const on = t === sourceTier;
               return (
                 <button

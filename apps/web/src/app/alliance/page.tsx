@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAlliances } from '@/hooks/useAlliances';
 import { useAllianceWars, type AllianceWarDto } from '@/hooks/useAllianceWars';
@@ -110,6 +111,10 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 };
 
 export default function AlliancePage() {
+  // Auth gate — without this guests landed here, the data hooks all
+  // 401'd, and the page rendered with placeholder copy ("İTTİFAK YOK")
+  // that looked like real empty state. Bounce to /login first.
+  const ready = useRequireAuth();
   const race = useNDRace();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('genel');
@@ -237,6 +242,8 @@ export default function AlliancePage() {
     researchName: hasAlliance ? 'Genom Optimizasyonu' : '—',
     researchPct: hasAlliance ? 62 : 0,
   };
+
+  if (!ready) return null;
 
   return (
     <Screen race={race} style={{ height: '100dvh' }}>

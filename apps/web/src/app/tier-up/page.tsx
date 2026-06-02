@@ -2,11 +2,13 @@
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { ND, ScrTierUp, useNDRace } from '@/components/handoff';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useTierProgress } from '@/hooks/useTierProgress';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useProgression } from '@/hooks/useProgression';
 
 function TierUpInner() {
+  const ready = useRequireAuth();
   const race = useNDRace();
   const { progress, requirements, levels, loading, error, xpPercent, levelUp, refresh } = useTierProgress();
 
@@ -71,6 +73,8 @@ function TierUpInner() {
   const xpLabel = progress
     ? `${progress.xp} / ${progress.xpToNextLevel}`
     : undefined;
+
+  if (!ready) return null;
 
   return (
     <ScrTierUp

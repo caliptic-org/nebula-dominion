@@ -29,6 +29,7 @@ import { hasSession } from '@/lib/session';
 import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useVipStatus } from '@/hooks/useVip';
 import { useGates, gateAllows } from '@/lib/gates';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
 type Currency = 'gem' | 'gold';
@@ -178,6 +179,7 @@ export default function ShopPage() {
 const TAB_KEYS: Tab[] = ['genel', 'vip', 'lonca', 'etkinlik', 'gecis'];
 
 function ShopPageInner() {
+  const ready = useRequireAuth();
   const race = useNDRace();
   const router = useRouter();
   const tCommon = useTranslations('common');
@@ -228,6 +230,8 @@ function ShopPageInner() {
     if (tab === 'gecis') return [] as ShopProduct[];
     return PRODUCTS.filter(p => p.category === tab);
   }, [tab]);
+
+  if (!ready) return null;
 
   return (
     <Screen race={race} style={{ height: '100dvh' }}>

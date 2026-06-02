@@ -20,6 +20,7 @@ import {
   useNDRace,
   type NDRace,
 } from '@/components/handoff';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useBaseState } from '@/hooks/useBaseState';
 import { useGameResources } from '@/hooks/useGameResources';
@@ -114,6 +115,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 };
 
 export default function ProfilePage() {
+  const ready = useRequireAuth();
   const race = useNDRace();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('stats');
@@ -220,6 +222,8 @@ export default function ProfilePage() {
     () => summariseAchievements(claimedAchievementIds),
     [claimedAchievementIds],
   );
+
+  if (!ready) return null;
 
   return (
     <Screen race={race} style={{ height: '100dvh' }}>

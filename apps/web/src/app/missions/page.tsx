@@ -23,6 +23,7 @@ import {
   type NDRace,
 } from '@/components/handoff';
 import { useMissionClaims, useMissions, type Quest } from '@/hooks/useMissions';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { refreshGameResources } from '@/hooks/useGameResources';
 import { toast } from '@/components/handoff/Toaster';
@@ -128,6 +129,7 @@ const BOTTOM_NAV_ROUTES: Record<string, string> = {
 };
 
 export default function MissionsPage() {
+  const ready = useRequireAuth();
   const race = useNDRace();
   const router = useRouter();
   const tMissions = useTranslations('missions');
@@ -157,6 +159,8 @@ export default function MissionsPage() {
   const completed = visible.filter(m => m.state === 'completed').length;
   const claimable = allMissions.filter(m => m.state === 'completed').length;
   const unlockedAch = ACHIEVEMENTS.filter(a => a.unlocked).length;
+
+  if (!ready) return null;
 
   return (
     <Screen race={race} style={{ height: '100dvh' }}>

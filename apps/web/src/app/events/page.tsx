@@ -19,6 +19,7 @@ import {
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 /* ── Domain types ─────────────────────────────────────────────────────── */
 
@@ -769,6 +770,7 @@ function TabButton({
 /* ── Page ─────────────────────────────────────────────────────────────── */
 
 export default function EventsPage() {
+  const ready = useRequireAuth();
   const race = useNDRace();
   const [tab, setTab] = useState<Tab>('active');
 
@@ -789,6 +791,8 @@ export default function EventsPage() {
   );
 
   const showFeatured = tab === 'active' && featured !== null;
+
+  if (!ready) return null;
 
   return (
     <Screen race={race} style={{ height: '100dvh', overflow: 'auto' }}>

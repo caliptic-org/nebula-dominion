@@ -514,8 +514,36 @@ function BuildMenuInner() {
              *  doubles as an upgrade panel (the user no longer has to
              *  drill into /base/building/[slug] just to bump Lv N → N+1).
              *  RaceTabs above already exposes the "Tümü" filter — the
-             *  dedicated reset button was redundant. */}
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+             *  dedicated reset button was redundant.
+             *
+             *  Sticky-bottom positioning: position: sticky + bottom: 0
+             *  keeps the action bar glued to the bottom of the scrollable
+             *  sheet so the player doesn't have to scroll down every time
+             *  they pick a card. Negative bottom-margin + extra padding-top
+             *  produces a soft gradient fade against the cards above so
+             *  the boundary reads as a deliberate UI band, not a clip.
+             *  At natural-bottom (last card reached) the sheet's own
+             *  background blends in, matching the pre-sticky design. */}
+            <div
+              style={{
+                position: 'sticky',
+                bottom: 0,
+                marginTop: 12,
+                marginLeft: -14,
+                marginRight: -14,
+                marginBottom: -18,
+                padding: '14px 14px 18px',
+                display: 'flex',
+                gap: 8,
+                background:
+                  race.key === 'seytan'
+                    ? 'linear-gradient(180deg, rgba(20,2,6,0) 0%, rgba(20,2,6,0.94) 38%, rgba(8,1,3,0.98) 100%)'
+                    : 'linear-gradient(180deg, rgba(6,10,24,0) 0%, rgba(6,10,24,0.94) 38%, rgba(6,10,24,0.98) 100%)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                zIndex: 2,
+              }}
+            >
               {/* Left: DETAY → routes to the detail page when the player
                *  wants the full breakdown (requirements list, cost table,
                *  construction history). Disabled when nothing is selected

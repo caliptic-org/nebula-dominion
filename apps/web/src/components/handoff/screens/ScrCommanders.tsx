@@ -52,6 +52,12 @@ interface ScrCommandersProps {
      *  hook-level useActiveCommander() polling that still runs as
      *  fallback for guest-mode demos. */
     isActive?: boolean;
+    /** Portrait path from backend (/assets/characters/<race>/<id>.png).
+     *  PNG files already live in apps/web/public/assets/characters/.
+     *  Card and detail panel render this as an <img>; onError falls
+     *  back to the abstract Sigil so a missing render still produces a
+     *  card that looks intentional. */
+    portrait?: string;
   }>;
 }
 
@@ -64,6 +70,9 @@ interface CommanderEntry extends NDRaceCmdr {
    *  undefined and the XP bar is suppressed. */
   xp?: number;
   xpToNext?: number;
+  /** Path to a portrait PNG (e.g. /assets/characters/insan/voss.png).
+   *  When present the card/detail render it instead of the Sigil. */
+  portrait?: string;
 }
 
 /* Map RACES commander names to the existing commanders/data.ts ID so the
@@ -140,6 +149,7 @@ function rosterFromLive(
       locked: !c.unlocked,
       xp: c.xp,
       xpToNext: c.xpToNext,
+      portrait: c.portrait,
     };
   });
 }
@@ -333,15 +343,26 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
             className="commanders-grid-wrapper"
             style={{
               flex: 1,
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr)',
               minHeight: 0,
+              // SoT fix: was display:grid with no row sizing, so the
+              // inner grid (commanders-layout) sized to content and
+              // exceeded the bounded parent → section.overflowY:auto
+              // never triggered → outer overflow:hidden silently
+              // clipped the bottom of the cards/detail. Switched to a
+              // flex container so the inner layout fills the available
+              // height (flex:1 + minHeight:0 below) and the section/
+              // aside's overflowY:auto bounds against THAT.
+              display: 'flex',
             }}
           >
             <div
               style={{
+                flex: 1,
+                minHeight: 0,
+                minWidth: 0,
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0, 1fr) minmax(0, auto)',
+                gridAutoRows: '1fr',
                 gap: 0,
                 alignItems: 'stretch',
               }}
@@ -352,6 +373,10 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                 style={{
                   padding: '18px 16px 32px',
                   overflowY: 'auto',
+                  // minHeight:0 lets grid item shrink below intrinsic
+                  // content height — without this the section is
+                  // content-tall and overflowY:auto never fires.
+                  minHeight: 0,
                 }}
               >
                 {visible.length === 0 ? (
@@ -387,6 +412,7 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                   background: `linear-gradient(180deg, ${selectedTheme.primary}11 0%, rgba(8,10,16,0.85) 50%)`,
                   overflowY: 'auto',
                   transition: 'background 700ms cubic-bezier(0.32,0.72,0,1)',
+                  minHeight: 0,
                 }}
                 className="commanders-detail"
                 aria-label="Komutan detay paneli"
@@ -510,7 +536,11 @@ function CommanderCard({
             WebkitBackdropFilter: 'blur(8px)',
           }}
         >
-          {/* Portrait area — sigil based since no commander portraits yet */}
+          {/* Portrait area — renders the PNG portrait when one is in the
+              live roster (entry.portrait), falls back to the abstract
+              Sigil otherwise OR if the <img> fires onError (locked tier
+              4 commanders typically have no asset yet). Locked entries
+              keep the grayscale filter regardless of which renders. */}
           <div
             style={{
               position: 'relative',
@@ -523,9 +553,16 @@ function CommanderCard({
               alignItems: 'center',
               justifyContent: 'center',
               filter: locked ? 'grayscale(1) brightness(0.45)' : 'none',
+              overflow: 'hidden',
             }}
           >
-            <Sigil race={race} size={88} glow={!locked} />
+            <CommanderPortrait
+              portrait={entry.portrait}
+              alt={entry.n}
+              race={race}
+              size={88}
+              glow={!locked}
+            />
             {/* Race + tier badges */}
             <div
               style={{
@@ -705,7 +742,14 @@ function CommanderDetail({
           boxShadow: locked ? 'none' : `0 0 36px -10px ${race.glow}77`,
         }}
       >
-        <Sigil race={race} size={148} glow={!locked} />
+        <CommanderPortrait
+          portrait={entry.portrait}
+          alt={entry.n}
+          race={race}
+          size={148}
+          glow={!locked}
+          full
+        />
         <div
           aria-hidden
           style={{
@@ -915,6 +959,73 @@ function CommanderDetail({
         </NDButton>
       </div>
     </div>
+  );
+}
+
+/** Renders a commander portrait PNG with a graceful fallback to the
+ *  abstract Sigil. Used in both the card (size=88) and the detail panel
+ *  (size=148, full=true → cover-stretches across the framed area).
+ *
+ *  Falls back when:
+ *  - `portrait` prop is undefined (static lex roster, no live data yet)
+ *  - the <img> fires onError (404 / network failure / missing asset)
+ *
+ *  Locked tier-4/5 commanders that don't have asset files yet land in
+ *  the fallback path automatically. */
+function CommanderPortrait({
+  portrait,
+  alt,
+  race,
+  size,
+  glow,
+  full,
+}: {
+  portrait?: string;
+  alt: string;
+  race: NDRace;
+  size: number;
+  glow?: boolean;
+  /** When true, fill the parent frame (object-fit: cover) instead of
+   *  rendering at fixed `size`. Used in the detail panel. */
+  full?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (!portrait || failed) {
+    return <Sigil race={race} size={size} glow={glow} />;
+  }
+  if (full) {
+    return (
+      <img
+        src={portrait}
+        alt={alt}
+        onError={() => setFailed(true)}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center top',
+        }}
+      />
+    );
+  }
+  return (
+    <img
+      src={portrait}
+      alt={alt}
+      onError={() => setFailed(true)}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        objectPosition: 'center top',
+        // Subtle glow ring picked up from the race when not locked,
+        // so the portrait still reads as "yours" alongside the sigil
+        // version. drop-shadow keeps the PNG's silhouette intact.
+        filter: glow ? `drop-shadow(0 0 14px ${race.glow}55)` : 'none',
+      }}
+    />
   );
 }
 

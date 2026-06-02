@@ -11,6 +11,7 @@ import {
   H3,
   ND,
   NDButton,
+  NDModal,
   NebulaBg,
   Panel,
   RACES,
@@ -159,6 +160,11 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
   const [filter, setFilter] = useState<Filter>('all');
   const [showLockedOnly, setShowLockedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Modal open state — was a sticky right-aside on desktop / collapsed
+  // section on mobile, but both kept fighting the page scroll. Switched to
+  // a centred NDModal: card taps open it, ESC / backdrop / × close it. The
+  // grid then has the full viewport to scroll through 20 commanders.
+  const [detailOpen, setDetailOpen] = useState(false);
   // Live "currently activated" id from /commanders/me/active. Used to render
   // an AKTİF badge on the matching card and to keep the detail-panel CTA
   // consistent. Hook handles 404 / 401 / guest gracefully → null.
@@ -392,63 +398,45 @@ export function ScrCommanders({ playerRaceKey, liveCommanders }: ScrCommandersPr
                         entry={c}
                         selected={c.id === selected.id}
                         active={activeCommander?.commanderId === c.id}
-                        onSelect={() => setSelectedId(c.id)}
+                        onSelect={() => {
+                          setSelectedId(c.id);
+                          setDetailOpen(true);
+                        }}
                       />
                     ))}
                   </div>
                 )}
               </section>
-
-              <aside
-                style={{
-                  width: 'min(380px, 38vw)',
-                  minWidth: 280,
-                  borderLeft: `1px solid ${ND.border}`,
-                  background: `linear-gradient(180deg, ${selectedTheme.primary}11 0%, rgba(8,10,16,0.85) 50%)`,
-                  overflowY: 'auto',
-                  transition: 'background 700ms cubic-bezier(0.32,0.72,0,1)',
-                  minHeight: 0,
-                }}
-                className="commanders-detail"
-                aria-label="Komutan detay paneli"
-              >
-                <CommanderDetail
-                  entry={selected}
-                  isActive={activeCommander?.commanderId === selected.id}
-                  onActivated={refreshActive}
-                />
-              </aside>
           </div>
         </main>
       </div>
 
-      <style jsx>{`
-        @media (max-width: 768px) {
-          /* Switch from row-flex (cards | aside) to column-flex (cards over
-             aside) and hand scroll authority to the wrapper. flex:none on
-             children prevents them from filling the wrapper's bounded
-             height — they instead take their natural content height, so
-             the sum exceeds the wrapper and overflow-y:auto engages. */
-          :global([data-testid='scr-commanders']) .commanders-grid-wrapper {
-            flex-direction: column !important;
-            overflow: hidden !important;
-            overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch;
-          }
-          :global([data-testid='scr-commanders']) .commanders-cards {
-            flex: none !important;
-            overflow: visible !important;
-          }
-          :global([data-testid='scr-commanders']) .commanders-detail {
-            flex: none !important;
-            width: 100% !important;
-            min-width: 0 !important;
-            border-left: none !important;
-            border-top: 1px solid ${ND.border};
-            overflow: visible !important;
-          }
+      {/* Commander detail modal — opens on card tap, dismissed via ×,
+          backdrop click, or ESC. Replaces the prior side-aside which
+          created layout headaches across viewports and couldn't have
+          a sticky footer that always reached its CTAs. NDModal already
+          handles body scroll lock + ESC key. */}
+      <NDModal
+        race={selected.race}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        eyebrow={`${selected.race.allianceTag} · ${selected.tier}`}
+        title={selected.n}
+        maxWidth={440}
+        actions={
+          <CommanderDetailActions
+            entry={selected}
+            isActive={activeCommander?.commanderId === selected.id}
+            onActivated={() => {
+              refreshActive();
+              setDetailOpen(false);
+            }}
+          />
         }
-      `}</style>
+      >
+        <CommanderDetailBody entry={selected} />
+      </NDModal>
+
     </div>
   );
 }
@@ -707,19 +695,14 @@ function CommanderCard({
   );
 }
 
-function CommanderDetail({
-  entry,
-  isActive,
-  onActivated,
-}: {
-  entry: CommanderEntry;
-  isActive?: boolean;
-  onActivated?: () => void;
-}) {
+/** Body content for the commander detail modal — portrait hero + tier/
+ *  skill/lore panels. Buttons live separately in CommanderDetailActions
+ *  so NDModal can pin them as a sticky footer that's always reachable
+ *  regardless of how tall the lore copy is. */
+function CommanderDetailBody({ entry }: { entry: CommanderEntry }) {
   const { race, locked } = entry;
-  const [activating, setActivating] = useState(false);
   return (
-    <div style={{ padding: '20px 18px 32px' }}>
+    <div style={{ padding: '18px 4px 4px' }}>
       <div
         style={{
           position: 'relative',
@@ -879,82 +862,101 @@ function CommanderDetail({
         </Caption>
       </Panel>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Link
-          href={`/commanders/${entry.id}`}
+    </div>
+  );
+}
+
+/** Sticky-footer actions for the commander detail modal. NDModal renders
+ *  this inside its bottom band, so the buttons stay reachable even when
+ *  the body content is too tall to fit. Two CTAs in a vertical stack:
+ *  navigate to the full detail route, or activate this commander. */
+function CommanderDetailActions({
+  entry,
+  isActive,
+  onActivated,
+}: {
+  entry: CommanderEntry;
+  isActive?: boolean;
+  onActivated?: () => void;
+}) {
+  const { race, locked } = entry;
+  const [activating, setActivating] = useState(false);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <Link
+        href={`/commanders/${entry.id}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px',
+          background: `${race.primary}18`,
+          color: race.primary,
+          border: `1px solid ${race.primary}55`,
+          fontFamily: ND.display,
+          fontSize: 11,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          textDecoration: 'none',
+          transition: 'all 200ms cubic-bezier(0.32,0.72,0,1)',
+        }}
+      >
+        ◈ Detay Sayfası
+        <span
           style={{
-            display: 'flex',
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            background: `${race.primary}22`,
+            border: `1px solid ${race.primary}44`,
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 16px',
-            background: `${race.primary}18`,
-            color: race.primary,
-            border: `1px solid ${race.primary}55`,
-            fontFamily: ND.display,
-            fontSize: 11,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            textDecoration: 'none',
-            transition: 'all 200ms cubic-bezier(0.32,0.72,0,1)',
+            justifyContent: 'center',
           }}
         >
-          ◈ Detay Sayfası
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              background: `${race.primary}22`,
-              border: `1px solid ${race.primary}44`,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            →
-          </span>
-        </Link>
-        <NDButton
-          race={race}
-          variant={locked ? 'outline' : isActive ? 'outline' : 'primary'}
-          full
-          disabled={locked || activating || isActive}
-          onClick={async () => {
-            if (locked || activating || isActive) return;
-            setActivating(true);
-            // Cache the selection optimistically so guest mode still feels
-            // responsive — the auth-required POST below upgrades it to the
-            // server-authoritative source when the player has a token.
-            const writeCache = () => {
-              try {
-                window.localStorage.setItem(
-                  'nebula:active-commander:v1',
-                  JSON.stringify({ id: entry.id, name: entry.n, race: race.key, ts: Date.now() }),
-                );
-              } catch {
-                /* private mode — best effort */
-              }
-            };
+          →
+        </span>
+      </Link>
+      <NDButton
+        race={race}
+        variant={locked ? 'outline' : isActive ? 'outline' : 'primary'}
+        full
+        disabled={locked || activating || isActive}
+        onClick={async () => {
+          if (locked || activating || isActive) return;
+          setActivating(true);
+          // Cache the selection optimistically so guest mode still feels
+          // responsive — the auth-required POST below upgrades it to the
+          // server-authoritative source when the player has a token.
+          const writeCache = () => {
             try {
-              await api.post(`/commanders/${entry.id}/activate`);
-              writeCache();
-              toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
-              onActivated?.();
-            } catch (err) {
-              writeCache();
-              // 401 / 4xx → fall back to optimistic UI in guest mode so the
-              // badge still feels consistent on the next reload; surface
-              // the translated message so the player knows it didn't sync.
-              const msg = err instanceof FetchError ? err.message : 'Aktif komutan ayarlanamadı';
-              toast.error(msg);
-            } finally {
-              setActivating(false);
+              window.localStorage.setItem(
+                'nebula:active-commander:v1',
+                JSON.stringify({ id: entry.id, name: entry.n, race: race.key, ts: Date.now() }),
+              );
+            } catch {
+              /* private mode — best effort */
             }
-          }}
-        >
-          {locked ? '🔒 Kilidi Aç' : isActive ? '★ Aktif Komutan' : activating ? 'Ayarlanıyor…' : '⚔ Komutan Seç'}
-        </NDButton>
-      </div>
+          };
+          try {
+            await api.post(`/commanders/${entry.id}/activate`);
+            writeCache();
+            toast.success(`${entry.n} aktif komutan olarak ayarlandı`);
+            onActivated?.();
+          } catch (err) {
+            writeCache();
+            // 401 / 4xx → fall back to optimistic UI in guest mode so the
+            // badge still feels consistent on the next reload; surface
+            // the translated message so the player knows it didn't sync.
+            const msg = err instanceof FetchError ? err.message : 'Aktif komutan ayarlanamadı';
+            toast.error(msg);
+          } finally {
+            setActivating(false);
+          }
+        }}
+      >
+        {locked ? '🔒 Kilidi Aç' : isActive ? '★ Aktif Komutan' : activating ? 'Ayarlanıyor…' : '⚔ Komutan Seç'}
+      </NDButton>
     </div>
   );
 }

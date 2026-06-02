@@ -12,6 +12,7 @@ import {
   Caption,
   Panel,
   NDButton,
+  toast,
   useNDRace,
 } from '@/components/handoff';
 import {
@@ -362,10 +363,18 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
         })
       );
       setPendingUnit(null);
+    } else if (pendingCmd) {
+      // Cross-type click — user has a commander pending and tapped a unit
+      // slot. Without this guard the click silently did nothing; users
+      // reported "the slot ignores me". Show a hint so they know to head
+      // to the commander row instead, and clear the pending so the next
+      // tap starts fresh.
+      toast.info('Komutan slotuna yerleştir (alttaki komutan satırı)');
+      setPendingCmd(null);
     } else if (currentUnit) {
       handleUnitRemove(slotId);
     }
-  }, [pendingUnit, handleUnitRemove]);
+  }, [pendingUnit, pendingCmd, handleUnitRemove]);
 
   /* ── Commander interactions ───────────────────────────────────────────── */
   const handleCommanderDrop = useCallback((toSlotId: string, commanderId: string) => {
@@ -394,10 +403,14 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
         })
       );
       setPendingCmd(null);
+    } else if (pendingUnit) {
+      // Cross-type click (mirror of the unit-slot guard above).
+      toast.info('Birim slotuna yerleştir (Kadro tablosu)');
+      setPendingUnit(null);
     } else if (currentCmd) {
       handleCommanderRemove(slotId);
     }
-  }, [pendingCmd, handleCommanderRemove]);
+  }, [pendingCmd, pendingUnit, handleCommanderRemove]);
 
   /* ── Roster selection ─────────────────────────────────────────────────── */
   const handleSelectUnit = useCallback((unit: SlotUnit) => {
@@ -880,35 +893,50 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
                 ))}
               </div>
 
-              {/* Race filter */}
+              {/* Race filter — only show chips for races the roster
+                  actually contains. Units come from game-server with the
+                  player's race AND any cross-race units they might have
+                  inherited; commanders are now race-filtered. So this
+                  computes the present races dynamically. */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                {(['all', 'insan', 'zerg', 'otomat', 'canavar', 'seytan'] as const).map((k) => {
-                  const isAll = k === 'all';
-                  const filterRace = !isAll ? RACES[k] : null;
-                  const active = raceFilter === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setRaceFilter(k)}
-                      style={{
-                        all: 'unset',
-                        cursor: 'pointer',
-                        padding: '3px 8px',
-                        fontFamily: ND.mono,
-                        fontSize: 9,
-                        letterSpacing: '0.10em',
-                        textTransform: 'uppercase',
-                        border: `1px solid ${active ? (filterRace?.primary ?? race.primary) + '88' : ND.border}`,
-                        background: active ? `${filterRace?.primary ?? race.primary}18` : 'transparent',
-                        color: active ? (filterRace?.primary ?? race.primary) : ND.textMute,
-                        borderRadius: 2,
-                      }}
-                    >
-                      {isAll ? 'Tümü' : RACES[k].short}
-                    </button>
+                {(() => {
+                  const presentRaces = new Set<RaceKey>();
+                  for (const u of availableUnits) presentRaces.add(u.race);
+                  for (const c of availableCommanders) presentRaces.add(c.race);
+                  const races = (['insan', 'zerg', 'otomat', 'canavar', 'seytan'] as const).filter(
+                    (k) => presentRaces.has(k),
                   );
-                })}
+                  // If only one race is present, no point in showing the filter
+                  // chips at all — collapse to just nothing (Tümü is implicit).
+                  if (races.length <= 1) return null;
+                  return (['all', ...races] as const).map((k) => {
+                    const isAll = k === 'all';
+                    const filterRace = !isAll ? RACES[k] : null;
+                    const active = raceFilter === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setRaceFilter(k)}
+                        style={{
+                          all: 'unset',
+                          cursor: 'pointer',
+                          padding: '3px 8px',
+                          fontFamily: ND.mono,
+                          fontSize: 9,
+                          letterSpacing: '0.10em',
+                          textTransform: 'uppercase',
+                          border: `1px solid ${active ? (filterRace?.primary ?? race.primary) + '88' : ND.border}`,
+                          background: active ? `${filterRace?.primary ?? race.primary}18` : 'transparent',
+                          color: active ? (filterRace?.primary ?? race.primary) : ND.textMute,
+                          borderRadius: 2,
+                        }}
+                      >
+                        {isAll ? 'Tümü' : RACES[k].short}
+                      </button>
+                    );
+                  });
+                })()}
               </div>
 
               {hasPending && (

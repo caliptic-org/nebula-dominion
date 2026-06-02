@@ -30,6 +30,17 @@ interface SlotInput {
   count?: number;
 }
 
+/** New shape the /formation FE sends: separate unit + commander slot
+ *  arrays with explicit positions, instead of one flat slots[] index. */
+interface UnitSlotPosition {
+  unitId: string;
+  position: number;
+}
+interface CommanderSlotPosition {
+  commanderId: string;
+  position: number;
+}
+
 interface FormationInput {
   /** Optional override; server generates a uuid when missing */
   id?: string;
@@ -37,7 +48,11 @@ interface FormationInput {
   rows?: number;
   cols?: number;
   templateId?: string;
-  slots: SlotInput[];
+  /** Legacy shape — kept for backward compatibility with older clients. */
+  slots?: SlotInput[];
+  /** New shape — what FormationScreenND.tsx actually sends today. */
+  unitSlots?: UnitSlotPosition[];
+  commanderSlots?: CommanderSlotPosition[];
 }
 
 /**
@@ -133,6 +148,12 @@ export class FormationsController {
       cols: body.cols ?? 5,
       templateId: body.templateId,
       slots: body.slots ?? [],
+      // Persist the new dual-array shape too — FE always sends these
+      // now (formation-api.ts createFormation/updateFormation). Without
+      // storing them, GET /formations returned records that round-tripped
+      // to empty slots in the UI even though save succeeded.
+      unitSlots: body.unitSlots ?? [],
+      commanderSlots: body.commanderSlots ?? [],
       updatedAt,
     };
 

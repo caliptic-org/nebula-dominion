@@ -175,15 +175,27 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
   }, [playerId]);
 
   /* ── Load commanders from the real CommandersService roster ───────────── */
-  // Previously this screen filtered the unit roster for tier ≥ 4 / abilities
-  // and called the survivors "commanders". That was a pre-system stub.
-  // With game-server's CommandersModule live, the player actually has a
-  // player_commanders table with 3+ unlocked entries — those are the ones
-  // to surface here. Race=null fetches across all races so an İnsan
-  // player who's been browsing other races' galleries still sees their
-  // OWN unlocks (currently all races' starters seed once the player views
-  // them in /commanders).
-  const { commanders: liveCommanders } = useCommanders(null);
+  // Read player's own race so the formation roster shows ONLY their
+  // commanders, not the cross-race noise the previous useCommanders(null)
+  // pulled in. localStorage key 'nebula:race-commitment:v1' is the same
+  // SoT /commanders page reads — written by /race-select on race pick.
+  // Falls back to insan if unset (guest / pre-onboarding).
+  const playerRace = useMemo<RaceKey>(() => {
+    if (typeof window === 'undefined') return 'insan';
+    try {
+      const raw = window.localStorage.getItem('nebula:race-commitment:v1');
+      if (!raw) return 'insan';
+      const parsed = JSON.parse(raw) as { race?: string };
+      const valid: readonly RaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
+      if (parsed?.race && (valid as readonly string[]).includes(parsed.race)) {
+        return parsed.race as RaceKey;
+      }
+      return 'insan';
+    } catch {
+      return 'insan';
+    }
+  }, []);
+  const { commanders: liveCommanders } = useCommanders(playerRace);
   useEffect(() => {
     if (!liveCommanders) return;
     // Map CommanderDto → SlotCommander. Only unlocked commanders are

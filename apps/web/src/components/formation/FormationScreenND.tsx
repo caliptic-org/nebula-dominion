@@ -28,10 +28,9 @@ import {
   updateFormation,
   calculatePower,
   unitToSlotUnit,
-  unitToSlotCommander,
-  isCommanderEligible,
   FormationApiError,
 } from '@/lib/formation-api';
+import { useCommanders, type CommanderDto } from '@/hooks/useCommanders';
 
 const MAX_COMMANDERS = FORMATION_LIMITS.MAX_COMMANDER_SLOTS;
 const ROWS = ['rear', 'middle', 'front'] as const;
@@ -161,9 +160,7 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
       .then((rawUnits) => {
         if (cancelled) return;
         const units = rawUnits.map(unitToSlotUnit);
-        const commanders = rawUnits.filter(isCommanderEligible).map(unitToSlotCommander);
         setAvailableUnits(units);
-        setAvailableCommanders(commanders);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -176,6 +173,42 @@ export function FormationScreenND({ playerId }: FormationScreenNDProps) {
 
     return () => { cancelled = true; };
   }, [playerId]);
+
+  /* ── Load commanders from the real CommandersService roster ───────────── */
+  // Previously this screen filtered the unit roster for tier ≥ 4 / abilities
+  // and called the survivors "commanders". That was a pre-system stub.
+  // With game-server's CommandersModule live, the player actually has a
+  // player_commanders table with 3+ unlocked entries — those are the ones
+  // to surface here. Race=null fetches across all races so an İnsan
+  // player who's been browsing other races' galleries still sees their
+  // OWN unlocks (currently all races' starters seed once the player views
+  // them in /commanders).
+  const { commanders: liveCommanders } = useCommanders(null);
+  useEffect(() => {
+    if (!liveCommanders) return;
+    // Map CommanderDto → SlotCommander. Only unlocked commanders are
+    // eligible for formation placement (locked tier-4 slots can be
+    // surfaced as greyed-out "?" cards in a follow-up; for now keep the
+    // roster honest about what the player can actually deploy).
+    const mapped: SlotCommander[] = liveCommanders
+      .filter((c: CommanderDto) => c.unlocked)
+      .map((c: CommanderDto) => ({
+        id: c.id,
+        name: c.name,
+        race: c.race as RaceKey,
+        level: c.level,
+        portrait: c.portrait,
+        // Derive a power proxy from level + tier so formation power calc
+        // stays meaningful until the BE side surfaces a real
+        // commander.power field. Linear: level × 50 + tier-of-base bonus.
+        power: c.level * 50 + (c.tier === 'BAŞ KOMUTAN' ? 200 : 100),
+        // Abilities = the human-readable skill text + the bonus type
+        // detected from bonusAtLevel for chip rendering.
+        abilities: [c.skill],
+        isUnlocked: true,
+      }));
+    setAvailableCommanders(mapped);
+  }, [liveCommanders]);
 
   /* ── Load templates + saved formations ────────────────────────────────── */
   useEffect(() => {

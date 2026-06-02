@@ -647,30 +647,46 @@ function buildRoster(
   const states: UnitState[] = ['ready', 'fleet', 'wounded'];
   const liveByType = liveUnits ? groupUnitsByType(liveUnits) : null;
 
-  return race.units.map((u, i) => {
-    const id       = `${race.key}-${u.n}-${i}`;
-    const seed     = hash(id);
-    const live     = backend[i];
-    const liveType = (live?.type as string | undefined)?.toLowerCase();
-    const realCount = liveType && liveByType ? (liveByType.get(liveType)?.length ?? 0) : 0;
+  // ── Index helpers ────────────────────────────────────────────────────
+  // Match lex names and backend types by NAME, not by array index.  The
+  // previous index-based pairing broke after getUnitConfigsByRace started
+  // filtering merge-only units (trainable: false) out of the catalog —
+  // race.units kept all 6 slots (Marine..Captain) but backend shrank to
+  // 4 (Marine/Medic/Siege/Ghost), so lex slot 5 (Captain) paired with
+  // backend[5] = undefined and the player's chain-merged Captain unit
+  // counted zero in /inventory.
+  //
+  // The mapping rule: a lex entry matches a backend config if the
+  // backend's `type` snake-case prefix equals the lex name's snake-case
+  // (case-insensitive). 'Marine' ↔ 'marine', 'Mecha Walker' ↔ 'mecha_walker'.
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '_');
+  const backendByName = new Map<string, UnitConfigDto>();
+  for (const cfg of backend) {
+    backendByName.set(norm(String(cfg.type ?? '')), cfg);
+  }
+
+  const cards: RosterUnit[] = race.units.map((u, i) => {
+    const id        = `${race.key}-${u.n}-${i}`;
+    const seed      = hash(id);
+    const lexKey    = norm(u.n);
+    const live      = backendByName.get(lexKey);
+    // The lex name itself becomes the backendType when no backend config
+    // matches — so a lex-only entry (Sniper/Mecha/Genetic/Captain, all
+    // merge-only) still resolves correctly against liveByType from the
+    // game-server roster fetch.
+    const liveType  = live ? norm(String(live.type)) : lexKey;
+    const realCount = liveByType?.get(liveType)?.length ?? 0;
 
     const atk = live?.attack  != null ? clamp(Math.round((live.attack  as number) * 2))   : clamp(u.t * 14 + (seed % 9) + 8);
     const def = live?.defense != null ? clamp(Math.round((live.defense as number) * 2.5)) : clamp(u.t * 11 + ((seed >> 3) % 8) + 6);
     const spd = live?.speed   != null ? clamp(Math.round((live.speed   as number) * 14))  : clamp(94 - u.t * 12 + ((seed >> 6) % 10));
 
-    // Prefer the real per-unit level from the player's first owned copy of
-    // this slot. Falls back to the synthetic level only when the slot is
-    // empty so the UI still has a stable preview number. (Old code always
-    // synthesized `Math.max(1, 10 - i*2)` which mismatched the live API.)
-    const liveSampleLevel =
-      liveType && liveByType
-        ? (liveByType.get(liveType)?.[0] as unknown as { level?: number } | undefined)?.level
-        : undefined;
+    const liveSampleLevel = (liveByType?.get(liveType)?.[0] as unknown as { level?: number } | undefined)?.level;
 
     return {
       id,
       name:        u.n,
-      backendType: liveType ?? null,
+      backendType: liveType,
       tier:        live?.tier ?? u.t,
       level:       liveSampleLevel ?? Math.max(1, 10 - i * 2),
       count:       realCount,
@@ -680,4 +696,40 @@ function buildRoster(
       spd,
     };
   });
+
+  // Surface ANY backend types the player actually owns that aren't in the
+  // race-lex yet (Medic / Ghost / Siege Tank for İnsan are trainable but
+  // not in RACES[insan].units — the lex only covers the promotion ladder).
+  // Without this, a player with 50 Ghosts saw zero of them on /inventory.
+  if (liveByType) {
+    const seenTypes = new Set(cards.map((c) => c.backendType));
+    let extraIdx = race.units.length;
+    for (const [type, units] of liveByType.entries()) {
+      if (seenTypes.has(type)) continue;
+      const sample = (units as unknown as Array<{ level?: number }>)[0];
+      const cfg = backendByName.get(type);
+      const id = `${race.key}-${type}-extra-${extraIdx++}`;
+      const seed = hash(id);
+      const tier = cfg?.tier ?? 1;
+      // Pretty-up the raw enum code: 'siege_tank' → 'Siege Tank'.
+      const prettyName = type
+        .split('_')
+        .map((w) => w[0]?.toUpperCase() + w.slice(1))
+        .join(' ');
+      cards.push({
+        id,
+        name: prettyName,
+        backendType: type,
+        tier,
+        level: sample?.level ?? 1,
+        count: units.length,
+        state: 'ready',
+        atk: cfg?.attack  != null ? clamp(Math.round((cfg.attack  as number) * 2))   : clamp(tier * 14 + (seed % 9) + 8),
+        def: cfg?.defense != null ? clamp(Math.round((cfg.defense as number) * 2.5)) : clamp(tier * 11 + ((seed >> 3) % 8) + 6),
+        spd: cfg?.speed   != null ? clamp(Math.round((cfg.speed   as number) * 14))  : clamp(94 - tier * 12 + ((seed >> 6) % 10)),
+      });
+    }
+  }
+
+  return cards;
 }

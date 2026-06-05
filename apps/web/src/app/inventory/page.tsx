@@ -24,6 +24,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
+import { unitPortrait } from '@/lib/assets';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { useGameUnits, groupUnitsByType, type PlayerUnitDto } from '@/hooks/useGameUnits';
 import { useGameResources } from '@/hooks/useGameResources';
@@ -421,19 +422,48 @@ function RosterCard({ race, unit, selected, onClick }: RosterCardProps) {
           zIndex: 2,
         }}>×{unit.count}</span>
 
-        {/* Silhouette area — diagonal hatch + centered glyph */}
-        <div style={{
-          flex: 1,
-          marginTop: 20,
-          marginBottom: 3,
-          background: `repeating-linear-gradient(135deg, ${race.primary}0e 0 5px, transparent 5px 10px)`,
-          border: `1px dashed ${race.primary}44`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <UnitSilhouette race={race} />
-        </div>
+        {/* Portrait area — 512² ComfyUI sweep portrait when wired in
+         *  UNIT_ASSETS; otherwise the original hatched-SVG silhouette so
+         *  unmapped units (medic/siege_tank/ghost pending next sweep)
+         *  stay legible instead of going blank. */}
+        {(() => {
+          const portrait = unitPortrait(race.key, unit.backendType ?? unit.name);
+          return (
+            <div style={{
+              flex: 1,
+              marginTop: 20,
+              marginBottom: 3,
+              position: 'relative',
+              overflow: 'hidden',
+              background: portrait
+                ? `${race.primary}08`
+                : `repeating-linear-gradient(135deg, ${race.primary}0e 0 5px, transparent 5px 10px)`,
+              border: `1px ${portrait ? 'solid' : 'dashed'} ${race.primary}44`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {portrait ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={portrait}
+                  alt={unit.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'top',
+                    /* drop a faint race-tint over the image so the card's
+                     * race feel doesn't fully evaporate behind the photo. */
+                    mixBlendMode: 'normal',
+                  }}
+                />
+              ) : (
+                <UnitSilhouette race={race} />
+              )}
+            </div>
+          );
+        })()}
 
         {/* Unit name */}
         <div style={{

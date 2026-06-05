@@ -23,6 +23,7 @@ import {
 } from '@/components/handoff';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace, NDRaceKey } from '@/components/handoff/nd-tokens';
+import { unitPortrait } from '@/lib/assets';
 import { useMergePreview } from '@/hooks/useMergePreview';
 import { useMergePreviewBackend } from '@/hooks/useMergePreviewBackend';
 import { useHudState } from '@/hooks/useHudState';
@@ -432,12 +433,21 @@ export default function MergePage() {
             }}>
               {[0, 1, 2].map((slot) => {
                 const filled = selected.length > slot;
+                // When a real pool unit is dropped in, thread its
+                // code/name through so MergeSlot can show the matching
+                // portrait. The 3-slot merge requires same-type-only,
+                // so all three filled slots share the first selection's
+                // code — keeps the visual consistent without having to
+                // surface different portraits per slot.
+                const sourceUnit = filled ? pool[selected[slot]] : null;
                 return (
                   <MergeSlot
                     key={slot}
                     race={race}
                     filled={filled}
                     tier={sourceTier}
+                    unitCode={sourceUnit?.code}
+                    unitName={sourceUnit?.name}
                     onClick={() => {
                       if (filled) {
                         const idx = selected[slot];
@@ -603,7 +613,27 @@ export default function MergePage() {
                       boxShadow: on ? `0 0 12px ${race.glow}66` : undefined,
                     }}
                   >
-                    <Sigil race={race} size={20} />
+                    {(() => {
+                      const portrait = unitPortrait(race.key, u.code ?? u.name);
+                      return portrait ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={portrait}
+                          alt={u.name}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'top',
+                            opacity: on ? 1 : 0.85,
+                          }}
+                        />
+                      ) : (
+                        <Sigil race={race} size={20} />
+                      );
+                    })()}
                     <span
                       style={{
                         position: 'absolute',
@@ -613,6 +643,7 @@ export default function MergePage() {
                         fontSize: 8,
                         color: race.primary,
                         letterSpacing: '0.06em',
+                        textShadow: '0 0 4px rgba(0,0,0,0.85)',
                       }}
                     >
                       T{u.tier}
@@ -816,13 +847,23 @@ function MergeSlot({
   race,
   filled,
   tier,
+  unitCode,
+  unitName,
   onClick,
 }: {
   race: NDRace;
   filled: boolean;
   tier: number;
+  /** BE type code OR FE display name — either resolves to the
+   *  portrait via unitPortrait(). When neither matches a wired asset
+   *  (medic/ghost pending), the Sigil placeholder kicks in. */
+  unitCode?: string;
+  unitName?: string;
   onClick: () => void;
 }) {
+  const portrait = filled
+    ? unitPortrait(race.key, unitCode ?? unitName ?? '')
+    : null;
   return (
     <button
       type="button"
@@ -840,12 +881,29 @@ function MergeSlot({
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+        overflow: 'hidden',
         boxShadow: filled ? `0 0 14px ${race.glow}55` : undefined,
       }}
     >
       {filled ? (
         <>
-          <Sigil race={race} size={24} />
+          {portrait ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={portrait}
+              alt={unitName ?? ''}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'top',
+              }}
+            />
+          ) : (
+            <Sigil race={race} size={24} />
+          )}
           <span style={{
             position: 'absolute',
             bottom: 3,
@@ -853,6 +911,7 @@ function MergeSlot({
             fontFamily: ND.mono,
             fontSize: 8,
             color: race.primary,
+            textShadow: '0 0 4px rgba(0,0,0,0.85)',
           }}>
             T{tier}
           </span>

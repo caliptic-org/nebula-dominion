@@ -22,6 +22,7 @@ import {
 import { refreshGates } from '@/lib/gates';
 import { useNDRace } from '@/components/handoff/useNDRace';
 import type { NDRace } from '@/components/handoff/nd-tokens';
+import { unitPortrait } from '@/lib/assets';
 import { useUnitConfigs, type UnitConfigDto } from '@/hooks/useUnitConfigs';
 import { formatResource, useGameResources, refreshGameResources } from '@/hooks/useGameResources';
 import { useGameBuildings } from '@/hooks/useGameBuildings';
@@ -681,21 +682,46 @@ export default function ProductionPage() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      aria-hidden
-                      style={{
-                        width: 44,
-                        height: 44,
-                        flexShrink: 0,
-                        background: `${race.primary}12`,
-                        border: `1px dashed ${race.primary}55`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Sigil race={race} size={24} />
-                    </div>
+                    {(() => {
+                      const portrait = unitPortrait(
+                        race.key,
+                        u.backendType ?? u.name,
+                      );
+                      return (
+                        <div
+                          aria-hidden
+                          style={{
+                            width: 44,
+                            height: 44,
+                            flexShrink: 0,
+                            overflow: 'hidden',
+                            background: portrait
+                              ? `${race.primary}10`
+                              : `${race.primary}12`,
+                            border: `1px ${portrait ? 'solid' : 'dashed'} ${race.primary}55`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {portrait ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={portrait}
+                              alt=""
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'top',
+                              }}
+                            />
+                          ) : (
+                            <Sigil race={race} size={24} />
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <H3 style={{ color: ND.text, fontSize: 12 }}>{u.name}</H3>

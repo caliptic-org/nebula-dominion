@@ -109,3 +109,40 @@ export const STRUCTURE_ASSETS = {
 
 export type RaceAssetKey = keyof typeof CHARACTER_ASSETS;
 export type StructureAssetKey = keyof typeof STRUCTURE_ASSETS;
+export type UnitAssetRace = keyof typeof UNIT_ASSETS;
+
+/**
+ * Resolve a unit portrait by race + (BE type code OR FE display name).
+ *
+ * `key` accepts either:
+ *   - the BE snake-case unit type (e.g. 'marine', 'siege_tank', 'hydralisk') —
+ *     these match UNIT_ASSETS keys directly,
+ *   - or the FE display label from nd-tokens.ts (e.g. 'Pençeli Avcı',
+ *     'Mecha Walker') — folded through the same Turkish-diacritic slug
+ *     rule that the formation pipeline uses, so a player roster
+ *     coming back as either shape resolves the same image.
+ *
+ * Returns `null` when no portrait is wired (medic/siege_tank/ghost still
+ * pending the next ComfyUI batch — or a race/unit combo not in the
+ * catalog yet). Callers should fall back to the page's existing SVG
+ * glyph / Sigil placeholder when null.
+ */
+export function unitPortrait(race: UnitAssetRace | string, key: string): string | null {
+  if (!(race in UNIT_ASSETS)) return null;
+  const raceTable = UNIT_ASSETS[race as UnitAssetRace] as Record<string, string>;
+  // First pass — exact key (BE type code is already in the slug shape).
+  if (key in raceTable) return raceTable[key];
+  // Second pass — slug the input the same way formation-api.ts does
+  // (Turkish diacritics folded, non-alphanumerics → underscore).
+  const folded = key
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i')
+    .replace(/ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/ç/g, 'c')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return folded in raceTable ? raceTable[folded] : null;
+}

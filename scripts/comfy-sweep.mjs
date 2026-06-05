@@ -3,13 +3,15 @@
  *
  * Drives ComfyUI at http://127.0.0.1:8188 with the
  * dreamshaperXL_lightningDPMSDE.safetensors checkpoint (8-step DPM++ SDE
- * Lightning XL).  Generates the four asset families the project needs:
+ * Lightning XL).  Generates the five asset families the project needs:
  *
  *   tiles      — 5 races × 6 ages × 3 variants = 90 @ 256² (cropped to
  *                128² on save, flat ambient lighting → tile-safe)
  *   buildings  — 5 races × 6 buildings × 6 ages ≈ 180 @ 1024²
  *                (saved to _orig/; bg-removal runs in a follow-up step)
  *   characters — 4 commanders × 5 races = 20 @ 768×1024 portraits
+ *   units      — 5 races × 6 units = 30 @ 512² unit portraits (Marine,
+ *                Medic, Sniper, … for the formation roster + /merge cards)
  *   map        — 5 races × 6 ages = 30 @ 1024×512 wide-angle skybox
  *
  * VISUAL DIRECTION — matches the Hikaye Kitabı v1.0 story bible:
@@ -270,6 +272,112 @@ const COMMANDERS = {
   ],
 };
 
+/* ── Unit catalogues — one prompt per (race, unit) ──────────────────────
+ *
+ * Sources for slug naming + lore (kept in sync by hand):
+ *   - apps/game-server/src/units/constants/race-configs.constants.ts
+ *     (insan + zerg actually have BE UnitType enum entries; the merge
+ *     ladder for insan is reflected here)
+ *   - apps/web/src/lib/nd-tokens.ts RACES[*].units  (FE display lex
+ *     — drives /merge "Promosyon Töreni" tier ladder labels)
+ *   - Hikaye Kitabı v1.0 §10 + §4 (race lore archetypes)
+ *
+ * Slugs match the BE UnitType enum where one exists; for races whose
+ * UnitType rows haven't landed yet (otomat / canavar / seytan are
+ * defined in FE lex only) the slug is the romanised FE name, dot-less,
+ * underscored. When the BE catalog gains a row for those units the
+ * slug *must* match this filename — the FE will read
+ * `/assets/units/<race>/<slug>.png` from the matching unit type.
+ *
+ * Each entry: [slug, prompt-subject]. The prompt-subject describes
+ * ONE unit standing on a plain studio backdrop (anti-figure negatives
+ * are removed — unlike buildings, units ARE the subject). Tier-implied
+ * power is baked into the prompt language (T1 = grunt/initiate,
+ * T5 = transcendent / xianxia-cultivator). */
+const UNITS = {
+  insan: [
+    ['marine',          `Marine Federation infantry grunt T1, masculine soldier in cobalt-and-gold combat armour, ` +
+                        `glowing helmet visor, gauss rifle held across chest, hopeful Federation Yutucu Yıldız insignia`],
+    // Medic + Siege Tank + Ghost are the BE-only trainable insan units
+    // (apps/game-server/src/units/constants/race-configs.constants.ts).
+    // They aren't in the FE merge-ladder lex but DO render in the
+    // formation roster + /merge cards once trained, so they need
+    // portraits too.
+    ['medic',           `Medic Federation field medic T1, woman in cobalt-and-white combat medic armour with red ` +
+                        `cross insignia, healing wand glowing cyan in one hand, sterile visor helmet, calm reassuring stance`],
+    ['siege_tank',      `Siege Tank Federation heavy artillery T1, massive cobalt-and-gold tracked tank with twin ` +
+                        `long-barrel siege cannons elevated, deployed siege mode stance, Federation insignia on turret`],
+    ['ghost',           `Ghost covert operative T1, hooded soldier in stealth-cobalt cloaked armour, glowing red ` +
+                        `optical visor, silenced railgun raised, partial cloak shimmer, lethal precision`],
+    ['sniper',          `Sniper marksman T2 promoted from three Marines, lean soldier in stealth-grey cobalt armour, ` +
+                        `long-barrel railgun across one shoulder, single glowing scope-lens helmet, calm precision`],
+    ['engineer',        `Combat Engineer T2, soldier-technician with tool-belt and floating drone companions, ` +
+                        `welder gauntlets glowing cyan, blueprint hologram at hip, cobalt-and-gold field uniform`],
+    ['mecha_walker',    `Mecha Walker T3 pilot-driven mech, two-legged armoured battle frame with plasma cannon arm, ` +
+                        `cockpit visor at chest height, cobalt-and-gold heavy plating, donghua mecha aesthetic`],
+    ['genetic_warrior', `Genetic Warrior T4 Luo Feng style gene-tailored super soldier, towering hero in cobalt armour ` +
+                        `with gold filigree, glowing veins, holographic HUD halo, cosmic warrior pose`],
+    ['captain',         `Field Captain T5 strike-force commander, regal officer in ornate cobalt-and-platinum armour, ` +
+                        `cape, glowing tactical overlay, drawn officer's sabre, Federation banner backdrop`],
+  ],
+  zerg: [
+    ['larva',           `Larva Zerg T1 hatchling, small glistening pulsing larva creature, magenta bioluminescence, ` +
+                        `chitin segments, primordial spawn-form, biotech horror anime style`],
+    ['penceli_avci',    `Pençeli Avcı Zerg T2 claw-hunter, four-legged insectoid stalker with razor scythe claws, ` +
+                        `magenta veins on dark chitin, mantis-like head, ichor-glistening hide`],
+    ['tuneli_yutan',    `Tüneli Yutan Zerg T2 tunneller, segmented worm-creature with circular fanged maw and ` +
+                        `digging mandibles, violet bioluminescent veins, partially emerging from hive ground`],
+    ['mutasyon_lord',   `Mutasyon Lord Zerg T3 mutation overlord, humanoid Zerg with multiple arms and pulsating ` +
+                        `tumour-growths, magenta-violet chitin crown, evolutionary apex commander`],
+    ['mega_lokost',     `Mega Lokost Zerg T4 massive locust beast, towering chitin-armoured colossus with spike ridges, ` +
+                        `golden-violet veins, donghua bio-titan, devouring scale`],
+    ['beyin_kurt',      `Beyin Kurt Zerg T5 ancient Yutucu Kurt brain-worm transcendent, vast floating brain creature ` +
+                        `with neural tendrils and a single cosmic-gold cyclops eye, tragic apex, divine bio-consciousness`],
+  ],
+  otomat: [
+    ['sentinel',        `Sentinel Otomat T1 patrol drone, slender white-ceramic and chrome humanoid robot with cyan ` +
+                        `circuit visor, geometric perfection, donghua mecha priest aesthetic`],
+    ['drone_operator',  `Drone Operatör Otomat T2 swarm-controller, slim chrome operator with hovering drone halo, ` +
+                        `cyan holographic data rings, multi-arm config, calculating composure`],
+    ['cataphract',      `Cataphract Otomat T3 heavy battle android, black-ceramic-and-cyan armoured knight with ` +
+                        `tower shield and energy lance, geometric crest, donghua mecha cavalry`],
+    ['phoenix_komutan', `Phoenix Komutan Otomat T3 aerial commander, golden-chrome winged android with cyan halo, ` +
+                        `prismatic logic rings, soaring composure, ancient creator-tech wings`],
+    ['yargi_cekirdek',  `Yargı Çekirdek Otomat T4 judgement core, towering android with massive halo of rotating ` +
+                        `holographic data rings, faceplate of geometric inscriptions, infinite-logic presence`],
+    ['demiurge_birimi', `Demiurge Birimi Otomat T5 transcendent infinite-logic avatar, cosmic white-gold android with ` +
+                        `prismatic fractal halo, calm symmetrical face, ceramic robes, divine donghua xianxia mecha`],
+  ],
+  canavar: [
+    ['howler',          `Howler Canavar T1 feral beastling, mid-sized fanged hound-creature with ember-glow eyes, ` +
+                        `fur and bone collar, primal stance, Black Dragon Mountain savagery`],
+    ['yelmik_avci',     `Yelmik Avcı Canavar T2 swift hunter, lean leopard-spotted beastman with curved bone spear, ` +
+                        `tribal warpaint, ember-glow gaze, feline donghua hunter`],
+    ['firtina_bogasi',  `Fırtına Boğası Canavar T3 storm-bull, towering minotaur-bull beast with lightning-veined ` +
+                        `horns and massive obsidian-hammer fists, magma-glow seams, primal donghua titan`],
+    ['ejder_aslani',    `Ejder Aslanı Canavar T4 dragon-lion hybrid, four-eyed lion-beast with serpentine dragon mane ` +
+                        `of golden fire, cosmic markings, regal Beast God descendent pose`],
+    ['atavar_ruhu',     `Atavar Ruhu Canavar T4 ancestor-spirit projection, translucent ghostly beast-warrior with ` +
+                        `feathered totem cloak and ember-glow eyes, ancestral mist, semi-corporeal aura`],
+    ['beast_god_yavru', `Beast God Yavru Canavar T5 primordial cub, four-eyed wolf cub with cosmic golden star-mane ` +
+                        `markings, oversized paws radiating divine power, infant Universe-Master, awe-inspiring`],
+  ],
+  seytan: [
+    ['imp',             `Imp Şeytan T1 lesser demon, small horned imp with red-rune-burning skin, leathery wings, ` +
+                        `glowing crimson eyes, mischievous gothic posture, donghua demon attendant`],
+    ['cadi_kalfasi',    `Cadı Kalfası Şeytan T2 witch-apprentice, pale demoness in dark robes with crimson glyph tattoos, ` +
+                        `levitating dark grimoire, glowing sigil halo, gothic xianxia witch`],
+    ['lanetli_asker',   `Lanetli Asker Şeytan T2 cursed soldier, fallen warrior in obsidian armour bound by glowing ` +
+                        `red chains, hollow crimson eye slits in helm, blood-pact aura`],
+    ['kanli_lord',      `Kanlı Lord Şeytan T3 blood lord, armoured demon-noble with crimson cape and curved twin blades, ` +
+                        `pale aristocratic face, crimson sigil burning behind, gothic demon court`],
+    ['kanat_seytani',   `Kanat Şeytanı Şeytan T4 winged demon, fearsome demon-warrior with vast black-feathered wings, ` +
+                        `obsidian breastplate inscribed with crimson runes, glowing red eyes, soaring menace`],
+    ['demon_lord',      `Demon Lord Şeytan T5 Sonsuz Karanlık Hükümdar transcendent, towering ornate demon-king in ` +
+                        `black-and-gold armour, crown of curved horns, eternal crimson flame backdrop, divine dark sovereign`],
+  ],
+};
+
 /* ── Render specs per family ──────────────────────────────────────────── */
 
 const NEG_BASE =
@@ -384,6 +492,36 @@ function characterSpec(race, slug, description) {
     ].join(', '),
     negative: `${NEG_BASE}, full body, multiple people, group, weapons in foreground, busy background, landscape, text`,
     outPath: path.join(ASSETS, 'characters', race, `${slug}.png`),
+  };
+}
+
+function unitSpec(race, slug, description) {
+  const r = RACES[race];
+  return {
+    family: 'units',
+    name:   slug,
+    race,
+    // 512² square: small enough that Lightning XL stays fast (~12s/each
+    // with hi-res fix), large enough that the formation roster + /merge
+    // cards (typically 64-128px display) downsample cleanly. Same square
+    // aspect as commander portraits used elsewhere on /formation.
+    width: 512, height: 512,
+    positive: [
+      DONGHUA_STYLE,
+      'xuanhuan cultivation hero aesthetic, mysterious-fantasy character art',
+      `portrait of ${description}`,
+      r.style,
+      // Cinematic single-subject framing — head + chest + a hint of weapon
+      // or trademark gear. Same painterly direction as commanders so the
+      // formation panel reads as a coherent set, but unit portraits are
+      // a touch tighter (less "hero" framing) so a stack of 10 reads as
+      // an army not a squad of mini-bosses.
+      'cinematic three-quarter unit portrait, head and upper torso, slight low angle, dramatic key lighting',
+      'plain dark studio backdrop, vignette, no scenery',
+      'donghua xianxia unit portrait, painterly digital art, sharp detailed face, expressive eyes, single subject only',
+    ].join(', '),
+    negative: `${NEG_BASE}, full body, multiple people, group, crowd, weapons in foreground, busy background, landscape, text, building`,
+    outPath: path.join(ASSETS, 'units', race, `${slug}.png`),
   };
 }
 
@@ -557,6 +695,11 @@ function buildAllSpecs(only) {
   if (!only || only.has('characters')) {
     for (const race of Object.keys(COMMANDERS))
       for (const [slug, desc] of COMMANDERS[race]) specs.push(characterSpec(race, slug, desc));
+  }
+
+  if (!only || only.has('units')) {
+    for (const race of Object.keys(UNITS))
+      for (const [slug, desc] of UNITS[race]) specs.push(unitSpec(race, slug, desc));
   }
 
   if (!only || only.has('map')) {

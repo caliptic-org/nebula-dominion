@@ -1,4 +1,4 @@
-import { CHARACTER_ASSETS } from './assets';
+import { CHARACTER_ASSETS, UNIT_ASSETS } from './assets';
 import { toFrontendRace, type BackendRace } from './race-api';
 // Re-export so legacy importers (`import { BackendRace } from './formation-api'`)
 // keep building. New code should import from race-api directly.
@@ -148,11 +148,22 @@ function slug(name: string): string {
 }
 
 function portraitFor(race: RaceKey, name: string): string {
+  const key = slug(name);
+
+  // 1. Unit asset table first — the formation roster + /merge cards
+  //    show units, and a unit named "Marine" should resolve to
+  //    /assets/units/insan/marine.png, NOT cascade to Voss commander.
+  const unitAssets = UNIT_ASSETS[race] as Record<string, string> | undefined;
+  if (unitAssets && key in unitAssets) return unitAssets[key];
+
+  // 2. Commander assets — covers the unitToSlotCommander path where the
+  //    `name` IS a commander name (Voss/Chen/Reyes/etc.).
   const raceAssets = CHARACTER_ASSETS[race] as Record<string, string> | undefined;
   if (raceAssets) {
-    const key = slug(name);
     if (key in raceAssets) return raceAssets[key];
-    // Fallback: any portrait for the race so the slot shows a themed image.
+    // Race-themed fallback so the slot still shows a coherent image
+    // for names that don't slug to a known key (legacy unit names
+    // pre-sweep, units added later without a portrait, etc.).
     const first = Object.values(raceAssets)[0];
     if (first) return first;
   }

@@ -525,35 +525,89 @@ function unitSpec(race, slug, description) {
   };
 }
 
+/* ── Map landmark vocab (environment-only — STRICTLY NO characters or
+ *     animals) ────────────────────────────────────────────────────────
+ *
+ * Mirrors the "planet vista + iconic landmark + multiple celestial bodies
+ * in sky" aesthetic the user picked the favorite refs from
+ * (canavar/bg-age2, insan/bg-age2, otomat/bg-age6, seytan/bg-age1,
+ * zerg/bg-age1). The earlier mapSpec leaked r.style into the prompt
+ * which for canavar includes "massive lion-beast hybrids with star
+ * manes" — Lightning XL gladly produced lions. Map prompts now NEVER
+ * pull from r.style; only this purely-architectural/geographical
+ * vocabulary drives the subject.
+ *
+ * Canavar landmark is intentionally a primal cave + stone-spire
+ * mountain formation. NO beasts, NO animals, NO figures — that was the
+ * specific user feedback ("aslan olmasın mağara olsun gibi"). */
+const MAP_LANDMARK = {
+  insan:
+    'futuristic Federation orbital colony of cobalt and gold spires rising from cratered plains, ' +
+    'holo-lit highways winding to a central command citadel, hopeful Yutucu Yıldız civilisation',
+  zerg:
+    'vast organic hive-pillar formation of chitinous spires erupting from biomass-coated plains, ' +
+    'bioluminescent magenta-violet veins glowing across glistening bone architecture, biotech terrain',
+  otomat:
+    'geometric chrome megastructure of crystalline ziggurat spires with rotating holographic data rings, ' +
+    'cyan circuit veins running through pristine white ceramic plains, ancient creator-tech ruins',
+  // STRICTLY environmental — primal cave entrance, jagged stone-spire
+  // mountains, ember-glow firepits. NO beasts, NO animals, NO figures
+  // anywhere in the prompt. The 'massive lion-beast hybrids' from the
+  // canavar style vocab does NOT enter this prompt.
+  canavar:
+    'massive primal cave entrance carved into towering jagged stone-spire mountains, ' +
+    'weathered ancestor totems and ember-glow firepits along cliff terraces, primordial cradle landscape',
+  seytan:
+    'dark gothic cathedral-spire mountains of basalt and obsidian with crimson sigils carved into the cliffs, ' +
+    'pact-rune monoliths and chained gate-pillars rising from cracked volcanic plains, exiled dark court terrain',
+};
+
 function mapSpec(race, age) {
   const r       = RACES[race];
   const palette = r.paletteByAge[age - 1];
-  // Per age, the world background shifts from planetary to cosmic per
-  // Hikaye Kitabı §2 progression.
-  const ageScene = [
-    'home planet surface, early colonial outpost on the horizon',                    // 1
-    'orbital view with twin-planet colony silhouettes',                              // 2
-    'interstellar sector with distant star systems and capital ship trails',         // 3
-    'galactic warfront with multi-fleet engagement on the horizon',                  // 4
-    'subspace rift landscape with parallel-universe shimmer',                        // 5
-    'cosmic transcendence vista, universe-scale energy currents',                    // 6
+  // Sky / atmospheric mood — driven only by age progression. Earlier
+  // ages keep a more planet-bound feel (multiple moons / dawn sky),
+  // late ages dial up the cosmic-energy effects without ever returning
+  // to fleet engagement vocabulary (which kept producing capital ships
+  // in the foreground).
+  const skyByAge = [
+    'twin moons and gas-giant low in dawn sky, early planetary awakening',
+    'multiple moons and ringed planet at sunset, twin-planet system in the sky',
+    'distant star system with multiple celestial bodies, sector-scale sky panorama',
+    'huge ringed gas-giant and parallel planets in dramatic atmospheric sky',
+    'subspace rift in the upper sky with parallel-universe shimmer and prismatic clouds',
+    'cosmic energy currents arcing through the sky, transcendent universe-scale aurora',
   ][age - 1];
   return {
     family: 'map',
     name:   `bg-age${age}`,
     race, age,
-    width: 1024, height: 512,
+    // Square 1024 native — SDXL most-trained resolution, single pass
+    // produces crisp matte-painting detail without needing hi-res fix.
+    // Earlier rev rendered at 1024×512 + 1.25× hi-res (final 1280×640);
+    // user explicitly wants 1024×1024 final.
+    width: 1024, height: 1024,
     positive: [
       DONGHUA_STYLE,
-      `wide-angle close-up structural perspective of the ${race} ${ageScene}`,
-      r.style,
+      // Subject = landmark + sky. NO r.style line — that's where the
+      // canavar lion-beast vocabulary lived. Architecture-only.
+      `panoramic planet surface vista of a ${MAP_LANDMARK[race]}`,
+      skyByAge,
       palette,
       AGE_MOOD[age - 1],
-      `${r.motto}, distant structures sprawling toward the horizon`,
-      'matte painting style, environmental concept art, cinematic depth, atmospheric haze',
-      'no characters, no buildings in foreground, panoramic backdrop suitable for parallax skybox',
+      'matte painting style environmental concept art, cinematic depth, atmospheric haze, golden hour rim light',
+      'empty landscape, no inhabitants visible, distant landmark structure on the horizon, sweeping panoramic backdrop',
     ].join(', '),
-    negative: `${NEG_BASE}, character, person, ui overlay, text, logo, foreground objects, isometric tiles`,
+    // Heavy anti-figure + anti-animal sweep. The canavar lion problem
+    // was Lightning XL inferring beasts from "Beast God primordial fury"
+    // in r.style; we no longer use r.style here AND we explicitly
+    // negate every animal noun that might creep in from the donghua
+    // aesthetic vocab (xianxia art often has spirit beasts).
+    negative: `${NEG_BASE}, character, person, people, figure, humanoid, biped, hero, soldier, knight, ` +
+              `lion, lion-beast, tiger, wolf, dragon, beast, animal, creature, monster, ` +
+              `mecha, robot, warrior, armour worn, ` +
+              `ui overlay, text, logo, foreground objects, isometric tiles, ` +
+              `capital ship, fleet, spacecraft in foreground`,
     outPath: path.join(ASSETS, 'map', race, `bg-age${age}.png`),
   };
 }
@@ -659,9 +713,11 @@ async function runSpec(spec, i, total) {
   }
   const seed = nextSeed++;
   // Tiles downscale to 128 anyway so hi-res fix would just waste time —
-  // skip them. Buildings/characters/maps gain the most from the second
-  // pass (composition + anatomy/architecture detail).
-  const hiResFix = spec.family !== 'tiles';
+  // skip them. Maps render at SDXL-native 1024² and target an exact
+  // 1024² output (per user spec) — hi-res 1.25× would produce 1280²
+  // instead. Buildings/characters gain the most from the second pass
+  // (composition + anatomy/architecture detail).
+  const hiResFix = spec.family !== 'tiles' && spec.family !== 'map';
   const wf   = makeWorkflow({ ...spec, seed, hiResFix });
   const t0   = Date.now();
   const { prompt_id } = await post('/prompt', { prompt: wf, client_id: 'nd-sweep' });

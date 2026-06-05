@@ -172,6 +172,13 @@ services:
       # shipping anything to live players. Default never bypasses since
       # the helper sanitises invalid / missing values to 1.
       GAME_SPEED_MULTIPLIER: ${GAME_SPEED_MULTIPLIER:-1}
+      # Mirrors the api service's CORS list above. Was previously omitted
+      # here, so game-server fell back to the in-code default
+      # ['http://localhost:3000'] and any browser fetch from
+      # http://127.0.0.1:3000 hit "No Access-Control-Allow-Origin header".
+      # docker-compose.prod.yml already wires this; dev compose was the
+      # outlier.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       postgres:
         condition: service_healthy

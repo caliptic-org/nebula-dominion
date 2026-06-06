@@ -7,7 +7,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 @ApiTags('Subspace')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/subspace')
+@Controller('subspace')
 export class SubspaceController {
   constructor(private readonly subspaceService: SubspaceService) {}
 

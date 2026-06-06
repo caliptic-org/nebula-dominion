@@ -217,7 +217,9 @@
   },
   "tutorial": {
     "giftClaimed": "Starter gift received: +500 mineral · +25 crystal · +200 XP",
-    "giftFailed": "Gift failed — continue from /base"
+    "giftFailed": "Gift failed — continue from /base",
+    "stepBlocked": "You can't advance to this step yet — complete the previous steps in order",
+    "stepSyncFailed": "Step couldn't be synced to the server — progress saved locally"
   },
   "merge": {
     "previewModeHint": "Can't merge in preview mode — train units first."

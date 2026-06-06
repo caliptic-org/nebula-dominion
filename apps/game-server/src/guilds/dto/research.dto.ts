@@ -14,11 +14,12 @@ export class StartResearchDto {
   selectedBy: string;
 }
 
-export class ResearchContributeDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
+// userId field removed (P5-S1 security fix): trusting dto.userId let an
+// attacker burn another player's XP into a guild research bucket. The
+// contributor is now taken from the JWT subject claim in
+// GuildsController.contributeResearch.
 
+export class ResearchContributeDto {
   @IsInt()
   @Min(1)
   xp: number;

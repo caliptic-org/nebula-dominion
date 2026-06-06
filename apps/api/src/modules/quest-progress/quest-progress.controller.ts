@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { QuestProgressService } from './quest-progress.service';
 import { ServerIncrementProgressDto } from './dto/server-increment.dto';
 import { InternalServiceGuard } from './guards/internal-service.guard';
@@ -44,6 +45,7 @@ export class QuestProgressController {
   @Post('increment')
   @HttpCode(HttpStatus.OK)
   @UseGuards(InternalServiceGuard)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({
     summary:
       'Bump a quest counter for a user. Idempotent on (userId, questId, idempotencyKey). ' +

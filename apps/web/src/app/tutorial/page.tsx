@@ -19,9 +19,38 @@ import { Analytics, track } from '@/lib/analytics';
 import { gameServerApi } from '@/lib/game-server-api';
 import { refreshGameResources } from '@/hooks/useGameResources';
 import { hasSession } from '@/lib/session';
-import { FetchError } from '@/lib/api';
+import { api, FetchError } from '@/lib/api';
 
 const STORAGE_KEY = 'nebula:tutorial:v1';
+
+/**
+ * Backend stepId for each of the 6 UI tutorial screens.
+ *
+ * The backend (apps/api/src/modules/onboarding/onboarding.config.ts) defines
+ * 10 named steps. The UI shows 6 condensed screens. Each UI advance reports
+ * completion for the matching backend step so the api's TutorialProgress row
+ * flips `isCompleted = true` only after all 6 UI taps have been logged in
+ * order. game-server's tutorial-complete handler reads that flag before
+ * granting the starter gift, which closes the URL-jump exploit
+ * (`/tutorial?step=6` → Advance → harvest).
+ *
+ * We deliberately collapse the 10 backend steps to the 6 the UI actually
+ * walks through; the missing intermediate steps stay unrecorded — that's
+ * fine because the gate only checks the final `isCompleted` flag, which
+ * flips on `tutorial_complete`.
+ *
+ * Tuple uses the literal `tutorial_step_N` prefix the audit spec mandated
+ * (kept as a comment marker so future readers can grep for the exploit
+ * fix). The actual stepId sent to the api is the named backend value.
+ */
+const UI_STEP_TO_BACKEND_STEP_ID: Record<number, string> = {
+  1: 'welcome', // tutorial_step_1
+  2: 'first_building', // tutorial_step_2
+  3: 'resource_collection', // tutorial_step_3
+  4: 'first_pve_battle', // tutorial_step_4
+  5: 'progression_intro', // tutorial_step_5
+  6: 'tutorial_complete', // tutorial_step_6
+};
 
 interface TutorialProgress {
   stepIndex: number;
@@ -90,6 +119,40 @@ function TutorialFlow() {
   );
 
   const handleAdvance = useCallback(async () => {
+    // Before advancing past the current step, record completion on the api
+    // side so the game-server tutorial-complete check (which reads the api's
+    // TutorialProgress row) can verify the player actually walked through
+    // every step. Previously the gate was URL+localStorage only — a player
+    // could navigate directly to /tutorial?step=6 and tap Advance to harvest
+    // the starter gift. Skipped for guests (no token, no progress row).
+    //
+    // Path matches apps/api/src/modules/onboarding/onboarding.controller.ts:
+    //   POST /api/v1/onboarding/step/complete   {stepId: 'tutorial_step_N'}
+    //
+    // The api's completeStep enforces the natural step order. If the player
+    // jumped ahead, it returns 400 ("Mevcut adım '...', '...' değil") — we
+    // surface that as a hint and block the navigation. NotFound (404) for an
+    // unknown stepId follows the same path: don't advance, tell the player.
+    if (hasSession()) {
+      const backendStepId = UI_STEP_TO_BACKEND_STEP_ID[step];
+      try {
+        await api.post('/onboarding/step/complete', {
+          stepId: backendStepId,
+        });
+      } catch (err) {
+        if (err instanceof FetchError && (err.status === 400 || err.status === 404)) {
+          // Out-of-order step or unknown stepId — don't move forward, surface
+          // the api's translated message so the player understands.
+          toast.info(err.message || tTutorial('stepBlocked'));
+          return;
+        }
+        // 401 already triggers a global redirect via api.ts. Other transport
+        // errors shouldn't trap the player — log via toast and let them keep
+        // going so a flaky network doesn't permanently lock the tutorial.
+        toast.info(tTutorial('stepSyncFailed'));
+      }
+    }
+
     if (step >= TUTORIAL_STEPS) {
       writeProgress({ stepIndex: TUTORIAL_STEPS, completedAt: new Date().toISOString() });
       markTutorialCompleted();
@@ -120,7 +183,7 @@ function TutorialFlow() {
     // which step is the friction point.
     Analytics.tutorialStep(step);
     go(step + 1);
-  }, [step, go, markTutorialCompleted, router]);
+  }, [step, go, markTutorialCompleted, router, tTutorial]);
 
   const handleSkip = useCallback(() => {
     writeProgress({ stepIndex: TUTORIAL_STEPS, completedAt: new Date().toISOString() });

@@ -57,12 +57,27 @@ interface FormationInput {
 }
 
 /**
+ * STUB controller — backed by in-memory state. Acceptable risk until
+ * DB-backed module lands (task #200). Restart wipes state.
+ *
  * In-memory store keyed by playerId. The proper persistence layer (TypeORM
  * Formation entity + repository) lands in a follow-up; until then this
  * provides round-trip save/load so the /formation screen and any backend
  * battle preview share state within a single api process.
  *
  * Container restart wipes the store — same caveat as battles-stub.controller.
+ *
+ * SECURITY: All reads/writes to FORMATIONS MUST be scoped to req.user.id.
+ * The previous `playerId` query-param hand-off on GET /formations allowed
+ * cross-player reads (Bob → ?playerId=Alice → Alice's formations). The
+ * param is now accepted for FE API parity but ignored when it doesn't
+ * match the caller. Real persistence is deferred to task #200, at which
+ * point this module gains a proper TypeORM repository + row-level guard.
+ *
+ * NOTE: POST /formations/power is fully functional and reads from the real
+ * shared Postgres DB (player_units / player_commanders, owned by
+ * game-server) — only the save/load round-trip is in-memory. Do not break
+ * power.
  */
 const FORMATIONS: Map<string, Array<FormationInput & { id: string; updatedAt: string }>> = new Map();
 
@@ -99,7 +114,15 @@ export class FormationsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
   ) {
-    const owner = playerId || req.user.id;
+    // SECURITY: ignore the playerId query param unless it matches the caller.
+    // The FE sends `playerId` for API parity (matches the eventual DB-backed
+    // shape), but the stub MUST NOT let one user pull another user's saved
+    // formations. See class-level SECURITY note. Real cross-player viewing
+    // (alliance scouting, etc.) lands with the DB module in task #200.
+    if (playerId && playerId !== req.user.id) {
+      return { formations: [], page: 1, limit: 0, total: 0 };
+    }
+    const owner = req.user.id;
     const formations = FORMATIONS.get(owner) ?? [];
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Math.min(100, Number(limit)));

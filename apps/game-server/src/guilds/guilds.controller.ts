@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { GuildsService } from './guilds.service';
 import { GuildRaidsService } from './guild-raids.service';
@@ -16,7 +17,40 @@ import { JoinGuildDto, LeaveGuildDto, DonateDto } from './dto/membership.dto';
 import { AdvanceTutorialDto } from './dto/advance-tutorial.dto';
 import { RaidAttackDto } from './dto/raid.dto';
 import { ResearchContributeDto, StartResearchDto } from './dto/research.dto';
+import { HttpJwtGuard } from '../auth/http-jwt.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 
+/**
+ * GuildsController — JWT-guarded as of P5-S1 (audit blocker).
+ *
+ * Previously this controller had NO authentication at all: every endpoint
+ * was anonymously callable, and write endpoints trusted a `userId` field
+ * from the request body or URL path. That meant an attacker could:
+ *   - POST /api/guilds/<id>/join {userId:'<victim>'} to force a player
+ *     into a guild against their will,
+ *   - POST /api/guilds/tutorial/<victim>/reward to drain the victim's
+ *     one-shot tutorial reward,
+ *   - POST /api/guilds/raids/<id>/attack {userId:'<victim>'} to credit
+ *     fake raid damage against another player's account, etc.
+ *
+ * Mitigation:
+ *   1. @UseGuards(HttpJwtGuard) at the class level — every endpoint now
+ *      requires a valid Bearer token signed with the shared JWT secret.
+ *   2. The acting user identity is taken EXCLUSIVELY from the JWT
+ *      subject claim via @CurrentUser(). The body/path userId fields
+ *      have been removed from the DTOs (see dto/*.ts).
+ *   3. Tutorial endpoints lost their /:userId path segment — the user
+ *      is derived from the token, not the URL.
+ *
+ * Service-layer signatures intentionally still take `userId: string` as
+ * their first argument; only the SOURCE of that string changed (JWT
+ * instead of attacker-controlled input). Read-only `GET` endpoints over
+ * public guild data (list, members, events, raid drops) are still
+ * exposed but now require any valid login token — that's an acceptable
+ * scope reduction; we can relax specific GETs later if a logged-out
+ * "browse" UX becomes a product requirement.
+ */
+@UseGuards(HttpJwtGuard)
 @Controller('guilds')
 export class GuildsController {
   constructor(
@@ -63,39 +97,55 @@ export class GuildsController {
 
   @Post(':id/join')
   @HttpCode(HttpStatus.OK)
-  join(@Param('id') id: string, @Body() dto: JoinGuildDto) {
-    return this.guilds.joinGuild(id, dto.userId);
+  join(
+    @Param('id') id: string,
+    @Body() _dto: JoinGuildDto,
+    @CurrentUser() userId: string,
+  ) {
+    return this.guilds.joinGuild(id, userId);
   }
 
   @Post(':id/leave')
   @HttpCode(HttpStatus.OK)
-  async leave(@Param('id') id: string, @Body() dto: LeaveGuildDto) {
-    await this.guilds.leaveGuild(id, dto.userId);
+  async leave(
+    @Param('id') id: string,
+    @Body() _dto: LeaveGuildDto,
+    @CurrentUser() userId: string,
+  ) {
+    await this.guilds.leaveGuild(id, userId);
     return { ok: true };
   }
 
   @Post(':id/donate')
   @HttpCode(HttpStatus.OK)
-  donate(@Param('id') id: string, @Body() dto: DonateDto) {
-    return this.guilds.recordDonation(id, dto.userId, dto.amount);
+  donate(
+    @Param('id') id: string,
+    @Body() dto: DonateDto,
+    @CurrentUser() userId: string,
+  ) {
+    return this.guilds.recordDonation(id, userId, dto.amount);
   }
 
   // ─── Tutorial state machine ─────────────────────────────────────────────────
+  //
+  // The :userId path segment was REMOVED from /tutorial/* endpoints —
+  // a player can only read or advance THEIR OWN tutorial state, which
+  // comes from the JWT.
 
-  @Get('tutorial/:userId')
-  getTutorial(@Param('userId') userId: string) {
+  @Get('tutorial')
+  getTutorial(@CurrentUser() userId: string) {
     return this.guilds.getTutorialState(userId);
   }
 
-  @Post('tutorial/:userId/advance')
+  @Post('tutorial/advance')
   @HttpCode(HttpStatus.OK)
-  advance(@Param('userId') userId: string, @Body() dto: AdvanceTutorialDto) {
+  advance(@Body() dto: AdvanceTutorialDto, @CurrentUser() userId: string) {
     return this.guilds.advanceTutorial(userId, dto.toStep);
   }
 
-  @Post('tutorial/:userId/reward')
+  @Post('tutorial/reward')
   @HttpCode(HttpStatus.OK)
-  reward(@Param('userId') userId: string) {
+  reward(@CurrentUser() userId: string) {
     return this.guilds.grantTutorialReward(userId);
   }
 
@@ -135,8 +185,12 @@ export class GuildsController {
 
   @Post('raids/:raidId/attack')
   @HttpCode(HttpStatus.OK)
-  attackRaid(@Param('raidId') raidId: string, @Body() dto: RaidAttackDto) {
-    return this.raids.attack(raidId, dto.userId, dto.damage);
+  attackRaid(
+    @Param('raidId') raidId: string,
+    @Body() dto: RaidAttackDto,
+    @CurrentUser() userId: string,
+  ) {
+    return this.raids.attack(raidId, userId, dto.damage);
   }
 
   @Post('raids/:raidId/resolve-drops')
@@ -203,10 +257,11 @@ export class GuildsController {
   contributeResearch(
     @Param('stateId') stateId: string,
     @Body() dto: ResearchContributeDto,
+    @CurrentUser() userId: string,
   ) {
     return this.research.contribute({
       researchStateId: stateId,
-      userId: dto.userId,
+      userId,
       xp: dto.xp,
     });
   }

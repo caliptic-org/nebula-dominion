@@ -16,8 +16,15 @@ interface StartAttemptDto {
 
 interface AttackBossDto {
   attemptId: string;
-  damageDealt: number;
   mechanicName?: string;
+}
+
+interface DeployedUnitEntry {
+  attack?: number;
+  count?: number;
+  raceBonus?: number;
+  race_bonus?: number;
+  [key: string]: unknown;
 }
 
 @Injectable()
@@ -87,9 +94,36 @@ export class BossService {
     if (!attempt) throw new NotFoundException('Aktif boss karşılaşması bulunamadı');
 
     const boss = attempt.bossEncounter;
+
+    // Server-side damage calculation — client cannot inject damageDealt.
+    const units = (attempt.unitsDeployed || []) as DeployedUnitEntry[];
+    if (!Array.isArray(units) || units.length === 0) {
+      throw new BadRequestException('Saldırı için birim seç');
+    }
+
+    let attackPower = 0;
+    for (const unit of units) {
+      const atk = Number(unit?.attack) || 0;
+      const count = Number(unit?.count) || 0;
+      const raceBonus = Number(unit?.raceBonus ?? unit?.race_bonus) || 1;
+      if (atk < 0 || count < 0 || raceBonus < 0) continue; // defensive: ignore negatives
+      attackPower += atk * count * raceBonus;
+    }
+
+    const bossDefense = Math.max(0, Number(boss.defense) || 0);
+    let damage = Math.max(1, Math.floor(attackPower - bossDefense));
+
+    // Cap per-attack damage at 10% of boss max HP so a kill takes >=10 attacks.
+    const bossMaxHp = parseInt(boss.hp, 10);
+    const damageCap = Math.max(1, Math.floor(bossMaxHp * 0.1));
+    if (damage > damageCap) damage = damageCap;
+
+    // Defensive: never allow a negative damage path to slip through.
+    if (damage < 0 || !Number.isFinite(damage)) damage = 1;
+
     const currentHp = parseInt(attempt.bossHpRemaining || boss.hp, 10);
-    const newHp = Math.max(0, currentHp - dto.damageDealt);
-    const totalDamage = parseInt(attempt.damageDealt, 10) + dto.damageDealt;
+    const newHp = Math.max(0, currentHp - damage);
+    const totalDamage = parseInt(attempt.damageDealt, 10) + damage;
 
     attempt.bossHpRemaining = String(newHp);
     attempt.damageDealt = String(totalDamage);

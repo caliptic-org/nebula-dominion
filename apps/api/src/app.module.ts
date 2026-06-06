@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import configuration from './config/configuration';
 import { databaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
@@ -38,6 +41,7 @@ import { QuestProgressModule } from './modules/quest-progress/quest-progress.mod
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     TypeOrmModule.forRoot(databaseConfig),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 30 }]),
     AuthModule,
     UserModule,
     GameModule,
@@ -68,6 +72,12 @@ import { QuestProgressModule } from './modules/quest-progress/quest-progress.mod
     ConversionsModule,
     FormationsModule,
     QuestProgressModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

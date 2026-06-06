@@ -583,48 +583,33 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                     /* private mode — best effort */
                   }
                 }
-                // Credit mineral + gas + science to the player's wallet on
-                // the game-server so resources persist between sessions.
-                // Logs the grant intent + result so users can see in DevTools
-                // whether the wallet write succeeded — silent failures here
-                // are the #1 reason science feels "stuck" after a battle.
+                // Credit mineral + gas + science to the player's wallet by
+                // asking the api to fan out to game-server.
+                //
+                // Previously the FE POSTed the rewards object straight to
+                // game-server's `/api/buildings/resources/battle-reward`,
+                // which trusted the body — any logged-in player could
+                // curl a 9999999999 grant and cap their wallet on demand
+                // (audit S3 + F3). The api now owns the server-stored
+                // rewards (from the BATTLES map keyed by userId+battleId)
+                // and signs the fan-out with the shared service secret.
+                // The FE no longer says *how much* — only *which battle*.
                 try {
-                  const GAME_SERVER =
-                    (process.env.NEXT_PUBLIC_GAME_SERVER_URL || 'http://localhost:4001')
-                      .replace(/\/+$/, '');
-                  const { getAccessToken } = await import('@/lib/session');
-                  const token = getAccessToken();
-                  if (token) {
-                    const grantBody = {
-                      mineral: battle.rewards.mineral ?? 0,
-                      gas:     battle.rewards.gas     ?? 0,
-                      science: battle.rewards.science ?? 0,
-                      xp:      battle.rewards.xp      ?? 0,
+                  const claim = await api.post<{
+                    battleId: string;
+                    status: 'won' | 'lost' | 'in-progress' | 'pending';
+                    alreadyClaimed: boolean;
+                    walletCredited: boolean;
+                    rewards: {
+                      gold: number; gems: number; xp: number;
+                      mineral: number; gas: number; science: number;
                     };
-                    // eslint-disable-next-line no-console
-                    console.log('[battle] granting wallet:', grantBody, '→', GAME_SERVER);
-                    const r = await fetch(`${GAME_SERVER}/api/buildings/resources/battle-reward`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify(grantBody),
-                    });
-                    // eslint-disable-next-line no-console
-                    console.log('[battle] grant response status:', r.status);
-                    if (!r.ok) {
-                      const text = await r.text().catch(() => '');
-                      // eslint-disable-next-line no-console
-                      console.warn('[battle] grant failed:', r.status, text);
-                    }
-                  } else {
-                    // eslint-disable-next-line no-console
-                    console.warn('[battle] no access token — grant skipped');
-                  }
+                  }>(`/battles/${battle.id}/claim-reward`, {});
+                  // eslint-disable-next-line no-console
+                  console.log('[battle] claim-reward result:', claim);
                 } catch (err) {
                   // eslint-disable-next-line no-console
-                  console.error('[battle] grant exception:', err);
+                  console.error('[battle] claim-reward exception:', err);
                   /* swallow so navigation still happens */
                 }
                 // Broadcast so the HUD picks up the new wallet totals.

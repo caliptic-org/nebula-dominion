@@ -63,8 +63,14 @@ export class UserController {
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.findOne(id);
+  // SEC/PII (audit S7): pass the caller's id so the service can pick
+  // PRIVATE_FIELDS (email, lastLoginAt) only when the lookup is a
+  // self-lookup. Cross-user lookups stay on the PUBLIC projection.
+  findOne(
+    @Request() req: { user: { id: string } },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.userService.findOne(id, req.user.id);
   }
 
   @Delete(':id')

@@ -9,7 +9,7 @@ import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Age2ContentService } from './age2-content.service';
 
 @ApiTags('Age 2 Content')
-@Controller('api/v1/content/age2')
+@Controller('content/age2')
 export class Age2ContentController {
   constructor(private readonly service: Age2ContentService) {}
 

@@ -12,15 +12,26 @@ import { Race } from './entities/race.enum';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { OnboardingService } from '../modules/onboarding/onboarding.service';
 
-const PROFILE_FIELDS: (keyof User)[] = [
+// SEC/PII: Split profile field projections so list + cross-user lookups
+// don't leak `email` / `lastLoginAt` to any authenticated caller.
+// Audit S7: GET /users and GET /users/:id used to return the full
+// PROFILE_FIELDS for everyone, producing a phishing-ready (email,
+// lastSeen) target list. Public lookups now return PUBLIC_FIELDS only;
+// self-lookups (and the /users/profile route, which is always self) get
+// PRIVATE_FIELDS.
+const PUBLIC_FIELDS: (keyof User)[] = [
   'id',
-  'email',
   'username',
   'race',
   'isActive',
-  'lastLoginAt',
   'createdAt',
+];
+
+const PRIVATE_FIELDS: (keyof User)[] = [
+  ...PUBLIC_FIELDS,
+  'email',
   'updatedAt',
+  'lastLoginAt',
 ];
 
 @Injectable()
@@ -36,18 +47,30 @@ export class UserService {
   ) {}
 
   async findAll(): Promise<Omit<User, 'password'>[]> {
-    const users = await this.userRepo.find({ select: PROFILE_FIELDS });
+    // Public projection — no email/lastLoginAt for the list endpoint.
+    const users = await this.userRepo.find({ select: PUBLIC_FIELDS });
     return users as Omit<User, 'password'>[];
   }
 
-  async findOne(id: string): Promise<Omit<User, 'password'>> {
-    const user = await this.userRepo.findOne({ where: { id }, select: PROFILE_FIELDS });
+  async findOne(id: string, callerUserId?: string): Promise<Omit<User, 'password'>> {
+    // Self-lookups see the private projection (email, updatedAt,
+    // lastLoginAt). Anyone else gets only the public columns. Controller
+    // passes req.user.id as callerUserId for GET /users/:id; service
+    // callers that already know it's self (e.g. getProfile) can pass id
+    // for both or rely on the explicit private variant below.
+    const fields = callerUserId === id ? PRIVATE_FIELDS : PUBLIC_FIELDS;
+    const user = await this.userRepo.findOne({ where: { id }, select: fields });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     return user as Omit<User, 'password'>;
   }
 
   async getProfile(id: string): Promise<Omit<User, 'password'>> {
-    return this.findOne(id);
+    // /users/profile is always self — return PRIVATE_FIELDS directly so
+    // an accidental signature change upstream can't silently downgrade
+    // this to the public projection.
+    const user = await this.userRepo.findOne({ where: { id }, select: PRIVATE_FIELDS });
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    return user as Omit<User, 'password'>;
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto): Promise<Omit<User, 'password'>> {
@@ -61,7 +84,9 @@ export class UserService {
     }
 
     await this.userRepo.save(user);
-    return this.findOne(id);
+    // Self-update — return the private projection so the FE doesn't see
+    // its own email/lastLoginAt vanish after a username change.
+    return this.findOne(id, id);
   }
 
   async selectRace(id: string, race: Race): Promise<Omit<User, 'password'>> {
@@ -131,7 +156,10 @@ export class UserService {
     // Status 'active' so the gates evaluate immediately rather than
     // queueing the seed buildings through a fake construction cooldown.
     await this.seedStarterBuildings(id, race);
-    return this.findOne(id);
+    await this.seedStarterUnits(id, race);
+    // Self-action — caller is selecting their own race, so the response
+    // should carry the private projection.
+    return this.findOne(id, id);
   }
 
   private async seedStarterBuildings(userId: string, race: Race): Promise<void> {
@@ -200,6 +228,87 @@ export class UserService {
         // single bad enum value to wedge the whole race-select flow.
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`seedStarterBuildings(${s.type}) failed for ${userId}: ${msg}`);
+      }
+    }
+  }
+
+  private async seedStarterUnits(userId: string, race: Race): Promise<void> {
+    // Audit C4: a freshly race-selected player landed on /inventory and
+    // /battle with zero units — the build-train-merge loop was gated by
+    // the seedStarterBuildings flow, but nothing handed them an actual
+    // squad to play with. Empty roster → /battle "no units available"
+    // 400, /inventory shows demo-placeholder grid, day-0 churn.
+    //
+    // Fix: hand out 3 starter units in the player's race (3× marine for
+    // HUMAN, 3× zergling for ZERG). Stats follow the task-defined
+    // baselines (marine 100/20/10/5, zergling 70/15/5/8) with the race
+    // multipliers applied inline so the seeded rows match what
+    // applyRaceBonuses() in game-server would produce.
+    //
+    // Race bonuses (mirrors RACE_BONUSES in race-configs.constants.ts):
+    //   HUMAN → atk x1.0, def x1.15, hp x1.10, spd x1.0
+    //   ZERG  → atk x1.15, def x0.85, hp x0.90, spd x1.30
+    //
+    // Speed column is int in player_units; we round to keep schema
+    // compatibility. position_x/y land near the player's starter base
+    // grid (x∈[3..5], y∈[4..5]) so the unit token renders on-map.
+    let unitType: string;
+    let hp: number;
+    let attack: number;
+    let defense: number;
+    let speed: number;
+
+    if (race === Race.ZERG) {
+      unitType = 'zergling';
+      // 70 * 0.90 = 63; 15 * 1.15 = 17.25 → 17; 5 * 0.85 = 4.25 → 4;
+      // 8 * 1.30 = 10.4 → 10
+      hp = 63;
+      attack = 17;
+      defense = 4;
+      speed = 10;
+    } else if (race === Race.HUMAN) {
+      unitType = 'marine';
+      // 100 * 1.10 = 110; 20 * 1.0 = 20; 10 * 1.15 = 11.5 → 12; 5
+      hp = 110;
+      attack = 20;
+      defense = 12;
+      speed = 5;
+    } else {
+      // Other races (AUTOMATON/BEAST/DEMON) currently blocked by the
+      // PLAYABLE whitelist above — bail before we'd insert a unit_type
+      // with no UNIT_CONFIGS entry. When their unit kits ship, add a
+      // race→starter mapping here.
+      return;
+    }
+
+    // Spread the 3 starters across adjacent tiles north of the base so
+    // they don't all stack on the same coordinate (the battle/inventory
+    // view groups by position; identical x,y collapses to one icon).
+    const positions = [
+      { x: 3, y: 2 },
+      { x: 4, y: 2 },
+      { x: 5, y: 2 },
+    ];
+    const raceValue = race === Race.ZERG ? 'zerg' : 'human';
+
+    for (const pos of positions) {
+      try {
+        await this.dataSource.query(
+          `INSERT INTO player_units
+             (player_id, type, race, hp, max_hp, attack, defense, speed,
+              position_x, position_y, created_at, updated_at)
+           VALUES ($1::uuid, $2::player_units_type_enum,
+                   $3::player_units_race_enum,
+                   $4, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+          [userId, unitType, raceValue, hp, attack, defense, speed, pos.x, pos.y],
+        );
+      } catch (err) {
+        // Non-fatal — log and continue. A player with 2/3 starters is
+        // still playable; a hard throw here would wedge the whole
+        // race-select endpoint (and roll back seedStarterBuildings's
+        // committed rows if we ever wrap them in a transaction).
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`seedStarterUnits(${unitType}) failed for ${userId}: ${msg}`);
       }
     }
   }

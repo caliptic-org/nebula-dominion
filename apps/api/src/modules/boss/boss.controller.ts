@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 @ApiTags('Boss Encounters')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('api/v1/bosses')
+@Controller('bosses')
 export class BossController {
   constructor(private readonly bossService: BossService) {}
 
@@ -44,12 +44,13 @@ export class BossController {
   attackBoss(
     @Request() req: { user: { id: string } },
     @Param('attemptId') attemptId: string,
-    @Body() body: { damageDealt: number; mechanicName?: string },
+    @Body() body: { mechanicName?: string },
   ) {
+    // damageDealt is intentionally NOT accepted from the client.
+    // The server computes damage from the attempt's unitsDeployed snapshot.
     return this.bossService.attackBoss(req.user.id, {
       attemptId,
-      damageDealt: body.damageDealt,
-      mechanicName: body.mechanicName,
+      mechanicName: body?.mechanicName,
     });
   }
 

@@ -217,7 +217,9 @@
   },
   "tutorial": {
     "giftClaimed": "初始礼包已领取：+500矿物 · +25水晶 · +200XP",
-    "giftFailed": "礼包领取失败 — 请从/base页面继续"
+    "giftFailed": "礼包领取失败 — 请从/base页面继续",
+    "stepBlocked": "你还不能跳到此步骤 — 请按顺序完成前面的步骤",
+    "stepSyncFailed": "步骤未能同步到服务器 — 进度已保存在本地"
   },
   "merge": {
     "previewModeHint": "预览模式下无法合并 — 请先训练单位。"

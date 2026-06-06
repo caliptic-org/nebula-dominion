@@ -84,9 +84,10 @@ function makeMockData(outcome: BattleOutcome, raceKey: NDRaceKey): BattleResultD
       resourceA: isV ? 3200 : 800,
       resourceB: isV ? 1400 : 350,
       crystal: isV ? 6 : 1,
-      // Science reward — granted by /api/buildings/resources/battle-reward
-      // on victory. Mocked here so the demo result screen also shows the
-      // ◈ chip and players understand the science economy from day one.
+      // Science reward — granted server-side via api /battles/:id/claim-reward
+      // (fan-out to game-server is internal-service-signed). Mocked here so
+      // the demo result screen also shows the ◈ chip and players understand
+      // the science economy from day one.
       science: isV ? 18 : 4,
       xpGained: isV ? 4800 : 1200,
       xpBefore: 12400,

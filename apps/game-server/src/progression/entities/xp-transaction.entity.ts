@@ -4,11 +4,20 @@ import {
   Column,
   CreateDateColumn,
   Index,
+  Unique,
 } from 'typeorm';
 import { XpSource } from '../config/level-config';
 
+// Audit fix (S4 + F4-econ): UNIQUE(user_id, source, reference_id)
+// closes the unlimited-XP loop. Per-grant referenceId is now required
+// by the DTO; the DB constraint is the second line of defense so any
+// retry / replay / forged client request collides on insert and is
+// caught by the service's 23505 handler. Postgres treats NULL as
+// distinct for UNIQUE — legacy rows with NULL reference_id (pre-fix)
+// won't collide and won't block this migration.
 @Entity('xp_transactions')
 @Index(['userId', 'createdAt'])
+@Unique('uq_xp_tx_user_source_ref', ['userId', 'source', 'referenceId'])
 export class XpTransaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;

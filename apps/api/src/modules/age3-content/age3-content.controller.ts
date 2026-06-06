@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Age3ContentService } from './age3-content.service';
 
 @ApiTags('Age 3 Content')
-@Controller('api/v1/content/age3')
+@Controller('content/age3')
 export class Age3ContentController {
   constructor(private readonly contentService: Age3ContentService) {}
 

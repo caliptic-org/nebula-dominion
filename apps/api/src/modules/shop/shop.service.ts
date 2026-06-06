@@ -9,6 +9,7 @@ import { DataSource, Repository } from 'typeorm';
 import { ShopItem } from './entities/shop-item.entity';
 import { UserInventory } from './entities/user-inventory.entity';
 import { VipService } from '../vip/vip.service';
+import { PurchaseDto } from './dto/purchase.dto';
 
 interface ShopFilter {
   category?: string;
@@ -17,11 +18,19 @@ interface ShopFilter {
   ageRequired?: number;
 }
 
-interface PurchaseDto {
-  sku: string;
-  currencyType: 'nebula_coins' | 'void_crystals' | 'premium_gems' | 'real_money';
-  quantity?: number;
-}
+/**
+ * Hard bounds on `quantity` for any single purchase call.
+ *
+ * Primary validation lives on PurchaseDto (@Min(1) @Max(99) @IsInt) so
+ * malformed requests fail at the global ValidationPipe with a 400. The
+ * constants here re-apply the same bounds inside the service as
+ * defence-in-depth — if any future caller bypasses the DTO (internal
+ * service-to-service call, a test, etc.) we still won't let a negative
+ * or absurd quantity flow into the wallet UPDATE, which previously
+ * **credited** the player (UPDATE balance - (-N) = +N).
+ */
+const PURCHASE_QUANTITY_MIN = 1;
+const PURCHASE_QUANTITY_MAX = 99;
 
 @Injectable()
 export class ShopService {
@@ -97,14 +106,28 @@ export class ShopService {
     const item = await this.shopItemRepository.findOne({ where: { sku: dto.sku } });
     if (!item) throw new NotFoundException(`İtem '${dto.sku}' bulunamadı`);
 
-    const quantity = dto.quantity || 1;
+    // Defence-in-depth clamp. PurchaseDto already enforces
+    // @IsInt @Min(1) @Max(99) at the ValidationPipe layer, so under
+    // normal request flow `dto.quantity` is already in [1, 99]. We
+    // re-clamp here for any future internal caller that constructs the
+    // DTO by hand and might pass a negative / NaN / huge value. Floor
+    // first to defang fractional inputs before Math.max/min.
+    const rawQuantity = Math.floor(Number(dto.quantity ?? 1));
+    const quantity = Number.isFinite(rawQuantity)
+      ? Math.max(PURCHASE_QUANTITY_MIN, Math.min(PURCHASE_QUANTITY_MAX, rawQuantity))
+      : PURCHASE_QUANTITY_MIN;
+
     let price: number | null = null;
 
     switch (dto.currencyType) {
       case 'nebula_coins': price = item.priceNebulaCoins; break;
       case 'void_crystals': price = item.priceVoidCrystals; break;
       case 'premium_gems': price = item.pricePremiumGems; break;
-      case 'real_money':
+      default:
+        // `real_money` and any other unexpected currencyType: real-money
+        // payments go through /api/v1/payment, not the in-game shop.
+        // PurchaseDto's @IsEnum already rejects this at the pipe layer,
+        // so reaching here means a hand-built DTO from internal code.
         throw new BadRequestException(
           'Gerçek para ödemeleri /api/v1/payment endpoint\'i ile yapılmalıdır',
         );

@@ -53,11 +53,22 @@ interface Mission {
   chapter?: number;
 }
 
+// BLOCKER F2: story missions used to seed with state:'completed' (story-1)
+// and progress:60/'3/5' (story-2) hardcoded — fresh accounts would see the
+// "Ödülü Al" button on first load and the BE had no progression check, so
+// 5000 gold + 1200 XP fell out of the sky. The BE now 400s with a Turkish
+// hint when progression preconditions aren't met (see
+// apps/api/src/modules/daily-engagement/daily-engagement.service.ts
+// STORY_PRECONDITIONS). Here we render every story mission in a neutral
+// "in progress / complete precondition to claim" state so the UI doesn't
+// imply a reward is ready before the player has earned it. Persisted-claim
+// hydration via useMissionClaims still flips the badge to "ÖDÜL ALINDI"
+// once the BE has recorded a successful claim.
 const MISSIONS: Mission[] = [
-  { id: 'story-1', title: "Nebula'nın Uyanışı", description: 'İlk üssünü kur ve komutanını seç.', state: 'completed', progress: 100, progressLabel: '1/1', rewards: [{ label: 'Kaynak', amount: 5000 }, { label: 'XP', amount: 1200 }], category: 'story', difficulty: 'kolay', chapter: 1 },
-  { id: 'story-2', title: 'İlk Kan', description: 'Yakındaki düşman üssüne saldır ve ilk savaş zaferini kazan.', state: 'active', progress: 60, progressLabel: '3/5', rewards: [{ label: 'Kaynak', amount: 8000 }, { label: 'XP', amount: 2500 }], category: 'story', difficulty: 'orta', chapter: 1 },
-  { id: 'story-3', title: 'İttifak ya da Kan', description: 'Başka bir ırkla diplomatik ilişki kur veya savaş ilan et.', state: 'locked', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Enerji', amount: 10000 }, { label: 'XP', amount: 5000 }], category: 'story', difficulty: 'zor', chapter: 2 },
-  { id: 'story-4', title: 'Nebula Hâkimi', description: 'Tüm galaksiye hükmeden tek ırk ol.', state: 'locked', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Rozet', amount: 1 }, { label: 'XP', amount: 50000 }], category: 'story', difficulty: 'efsane', chapter: 3 },
+  { id: 'story-1', title: "Nebula'nın Uyanışı", description: 'İlk üssünü kur ve komutanını seç.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 5000 }, { label: 'XP', amount: 1200 }], category: 'story', difficulty: 'kolay', chapter: 1 },
+  { id: 'story-2', title: 'İlk Kan', description: 'Yakındaki düşman üssüne saldır ve ilk savaş zaferini kazan.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 8000 }, { label: 'XP', amount: 2500 }], category: 'story', difficulty: 'orta', chapter: 1 },
+  { id: 'story-3', title: 'İttifak ya da Kan', description: 'Başka bir ırkla diplomatik ilişki kur veya savaş ilan et.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Enerji', amount: 10000 }, { label: 'XP', amount: 5000 }], category: 'story', difficulty: 'zor', chapter: 2 },
+  { id: 'story-4', title: 'Nebula Hâkimi', description: 'Tüm galaksiye hükmeden tek ırk ol.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Rozet', amount: 1 }, { label: 'XP', amount: 50000 }], category: 'story', difficulty: 'efsane', chapter: 3 },
   { id: 'daily-1', title: 'Kaynak Toplayıcı', description: '3 madeni tamamen topla.', state: 'completed', progress: 100, progressLabel: '3/3', timeLeft: '—', rewards: [{ label: 'Kaynak', amount: 2000 }], category: 'daily', difficulty: 'kolay' },
   { id: 'daily-2', title: 'Savaşçı Ruhu', description: 'En az 2 PvP savaşı kazan.', state: 'active', progress: 50, progressLabel: '1/2', timeLeft: '14s 23d', rewards: [{ label: 'XP', amount: 800 }], category: 'daily', difficulty: 'orta' },
   { id: 'daily-3', title: 'Araştırmacı Zihni', description: '1 teknoloji araştırması tamamla.', state: 'active', progress: 0, progressLabel: '0/1', timeLeft: '14s 23d', rewards: [{ label: 'Enerji', amount: 1000 }], category: 'daily', difficulty: 'kolay' },

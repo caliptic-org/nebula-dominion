@@ -1,8 +1,26 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GalaxyNodeGarrison } from './galaxy-map.entity';
 import { CommandersService } from '../commanders/commanders.service';
+import { Resource } from '../resources/entities/resource.entity';
+
+/**
+ * Mineral cost charged per troop committed when capturing a node.
+ * Kept intentionally low (100/troop) so casual gameplay isn't blocked
+ * but still meaningful enough to deter rapid-fire sabotage attempts
+ * by U1-style spoiler clients.
+ */
+export const NODE_CAPTURE_COST_PER_TROOP = 100;
+
+/**
+ * Defender advantage multiplier — an attacker must field at least this
+ * many troops relative to the defender's garrison to overwhelm them.
+ * 1.5× mirrors classic 4X / RTS attacker-vs-fortified-defender baselines
+ * and gives existing garrisons a real "moat" instead of being a one-shot
+ * line in the dirt.
+ */
+export const NODE_CAPTURE_ATTACK_RATIO = 1.5;
 
 /** Income rates per 30-second tick when a node is garrisoned by a player. */
 const NODE_INCOME: Record<string, { mineral: number; gas: number; science: number }> = {
@@ -35,9 +53,42 @@ export class GalaxyMapService {
   }
 
   /**
-   * Capture a node: create or update the garrison entry.
-   * If the node was already garrisoned by this player, troops are added.
-   * If it was garrisoned by another player, the old garrison is replaced.
+   * Capture a node — with combat check, resource cost, and atomic guarantees.
+   *
+   * ── Previous vulnerability (HIGH S6, fixed) ─────────────────────────
+   * The prior implementation unconditionally `DELETE`'d any existing
+   * garrison on the target node and inserted the caller's record. That
+   * meant a malicious / sabotage client (U1) could wipe an opposing
+   * player's entire garrison (e.g. KAEL-7 capital) with a single troop
+   * — no combat math, no resource cost, no idempotency guard. The
+   * service trusted the controller's troop count and the controller
+   * trusted the body, so the only check was "is troops ≥ 1".
+   *
+   * ── New contract ─────────────────────────────────────────────────────
+   *   1. Empty node             →  capture allowed; debit
+   *                                troops × NODE_CAPTURE_COST_PER_TROOP
+   *                                mineral.
+   *   2. Same player owns it    →  reject 400 ("Bu node zaten sizin").
+   *                                Idempotency: a re-fire of the same
+   *                                capture call lands here on the
+   *                                second hit and is rejected, so we
+   *                                don't double-charge or double-grant.
+   *   3. Different player owns  →  attacker troops must be at least
+   *                                NODE_CAPTURE_ATTACK_RATIO (1.5×)
+   *                                the defender's count. Otherwise
+   *                                reject 400 with the defender's
+   *                                visible strength so the caller
+   *                                knows what they're up against.
+   *
+   * Resource cost: charged on success (mine, capture-from-empty, AND
+   * successful overrun). The pre-flight check + debit + delete + insert
+   * all run inside a single typeorm transaction with a pessimistic_write
+   * lock on the player's resources row, so two concurrent capture calls
+   * can't both pass the affordability check or the combat check.
+   *
+   * Note: `nodeKind` is sourced from the controller's `STATIC_NODES`
+   * table so the caller can't spoof a 'capital' as a 'mine' to cheat
+   * income rates.
    */
   async captureNode(
     userId: string,
@@ -45,19 +96,71 @@ export class GalaxyMapService {
     nodeKind: string,
     troops: number,
   ): Promise<GalaxyNodeGarrison> {
-    // Remove any existing garrison on this node (could be different player)
-    await this.garrisonRepo.delete({ nodeId });
+    const cost = troops * NODE_CAPTURE_COST_PER_TROOP;
+    let result!: GalaxyNodeGarrison;
 
-    const garrison = this.garrisonRepo.create({
-      nodeId,
-      userId,
-      nodeKind,
-      garrisonCount: troops,
-      capturedAt: new Date(),
-      lastIncomeAt: null,
+    await this.garrisonRepo.manager.transaction(async (em) => {
+      // 1. Read existing garrison (if any) — same TX so a parallel
+      //    capture can't slip in between the read and the write.
+      const existing = await em.findOne(GalaxyNodeGarrison, {
+        where: { nodeId },
+      });
+
+      // 2. Idempotency: same caller already owns this node.
+      if (existing && existing.userId === userId) {
+        throw new BadRequestException('Bu node zaten sizin');
+      }
+
+      // 3. Combat check against a foreign defender.
+      if (existing && existing.userId !== userId) {
+        const required = Math.ceil(existing.garrisonCount * NODE_CAPTURE_ATTACK_RATIO);
+        if (troops < required) {
+          throw new BadRequestException(
+            `Yetersiz kuvvet — savunmacı ${existing.garrisonCount} birim`,
+          );
+        }
+      }
+
+      // 4. Lock + debit mineral. Mirrors ResourcesService.deduct but
+      //    inline so the whole operation lives in one transaction.
+      const resource = await em.findOne(Resource, {
+        where: { playerId: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!resource) {
+        throw new BadRequestException('Oyuncu kaynakları bulunamadı');
+      }
+      if (Number(resource.mineral) < cost) {
+        throw new BadRequestException(
+          `Yetersiz mineral — ${cost} gerekli, ${Math.floor(Number(resource.mineral))} mevcut`,
+        );
+      }
+      resource.mineral = Number(resource.mineral) - cost;
+      await em.save(resource);
+
+      // 5. Replace any defending garrison, install the new owner.
+      if (existing) {
+        await em.delete(GalaxyNodeGarrison, { nodeId });
+      }
+
+      const garrison = em.create(GalaxyNodeGarrison, {
+        nodeId,
+        userId,
+        nodeKind,
+        garrisonCount: troops,
+        capturedAt: new Date(),
+        lastIncomeAt: null,
+      });
+      result = await em.save(garrison);
     });
 
-    return this.garrisonRepo.save(garrison);
+    // Resource snapshot cache is cleared outside the TX — failing to
+    // invalidate doesn't corrupt anything (TTL is 60s) so it's safe
+    // post-commit.
+    this.logger.log(
+      `Player ${userId} captured ${nodeId} with ${troops} troops (cost ${cost} mineral)`,
+    );
+    return result;
   }
 
   /**

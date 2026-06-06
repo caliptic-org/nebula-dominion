@@ -16,6 +16,7 @@ import { GuildRaidsService } from './guild-raids.service';
 import { GuildResearchService } from './guild-research.service';
 import { GuildsController } from './guilds.controller';
 import { ResourcesModule } from '../resources/resources.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -33,6 +34,10 @@ import { ResourcesModule } from '../resources/resources.module';
       GuildResearchContribution,
     ]),
     ResourcesModule,
+    // AuthModule exposes JwtService + HttpJwtGuard; the controller-level
+    // @UseGuards(HttpJwtGuard) needs JwtService in this module's DI scope
+    // to verify Bearer tokens (P5-S1 security fix).
+    AuthModule,
   ],
   providers: [GuildsService, GuildRaidsService, GuildResearchService],
   controllers: [GuildsController],

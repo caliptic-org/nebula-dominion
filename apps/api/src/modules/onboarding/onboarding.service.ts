@@ -85,7 +85,27 @@ export class OnboardingService {
       throw new NotFoundException(`Tutorial adımı '${dto.stepId}' bulunamadı`);
     }
 
-    if (record.currentStep !== dto.stepId) {
+    // The /tutorial UI collapses the 10 backend steps into 6 screens (see
+    // apps/web/src/app/tutorial/page.tsx UI_STEP_TO_BACKEND_STEP_ID).
+    // So a player walking the UI in order will report e.g. `welcome` →
+    // `first_building` → `resource_collection` → ... skipping the
+    // intermediate `race_selection`, `base_overview`, etc.
+    //
+    // Strict `currentStep === dto.stepId` would reject every UI advance
+    // past the first. Instead, accept any step that is forward-or-equal
+    // in the canonical order: we fast-forward `currentStep` to the
+    // requested step, marking every skipped intermediate as completed
+    // (without a reward — only the explicitly-reported step earns).
+    //
+    // Backward jumps are still rejected — that's the URL-tamper case the
+    // audit fix is closing.
+    const currentIdx = TUTORIAL_STEP_IDS.indexOf(record.currentStep);
+    const targetIdx = TUTORIAL_STEP_IDS.indexOf(dto.stepId);
+    if (targetIdx < 0) {
+      // Defensive — getStepById already guarded this, but keep the safety.
+      throw new NotFoundException(`Tutorial adımı '${dto.stepId}' bulunamadı`);
+    }
+    if (targetIdx < currentIdx) {
       throw new BadRequestException(
         `Mevcut adım '${record.currentStep}', '${dto.stepId}' değil`,
       );
@@ -95,7 +115,12 @@ export class OnboardingService {
       throw new BadRequestException(`Adım '${dto.stepId}' zaten tamamlandı`);
     }
 
-    record.completedSteps = [...record.completedSteps, dto.stepId];
+    // Fast-forward: mark every step between current and target inclusive
+    // as completed (skipping already-completed ones — idempotent).
+    const newlyCompleted = TUTORIAL_STEP_IDS.slice(currentIdx, targetIdx + 1).filter(
+      (id) => !record.completedSteps.includes(id),
+    );
+    record.completedSteps = [...record.completedSteps, ...newlyCompleted];
 
     if (dto.stepId === 'race_selection' && dto.selectedRace) {
       record.selectedRace = dto.selectedRace;

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourcesService } from './resources.service';
 import { Resource } from './entities/resource.entity';
 import { REDIS_CLIENT } from '../database/redis.provider';
@@ -70,6 +72,11 @@ describe('ResourcesService', () => {
         { provide: getRepositoryToken(Resource), useFactory: mockResourceRepo },
         { provide: REDIS_CLIENT, useFactory: mockRedis },
         { provide: EconomyService, useFactory: mockEconomyService },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: DataSource,
+          useValue: { query: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 

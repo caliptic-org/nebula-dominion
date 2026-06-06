@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import Redis from 'ioredis';
 import { InjectRedis } from '../database/redis.provider';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -44,6 +44,7 @@ export class ResourcesService {
     private readonly redis: Redis,
     private readonly economyService: EconomyService,
     private readonly emitter: EventEmitter2,
+    private readonly dataSource: DataSource,
   ) {}
 
   async getOrCreate(playerId: string): Promise<Resource> {
@@ -312,6 +313,111 @@ export class ResourcesService {
     this.checkStorageWarning(playerId, snapshot);
 
     return snapshot;
+  }
+
+  /**
+   * Bulk version of applyTick — advances every actively-producing row in a
+   * single SQL round-trip instead of N (= active player count) round-trips
+   * from the cron worker. Replaces the per-player for-of loop in
+   * ResourceTickWorker, cutting ~2 queries per active producer per tick.
+   *
+   * Postgres handles the cap clamp inline via LEAST(...) so we never
+   * over-credit a wallet, and RETURNING gives us the post-update values
+   * for the Redis cache priming + storage-warning fan-out below.
+   *
+   * Population is intentionally NOT in the WHERE filter — only the three
+   * "currency" rates gate activeness (matches getActivePlayerIds in the
+   * worker). Population_per_tick > 0 alone wouldn't trigger a tick row
+   * pre-fix, so we keep that behaviour identical post-fix.
+   */
+  async applyTickBulk(): Promise<number> {
+    const rows = await this.dataSource.query(`
+      UPDATE player_resources
+      SET mineral    = LEAST(mineral_cap,    FLOOR(mineral    + mineral_per_tick)),
+          gas        = LEAST(gas_cap,        FLOOR(gas        + gas_per_tick)),
+          energy     = LEAST(energy_cap,     FLOOR(energy     + energy_per_tick)),
+          population = LEAST(population_cap, FLOOR(population + population_per_tick)),
+          last_tick_at = NOW()
+      WHERE mineral_per_tick > 0
+         OR gas_per_tick > 0
+         OR energy_per_tick > 0
+      RETURNING player_id, mineral, gas, energy, population, science,
+                mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
+                mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
+                last_tick_at
+    `) as Array<{
+      player_id: string;
+      mineral: string | number;
+      gas: string | number;
+      energy: string | number;
+      population: string | number;
+      science: string | number;
+      mineral_cap: string | number;
+      gas_cap: string | number;
+      energy_cap: string | number;
+      population_cap: string | number;
+      science_cap: string | number;
+      mineral_per_tick: string | number;
+      gas_per_tick: string | number;
+      energy_per_tick: string | number;
+      population_per_tick: string | number;
+      last_tick_at: Date;
+    }>;
+
+    if (rows.length === 0) return 0;
+
+    // ── Prime the Redis cache + emit warnings — pipelined to keep this O(1) round-trips ──
+    const pipeline = this.redis.pipeline();
+    const warnings: Array<{ playerId: string; nearFull: string[]; snapshot: ResourceSnapshot }> = [];
+
+    for (const r of rows) {
+      const snapshot: ResourceSnapshot = {
+        mineral:           Math.floor(Number(r.mineral)),
+        gas:               Math.floor(Number(r.gas)),
+        energy:            Math.floor(Number(r.energy)),
+        population:        Math.floor(Number(r.population)),
+        science:           Math.floor(Number(r.science ?? 0)),
+        mineralCap:        Number(r.mineral_cap),
+        gasCap:            Number(r.gas_cap),
+        energyCap:         Number(r.energy_cap),
+        populationCap:     Number(r.population_cap),
+        scienceCap:        Number(r.science_cap ?? 999999),
+        mineralPerTick:    Number(r.mineral_per_tick),
+        gasPerTick:        Number(r.gas_per_tick),
+        energyPerTick:     Number(r.energy_per_tick),
+        populationPerTick: Number(r.population_per_tick),
+        lastTickAt:        r.last_tick_at,
+      };
+
+      pipeline.set(
+        RESOURCE_CACHE_KEY(r.player_id),
+        JSON.stringify(snapshot),
+        'EX',
+        RESOURCE_CACHE_TTL,
+      );
+
+      const nearFull: string[] = [];
+      if (snapshot.mineralCap > 0 && snapshot.mineral / snapshot.mineralCap >= STORAGE_WARN_THRESHOLD) nearFull.push('mineral');
+      if (snapshot.gasCap     > 0 && snapshot.gas     / snapshot.gasCap     >= STORAGE_WARN_THRESHOLD) nearFull.push('gas');
+      if (snapshot.energyCap  > 0 && snapshot.energy  / snapshot.energyCap  >= STORAGE_WARN_THRESHOLD) nearFull.push('energy');
+
+      if (nearFull.length > 0) {
+        warnings.push({ playerId: r.player_id, nearFull, snapshot });
+      }
+    }
+
+    await pipeline.exec();
+
+    // Fan out storage warnings after the pipeline so the cache is hot
+    // before any listener (e.g. socket gateway) reads back the snapshot.
+    if (warnings.length > 0) {
+      this.emitter.emit('resources.storage_near_full_bulk', warnings);
+      for (const w of warnings) {
+        this.emitter.emit('resources.storage_near_full', w);
+      }
+    }
+
+    return rows.length;
   }
 
   /** Emit a storage warning when any resource hits 90% of its cap */

@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, Repository, MoreThan } from 'typeorm';
+import { DataSource, QueryFailedError, Repository, MoreThan } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PlayerLevel } from './entities/player-level.entity';
 import { XpTransaction } from './entities/xp-transaction.entity';
@@ -97,21 +97,51 @@ export class ProgressionService {
     // Lv 54 reachable in ~12 trains. Fix: XP is fixed per source.
     const finalAmount = Math.round(baseAmount * multiplier);
 
+    // Insert the xp_tx row FIRST so a duplicate (user_id, source,
+    // reference_id) trips the UNIQUE constraint before we mutate
+    // player_level. Pre-fix, the mutation happened in memory first,
+    // and a 23505 from xpTxRepo.save would have left record.currentXp
+    // bumped even though the row didn't persist — split-brain.
+    try {
+      await this.xpTxRepo.save(
+        this.xpTxRepo.create({
+          userId: dto.userId,
+          source: dto.source,
+          baseAmount,
+          multiplier,
+          finalAmount,
+          levelBefore,
+          levelAfter: record.currentLevel,
+          referenceId: dto.referenceId,
+        }),
+      );
+    } catch (err) {
+      // 23505 = unique_violation. The (user, source, referenceId)
+      // grant already landed — treat as success-no-op rather than
+      // surfacing a 500 to the caller. apps/api's daily-engagement
+      // already expects 409-style benign duplicates and downgrades
+      // them to debug logs; we return the current progress unchanged
+      // and leveledUp=false.
+      // QueryFailedError exposes the pg error code either as `.code`
+      // (top-level on older typeorm) or under `.driverError.code` (newer
+      // versions, matching apps/api/.../daily-engagement.service.ts).
+      // Check both for portability.
+      const pgCode =
+        err instanceof QueryFailedError
+          ? ((err as QueryFailedError & { code?: string }).code ??
+              (err.driverError as { code?: string } | undefined)?.code)
+          : undefined;
+      if (pgCode === '23505') {
+        this.logger.debug(
+          `XP grant already credited: user=${dto.userId} source=${dto.source} ref=${dto.referenceId}`,
+        );
+        return { progress: this.toDto(record), leveledUp: false };
+      }
+      throw err;
+    }
+
     record.currentXp += finalAmount;
     record.totalXp += finalAmount;
-
-    await this.xpTxRepo.save(
-      this.xpTxRepo.create({
-        userId: dto.userId,
-        source: dto.source,
-        baseAmount,
-        multiplier,
-        finalAmount,
-        levelBefore,
-        levelAfter: record.currentLevel,
-        referenceId: dto.referenceId ?? null,
-      }),
-    );
 
     // Emit telemetry for XP source breakdown calibration
     this.emitTelemetry(dto.userId, dto.source, baseAmount, finalAmount, record);

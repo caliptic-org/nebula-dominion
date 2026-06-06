@@ -217,7 +217,9 @@
   },
   "tutorial": {
     "giftClaimed": "Başlangıç hediyesi alındı: +500 mineral · +25 kristal · +200 XP",
-    "giftFailed": "Hediye verilemedi — /base sayfasından devam edebilirsin"
+    "giftFailed": "Hediye verilemedi — /base sayfasından devam edebilirsin",
+    "stepBlocked": "Bu adıma henüz geçemezsin — önceki adımları sırayla tamamla",
+    "stepSyncFailed": "Adım sunucuya kaydedilemedi — ilerleme local olarak tutuldu"
   },
   "merge": {
     "previewModeHint": "Önizleme modunda gerçek birleştirme yapılamaz — önce birim eğit."

@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Get,
   Param,
@@ -70,15 +69,22 @@ export class CommandersController {
   }
 
   /**
-   * POST /api/commanders/:id/award-xp — manual XP grant (admin / debug).
-   * Production XP awards flow through CommandersService.awardXp() from
-   * game.service post-battle; this endpoint is for /dev tooling.
+   * REMOVED: POST /api/commanders/:id/award-xp
+   *
+   * The previous "manual XP grant (admin / debug)" endpoint was guarded
+   * only by HttpJwtGuard, meaning any authenticated player could POST
+   * `{amount: 999999999}` and promote their commander from Lv1 to MAX in
+   * a single call (BLOCKER F2 / HIGH S5 — 2026-06-06 punch list).
+   *
+   * Production XP grants flow exclusively through
+   * `CommandersService.awardXp()`, which is invoked server-side from
+   * `game.service` on battle-won (+100 winner / +30 loser). No FE caller
+   * existed for this controller route (verified via repo grep), so the
+   * endpoint is deleted outright rather than gated behind AdminRoleGuard.
+   *
+   * If a future /dev tool needs manual grants, mount the route under
+   * `@Controller('admin/commanders')` with
+   * `@UseGuards(HttpJwtGuard, AdminRoleGuard)` — mirroring the pattern in
+   * `apps/game-server/src/economy/economy.controller.ts`.
    */
-  @Post(':id/award-xp')
-  @UseGuards(HttpJwtGuard)
-  async awardXp(@Req() req: any, @Body() body: { amount: number }) {
-    const userId: string = req.user?.sub;
-    const amount = Math.max(0, Math.floor(body.amount ?? 0));
-    return this.service.awardXp(userId, amount);
-  }
 }

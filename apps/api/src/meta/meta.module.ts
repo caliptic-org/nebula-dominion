@@ -23,15 +23,29 @@ import { QuestProgressModule } from '../modules/quest-progress/quest-progress.mo
  * drop in without breaking the wire contract.
  *
  * When the canonical modules land (LeaderboardModule from backend/src,
- * DailyEngagement, etc.), remove the matching stub here. */
+ * DailyEngagement, etc.), remove the matching stub here.
+ *
+ * ## S2 + F8 production gate
+ *
+ * BattlesStubController / BattlePrepStubController previously accepted a
+ * client-controlled `outcome` field that minted real currency, and leaked
+ * other users' battles via a device-global Map. The controllers themselves
+ * now reject every request in production (404), but we also drop them from
+ * the module wiring so they don't even register routes. Belt + braces:
+ * if either gate fails open, the other still closes the surface. */
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+const battleStubControllers = IS_PROD
+  ? []
+  : [BattlesStubController, BattlePrepStubController];
+
 @Module({
   imports: [QuestProgressModule],
   controllers: [
     LeaderboardStubController,
     MissionsStubController,
     TargetStubController,
-    BattlesStubController,
-    BattlePrepStubController,
+    ...battleStubControllers,
     ChatStubController,
     BuffsStubController,
     ResearchStubController,

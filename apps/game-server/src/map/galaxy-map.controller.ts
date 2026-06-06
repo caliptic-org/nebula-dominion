@@ -129,6 +129,17 @@ export class GalaxyMapController {
    * POST /api/galaxy/nodes/:id/capture
    * Body: { troops: number }
    * Captures the given node for the authenticated player.
+   *
+   * ── Security note (HIGH S6, fixed) ───────────────────────────────────
+   * Prior to the S6 fix this endpoint forwarded straight to a service
+   * that unconditionally DELETE'd any existing garrison and inserted
+   * the caller's row — a sabotage client could wipe a defender's
+   * capital with troops=1 and pay nothing. The service is now combat-
+   * checked, resource-costed, and transactional; see
+   * `GalaxyMapService.captureNode`. The controller's only remaining
+   * job is input shape validation and pinning `nodeKind` from the
+   * trusted `NODE_MAP` so the caller can't lie about the node type
+   * to game the income table.
    */
   @Post('nodes/:id/capture')
   @UseGuards(HttpJwtGuard)

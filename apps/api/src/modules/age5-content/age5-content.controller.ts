@@ -13,7 +13,7 @@ import { Age5ContentService } from './age5-content.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('Age 5 Content')
-@Controller('api/v1/content/age5')
+@Controller('content/age5')
 export class Age5ContentController {
   constructor(private readonly contentService: Age5ContentService) {}
 

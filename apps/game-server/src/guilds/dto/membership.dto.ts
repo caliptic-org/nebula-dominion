@@ -1,22 +1,16 @@
 import { IsString, IsNotEmpty, IsOptional, IsInt, Min } from 'class-validator';
 
-export class JoinGuildDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-}
+// userId field removed (P5-S1 security fix): previously the controller
+// trusted dto.userId from the request body, which let an attacker force
+// any victim into a guild or drain their resources by spoofing the field.
+// The authenticated user is now derived from the JWT subject claim via
+// the @CurrentUser() decorator in GuildsController.
 
-export class LeaveGuildDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-}
+export class JoinGuildDto {}
+
+export class LeaveGuildDto {}
 
 export class DonateDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-
   @IsInt()
   @Min(1)
   amount: number;

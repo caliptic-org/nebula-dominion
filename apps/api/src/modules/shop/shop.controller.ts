@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ShopService } from './shop.service';
+import { PurchaseDto } from './dto/purchase.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -53,12 +54,7 @@ export class ShopController {
   @ApiOperation({ summary: 'Item satın al (oyun içi para birimi ile)' })
   purchase(
     @CurrentUser() currentUserId: string,
-    @Body()
-    body: {
-      sku: string;
-      currencyType: 'nebula_coins' | 'void_crystals' | 'premium_gems';
-      quantity?: number;
-    },
+    @Body() body: PurchaseDto,
   ) {
     return this.shopService.purchaseWithInGameCurrency(currentUserId, body);
   }

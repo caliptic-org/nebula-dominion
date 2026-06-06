@@ -4,9 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/+$/, '') + '/api/v1';
-
 export interface Quest {
   id: string;
   kind: 'pve' | 'pvp' | 'build' | 'merge' | 'donate' | 'login';
@@ -48,16 +45,20 @@ export function useMissions(playerId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!playerId) {
+    // We still take `playerId` as input so the hook only fires once the
+    // session-bound profile is loaded, but the request itself is now
+    // self-scoped — the backend derives the player from the JWT (audit
+    // IDOR-MISSIONS-01).  Guests with no session also short-circuit so
+    // we don't fire an unauthenticated request that will 401-redirect.
+    if (!playerId || !hasSession()) {
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    fetch(`${API_BASE}/daily/quests/${playerId}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as MissionsResponse;
+    api
+      .get<MissionsResponse>('/daily/quests')
+      .then((json) => {
         if (!cancelled) setData(json);
       })
       .catch((err) => {

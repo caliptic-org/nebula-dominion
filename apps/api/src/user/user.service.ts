@@ -157,9 +157,103 @@ export class UserService {
     // queueing the seed buildings through a fake construction cooldown.
     await this.seedStarterBuildings(id, race);
     await this.seedStarterUnits(id, race);
+
+    // Production-rate recompute hook — F2 fix (audit 2026-06-06).
+    //
+    // seedStarterBuildings() above INSERTs straight into
+    // player_buildings via raw SQL. That bypasses
+    // BuildingsService.recalculateProductionRates() which lives in the
+    // sibling game-server process and is the ONLY code path that
+    // refreshes player_resources.{mineral,gas,energy,population}_per_tick.
+    //
+    // Without this hook the freshly-seeded player has buildings but
+    // *_per_tick stays at 0 forever — ResourceTickWorker.applyTickBulk
+    // filters its UPDATE on the rate columns, so the wallet never ticks
+    // up. Cycle 4 made HUMAN seed a gas_refinery instead of
+    // mineral_extractor, but that fix is moot if the rates never
+    // recompute: gas_per_tick = 0 from day 0, every gas-cost building
+    // is unreachable, the player gives up.
+    //
+    // Best-effort: the call is fire-and-forget for failure handling
+    // (timeout, network blip, game-server boot-incomplete). The next
+    // legitimate building action from the player will hit
+    // startConstruction → recalculateProductionRates anyway, so the
+    // rates self-heal. We log so a persistent failure is observable.
+    await this.recalculateProductionRatesViaGameServer(id);
+
     // Self-action — caller is selecting their own race, so the response
     // should carry the private projection.
     return this.findOne(id, id);
+  }
+
+  /**
+   * Cross-service call to game-server's POST
+   * /api/buildings/internal/recalculate-rates.
+   *
+   * Pairs with `BuildingsController.recalculateRatesInternal()` in
+   * apps/game-server. See that endpoint's JSDoc for the F2 fix rationale.
+   *
+   * - Target URL: `${GAME_SERVER_URL}/api/buildings/internal/recalculate-rates`,
+   *   defaulting to `http://localhost:5000` for local dev (mirrors the
+   *   convention already used by DailyEngagementService.creditWallet).
+   *   Production docker-compose sets `GAME_SERVER_URL=http://game-server:3001`
+   *   so api → game-server stays on the internal docker network.
+   * - Auth: `X-Internal-Service: Bearer <INTERNAL_SERVICE_SECRET>`,
+   *   falling back to `JWT_SECRET`. Both services already share the
+   *   secret per CLAUDE.md §1 (JWT cross-service token).
+   * - Best-effort: swallows all errors. A failed recompute is
+   *   self-healing — the next building action from the player triggers
+   *   the same recalc in-process. We must NOT let a transient
+   *   game-server hiccup roll back the race-select flow (the player's
+   *   race was already committed above).
+   */
+  private async recalculateProductionRatesViaGameServer(userId: string): Promise<void> {
+    const baseUrl = (
+      process.env.GAME_SERVER_URL || 'http://localhost:5000'
+    ).replace(/\/+$/, '');
+    const url = `${baseUrl}/api/buildings/internal/recalculate-rates`;
+
+    const serviceSecret =
+      process.env.INTERNAL_SERVICE_SECRET || process.env.JWT_SECRET;
+    if (!serviceSecret) {
+      this.logger.warn(
+        `recalculateProductionRatesViaGameServer skipped for ${userId} — ` +
+          'neither INTERNAL_SERVICE_SECRET nor JWT_SECRET is set; ' +
+          'cannot sign request to game-server',
+      );
+      return;
+    }
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 3000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Service': `Bearer ${serviceSecret}`,
+        },
+        body: JSON.stringify({ userId }),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(
+          `game-server recalculate-rates non-2xx ${res.status} for ${userId} ` +
+            `body=${text.slice(0, 200)}`,
+        );
+      } else {
+        this.logger.log(`recalculateProductionRates ack for ${userId}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `recalculateProductionRatesViaGameServer failed for ${userId}: ${msg} ` +
+          '(rates will self-heal on next building action)',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async seedStarterBuildings(userId: string, race: Race): Promise<void> {

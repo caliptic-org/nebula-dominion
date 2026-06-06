@@ -110,7 +110,7 @@ function Inner() {
   const params = useSearchParams();
   const router = useRouter();
   const raceParam = params.get('race');
-  const outcome: BattleOutcome = params.get('outcome') === 'defeat' ? 'defeat' : 'victory';
+  const urlOutcome: BattleOutcome = params.get('outcome') === 'defeat' ? 'defeat' : 'victory';
   const hasOutcomeParam = params.get('outcome') !== null;
   const { race, setRace } = useRaceTheme();
 
@@ -124,6 +124,30 @@ function Inner() {
     setStash(readBattleStash());
     setStashLoaded(true);
   }, []);
+
+  // Source of truth for the headline + reward tier: the backend-rolled
+  // status carried by `stash.status` (set by BattleScreen.onContinue from
+  // POST /battles response). The BE owns the outcome since cycle 4; the
+  // FE cinematic may disagree but its result must not drive the result
+  // screen UI. Fall back to the URL outcome param only when there is no
+  // stash (offline / deep-link demo path).
+  const stashOutcome: BattleOutcome | null =
+    stash?.status === 'won'
+      ? 'victory'
+      : stash?.status === 'lost'
+        ? 'defeat'
+        : null;
+  const outcome: BattleOutcome = stashOutcome ?? urlOutcome;
+  useEffect(() => {
+    if (!stashLoaded || !stash) return;
+    if (stashOutcome && stashOutcome !== urlOutcome) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[battle-result] stash.status disagrees with URL outcome — rendering stash:',
+        { stash: stashOutcome, url: urlOutcome },
+      );
+    }
+  }, [stashLoaded, stash, stashOutcome, urlOutcome]);
 
   // Honest empty-state: if the player landed here with NO stash AND NO
   // outcome query param, they never actually fought. Rendering the mock

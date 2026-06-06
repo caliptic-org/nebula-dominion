@@ -66,9 +66,47 @@ export class MissionsStubController {
     @Optional() private readonly questProgress?: QuestProgressService,
   ) {}
 
+  /* Self-scoped quest read.
+   *
+   * IDOR fix (audit IDOR-MISSIONS-01): previously the route was
+   * `GET /daily/quests/:playerId` with no guard, so any caller could
+   * read another user's live quest progress (battles_won /
+   * buildings_built counters) and claimed-set just by guessing a UUID.
+   * The handler now derives the player from the JWT subject — the path
+   * param is gone, and the legacy `:playerId` route below is kept only
+   * as a deprecation alias that 403s on a mismatched UUID. */
+  @Get('quests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the day\'s quests for the authenticated player (stub seed)' })
+  async quests(@Request() req: any) {
+    const playerId: string = req.user?.id;
+    if (!playerId) {
+      throw new HttpException('Oturum bulunamadı.', HttpStatus.UNAUTHORIZED);
+    }
+    return this.buildQuestsPayload(playerId);
+  }
+
+  /* Deprecated alias for stale FE callers still issuing
+   * `GET /daily/quests/:playerId`. Hard-403s when the path id doesn't
+   * match the JWT subject so it can never be abused as an IDOR. Safe to
+   * delete once all clients move to `GET /daily/quests`. */
   @Get('quests/:playerId')
-  @ApiOperation({ summary: 'Get the day\'s quests for a player (stub seed)' })
-  async quests(@Param('playerId') playerId: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[DEPRECATED] Use GET /daily/quests instead' })
+  async questsLegacy(@Request() req: any, @Param('playerId') playerId: string) {
+    const userId: string = req.user?.id;
+    if (!userId) {
+      throw new HttpException('Oturum bulunamadı.', HttpStatus.UNAUTHORIZED);
+    }
+    if (playerId !== userId) {
+      throw new HttpException('Bu kaynağa erişim izniniz yok.', HttpStatus.FORBIDDEN);
+    }
+    return this.buildQuestsPayload(userId);
+  }
+
+  private async buildQuestsPayload(playerId: string) {
     // Reflect the per-player CLAIMED set into each quest's `claimed` flag.
     // Earlier the seed always returned `claimed: false` for everyone, so
     // the UI showed "ÖDÜL AL" even on quests the server had already
@@ -107,9 +145,38 @@ export class MissionsStubController {
     };
   }
 
+  /* Self-scoped daily streak. Same IDOR rationale as `quests` above —
+   * the canonical route is now path-param-free and derives the player
+   * from the JWT. */
+  @Get('streak')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Daily login streak for the authenticated player (stub seed)' })
+  streak(@Request() req: any) {
+    const playerId: string = req.user?.id;
+    if (!playerId) {
+      throw new HttpException('Oturum bulunamadı.', HttpStatus.UNAUTHORIZED);
+    }
+    return this.buildStreakPayload(playerId);
+  }
+
+  /* Deprecated alias kept for stale FE callers; 403s on UUID mismatch. */
   @Get('streak/:playerId')
-  @ApiOperation({ summary: 'Daily login streak (stub seed)' })
-  streak(@Param('playerId') playerId: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[DEPRECATED] Use GET /daily/streak instead' })
+  streakLegacy(@Request() req: any, @Param('playerId') playerId: string) {
+    const userId: string = req.user?.id;
+    if (!userId) {
+      throw new HttpException('Oturum bulunamadı.', HttpStatus.UNAUTHORIZED);
+    }
+    if (playerId !== userId) {
+      throw new HttpException('Bu kaynağa erişim izniniz yok.', HttpStatus.FORBIDDEN);
+    }
+    return this.buildStreakPayload(userId);
+  }
+
+  private buildStreakPayload(playerId: string) {
     const today = new Date();
     return {
       playerId,

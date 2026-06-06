@@ -209,4 +209,68 @@ export class BuildingsController {
     );
     return this.resources.grant(userId, grant);
   }
+
+  /**
+   * POST /api/buildings/internal/recalculate-rates
+   *
+   * Force a fresh recompute of `player_resources.{mineral,gas,energy,
+   * population}_per_tick` from the player's current set of ACTIVE
+   * buildings.
+   *
+   * ## Why this exists (F2 fix — audit 2026-06-06)
+   *
+   * `apps/api` seeds a fresh player's starter buildings via raw SQL
+   * (`UserService.seedStarterBuildings`) the moment they pick a race.
+   * It can't call `BuildingsService.recalculateProductionRates()`
+   * directly — that service lives in this `game-server` process.
+   *
+   * Without a cross-service hook the rates stay at the migration
+   * defaults (0 for every resource). `ResourceTickWorker.applyTickBulk`
+   * filters its UPDATE on `*_per_tick > 0`, so a brand-new player's
+   * wallet never advanced from day 0:
+   *
+   *   - mineral_per_tick = 0 → no minerals
+   *   - gas_per_tick     = 0 → no gas → can't afford gas-cost building
+   *   - energy_per_tick  = 0 → grid stays flat
+   *
+   * Cycle 4's gas_refinery swap fixed the *building* but not the
+   * *propagation* — rates only recompute on
+   * startConstruction / upgradeBuilding / destroyBuilding / completeOverdueConstructions,
+   * none of which `api`'s seed path triggers.
+   *
+   * ## Contract
+   *
+   * - Gated by `InternalServiceGuard` (header
+   *   `X-Internal-Service: Bearer <INTERNAL_SERVICE_SECRET>`). The FE
+   *   never calls this; only sibling backend services do.
+   * - Body: `{ userId: string }`. We don't trust the caller's JWT
+   *   because there is none — `api` makes this call right after the
+   *   player picks their race, asserting *which* player to recompute.
+   * - Idempotent: safe to call repeatedly. Each call replays the same
+   *   read+write against the player's active buildings.
+   * - Returns 200 with a small ack payload so the caller can confirm
+   *   the recompute ran (used by smoke tests). If `userId` is bad we
+   *   still return 200 — `recalculateProductionRates` is robust to an
+   *   empty active-buildings list (yields a zero update) and we don't
+   *   want a malformed userId from the caller to surface as a 500 that
+   *   rolls back unrelated transactions on their side.
+   */
+  @Post('/internal/recalculate-rates')
+  @UseGuards(InternalServiceGuard)
+  @HttpCode(HttpStatus.OK)
+  async recalculateRatesInternal(
+    @Body() body: { userId?: string },
+  ): Promise<{ ok: true; userId: string }> {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('body required');
+    }
+    const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+    if (!userId) {
+      throw new BadRequestException('userId required');
+    }
+
+    this.logger.log(`internal recalc rates user=${userId}`);
+    await this.buildings.recalculateProductionRates(userId);
+    return { ok: true, userId };
+  }
 }

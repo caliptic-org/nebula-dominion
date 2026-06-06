@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { TutorialState, TutorialStep } from '@/types/guild';
 import { guildApi } from '@/lib/guildApi';
+import { FetchError } from '@/lib/fetcher';
 
 const STORAGE_KEY = 'nebula:guildTutorial';
 
@@ -93,10 +94,16 @@ export function GuildTutorialProvider({ children }: { children: ReactNode }) {
         const m = await guildApi.getMembership();
         if (m) setState((prev) => ({ ...prev, guildId: m.guildId }));
       }
-    } catch {
-      // Backend unreachable — fall back to local cache (already loaded).
-      // Showing the overlay against stale state is fine; backend will reject
-      // illegal advance attempts on its side anyway.
+    } catch (err) {
+      // Distinguish authoritative auth failures from transient network errors.
+      // 401/403 means the JWT is missing/expired/invalid — the user is *not*
+      // eligible for the guild tutorial right now, so mark it not required so
+      // the overlay does not pester them. Network errors / 5xx fall through
+      // to the local cache: showing the overlay against stale state is fine
+      // because the backend will reject illegal advance attempts anyway.
+      if (err instanceof FetchError && (err.status === 401 || err.status === 403)) {
+        setTutorialRequired(false);
+      }
     } finally {
       setHydrating(false);
     }

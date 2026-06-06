@@ -46,6 +46,18 @@ export class BossAttempt {
   @Column({ name: 'started_at', type: 'timestamptz', default: () => 'NOW()' })
   startedAt: Date;
 
+  /**
+   * Wall-clock timestamp of the most recent attackBoss() call accepted
+   * for this attempt. Used to enforce a per-attempt cooldown (see
+   * `ATTACK_COOLDOWN_MS` in boss.service.ts) — a second attack arriving
+   * before `lastAttackAt + cooldown` is rejected with 429.
+   *
+   * Nullable: a fresh attempt with no attacks yet has no last-attack
+   * timestamp, and the cooldown gate passes through on null.
+   */
+  @Column({ name: 'last_attack_at', type: 'timestamptz', nullable: true })
+  lastAttackAt: Date | null;
+
   @Column({ name: 'ended_at', type: 'timestamptz', nullable: true })
   endedAt: Date | null;
 

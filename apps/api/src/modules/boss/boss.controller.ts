@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } 
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { BossService } from './boss.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { StartAttemptDto, AttackBossDto } from './dto/boss-attempt.dto';
 
 @ApiTags('Boss Encounters')
 @ApiBearerAuth()
@@ -30,10 +31,17 @@ export class BossController {
   }
 
   @Post('attempt')
-  @ApiOperation({ summary: 'Boss karşılaşması başlat' })
+  @ApiOperation({
+    summary: 'Boss karşılaşması başlat',
+    description:
+      'Body shape is { bossCode, unitsDeployed: [{ unitId, count }] }. ' +
+      "Per-slot stat fields (attack/raceBonus) are NOT accepted from the client — " +
+      "the server stamps them from UNIT_ATTACK_BY_TYPE + RACE_ATTACK_BONUS after " +
+      'ownership-checking each unitId against player_units (player_id = userId).',
+  })
   startAttempt(
     @Request() req: { user: { id: string } },
-    @Body() body: { bossCode: string; unitsDeployed: Record<string, unknown>[] },
+    @Body() body: StartAttemptDto,
   ) {
     return this.bossService.startAttempt(req.user.id, body);
   }
@@ -44,10 +52,12 @@ export class BossController {
   attackBoss(
     @Request() req: { user: { id: string } },
     @Param('attemptId') attemptId: string,
-    @Body() body: { mechanicName?: string },
+    @Body() body: AttackBossDto,
   ) {
     // damageDealt is intentionally NOT accepted from the client.
-    // The server computes damage from the attempt's unitsDeployed snapshot.
+    // The server computes damage from the attempt's unitsDeployed snapshot
+    // (which itself was stamped server-side at startAttempt time — see
+    // BossService.startAttempt JSDoc on the E2 vulnerability).
     return this.bossService.attackBoss(req.user.id, {
       attemptId,
       mechanicName: body?.mechanicName,

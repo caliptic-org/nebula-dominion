@@ -545,6 +545,14 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                 }
               : null;
 
+            // `backendStatus` is the source of truth for the headline /
+            // reward tier on /battle-result. The cinematic FE simulation
+            // (`state.status`) drives the overlay banner + cinematic, but
+            // the BE rolls its own outcome server-side (cycle 4) and may
+            // disagree. We stash the BE status AND mirror it into the URL
+            // outcome param so /battle-result never shows "GALİBİYET" with
+            // loss-tier rewards (or vice versa).
+            let backendStatus: 'won' | 'lost' | 'in-progress' | 'pending' | null = null;
             if (hasSession()) {
               try {
                 const battle = await api.post<{
@@ -563,6 +571,17 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                   defenderRace: enemy.key,
                   outcome: state.status === 'victory' ? 'won' : 'lost',
                 });
+                backendStatus = battle.status;
+                if (
+                  (battle.status === 'won' && state.status !== 'victory') ||
+                  (battle.status === 'lost' && state.status !== 'defeat')
+                ) {
+                  // eslint-disable-next-line no-console
+                  console.warn(
+                    '[battle] BE outcome disagrees with FE simulation — BE wins:',
+                    { be: battle.status, fe: state.status },
+                  );
+                }
                 if (typeof window !== 'undefined') {
                   try {
                     window.sessionStorage.setItem(
@@ -636,7 +655,20 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                 }
               }
             }
-            router.push(`/battle-result?race=${race.key}&outcome=${state.status}`);
+            // Prefer the BE-rolled outcome for the URL param so
+            // /battle-result shows a consistent headline + reward tier even
+            // when the cinematic FE simulation reached a different result.
+            // Fall back to the FE status only when the BE call failed or
+            // the player isn't logged in (offline / deep-link demo path).
+            const urlOutcome: 'victory' | 'defeat' =
+              backendStatus === 'won'
+                ? 'victory'
+                : backendStatus === 'lost'
+                  ? 'defeat'
+                  : state.status === 'victory'
+                    ? 'victory'
+                    : 'defeat';
+            router.push(`/battle-result?race=${race.key}&outcome=${urlOutcome}`);
           }}
         />
       )}

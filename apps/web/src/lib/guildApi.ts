@@ -522,8 +522,9 @@ export const guildApi = {
         completedAt: null,
       });
     }
-    const userId = getCurrentUserId();
-    const s = await fetcher<BackendTutorialState>(`/guilds/tutorial/${encodeURIComponent(userId)}`);
+    // F-CYCLE3-05: identity sourced from JWT subject server-side; no userId
+    // path segment. Calling with a path id would 404 against the new routes.
+    const s = await fetcher<BackendTutorialState>(`/guilds/tutorial`);
     return {
       step: s.state,
       tutorialRequired: s.tutorialRequired,
@@ -541,8 +542,8 @@ export const guildApi = {
     if (!isBackendReady()) {
       return wait(next);
     }
-    const userId = getCurrentUserId();
-    const s = await fetcher<BackendTutorialState>(`/guilds/tutorial/${encodeURIComponent(userId)}/advance`, {
+    // F-CYCLE3-05: identity sourced from JWT; no userId in path.
+    const s = await fetcher<BackendTutorialState>(`/guilds/tutorial/advance`, {
       method: 'POST',
       body: JSON.stringify({ toStep: next }),
     });
@@ -553,10 +554,10 @@ export const guildApi = {
     if (!isBackendReady()) {
       return wait({ energy: 500, cosmetic: 'guild_starter_emblem' });
     }
-    const userId = getCurrentUserId();
     try {
+      // F-CYCLE3-05: identity sourced from JWT; no userId in path.
       const res = await fetcher<{ reward: TutorialReward }>(
-        `/guilds/tutorial/${encodeURIComponent(userId)}/reward`,
+        `/guilds/tutorial/reward`,
         { method: 'POST' },
       );
       return res.reward;

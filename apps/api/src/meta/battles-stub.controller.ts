@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { QuestProgressService } from '../modules/quest-progress/quest-progress.service';
 
 /**
  * Battle + battle-prep controller (production-active, name kept for history).
@@ -279,6 +280,8 @@ function advance(state: BattleState): BattleState {
 export class BattlesStubController {
   private readonly logger = new Logger(BattlesStubController.name);
 
+  constructor(private readonly questProgress: QuestProgressService) {}
+
   @Post()
   @ApiOperation({ summary: 'Start a new battle (stub)' })
   start(
@@ -304,6 +307,57 @@ export class BattlesStubController {
 
     const battle = newBattle(body?.attackerRace ?? 'insan', body?.defenderRace ?? 'zerg');
     BATTLES.set(storeKey(userId, battle.id), battle);
+
+    // QUEST PROGRESS HOOK — battle.won (HIGH F3 fix)
+    //
+    // Before this fix BattlesStubController never told the quest-progress
+    // service that a battle was won, so:
+    //   - q1 "3 PvE savaş kazan" (liveCountQuestId='battles_won') never
+    //     ticked
+    //   - q5 "1 PvP zafer"        (liveCountQuestId='battles_won') never
+    //     ticked
+    //   - ach-1 "İlk Kan" precondition (battles.winner_id = $userId) is
+    //     unaffected here because the real `battles` table is owned by
+    //     game-server's PvP flow; the FE-driven /battle path through this
+    //     stub never wrote to it. The precondition still fail-closes on
+    //     claim, which is the right behaviour.
+    //
+    // We bump both 'battles_won' (canonical counter shared by q1/q5) and
+    // 'pve_won' (future PvE-only quest selector). The stub does not
+    // distinguish PvP from PvE yet — treat every claim through this path
+    // as PvE for the FE single-player /battle route.
+    //
+    // Idempotency: the referenceId derives from the freshly minted
+    // battleId, so a retry of POST /battles is naturally a new event;
+    // and the api-side QuestProgressService dedupes on the same key so a
+    // claim-reward replay (which doesn't re-enter this code path) is
+    // covered.
+    if (battle.status === 'won') {
+      try {
+        const refId = `battle:${battle.id}`;
+        void this.questProgress
+          .incrementProgress(userId, 'battles_won', 1, refId)
+          .catch((err) => {
+            this.logger.warn(
+              `quest-progress battles_won bump failed userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+        void this.questProgress
+          .incrementProgress(userId, 'pve_won', 1, refId)
+          .catch((err) => {
+            this.logger.warn(
+              `quest-progress pve_won bump failed userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+      } catch (err) {
+        // Defensive: never let a quest-progress failure roll back the
+        // battle response. The FE has already shown the win.
+        this.logger.warn(
+          `quest-progress hook threw synchronously userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     return battle;
   }
 

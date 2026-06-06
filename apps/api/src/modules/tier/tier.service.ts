@@ -95,32 +95,37 @@ export class TierService {
   }
 
   async levelUp(userId: string): Promise<TierProgressView> {
+    // Previously this method wrote DIRECTLY to tier_progression — bumping
+    // the player's level and burning `requiredXp` against the local
+    // tier_table.ts curve (100·L²). Three problems:
+    //
+    //   1. The local curve disagreed with game-server's per-level
+    //      level-config.ts table (e.g. tier_progress 400 XP needed vs
+    //      /progression 359 XP needed for the same level).
+    //   2. There was no HQ-level or age gate, so a player could skip past
+    //      intended progression walls just by hammering this endpoint
+    //      while stale XP was sitting in the mirror table.
+    //   3. The two sources of truth drifted on every level-up — the next
+    //      ensureProgress() pull-on-read had to reconcile the conflict.
+    //
+    // Game-server is now the sole source of truth (per audit workflow
+    // wf_cea4d7f7-3f1, A9). XP grants automatically trigger within-age
+    // level-ups in ProgressionService.awardXp; age transitions go through
+    // the gated POST /progression/:id/advance-age endpoint. There is no
+    // manual "click LEVEL UP" path on game-server because there's no
+    // gate that benefits from one.
+    //
+    // The api endpoint stays online for FE backward compatibility — it
+    // now reduces to a sync: pull the live state via ensureProgress()'s
+    // pull-on-read and return the canonical view. The FE /tier-up button
+    // becomes a "refresh" — either the player sees their level moved
+    // (because XP arrived from a mission/research/battle since the last
+    // /tier/progress call) or it stays the same. Both are correct.
     const [progress, user] = await Promise.all([
       this.ensureProgress(userId),
       this.userRepo.findOne({ where: { id: userId } }),
     ]);
     if (!user) throw new NotFoundException(`User ${userId} not found`);
-    if (progress.currentLevel >= MAX_TIER_LEVEL) {
-      throw new BadRequestException('Already at maximum tier level (54)');
-    }
-    const nextLevel = progress.currentLevel + 1;
-    const requiredXp = xpRequiredForLevel(nextLevel);
-    const currentXp = BigInt(progress.xp);
-    if (currentXp < requiredXp) {
-      throw new BadRequestException(
-        `Insufficient XP: have ${currentXp.toString()}, need ${requiredXp.toString()}`,
-      );
-    }
-
-    progress.currentLevel = nextLevel;
-    progress.currentAge = resolveAge(nextLevel);
-    progress.currentTierName = resolveTierName(nextLevel, user.race);
-    progress.xp = (currentXp - requiredXp).toString();
-    progress.xpToNextLevel =
-      nextLevel >= MAX_TIER_LEVEL
-        ? '0'
-        : xpRequiredForLevel(nextLevel + 1).toString();
-    await this.progressRepo.save(progress);
     return this.toView(progress, user.race);
   }
 

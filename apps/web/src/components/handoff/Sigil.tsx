@@ -118,20 +118,26 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
               backgroundPosition: 'center top',
               backgroundRepeat: 'no-repeat',
               opacity: 0.85,
-              // Mask fade extended a touch (60→80%) so the cutoff lands
-              // softer; the blur band below dissolves the hard edge fully.
+              // Long soft fade — image now goes all the way to the bottom
+              // of the viewport before dissolving into the dark Screen
+              // colour (NebulaBg falls through to #06080F = space-dark
+              // when bgImage isn't covered by the mask). Previous tuning
+              // (60→80%) cut the new 1024² square map PNGs mid-composition;
+              // 65% kept-sharp → 100% transparent gives a 35vh gradient
+              // band that quietly blends the photo into the space backdrop.
               WebkitMaskImage:
-                'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
+                'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
               maskImage:
-                'linear-gradient(to bottom, black 0%, black 60%, transparent 80%)',
+                'linear-gradient(to bottom, black 0%, black 65%, transparent 100%)',
               pointerEvents: 'none',
             }}
           />
           {/* Soft-blur band: same photo re-rendered with a mild blur, then
-           *  masked to a thin strip right where the sharp layer fades. This
-           *  is the "altından çok az blur" finish — the photo doesn't end
-           *  with a hard mask edge anymore, it dissolves through a blurred
-           *  intermediate before the iso tilemap takes over. */}
+           *  masked to a wide strip across the dissolving area. Bumped
+           *  blur strength (3px → 5px) and extended the strip range
+           *  (50→82% → 60→100%) so the bottom of the photo no longer ends
+           *  with a perceptible edge — it just softens into the space
+           *  colour. This is the "uzaya karışsın" finish. */}
           <div
             aria-hidden
             style={{
@@ -141,12 +147,12 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
               backgroundSize: '100% auto',
               backgroundPosition: 'center top',
               backgroundRepeat: 'no-repeat',
-              opacity: 0.55,
-              filter: 'blur(3px)',
+              opacity: 0.5,
+              filter: 'blur(5px)',
               WebkitMaskImage:
-                'linear-gradient(to bottom, transparent 50%, black 65%, black 72%, transparent 82%)',
+                'linear-gradient(to bottom, transparent 60%, black 80%, transparent 100%)',
               maskImage:
-                'linear-gradient(to bottom, transparent 50%, black 65%, black 72%, transparent 82%)',
+                'linear-gradient(to bottom, transparent 60%, black 80%, transparent 100%)',
               pointerEvents: 'none',
             }}
           />

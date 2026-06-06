@@ -171,6 +171,18 @@ export class VipService {
   // VIP Status Query
   // ==========================================
 
+  /**
+   * Last `claimDaily` timestamp for the player, or null if they've
+   * never claimed. Surfaced through the controller's /status mapper
+   * (the FE drives the "Günlük ödül hazır" countdown from this value).
+   * Kept as a separate query so callers that only need the timestamp
+   * don't have to deserialize the full spending row.
+   */
+  async getLastDailyClaimAt(userId: string): Promise<Date | null> {
+    const spending = await this.vipSpendingRepo.findOne({ where: { userId } });
+    return spending?.lastDailyClaimAt ?? null;
+  }
+
   async getVipStatus(userId: string): Promise<{
     userId: string;
     vipLevel: number;

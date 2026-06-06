@@ -16,8 +16,38 @@ export class VipController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mevcut kullanıcının VIP durumu ve kümülatif harcaması' })
-  getMyVipStatus(@Request() req: { user: { id: string } }) {
-    return this.vipService.getVipStatus(req.user.id);
+  async getMyVipStatus(@Request() req: { user: { id: string } }) {
+    // Wire-format mapper: FE useVip.ts (VipStatusWire) expects snake_case
+    // (vip_level, current_xp, next_level_xp, daily_claimed_at) but the
+    // service returns camelCase + a "spend" model instead of "xp". The
+    // mismatch silently broke every VIP progress bar (currentXp ended
+    // up undefined → bar always showed 0). Map service shape →
+    // FE-visible shape here so the contract is locally explicit.
+    //
+    // - vip_level         ← vipLevel
+    // - current_xp        ← cumulativeSpendUsd (USD spend doubles as XP
+    //                      until a dedicated VIP XP system ships)
+    // - next_level_xp     ← nextTierSpendUsd ?? cumulativeSpendUsd (cap
+    //                      when maxed so the bar reads as 100% full)
+    // - expiry_date       ← null (VIP has no expiry concept in this
+    //                      spend-tracked model; the field is kept so the
+    //                      FE shape stays stable for a future
+    //                      subscription-style VIP).
+    // - is_active         ← vipLevel > 0
+    // - daily_claimed_at  ← lastDailyClaimAt (own query — getVipStatus
+    //                      doesn't expose it directly)
+    const status = await this.vipService.getVipStatus(req.user.id);
+    const dailyClaimedAt = await this.vipService.getLastDailyClaimAt(
+      req.user.id,
+    );
+    return {
+      vip_level:        status.vipLevel,
+      current_xp:       status.cumulativeSpendUsd,
+      next_level_xp:    status.nextTierSpendUsd ?? status.cumulativeSpendUsd,
+      expiry_date:      null,
+      is_active:        status.vipLevel > 0,
+      daily_claimed_at: dailyClaimedAt ? dailyClaimedAt.toISOString() : null,
+    };
   }
 
   @Get('tiers')

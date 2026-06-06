@@ -275,4 +275,93 @@ export class CommandersService {
     );
     this.logger.log(`Commander unlocked: user=${userId} commander=${commanderId}`);
   }
+
+  /**
+   * Unlock every age-gated commander the player has just earned.
+   *
+   * Wired from the `era.transition` event listener — when a player
+   * advances into a new age, look up their race and unlock the tier-N
+   * commander that gates.config.ts ('commander.tier4'/'commander.tier5')
+   * had locked behind that age. Without this, the tier 4 + 5 slots
+   * (kovacs / morgath / lokhode / azurath / kthala / korova) stayed
+   * `unlockedAt = NULL` forever — formation filtered them out, players
+   * could never deploy them.
+   *
+   * Idempotent: `unlock()` uses INSERT ... ON CONFLICT DO UPDATE so
+   * resend / replay era.transition events don't matter. Iterating over
+   * the catalog also means a catch-up jump (e.g. age 3 → 5) unlocks
+   * BOTH tier 4 and tier 5 in one event.
+   *
+   * Race coverage gaps: canavar tier 4 + insan/otomat/seytan tier 5 are
+   * intentionally absent from the catalog today (future content). The
+   * iteration silently skips them — log surfaces the gap when none
+   * match so QA can see "expected tier 4 but catalog has none for
+   * race=canavar".
+   */
+  async unlockAgeGatedCommanders(userId: string, newAge: number): Promise<void> {
+    if (newAge < 4) return; // tier 4 is the earliest age-gated tier
+
+    const rows = await this.dataSource.query<Array<{ race: string | null }>>(
+      `SELECT u.race FROM users u WHERE u.id = $1 LIMIT 1`,
+      [userId],
+    );
+    const race = rows[0]?.race;
+    if (!race) {
+      this.logger.warn(
+        `Era transition unlock skipped: no race on user=${userId} (gates not yet applied)`,
+      );
+      return;
+    }
+    // Catalog uses Turkish race keys (insan/zerg/otomat/canavar/seytan)
+    // — see commanders.constants.ts CommanderRace. The api may store
+    // either Turkish or English (`human`/etc.) depending on which
+    // version of select-race ran. Normalise both shapes; unknown values
+    // fall through to a no-op log.
+    const RACE_ALIAS: Record<string, CommanderRace> = {
+      human: 'insan',     insan: 'insan',
+      zerg: 'zerg',
+      automaton: 'otomat', otomat: 'otomat',
+      beast: 'canavar',    canavar: 'canavar',
+      demon: 'seytan',     seytan: 'seytan',
+    };
+    const canonicalRace = RACE_ALIAS[race.toLowerCase()];
+    if (!canonicalRace) {
+      this.logger.warn(
+        `Era transition unlock skipped: unknown race='${race}' user=${userId}`,
+      );
+      return;
+    }
+
+    const candidates = getCommandersByRace(canonicalRace).filter((c) => {
+      if (c.tier === 'TIER 4' && newAge >= 4) return true;
+      if (c.tier === 'TIER 5' && newAge >= 5) return true;
+      return false;
+    });
+
+    if (candidates.length === 0) {
+      this.logger.log(
+        `Era transition: no new commanders to unlock (race=${canonicalRace} newAge=${newAge})`,
+      );
+      return;
+    }
+
+    for (const c of candidates) {
+      try {
+        await this.unlock(userId, c.id);
+      } catch (err) {
+        // NotFoundException on getCommanderById can't happen here (we
+        // sourced the id from the catalog), but a transient DB error
+        // could. Log and continue so one bad insert doesn't block the
+        // others.
+        this.logger.error(
+          `Failed to age-unlock commander id=${c.id} user=${userId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+    this.logger.log(
+      `Era transition unlocked ${candidates.length} commander(s) for race=${canonicalRace} newAge=${newAge}`,
+    );
+  }
 }

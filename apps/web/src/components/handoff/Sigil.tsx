@@ -156,6 +156,32 @@ export function NebulaBg({ race, intensity = 1, dim = 1, className, style, child
               pointerEvents: 'none',
             }}
           />
+          {/* Dark "atmosphere → space" gradient on TOP of the photo.
+           *  Without this, the new 1024² square images end naturally at
+           *  ~aspect-height (e.g. 375px on a 375-wide viewport) and the
+           *  perceived photo-bottom is just where image content stops —
+           *  a hard edge against either the dark Screen fill OR the iso
+           *  tilemap below it. This overlay progressively darkens the
+           *  photo's lower half so the visible "horizon" feels like
+           *  atmosphere fading into space, regardless of where the
+           *  PNG's natural pixels end. Then the soft mask above
+           *  finishes the dissolve. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(to bottom, ' +
+                'transparent 0%, ' +
+                'transparent 35%, ' +
+                'rgba(6,8,15,0.35) 55%, ' +
+                'rgba(6,8,15,0.75) 70%, ' +
+                'rgba(6,8,15,0.95) 85%, ' +
+                '#06080F 100%)',
+              pointerEvents: 'none',
+            }}
+          />
         </>
       )}
       <svg

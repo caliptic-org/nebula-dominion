@@ -113,16 +113,35 @@ export class UserService {
     // a type keeps theirs (e.g. dev seed scripts ran on the same uid).
     // Status 'active' so the gates evaluate immediately rather than
     // queueing the seed buildings through a fake construction cooldown.
-    await this.seedStarterBuildings(id);
+    await this.seedStarterBuildings(id, race);
     return this.findOne(id);
   }
 
-  private async seedStarterBuildings(userId: string): Promise<void> {
+  private async seedStarterBuildings(userId: string, race: Race): Promise<void> {
+    // Race-specific production building (audit C1 fix).
+    //
+    // Previously this seeded a flat `barracks` for every race — a zerg
+    // player landed on /base with an insan-only training building and
+    // POST /units/train zergling returned "Unknown requiredBuilding"
+    // because UNIT_CONFIGS[ZERGLING].requiredBuilding is SPAWNING_POOL.
+    // The full-audit playtest caught this as "select zerg, can't train".
+    //
+    // The other 3 starters (HQ + mineral + power) are race-neutral so
+    // they stay shared. The training building is the only one that has
+    // to branch.
+    //
+    // When the 3-race kits ship (currently A5 whitelist blocks
+    // otomat/canavar/seytan), wire their training building here too:
+    //   otomat  → montaj_hatti
+    //   canavar → vahsi_cukur
+    //   seytan  → lanet_tapinagi
+    // For now those races never reach this point.
+    const trainingBuilding = race === Race.ZERG ? 'spawning_pool' : 'barracks';
     const starters = [
       { type: 'command_center',    x: 4, y: 4 },
       { type: 'mineral_extractor', x: 3, y: 4 },
       { type: 'solar_plant',       x: 5, y: 4 },
-      { type: 'barracks',          x: 4, y: 5 },
+      { type: trainingBuilding,    x: 4, y: 5 },
     ];
     // Raw SQL — same Postgres DB as game-server, no entity import needed.
     // ON CONFLICT DO NOTHING via the partial unique pattern: skip insert

@@ -69,6 +69,31 @@ export const UNIT_ASSETS = {
     mutasyon_lord:    '/assets/units/zerg/mutasyon_lord.png',
     mega_lokost:      '/assets/units/zerg/mega_lokost.png',
     beyin_kurt:       '/assets/units/zerg/beyin_kurt.png',
+    // BE → FE alias map (audit C2 fix).
+    //
+    // game-server's UnitType enum names these as zergling / hydralisk /
+    // ultralisk / queen but the FE lore lex calls them Larva / Pençeli
+    // Avcı / Mutasyon Lord / Beyin Kurt. When a /merge or /inventory
+    // payload arrives with `type: 'zergling'` the portrait lookup
+    // would 404 and fall back to a generic Sigil. The aliases here
+    // point each BE type code at the lore-renamed PNG so the
+    // unitPortrait() resolver hits without a fallback.
+    //
+    // Tier mapping (BE → FE display + portrait file):
+    //   zergling   (T1) → Larva           (larva.png)
+    //   hydralisk  (T2) → Pençeli Avcı    (penceli_avci.png)
+    //   ultralisk  (T3) → Mutasyon Lord   (mutasyon_lord.png)
+    //   queen      (T4) → Beyin Kurt      (beyin_kurt.png)
+    //
+    // Tüneli Yutan (alt T2) + Mega Lokost (T4) currently have no BE
+    // equivalent — the FE merge-ladder lex carries 6 ranks vs the
+    // game-server's 4-unit catalog. The wider FE/BE catalog reconciliation
+    // is tracked separately; this map just stops the "missing portrait"
+    // visual regression.
+    zergling:         '/assets/units/zerg/larva.png',
+    hydralisk:        '/assets/units/zerg/penceli_avci.png',
+    ultralisk:        '/assets/units/zerg/mutasyon_lord.png',
+    queen:            '/assets/units/zerg/beyin_kurt.png',
   },
   otomat: {
     sentinel:         '/assets/units/otomat/sentinel.png',

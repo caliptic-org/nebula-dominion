@@ -25,6 +25,22 @@ import {
  */
 const STORY_XP_SOURCE = 'event';
 
+/**
+ * Sentinel marker appended to `story_progress.titles` by the cycle-13
+ * forgiving backfill migration (`BackfillLegacyStoryProgress1779930000000`).
+ *
+ * The marker is internal-only — it lets a future audit query
+ *   `SELECT count(*) FROM story_progress WHERE '__legacy_backfill__' = ANY(titles)`
+ * surface every row touched by the backfill without adding a new
+ * column. The serialiser below strips it from any HTTP response so the
+ * FE never renders an empty "title badge" for it.
+ *
+ * Do NOT rename without writing a new migration to rewrite existing
+ * rows — the SQL UPDATE in 1779930000000-BackfillLegacyStoryProgress
+ * hard-codes this literal.
+ */
+const LEGACY_BACKFILL_MARKER = '__legacy_backfill__';
+
 @Injectable()
 export class StoryService {
   private readonly logger = new Logger(StoryService.name);
@@ -70,10 +86,17 @@ export class StoryService {
     const completedCount = record.completedChapters.length;
     const totalChapters = STORY_CHAPTERS.length;
 
+    // Strip the cycle-13 legacy-backfill sentinel from the user-facing
+    // titles array — it's an internal audit marker, not a displayable
+    // title. See LEGACY_BACKFILL_MARKER docblock.
+    const titles = (record.titles ?? []).filter(
+      (t) => t !== LEGACY_BACKFILL_MARKER,
+    );
+
     return {
       userId,
       completedChapters: record.completedChapters,
-      titles: record.titles ?? [],
+      titles,
       completedCount,
       totalChapters,
       currentChapter: currentChapterDef ?? null,

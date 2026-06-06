@@ -416,6 +416,19 @@ export class PaymentService {
   // Stripe Webhook Handler
   // ==========================================
 
+  /**
+   * Handle a Stripe webhook delivery.  Verify-FIRST contract: the
+   * `stripe.webhooks.constructEvent` call throws on signature
+   * mismatch BEFORE any webhook_event INSERT, so a forged callback
+   * cannot pre-poison the `(provider='stripe', eventId)` UNIQUE
+   * index.  This is the same contract enforced manually on the
+   * iyzico path (see `handleIyzicoCallback` JSDoc, C13-AUDIT-03).
+   *
+   * Stripe's `eventId` is upstream-deterministic by design
+   * (`evt_...`), so once a verified event is persisted the UNIQUE
+   * constraint correctly serves as the replay defense for legitimate
+   * Stripe redeliveries.
+   */
   async handleStripeWebhook(
     rawBody: Buffer,
     signature: string,
@@ -425,19 +438,31 @@ export class PaymentService {
       throw new Error('STRIPE_WEBHOOK_SECRET ortam değişkeni eksik');
     }
 
-    let isVerified = false;
     let eventId = '';
     let eventType = '';
     let payload: Record<string, unknown> = {};
 
+    // Verify-FIRST: `constructEvent` throws before we touch the DB,
+    // so forged callbacks never reach the webhook_event INSERT below.
+    // No pre-poison DoS on (provider, eventId).  Mirrors the iyzico
+    // path's verify-first gate added in C13-AUDIT-03.
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
       const stripeEvent = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
       eventId = stripeEvent.id;
       eventType = stripeEvent.type;
       payload = stripeEvent as unknown as Record<string, unknown>;
-      isVerified = true;
     } catch (err) {
+      // Audit trail breadcrumb — structured WARN with the signature
+      // header fragment so ops can grep for forgery attempts.  No
+      // webhook_event row persisted (parity with iyzico forgery path).
+      const sigFragment = signature
+        ? signature.substring(0, 16) + '…'
+        : '(empty)';
+      this.logger.warn(
+        `Stripe webhook signature mismatch — refusing to fulfill (no row persisted): ` +
+          `sigFragment=${sigFragment}`,
+      );
       throw new UnauthorizedException('Stripe webhook imzası geçersiz');
     }
 
@@ -448,7 +473,7 @@ export class PaymentService {
         eventType,
         payload,
         signature,
-        isVerified,
+        isVerified: true,
         isProcessed: false,
       }),
     );
@@ -464,45 +489,51 @@ export class PaymentService {
   /**
    * Handle an iyzico async callback. Idempotent on `paymentId`.
    *
-   * **Signature verification contract** (BLOCKER fix —
-   * PAY-IYZICO-UNVERIFIED-CALLBACK, audit cycle 6):
+   * **Verify-FIRST contract** (HIGH fix — C13-AUDIT-03, audit cycle 13):
    *
-   *   Prior to this fix the handler computed `isVerified` from an HMAC
-   *   comparison, persisted that flag onto the webhook_event row, and
-   *   then UNCONDITIONALLY called `processIyzicoEvent` →
-   *   `completeTransaction` → `recordPurchaseAndUpgradeVip` +
-   *   `deliverPurchase`.  The `isVerified` boolean was never read
-   *   before crediting.
+   *   Prior revisions persisted the webhook_event row FIRST (with
+   *   `isVerified=false` on bad signature) and only THEN checked the
+   *   `isVerified` flag.  That ordering opened a **pre-poison DoS**:
    *
-   *   Combined with the (legacy) predictable conversationId
-   *     `nebula-${userId.substring(0,8)}-${Date.now()}`
-   *   any authenticated attacker could:
-   *     1. POST /payment/iyzico/create-payment to obtain a real pending
-   *        transaction with a known conversationId, OR forge a
-   *        conversationId for someone else's pending tx by guessing
-   *        their userId prefix + Date.now() window.
-   *     2. POST to /payment/iyzico/callback with
-   *        `{conversationId, paymentStatus:"SUCCESS", paymentId:"any",
-   *         token:"wrong"}`.
-   *     3. isVerified=false but completeTransaction still fired →
-   *        wallet credit + premium pass grant + VIP tier upgrade for
-   *        $0.
+   *     1. Attacker POSTs a forged callback with
+   *        `{paymentId:"pi_real_pending_42", paymentStatus:"SUCCESS",
+   *         token:"<garbage>", conversationId:"<anything>"}`.
+   *     2. The handler INSERTs a webhook_event row keyed on
+   *        `(provider='iyzico', eventId='iyz-pi_real_pending_42')`
+   *        with `isVerified=false`.
+   *     3. Handler throws 401 — but the row stays committed (it was
+   *        saved in its own statement, not inside the verification
+   *        gate's transaction).
+   *     4. Later, iyzico's LEGITIMATE callback for that same
+   *        paymentId arrives.  Our deterministic eventId =
+   *        `iyz-${paymentId}` collides with the poisoned row →
+   *        Postgres 23505 → we hit the existing replay path → return
+   *        `{received:true, duplicate:true}` with HTTP 200 → iyzico
+   *        stops retrying → the legitimate transaction stays
+   *        `pending` forever → the player paid, gets no goods, DoS.
    *
-   *   The fix has two halves, both in this file:
-   *     a) THIS METHOD now hard-gates `processIyzicoEvent` on
-   *        `isVerified===true`.  Mismatched signatures throw 401
-   *        UnauthorizedException (mirroring the Stripe path which
-   *        already throws on invalid signatures via
-   *        `stripe.webhooks.constructEvent`).  The webhook_event row
-   *        is still persisted with `isVerified=false` and
-   *        `isProcessed=false` so ops can audit forgery attempts after
-   *        the fact.
-   *     b) `createIyzicoPayment` no longer uses a predictable
-   *        conversationId — it's now `nebula-${crypto.randomUUID()}`.
-   *        Even with the signature gate, predictable conversationIds
-   *        opened replay-of-legitimate-completion windows (an
-   *        attacker who scraped one valid token could re-aim it at a
-   *        guessed-future conversationId).
+   *   The fix mirrors the Stripe path's "verify before any DB touch":
+   *     a) Compute HMAC and check `isVerified` FIRST.
+   *     b) On mismatch: structured warn log (conversationId,
+   *        paymentId, masked token fragment) and throw 401 BEFORE
+   *        any webhook_event INSERT.  No row persisted → no poisoning
+   *        → legitimate callback can still INSERT cleanly later.
+   *     c) Only on `isVerified===true` do we persist the
+   *        webhook_event row and call `processIyzicoEvent`.
+   *
+   *   Trade-off: forgery attempts no longer leave a webhook_event
+   *   breadcrumb in the DB.  Audit trail moves to the structured
+   *   logger (grep `iyzico callback signature mismatch`).  Better
+   *   than the alternative (forgeries DoS the legitimate path), and
+   *   the log line carries every field a forensic analyst would want.
+   *
+   *   Predictable conversationId fix (audit cycle 6, still in place):
+   *   `createIyzicoPayment` uses `nebula-${crypto.randomUUID()}` so an
+   *   attacker can't guess a victim's conversationId — but the DoS
+   *   above doesn't even depend on guessing it, only on knowing the
+   *   victim's paymentId (which iyzico exposes via the redirect URL
+   *   query string in the browser flow, observable to an MITM or to
+   *   anyone who shoulders the URL).
    *
    * **Replay-safety contract** (cycle-5 BLOCKER ECON-PAY-IYZICO-EVENTID-REPLAY):
    *
@@ -513,24 +544,31 @@ export class PaymentService {
    *   key, second INSERT → Postgres 23505 → we short-circuit before
    *   `processIyzicoEvent` ever calls `recordPurchaseAndUpgradeVip`.
    *
-   *   Prior to that earlier fix the eventId was built as
-   *     `iyz-${callbackData.paymentId}-${Date.now()}`
-   *   which embedded a wall-clock suffix in the key — every replay was a
-   *   different key, every replay passed the constraint, every replay
-   *   credited cumulative VIP spend a second time.  An attacker who
-   *   captured one legitimate SUCCESS callback (or who got iyzico to
-   *   re-deliver, which iyzico does on 5xx) could farm VIP tier
-   *   upgrades by re-POSTing the body N times.
-   *
    *   The current contract:
    *     eventId = `iyz-${paymentId}`        (no timestamp, deterministic)
    *
    *   Stripe path is unaffected — it already uses Stripe's own event id
-   *   (`stripeEvent.id`) which is upstream-deterministic by design.
+   *   (`stripeEvent.id`) which is upstream-deterministic by design AND
+   *   already verifies-before-persisting via `constructEvent`.
    *
-   * On replay the response is `{ received: true, duplicate: true }` with
-   * HTTP 200 so iyzico's retry loop stops (anything else, including 409,
-   * makes them keep retrying).
+   *   With the verify-first ordering, ONLY genuine iyzico-signed
+   *   callbacks reach the INSERT, so the UNIQUE constraint only fires
+   *   on real iyzico redeliveries (5xx retries) — never on attacker
+   *   forgeries.
+   *
+   * On replay (genuine iyzico redelivery) the response is
+   * `{ received: true, duplicate: true }` with HTTP 200 so iyzico's
+   * retry loop stops (anything else, including 409, makes them keep
+   * retrying).
+   *
+   * **DEFERRED follow-up: IP allowlist for iyzico webhooks** — iyzico
+   * publishes a known set of source IPs for their webhook delivery
+   * infrastructure.  We should add a guard that rejects callbacks
+   * from any other source IP at the controller layer.  Not done in
+   * this fix because ops needs to confirm the current allowed IPs
+   * with iyzico (their list changes occasionally).  Tracked as a
+   * follow-up; the verify-first + crypto-secure conversationId +
+   * @Throttle defenses cover us in the interim.
    */
   async handleIyzicoCallback(
     callbackData: IyzicoCallbackDto,
@@ -541,7 +579,11 @@ export class PaymentService {
       throw new UnauthorizedException('IYZICO_SECRET_KEY ortam değişkeni eksik');
     }
 
-    // iyzico imza doğrulama — HMAC-SHA256 + constant-time comparison
+    // ── Verify-FIRST gate (C13-AUDIT-03) ───────────────────────────
+    // HMAC-SHA256 + constant-time comparison.  Runs BEFORE any
+    // webhook_event INSERT so attacker forgeries can't pre-poison the
+    // (provider, eventId) UNIQUE index and DoS the legitimate
+    // callback that arrives later.
     const expectedHash = crypto
       .createHmac('sha256', secretKey)
       .update(callbackData.conversationId + callbackData.paymentStatus)
@@ -556,6 +598,32 @@ export class PaymentService {
       );
     }
 
+    if (!isVerified) {
+      // Audit trail breadcrumb for ops — structured WARN with the
+      // fields a forensic analyst would grep for.  We deliberately
+      // log only a short prefix of the bogus token (NOT the full
+      // value) so an accidental leak of legitimate iyzico tokens via
+      // log forwarding doesn't expose them.  No webhook_event row is
+      // persisted; this log line is the only audit artifact for
+      // forgery attempts.
+      const tokenFragment = receivedToken
+        ? receivedToken.substring(0, 8) + '…'
+        : '(empty)';
+      this.logger.warn(
+        `iyzico callback signature mismatch — refusing to fulfill (no row persisted): ` +
+          `conversationId=${callbackData.conversationId} ` +
+          `paymentId=${callbackData.paymentId} ` +
+          `status=${callbackData.paymentStatus} ` +
+          `tokenFragment=${tokenFragment}`,
+      );
+      // 401 mirrors the Stripe path (constructEvent throws Unauthorized
+      // on signature failure) and signals iyzico's retry loop to stop
+      // hammering us with the same bad token.  Most importantly: NO
+      // webhook_event row is committed, so a future legitimate
+      // callback for the same paymentId can still INSERT cleanly.
+      throw new UnauthorizedException('iyzico callback imza doğrulanamadı');
+    }
+
     // Deterministic dedup key — DO NOT add a timestamp or random suffix.
     // The UNIQUE(provider, eventId) index relies on this being stable
     // across iyzico's redelivery attempts.  See JSDoc above.
@@ -563,6 +631,10 @@ export class PaymentService {
 
     let event: WebhookEvent;
     try {
+      // Now that the signature is verified, persist the row.  Only
+      // genuine iyzico-signed callbacks reach this point, so the
+      // UNIQUE(provider, eventId) collision below only fires on real
+      // iyzico redeliveries (5xx retries) — never on forgeries.
       event = await this.webhookRepository.save(
         this.webhookRepository.create({
           provider: 'iyzico',
@@ -570,17 +642,16 @@ export class PaymentService {
           eventType: `payment.${callbackData.paymentStatus}`,
           payload: callbackData as unknown as Record<string, unknown>,
           signature: callbackData.token ?? null,
-          isVerified,
-          // Stay isProcessed=false on bad signatures so the row sticks
-          // around as an audit breadcrumb for ops to inspect later.
+          isVerified: true,
           isProcessed: false,
         }),
       );
     } catch (err: unknown) {
-      // Replay path: another (identical) callback for the same paymentId
-      // already wrote the row. We MUST NOT re-run processIyzicoEvent — it
-      // would call completeTransaction → recordPurchaseAndUpgradeVip a
-      // second time and inflate cumulative spend → free VIP tier.
+      // Replay path: another (identical, verified) callback for the
+      // same paymentId already wrote the row.  We MUST NOT re-run
+      // processIyzicoEvent — it would call completeTransaction →
+      // recordPurchaseAndUpgradeVip a second time and inflate
+      // cumulative spend → free VIP tier.
       if (err instanceof QueryFailedError) {
         const code = (err.driverError as { code?: string } | undefined)?.code;
         if (code === '23505') {
@@ -591,28 +662,6 @@ export class PaymentService {
         }
       }
       throw err;
-    }
-
-    // BLOCKER gate — PAY-IYZICO-UNVERIFIED-CALLBACK.  Before this guard,
-    // processIyzicoEvent fired regardless of signature validity, so a
-    // forged callback with a wrong token still triggered wallet credit
-    // + VIP upgrade.  Now: bad sig → 401, no side-effect downstream.
-    // The webhook_event row was already persisted above with
-    // isVerified=false / isProcessed=false so ops can audit attempts.
-    //
-    // 401 (vs. 400) mirrors the Stripe path which throws
-    // UnauthorizedException on `constructEvent` signature failure, and
-    // it signals iyzico's retry loop to stop hammering us with the
-    // same bad token (anything else, including 4xx and 5xx other than
-    // 401/403, makes them keep retrying).
-    if (!isVerified) {
-      this.logger.warn(
-        `iyzico callback signature mismatch — refusing to fulfill: ` +
-          `conversationId=${callbackData.conversationId} ` +
-          `paymentId=${callbackData.paymentId} ` +
-          `status=${callbackData.paymentStatus}`,
-      );
-      throw new UnauthorizedException('iyzico callback imza doğrulanamadı');
     }
 
     await this.processIyzicoEvent(event, callbackData);

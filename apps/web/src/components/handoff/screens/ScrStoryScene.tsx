@@ -10,8 +10,14 @@ import {
   NDButton,
   NebulaBg,
   Sigil,
+  toast,
   type NDRace,
 } from '@/components/handoff';
+import {
+  completeStoryChapter,
+  formatStoryRewardToast,
+} from '@/hooks/useStory';
+import { refreshUserWallet } from '@/hooks/useUserWallet';
 
 interface StoryAct {
   index: number;
@@ -26,6 +32,23 @@ interface ScrStorySceneProps {
   acts?: StoryAct[];
   /** Characters per second for typewriter. Default 32. */
   cps?: number;
+  /**
+   * BE story-chapter id to mark complete when the final act is reached.
+   * Source: `useStory(race.key).chapters[currentIdx].id` (the /story page
+   * resolves this from `?chapter=` or falls back to the user's current
+   * pointer). When supplied, `onComplete` waits for the cycle 13 BE
+   * pipeline (POST /story/progress/me/complete/:chapterId) to settle
+   * before firing — players see the reward toast before the page
+   * unmounts. Leave undefined to skip the network call (e.g. when the
+   * scene is rendered as a preview from the gallery). */
+  chapterId?: string;
+  /** Optional choice id to send alongside the complete POST. */
+  choiceId?: string;
+  /**
+   * Called AFTER the BE complete settles. The /story page typically
+   * routes back to the gallery or the next chapter here. The handler
+   * receives no result — the toast / wallet refresh is fired internally
+   * before this callback so navigation cannot drop the side effects. */
   onComplete?: () => void;
   onExit?: () => void;
 }
@@ -61,6 +84,8 @@ export function ScrStoryScene({
   race,
   acts: actsProp,
   cps = 32,
+  chapterId,
+  choiceId,
   onComplete,
   onExit,
 }: ScrStorySceneProps) {
@@ -68,6 +93,12 @@ export function ScrStoryScene({
   const [actIdx, setActIdx] = useState(0);
   const [typed, setTyped] = useState(0);
   const [entered, setEntered] = useState(false);
+  // Cycle 14 STORY-FE-NEVER-COMPLETES: local debounce flag so a fast
+  // double-tap on "BİTİR" can't fire two POSTs. The module-level guard
+  // in useStory.ts handles the cross-component case (cinematic + gallery
+  // both open); this one handles the in-component case (single
+  // user double-tap inside the typewriter screen).
+  const [inFlight, setInFlight] = useState(false);
   const skipRef = useRef(false);
 
   const act = acts[actIdx] ?? acts[0];
@@ -115,6 +146,63 @@ export function ScrStoryScene({
     return () => window.clearInterval(id);
   }, [actIdx, fullText, cps, entered]);
 
+  // Final-act completion handler.
+  //
+  // Cycle 13 BE pipeline (POST /story/progress/me/complete/:chapterId)
+  // delivers gold/gems via user_currency upsert, XP via game-server
+  // ProgressionService.awardXp, and titles via user_titles. Cycle 14
+  // (this) wires the FE caller — before, this handler just called
+  // router.back() and the BE pipeline was dead code.
+  //
+  // Order matters: POST → toast → wallet refresh → navigate. If we
+  // navigated first the toast would render on the next page (or get
+  // dropped if it unmounts the toaster), so we await the BE roundtrip
+  // before calling onComplete.
+  const completeAndExit = useCallback(async () => {
+    if (inFlight) return;
+    if (!chapterId) {
+      // No chapterId wired — preview / gallery embed. Just exit.
+      onComplete?.();
+      return;
+    }
+    setInFlight(true);
+    let bouncedToLogin = false;
+    try {
+      const result = await completeStoryChapter(chapterId, choiceId);
+      if (result.ok) {
+        const detail = formatStoryRewardToast(result);
+        toast.success(detail ? `Bölüm tamamlandı · ${detail}` : 'Bölüm tamamlandı');
+        // Wallet HUD pill (premium_gems / nebula_coins) reads
+        // /inventory/wallet on a 10s poll — kick a refresh so the
+        // bonus gold/gems show up immediately.
+        refreshUserWallet();
+      } else if (result.status === 401) {
+        // Token expired mid-cinematic — bounce to login. lib/api would
+        // do this automatically but we're using fetch directly here.
+        // Skip the trailing onComplete() so we don't double-navigate
+        // (router.back() would race with location.replace).
+        bouncedToLogin = true;
+        if (typeof window !== 'undefined') {
+          const here = window.location.pathname + window.location.search;
+          window.location.replace(
+            `/login?next=${encodeURIComponent(here)}&reason=expired`,
+          );
+        }
+      } else if (result.error) {
+        // 400 paths: "Çağ X gerekiyor", "Önce 'ch_XX' bölümünü
+        // tamamlamalısın", "Bölüm zaten tamamlandı". Surface verbatim
+        // — BE already returns TR.
+        toast.error(result.error);
+      }
+      // Even on a 400 we still call onComplete so the user isn't
+      // trapped on the cinematic screen — they can re-enter once
+      // the gate clears (level up, finish prereq chapter, etc.).
+    } finally {
+      setInFlight(false);
+      if (!bouncedToLogin) onComplete?.();
+    }
+  }, [chapterId, choiceId, inFlight, onComplete]);
+
   const skip = useCallback(() => {
     if (!isDone) {
       skipRef.current = true;
@@ -123,10 +211,18 @@ export function ScrStoryScene({
     }
     if (actIdx < acts.length - 1) {
       setActIdx((i) => i + 1);
-    } else {
-      onComplete?.();
+      return;
     }
-  }, [isDone, actIdx, acts.length, fullText.length, onComplete]);
+    if (inFlight) return;
+    void completeAndExit();
+  }, [
+    isDone,
+    actIdx,
+    acts.length,
+    fullText.length,
+    inFlight,
+    completeAndExit,
+  ]);
 
   const previous = useCallback(() => {
     if (actIdx > 0) setActIdx((i) => i - 1);
@@ -366,10 +462,18 @@ export function ScrStoryScene({
             <Caption style={{ flex: 1, textAlign: 'center', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               {isDone ? 'DOKUN · DEVAM ET' : 'DOKUN · ATLA'}
             </Caption>
-            <NDButton race={race} size="sm" onClick={skip}>
+            <NDButton
+              race={race}
+              size="sm"
+              onClick={skip}
+              disabled={inFlight}
+              data-testid="scr-story-scene-advance"
+            >
               {isDone
                 ? actIdx < acts.length - 1
                   ? 'SONRAKİ →'
+                  : inFlight
+                  ? 'KAYDEDİLİYOR…'
                   : 'BİTİR →'
                 : 'ATLA →'}
             </NDButton>

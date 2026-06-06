@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Caption,
   Chip,
@@ -16,9 +16,15 @@ import {
   Panel,
   RACES,
   Sigil,
+  toast,
   type NDRace,
   type NDRaceKey,
 } from '@/components/handoff';
+import {
+  completeStoryChapter,
+  formatStoryRewardToast,
+} from '@/hooks/useStory';
+import { refreshUserWallet } from '@/hooks/useUserWallet';
 
 const RACE_KEYS: NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 const ACTS_PER_RACE = 2;
@@ -35,6 +41,21 @@ interface ScrStoryGalleryProps {
   playerRaceKey: NDRaceKey;
   /** Map of race → number of acts unlocked. Defaults to 2 (all unlocked) for player race, 0 for others. */
   unlocks?: Partial<Record<NDRaceKey, number>>;
+  /**
+   * Cycle 14 (STORY-FE-NEVER-COMPLETES): map of act-index → BE chapter id
+   * for the PLAYER'S race only. Other races' acts stay decorative — the
+   * BE catalog is global, not race-specific, so an "Atomata Act 2" entry
+   * in the gallery doesn't correspond to a Zerg chapter at any well-defined
+   * index. The viewer renders a "TAMAMLA" CTA when this map has an entry
+   * for the currently viewed act, the act is unlocked, AND the act belongs
+   * to the player's race.
+   *
+   * Source: `/story-gallery` reads `useStory(playerRaceKey).chapters` and
+   * builds `{ 0: chapters[0]?.id, 1: chapters[1]?.id }`. The CTA POSTs to
+   * `/story/progress/me/complete/:chapterId` — the BE linear-order gate
+   * still applies, so completing act 2 before act 1 surfaces the 400 hint.
+   */
+  playerActChapterIds?: Partial<Record<number, string>>;
 }
 
 function buildActs(race: NDRace, unlockedCount: number): ActEntry[] {
@@ -62,7 +83,11 @@ function defaultUnlocksFor(playerRaceKey: NDRaceKey): Record<NDRaceKey, number> 
   }, {} as Record<NDRaceKey, number>);
 }
 
-export function ScrStoryGallery({ playerRaceKey, unlocks }: ScrStoryGalleryProps) {
+export function ScrStoryGallery({
+  playerRaceKey,
+  unlocks,
+  playerActChapterIds,
+}: ScrStoryGalleryProps) {
   const playerRace = RACES[playerRaceKey];
   const effectiveUnlocks = useMemo(() => {
     const base = defaultUnlocksFor(playerRaceKey);
@@ -89,6 +114,59 @@ export function ScrStoryGallery({ playerRaceKey, unlocks }: ScrStoryGalleryProps
 
   const [filter, setFilter] = useState<NDRaceKey | 'all'>('all');
   const [viewer, setViewer] = useState<{ race: NDRace; index: number } | null>(null);
+  /**
+   * Cycle 14: in-flight flag for the viewer's "TAMAMLA" CTA. The
+   * module-level `inFlightChapterIds` Set in useStory.ts dedups across
+   * components (cinematic + gallery both open), but this local flag
+   * disables the button + shows "KAYDEDİLİYOR…" copy so the user knows
+   * the tap registered.
+   */
+  const [completing, setCompleting] = useState(false);
+
+  /**
+   * Cycle 13 BE pipeline (POST /story/progress/me/complete/:chapterId)
+   * delivers gold/gems via user_currency upsert, XP via game-server
+   * ProgressionService.awardXp, and titles via user_titles. Cycle 14
+   * wires this gallery as a second FE caller (alongside the cinematic
+   * /story page).
+   *
+   * Only the player's race acts can be completed from here — other
+   * races' acts are decorative lore that doesn't map 1:1 to BE chapter
+   * ids. The CTA is hidden when `playerActChapterIds` has no entry for
+   * the current act index.
+   */
+  const handleCompleteAct = useCallback(
+    async (chapterId: string) => {
+      if (completing) return;
+      setCompleting(true);
+      try {
+        const result = await completeStoryChapter(chapterId);
+        if (result.ok) {
+          const detail = formatStoryRewardToast(result);
+          toast.success(
+            detail ? `Bölüm tamamlandı · ${detail}` : 'Bölüm tamamlandı',
+          );
+          refreshUserWallet();
+          setViewer(null);
+        } else if (result.status === 401) {
+          if (typeof window !== 'undefined') {
+            const here = window.location.pathname + window.location.search;
+            window.location.replace(
+              `/login?next=${encodeURIComponent(here)}&reason=expired`,
+            );
+          }
+        } else if (result.error) {
+          // 400 paths from the BE: "Çağ X gerekiyor", "Önce 'ch_XX'
+          // bölümünü tamamlamalısın", "Bölüm zaten tamamlandı". Show
+          // verbatim — already TR.
+          toast.error(result.error);
+        }
+      } finally {
+        setCompleting(false);
+      }
+    },
+    [completing],
+  );
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -345,6 +423,16 @@ export function ScrStoryGallery({ playerRaceKey, unlocks }: ScrStoryGalleryProps
           onNext={() => handleViewerNav(1)}
           hasPrev={viewer.index > 0 && viewerActs[viewer.index - 1]?.unlocked}
           hasNext={viewer.index < viewerActs.length - 1 && viewerActs[viewer.index + 1]?.unlocked}
+          /* Cycle 14: only surface the TAMAMLA CTA for the player's race
+           * acts that have a resolved BE chapter id. Other races stay
+           * read-only lore. */
+          chapterId={
+            viewer.race.key === playerRaceKey
+              ? playerActChapterIds?.[viewer.index]
+              : undefined
+          }
+          onComplete={handleCompleteAct}
+          completing={completing}
         />
       )}
     </div>
@@ -667,6 +755,9 @@ function ActViewer({
   hasPrev,
   hasNext,
   total,
+  chapterId,
+  onComplete,
+  completing,
 }: {
   race: NDRace;
   act: ActEntry;
@@ -676,7 +767,18 @@ function ActViewer({
   hasPrev: boolean;
   hasNext: boolean;
   total: number;
+  /**
+   * Cycle 14: BE chapter id this act maps to. When set AND the act is
+   * unlocked, the viewer renders a "TAMAMLA" CTA that POSTs to the
+   * cycle 13 BE pipeline. undefined → read-only lore (other races, or
+   * the player's race when /story-gallery couldn't resolve a chapter
+   * id, e.g. mid-load).
+   */
+  chapterId?: string;
+  onComplete?: (chapterId: string) => void;
+  completing?: boolean;
 }) {
+  const canComplete = !!chapterId && act.unlocked && !!onComplete;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -792,7 +894,7 @@ function ActViewer({
                 {act.text}
               </div>
 
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <NDButton race={race} variant="ghost" size="sm" onClick={onPrev} disabled={!hasPrev}>
                   ← ÖNCEKİ
                 </NDButton>
@@ -800,6 +902,17 @@ function ActViewer({
                 <NDButton race={race} variant="ghost" size="sm" onClick={onClose}>
                   KAPAT
                 </NDButton>
+                {canComplete && (
+                  <NDButton
+                    race={race}
+                    size="sm"
+                    onClick={() => onComplete?.(chapterId!)}
+                    disabled={completing}
+                    data-testid="scr-story-gallery-complete"
+                  >
+                    {completing ? 'KAYDEDİLİYOR…' : 'TAMAMLA ✓'}
+                  </NDButton>
+                )}
                 <NDButton race={race} size="sm" onClick={onNext} disabled={!hasNext}>
                   SONRAKİ →
                 </NDButton>

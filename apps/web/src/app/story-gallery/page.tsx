@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrStoryGallery, type NDRaceKey } from '@/components/handoff';
+import { useStory } from '@/hooks/useStory';
 
 const RACE_KEYS: NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 
@@ -27,5 +28,30 @@ export default function StoryGalleryPage() {
     setPlayerRaceKey(readPlayerRace());
   }, []);
 
-  return <ScrStoryGallery playerRaceKey={playerRaceKey} />;
+  /**
+   * Cycle 14 (STORY-FE-NEVER-COMPLETES): resolve BE chapter ids for the
+   * player's race acts so the gallery viewer can surface a "TAMAMLA" CTA
+   * that calls the cycle 13 BE pipeline (POST /story/progress/me/complete/:chapterId).
+   *
+   * The gallery only maps the FIRST TWO chapters of the player's race
+   * (matching the hardcoded `ACTS_PER_RACE=2` constant in ScrStoryGallery).
+   * The BE catalog has 6 chapters total but the gallery is a 2-act lore
+   * preview — the cinematic /story page is the canonical entry for the
+   * full arc.
+   */
+  const { chapters } = useStory(playerRaceKey);
+  const playerActChapterIds = useMemo(
+    () => ({
+      0: chapters[0]?.id,
+      1: chapters[1]?.id,
+    }),
+    [chapters],
+  );
+
+  return (
+    <ScrStoryGallery
+      playerRaceKey={playerRaceKey}
+      playerActChapterIds={playerActChapterIds}
+    />
+  );
 }

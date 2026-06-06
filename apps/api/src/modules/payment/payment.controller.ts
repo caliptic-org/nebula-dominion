@@ -18,6 +18,7 @@ import {
   ApiParam,
   ApiExcludeEndpoint,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -55,8 +56,16 @@ export class PaymentController {
     });
   }
 
+  // Per-IP throttle on the webhook callback path (C13-AUDIT-03,
+  // defense-in-depth against DDoS scripts that spam forged callbacks
+  // hoping to overwhelm the signature-verify path).  Legitimate
+  // Stripe redelivery is well under 10/min/IP — Stripe spaces its
+  // retries exponentially.  The handler already verifies-first
+  // (constructEvent throws before any DB write) so the throttler is
+  // belt-and-braces, not the primary defense.
   @Post('stripe/webhook')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiExcludeEndpoint()
   async stripeWebhook(
     @Req() req: RawBodyRequest<Request>,
@@ -100,8 +109,20 @@ export class PaymentController {
     });
   }
 
+  // Per-IP throttle on the iyzico callback (C13-AUDIT-03,
+  // defense-in-depth).  iyzico's legitimate retry frequency is well
+  // under 10/min/IP.  Combined with the verify-first gate in
+  // PaymentService.handleIyzicoCallback (forgeries throw 401 BEFORE
+  // any webhook_event INSERT, so they can't pre-poison the (provider,
+  // eventId) UNIQUE index and DoS the legitimate callback) this caps
+  // the effort a DDoS script can pour into the HMAC-verify path.
+  //
+  // DEFERRED follow-up: add an IP allowlist guard for iyzico's
+  // published webhook source IPs.  Ops needs to publish the current
+  // list before we wire it in.
   @Post('iyzico/callback')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiExcludeEndpoint()
   async iyzicoCallback(
     @Body()

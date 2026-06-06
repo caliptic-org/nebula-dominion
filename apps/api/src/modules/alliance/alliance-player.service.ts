@@ -246,11 +246,29 @@ export class AlliancePlayerService {
     return this.chatRepo.save(message);
   }
 
+  /**
+   * Reaksiyon ekle — alliance chat mesajlarına emoji düşürür.
+   *
+   * ── IDOR GUARD (cycle 6 — HIGH IDOR-ALLIANCE-CHAT-REACTION-15) ───────────
+   * Önceki sürümde sadece `requireMembership(userId)` çağrılıyordu; bu yalnız
+   * caller'ın HERHANGİ bir loncada üye olduğunu doğruluyor, çağrıdaki
+   * `messageId`'nin hangi loncaya ait olduğuna bakmıyordu. Lonca A üyesi,
+   * Lonca B'nin private chat mesaj UUID'sini öğrenirse / tahmin ederse
+   * `POST /alliance/chat/:messageId/reactions` ile B'nin thread'ini
+   * kirletebiliyordu (cross-alliance reaction pollution).
+   *
+   * Yeni davranış: mesajı çek, `channelType === 'alliance'` ise mesajın
+   * `channelId`'si (alliance UUID) üzerinden caller'ın aynı loncada üye
+   * olduğunu `alliance_members` tablosuna ek sorguyla doğrula. Aksi halde
+   * 403 ForbiddenException fırlat.
+   */
   async addReaction(userId: string, messageId: string, dto: AddReactionDto): Promise<ChatReaction> {
     await this.requireMembership(userId);
 
     const message = await this.chatRepo.findOne({ where: { id: messageId } });
     if (!message || message.isDeleted) throw new NotFoundException('Mesaj bulunamadı');
+
+    await this.assertCanAccessMessage(userId, message);
 
     const existing = await this.reactionRepo.findOne({
       where: { messageId, userId, emoji: dto.emoji },
@@ -262,8 +280,22 @@ export class AlliancePlayerService {
     );
   }
 
+  /**
+   * Reaksiyon kaldır — addReaction ile aynı IDOR yüzeyi.
+   *
+   * Önceden `reaction` lookup'u (messageId + userId + emoji) zaten caller'ın
+   * kendi reaksiyonunu hedeflediği için "veri silme" tarafında doğrudan
+   * cross-alliance abuse yoktu. Ama bir reaksiyonu önce yabancı bir mesaja
+   * iliştirip sonra kaldırmak yine yabancı thread'i mutate ediyor; tutarlılık
+   * için aynı message-scoped membership kontrolünü burada da uyguluyoruz.
+   */
   async removeReaction(userId: string, messageId: string, emoji: string): Promise<void> {
     await this.requireMembership(userId);
+
+    const message = await this.chatRepo.findOne({ where: { id: messageId } });
+    if (!message) throw new NotFoundException('Mesaj bulunamadı');
+
+    await this.assertCanAccessMessage(userId, message);
 
     const reaction = await this.reactionRepo.findOne({
       where: { messageId, userId, emoji },
@@ -271,6 +303,33 @@ export class AlliancePlayerService {
     if (!reaction) throw new NotFoundException('Reaksiyon bulunamadı');
 
     await this.reactionRepo.remove(reaction);
+  }
+
+  /**
+   * Mesaj kapsamlı erişim kontrolü.
+   * Alliance kanalı için: caller'ın mesajın `channelId`'sine (alliance UUID)
+   * karşılık gelen loncada üye olduğunu `alliance_members` tablosundan
+   * doğrular. Üye değilse 403 atar.
+   *
+   * `requireMembership` sadece "bir loncada üye mi?" sorusuna cevap verir —
+   * bu fonksiyon ise "BU mesajın loncasında üye mi?" sorusunu cevaplar.
+   * IDOR-ALLIANCE-CHAT-REACTION-15 fix'inin merkezi.
+   */
+  private async assertCanAccessMessage(userId: string, message: ChatMessage): Promise<void> {
+    if (message.channelType !== 'alliance') {
+      // Şu an sadece alliance kanal destekleniyor; başka kanal tiplerinde
+      // (örn. global / private) ayrı kontrol mantığı gerekir.
+      return;
+    }
+    if (!message.channelId) {
+      throw new ForbiddenException('Bu ittifak sohbetine reaksiyon ekleyemezsin');
+    }
+    const isMember = await this.memberRepo.findOne({
+      where: { userId, allianceId: message.channelId },
+    });
+    if (!isMember) {
+      throw new ForbiddenException('Bu ittifak sohbetine reaksiyon ekleyemezsin');
+    }
   }
 
   // ─── Donations ────────────────────────────────────────────────────────────

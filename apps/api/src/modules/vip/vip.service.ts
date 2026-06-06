@@ -114,50 +114,77 @@ export class VipService {
     nextClaimAt: string;
   }> {
     const COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h
-    let spending = await this.vipSpendingRepo.findOne({ where: { userId } });
-    if (!spending) {
-      // First-time claim: lazy-create the spending row at tier 0 so the
-      // claim still works for players who have never paid.
-      spending = await this.vipSpendingRepo.save(
-        this.vipSpendingRepo.create({
-          userId,
-          cumulativeSpendUsd: 0,
-          vipLevel: 0,
-          lastUpgradedAt: null,
-          lastDailyClaimAt: null,
-        }),
-      );
-    }
 
-    const now = new Date();
-    if (spending.lastDailyClaimAt) {
-      const since = now.getTime() - spending.lastDailyClaimAt.getTime();
-      if (since < COOLDOWN_MS) {
-        const nextClaimAt = new Date(spending.lastDailyClaimAt.getTime() + COOLDOWN_MS);
+    // Race-safe claim: the cooldown check and the timestamp write happen
+    // as a single atomic conditional UPDATE inside one transaction. Two
+    // concurrent POSTs cannot both pass the "20h since last claim" test
+    // — only one UPDATE's WHERE clause matches; the other's RETURNING
+    // comes back empty and we treat it as alreadyClaimed.
+    //
+    // Previous implementation did findOne() → JS-side cooldown check →
+    // transaction-credit. The read happened outside the transaction so
+    // two parallel requests could both observe stale lastDailyClaimAt
+    // (null or expired), both pass the guard, and both credit gems.
+    return this.dataSource.transaction(async (manager) => {
+      // Lazy-init spending row at tier 0 for never-paid players.
+      await manager.query(
+        `INSERT INTO user_vip_spending (user_id) VALUES ($1::uuid)
+           ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
+      );
+
+      // Atomic guard: the WHERE clause is the cooldown check. Postgres
+      // serializes concurrent UPDATEs on the same row, so only the first
+      // one sees last_daily_claim_at < now()-20h and gets a RETURNING
+      // row; the second sees the already-updated timestamp and returns 0
+      // rows.
+      const updated = await manager.query<Array<{
+        vip_level: number;
+        last_daily_claim_at: Date;
+      }>>(
+        `UPDATE user_vip_spending
+            SET last_daily_claim_at = NOW()
+          WHERE user_id = $1::uuid
+            AND (last_daily_claim_at IS NULL
+                 OR last_daily_claim_at < NOW() - INTERVAL '20 hours')
+          RETURNING vip_level, last_daily_claim_at`,
+        [userId],
+      );
+
+      if (updated.length === 0) {
+        // Cooldown not expired — fetch the existing timestamp so the
+        // client can render a countdown.
+        const rows = await manager.query<Array<{ last_daily_claim_at: Date }>>(
+          `SELECT last_daily_claim_at FROM user_vip_spending
+             WHERE user_id = $1::uuid`,
+          [userId],
+        );
+        const lastClaimAt = rows[0]?.last_daily_claim_at ?? new Date();
+        const nextClaimAt = new Date(
+          new Date(lastClaimAt).getTime() + COOLDOWN_MS,
+        );
         return {
           rewards: [],
           alreadyClaimed: true,
           nextClaimAt: nextClaimAt.toISOString(),
         };
       }
-    }
 
-    // Reward scales with VIP tier — Standard (0) gets the minimum gem
-    // grant so the daily claim is meaningful even for never-paid players;
-    // higher tiers get progressively more (50 → 80 → 120 → 180 → 250 …).
-    const gemReward = 50 + spending.vipLevel * 30;
-    const rewards = [
-      { type: 'gems' as const, amount: gemReward, label: `${gemReward} 💎` },
-    ];
+      const vipLevel = Number(updated[0].vip_level);
+      const claimedAt = new Date(updated[0].last_daily_claim_at);
 
-    // Credit the gems into the player's wallet AND mark the claim
-    // timestamp atomically — if the wallet write fails, the cooldown
-    // must not advance (otherwise the player loses their daily). Mirrors
-    // the lazy-init INSERT...ON CONFLICT pattern from
-    // premium.service.claimTierReward so a never-paid player who's never
-    // touched the shop still gets credited on their first claim.
-    const spendingRow = spending;
-    await this.dataSource.transaction(async (manager) => {
+      // Reward scales with VIP tier — Standard (0) gets the minimum gem
+      // grant so the daily claim is meaningful even for never-paid
+      // players; higher tiers get progressively more
+      // (50 → 80 → 120 → 180 → 250 …).
+      const gemReward = 50 + vipLevel * 30;
+      const rewards = [
+        { type: 'gems' as const, amount: gemReward, label: `${gemReward} 💎` },
+      ];
+
+      // Credit gems into the player's wallet within the same transaction
+      // so a failure here rolls back the cooldown advance — otherwise
+      // the player would lose their daily.
       await manager.query(
         `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
            ON CONFLICT (user_id) DO NOTHING`,
@@ -169,17 +196,17 @@ export class VipService {
           WHERE user_id = $1::uuid`,
         [userId, gemReward],
       );
-      spendingRow.lastDailyClaimAt = now;
-      await manager.getRepository(UserVipSpending).save(spendingRow);
+
+      this.logger.log(
+        `VIP günlük ödül: kullanıcı=${userId} VIP${vipLevel} → ${gemReward} gems`,
+      );
+
+      return {
+        rewards,
+        alreadyClaimed: false,
+        nextClaimAt: new Date(claimedAt.getTime() + COOLDOWN_MS).toISOString(),
+      };
     });
-
-    this.logger.log(`VIP günlük ödül: kullanıcı=${userId} VIP${spending.vipLevel} → ${gemReward} gems`);
-
-    return {
-      rewards,
-      alreadyClaimed: false,
-      nextClaimAt: new Date(now.getTime() + COOLDOWN_MS).toISOString(),
-    };
   }
 
   // ==========================================

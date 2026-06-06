@@ -38,6 +38,13 @@ const SLUG_TO_BACKEND_TYPE: Record<string, string> = {
   // insan
   komuta_ussu:        'command_center',
   reaktor_modulu:     'solar_plant',
+  // yakit_rafinerisi → gas_refinery: HUMAN's only Yakıt source. The
+  // nd-tokens.ts lex declares this slug but earlier wizard-steps maps
+  // omitted it, leaving the wizard's gate check blind to gas_refinery
+  // ownership. Paired with the user.service.ts seedStarterBuildings
+  // swap (mineral_extractor → gas_refinery) so the day-zero HUMAN
+  // economy actually produces gas.
+  yakit_rafinerisi:   'gas_refinery',
   kisla:              'barracks',
   bilim_akademisi:    'academy',
   subspace_anteni:    'shield_generator',

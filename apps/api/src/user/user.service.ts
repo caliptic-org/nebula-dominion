@@ -187,6 +187,22 @@ export class UserService {
     //
     // When the 3-race kits ship (currently A5 whitelist blocks
     // otomat/canavar/seytan), add their requiredBuilding rosters here.
+    //
+    // HUMAN gas-income note (F3): the HUMAN race lex in
+    // apps/web/src/lib/nd-tokens.ts declares `yakit_rafinerisi`
+    // (gas_refinery) as its unlocked Yakıt source but does NOT declare
+    // mineral_extractor — there is no race slot that maps to it. If we
+    // seed mineral_extractor for HUMAN, the player has a building they
+    // can never inspect or upgrade via the race-flavoured /base/build UI,
+    // AND their gas_per_tick stays at 0 forever because nothing produces
+    // gas from day 0. Swap mineral_extractor → gas_refinery for HUMAN:
+    // command_center already trickles +5 mineral/tick, and the player
+    // can build mineral-positive structures (additional gas_refinery or
+    // future mineral nodes) via /base/build once they have surplus.
+    // ZERG keeps mineral_extractor because its lex maps
+    // `biyokutle_havuzu` → mineral_extractor (gas comes from
+    // `subspace_damari` → gas_refinery, which the player can build
+    // later — Zerg starter still favours bio/mineral pressure).
     const starters =
       race === Race.ZERG
         ? [
@@ -198,7 +214,14 @@ export class UserService {
           ]
         : [
             { type: 'command_center',    x: 4, y: 4 },
-            { type: 'mineral_extractor', x: 3, y: 4 },
+            // HUMAN: gas_refinery instead of mineral_extractor — see
+            // block comment above. Day-zero economy: +5 mineral/tick
+            // from command_center base trickle, +10 gas/tick from
+            // gas_refinery, +20 energy/tick from solar_plant. Without
+            // this swap, gas_per_tick = 0 and every gas-cost building
+            // (barracks/academy/factory upgrade, future units) is
+            // unreachable until the player grinds a gas trade or wait.
+            { type: 'gas_refinery',      x: 3, y: 4 },
             { type: 'solar_plant',       x: 5, y: 4 },
             { type: 'barracks',          x: 4, y: 5 },
             { type: 'academy',           x: 3, y: 3 },

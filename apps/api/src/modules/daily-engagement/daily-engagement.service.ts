@@ -132,6 +132,154 @@ const STORY_PRECONDITIONS: Record<
   },
 };
 
+/**
+ * Per-achievement progression preconditions.
+ *
+ * HIGH F1-econ: a fresh account used to POST
+ *   { missionId: 'ach-6', missionType: 'achievement' }
+ * and immediately pocket 20_000 XP + 5 gems (the legendary "Nebula
+ * Lordu" payout) without ever touching the game. The FE achievements
+ * page renders unlock state from a hardcoded array; the BE accepted
+ * whatever it was told.
+ *
+ * Each probe hits the canonical table directly with raw SQL — same
+ * dependency-free design as STORY_PRECONDITIONS above. The probes are
+ * deliberately permissive on missing rows (a brand-new user with no
+ * player_levels row yet should clearly NOT unlock ach-5/ach-6) and
+ * **fail closed** when the underlying table or column has drifted —
+ * losing a legitimate claim is recoverable, accidentally minting
+ * 20k XP is not.
+ *
+ * Achievement catalog (apps/web/src/lib/achievements.ts) lists six IDs;
+ * we cover all six. Any future ach-* id without a precondition entry
+ * is also failed closed by the lookup in claim().
+ */
+const ACHIEVEMENT_PRECONDITIONS: Record<
+  string,
+  (userId: string, dataSource: DataSource) => Promise<{ met: boolean; hint: string }>
+> = {
+  // ach-1 "İlk Adımlar": at least one PvP win. Real schema is `battles`
+  // with `winner_id` (not `battles_history.outcome` per the F1-econ
+  // ticket — that table never existed in this repo; we use the
+  // canonical one). A win = winner_id matches user AND status terminal.
+  // Cheap: indexed on attacker_id / defender_id, scan is bounded by the
+  // small per-user battle history.
+  'ach-1': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ wins: string }[]>(
+        'SELECT COUNT(*)::text AS wins FROM battles WHERE winner_id = $1',
+        [userId],
+      );
+      const wins = Number(rows?.[0]?.wins ?? '0');
+      return {
+        met: wins >= 1,
+        hint: 'Önce bir PvP savaşı kazan.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+
+  // ach-2 "Mineral Baronu": cumulative mineral ≥ 10_000. No cumulative
+  // log table exists; the best available proxy is the live wallet
+  // balance in player_resources.mineral. A player who has held 10k
+  // mineral at some point either still holds it or spent it on a
+  // building — but spending it doesn't count toward the achievement
+  // here, which is a known under-grant. Better under-grant than
+  // self-claimed legendary payouts.
+  'ach-2': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ mineral: string }[]>(
+        'SELECT mineral::text AS mineral FROM player_resources WHERE player_id = $1 LIMIT 1',
+        [userId],
+      );
+      const mineral = Number(rows?.[0]?.mineral ?? '0');
+      return {
+        met: mineral >= 10_000,
+        hint: 'Önce 10.000 mineral biriktir.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+
+  // ach-3 "Düşman Avcısı": ≥ 100 enemies killed. Aggregate over
+  // subspace_sessions.enemies_killed (the only enemies_killed column
+  // in the schema). The F1-econ ticket asked for battles_history
+  // aggregation but that table doesn't exist; subspace is the canonical
+  // PvE kill log.
+  'ach-3': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ total: string | null }[]>(
+        'SELECT COALESCE(SUM(enemies_killed), 0)::text AS total ' +
+          'FROM subspace_sessions WHERE user_id = $1',
+        [userId],
+      );
+      const total = Number(rows?.[0]?.total ?? '0');
+      return {
+        met: total >= 100,
+        hint: 'Önce toplam 100 düşman alt et.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+
+  // ach-4 "Rütbe Yükselişi": at least one commander at level ≥ 5.
+  // Per-row max over player_commanders.level for the user.
+  'ach-4': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ max_level: number | null }[]>(
+        'SELECT MAX(level) AS max_level FROM player_commanders WHERE user_id = $1',
+        [userId],
+      );
+      const maxLevel = Number(rows?.[0]?.max_level ?? 0);
+      return {
+        met: maxLevel >= 5,
+        hint: 'Önce bir komutanı Seviye 5\'e ulaştır.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+
+  // ach-5 "Çağ Aşan": current_age ≥ 2.
+  'ach-5': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ current_age: number }[]>(
+        'SELECT current_age FROM player_levels WHERE user_id = $1 LIMIT 1',
+        [userId],
+      );
+      const age = rows?.[0]?.current_age ?? 1;
+      return {
+        met: age >= 2,
+        hint: 'Önce Çağ 2\'ye yüksel.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+
+  // ach-6 "Efsanevi" (Nebula Lordu): current_age ≥ 4. Legendary tier —
+  // 20k XP + 5 gems, the single highest mission payout in the catalog.
+  // Pre-fix a fresh account claimed this in one request.
+  'ach-6': async (userId, dataSource) => {
+    try {
+      const rows = await dataSource.query<{ current_age: number }[]>(
+        'SELECT current_age FROM player_levels WHERE user_id = $1 LIMIT 1',
+        [userId],
+      );
+      const age = rows?.[0]?.current_age ?? 1;
+      return {
+        met: age >= 4,
+        hint: 'Önce Çağ 4\'e yüksel.',
+      };
+    } catch {
+      return { met: false, hint: 'Bu başarı henüz açılmadı' };
+    }
+  },
+};
+
 @Injectable()
 export class DailyEngagementService {
   private readonly logger = new Logger(DailyEngagementService.name);
@@ -249,6 +397,40 @@ export class DailyEngagementService {
               (err instanceof Error ? err.message : String(err)),
           );
         }
+      }
+    }
+
+    // HIGH F1-econ: achievement-mission progression gate. Before this
+    // gate landed, a freshly-registered user could POST
+    //   { missionId: 'ach-6', missionType: 'achievement' }
+    // and pocket 20_000 XP + 5 gems instantly — the FE rendered
+    // achievement unlock state from a hardcoded array and the BE
+    // accepted whatever it was told. The ACHIEVEMENT_PRECONDITIONS
+    // table above is the canonical check now.
+    //
+    // FAIL-CLOSED policy: unlike story missions (which fall through on
+    // a probe SQL hiccup so a transient DB blip doesn't lock everyone
+    // out of progression), achievements default to BLOCKED on:
+    //   - unknown ach-* id (no probe entry)
+    //   - probe throws (already converted to {met:false} inside each probe)
+    // Achievement payouts are higher-value and lower-frequency than
+    // story missions, so the cost of a false negative (one annoyed
+    // legitimate player retries) is far less than a false positive
+    // (any fresh account farms the legendary tier).
+    if (missionType === 'achievement') {
+      const precondition = ACHIEVEMENT_PRECONDITIONS[missionId];
+      if (!precondition) {
+        this.logger.log(
+          `Achievement claim blocked — no precondition entry user=${userId} mission=${missionId}`,
+        );
+        throw new BadRequestException('Bu başarı henüz açılmadı');
+      }
+      const { met, hint } = await precondition(userId, this.dataSource);
+      if (!met) {
+        this.logger.log(
+          `Achievement claim blocked by precondition user=${userId} mission=${missionId} hint="${hint}"`,
+        );
+        throw new BadRequestException(hint);
       }
     }
 

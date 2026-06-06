@@ -349,7 +349,7 @@ drops always flow even if the killing-blow request never explicitly hit
 | GET    | `/guilds/:id/research`                     | All research states (active + historical) for a guild  |
 | GET    | `/guilds/:id/research/active`              | Slots used in the current ISO week (max 3)             |
 | GET    | `/guilds/:id/research/buffs`               | Composed `GuildBuffsSnapshot` for the guild            |
-| POST   | `/guilds/:id/research/start`               | `{ researchId, level, selectedBy }` — leader/officer only |
+| POST   | `/guilds/:id/research/start`               | `{ researchId, level }` — initiator from JWT; leader/officer only |
 | GET    | `/guilds/research/:stateId`                | Single research state detail                           |
 | GET    | `/guilds/research/:stateId/contributions`  | Per-user XP contribution leaderboard                   |
 | POST   | `/guilds/research/:stateId/contribute`     | `{ userId, xp }` — auto-completes when xp_required hit |

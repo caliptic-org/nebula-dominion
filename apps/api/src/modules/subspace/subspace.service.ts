@@ -2,10 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { SubspaceZone } from './entities/subspace-zone.entity';
 import { SubspaceSession } from './entities/subspace-session.entity';
 import { SubspaceBattle } from './entities/subspace-battle.entity';
@@ -22,6 +23,13 @@ export class SubspaceService {
     private readonly sessionRepository: Repository<SubspaceSession>,
     @InjectRepository(SubspaceBattle)
     private readonly battleRepository: Repository<SubspaceBattle>,
+    // game-server-owned tables (player_units etc.) live in the same
+    // Postgres DB but aren't modeled as TypeORM entities in the api
+    // module — raw queries via the shared DataSource are how the
+    // formations module already crosses this boundary (see
+    // FormationsService.calculatePower).
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async getZones(userLevel?: number) {
@@ -90,9 +98,9 @@ export class SubspaceService {
     return saved;
   }
 
-  async applyHazard(sessionId: string): Promise<Record<string, unknown>> {
+  async applyHazard(userId: string, sessionId: string): Promise<Record<string, unknown>> {
     const session = await this.sessionRepository.findOne({
-      where: { id: sessionId, status: 'active' },
+      where: { id: sessionId, userId, status: 'active' },
       relations: ['zone'],
     });
     if (!session) throw new NotFoundException('Aktif oturum bulunamadı');
@@ -119,15 +127,103 @@ export class SubspaceService {
     return { triggeredHazards, zoneModifiers: zone.modifiers };
   }
 
+  /**
+   * Start a subspace battle.
+   *
+   * SECURITY (C4-3):
+   *  - `defenderId` is NEVER taken from the client. Previously
+   *    `dto.defenderId` was written straight into the row, which let any
+   *    authenticated caller spoof an attack target (PvP grief vector).
+   *  - PvP battle types are rejected outright at this endpoint until a
+   *    real matchmaking service mints the pair server-side. For PvE the
+   *    defender is a bot / zone-owned entity and is represented as a null
+   *    defenderId on the row (the row already supports it — see
+   *    SubspaceBattle.defenderId).
+   *  - Each `attackerUnits[i].unitId` is verified against `player_units`
+   *    WHERE player_id = caller. Anything not owned by the caller causes
+   *    a 403 — no partial successes, no silent drops.
+   */
   async startBattle(userId: string, dto: StartSubspaceBattleDto): Promise<SubspaceBattle> {
     const zone = await this.zoneRepository.findOne({ where: { id: dto.zoneId } });
     if (!zone) throw new NotFoundException('Subspace bölgesi bulunamadı');
+
+    // ─── PvE-only gate ─────────────────────────────────────────────────
+    // DTO `@IsIn(['pve_raid', 'boss_hunt'])` already blocks PvP at the
+    // class-validator layer; this is a defense-in-depth check for any
+    // future code path that constructs the DTO programmatically.
+    if (dto.battleType !== 'pve_raid' && dto.battleType !== 'boss_hunt') {
+      throw new BadRequestException(
+        "PvP subspace savaşları şu an devre dışı: matchmaking servisi henüz hazır değil. " +
+          "Sadece 'pve_raid' veya 'boss_hunt' kullanın.",
+      );
+    }
+
+    // ─── Caller must have an active session in this zone ───────────────
+    // Defender entity for PvE is derived from session state, not body.
+    const activeSession = await this.sessionRepository.findOne({
+      where: { userId, zoneId: dto.zoneId, status: 'active' },
+    });
+    if (!activeSession) {
+      throw new BadRequestException(
+        'Bu bölgede aktif bir subspace oturumunuz yok. Önce /subspace/enter çağırın.',
+      );
+    }
+
+    // ─── Ownership check on attackerUnits ──────────────────────────────
+    // Each unit object must carry a `unitId` UUID, and every one of them
+    // must belong to the caller. Done in a single SELECT to avoid N+1.
+    const unitIds = dto.attackerUnits
+      .map((u) => (typeof u?.unitId === 'string' ? u.unitId : null))
+      .filter((x): x is string => x !== null);
+
+    if (unitIds.length !== dto.attackerUnits.length) {
+      throw new BadRequestException(
+        "attackerUnits içindeki her birim bir 'unitId' (uuid) alanı taşımalı.",
+      );
+    }
+
+    // De-dup; if FE sends the same id twice we only need to verify once.
+    const uniqueUnitIds = Array.from(new Set(unitIds));
+
+    try {
+      const owned = await this.dataSource.query<Array<{ id: string }>>(
+        `SELECT id
+           FROM player_units
+          WHERE player_id = $1
+            AND id = ANY($2::uuid[])`,
+        [userId, uniqueUnitIds],
+      );
+      const ownedSet = new Set(owned.map((r) => r.id));
+      const missing = uniqueUnitIds.filter((id) => !ownedSet.has(id));
+      if (missing.length > 0) {
+        this.logger.warn(
+          `startBattle ownership reject: user=${userId} sent ${missing.length} non-owned unitId(s): ${missing.join(',')}`,
+        );
+        throw new ForbiddenException(
+          'attackerUnits içinde sahibi olmadığınız birimler var. Sadece kendi birimlerinizi savaşa sokabilirsiniz.',
+        );
+      }
+    } catch (err) {
+      // Re-throw the auth errors we just raised, but treat a query failure
+      // (e.g. player_units missing in this DB) as a hard 500 — silently
+      // allowing the battle to start would defeat the purpose of the
+      // check. This differs from FormationsService.calculatePower which
+      // is read-only and falls back safely.
+      if (err instanceof ForbiddenException || err instanceof BadRequestException) {
+        throw err;
+      }
+      this.logger.error(
+        `unit ownership check failed for user=${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException('Birim sahipliği doğrulanamadı, lütfen tekrar deneyin.');
+    }
 
     const battle = this.battleRepository.create({
       zoneId: dto.zoneId,
       battleType: dto.battleType,
       attackerId: userId,
-      defenderId: dto.defenderId ?? null,
+      // PvE: no human defender. Encoded as null on the row.
+      defenderId: null,
       status: 'pending',
       attackerUnits: dto.attackerUnits,
       subspaceEffects: this.resolveSubspaceEffects(zone),
@@ -136,12 +232,36 @@ export class SubspaceService {
     return this.battleRepository.save(battle);
   }
 
-  async resolveBattle(battleId: string, defenderUnits: Record<string, unknown>[]): Promise<SubspaceBattle> {
+  /**
+   * Resolve a pending subspace battle.
+   *
+   * SECURITY (C4-2): the caller must be a participant in the battle —
+   * either the attacker, or (in a future PvP world) the defender. The
+   * previous version accepted ANY authenticated caller, which meant a
+   * third party could:
+   *   - end someone else's battle prematurely with garbage defenderUnits
+   *     to grief them, or
+   *   - end their OWN battle on a stranger's id to harvest rewards once
+   *     the result-rewards pipeline lands.
+   * Both are closed off by the participant assertion below.
+   */
+  async resolveBattle(
+    userId: string,
+    battleId: string,
+    defenderUnits: Record<string, unknown>[],
+  ): Promise<SubspaceBattle> {
     const battle = await this.battleRepository.findOne({
       where: { id: battleId, status: 'pending' },
       relations: ['zone'],
     });
     if (!battle) throw new NotFoundException('Savaş bulunamadı veya zaten tamamlandı');
+
+    if (battle.attackerId !== userId && battle.defenderId !== userId) {
+      this.logger.warn(
+        `resolveBattle forbidden: user=${userId} tried to resolve battle=${battleId} (attacker=${battle.attackerId}, defender=${battle.defenderId ?? 'null'})`,
+      );
+      throw new ForbiddenException('Bu savaşı sonuçlandırma yetkiniz yok.');
+    }
 
     const result = this.computeBattleResult(
       battle.attackerUnits,

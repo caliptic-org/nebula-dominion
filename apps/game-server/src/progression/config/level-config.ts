@@ -37,6 +37,23 @@ export const XP_SOURCE_WEIGHTS: Record<XpSource, number> = {
   [XpSource.QUEST_HARD]:      0,
 };
 
+// ─── Per-source daily XP caps ────────────────────────────────────────────────
+// Closes HIGH F6-econ: even with the units.service queue cap (50 in-flight
+// rows) a player could rotate completions all day. ProgressionService.awardXp
+// sums xp_transactions.final_amount WHERE source=<src> AND created_at >=
+// today_start (UTC) and refuses any grant whose addition would exceed the
+// cap. A missing entry in this map = no cap for that source (current default
+// for sources whose intended cadence is already gated by external cron / PvP
+// matchmaking / quest assignment).
+//
+// CONSTRUCTION: 5000 XP/day is comfortably above an average player's
+// building + training session (≈ 30–60 events × 80 XP = 2400–4800 XP)
+// while making the previous 800 000 XP exploit impossible — a determined
+// botter taps out at 5000 from this source per UTC day.
+export const XP_DAILY_CAPS: Partial<Record<XpSource, number>> = {
+  [XpSource.CONSTRUCTION]: 5000,
+};
+
 export const XP_BASE_AMOUNTS: Record<XpSource, number> = {
   [XpSource.DAILY_MISSION]:   200,
   [XpSource.PVE_WIN]:         150,

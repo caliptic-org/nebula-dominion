@@ -1,12 +1,16 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Param,
   ParseIntPipe,
   Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Age2ContentService } from './age2-content.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('Age 2 Content')
 @Controller('content/age2')
@@ -64,9 +68,20 @@ export class Age2ContentController {
   }
 
   @Get('progression/:userId')
-  @ApiOperation({ summary: 'Kullanıcının Çağ 2 ilerleme durumu' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kullanıcının Çağ 2 ilerleme durumu (self-only)' })
   @ApiParam({ name: 'userId', description: 'Kullanıcı UUID' })
-  getUserProgression(@Param('userId') userId: string) {
+  // SEC/IDOR: previously unauthenticated and accepted any :userId, leaking
+  // another user's progression. Now requires a JWT and the path userId must
+  // match req.user.id.
+  getUserProgression(
+    @Request() req: { user: { id: string } },
+    @Param('userId') userId: string,
+  ) {
+    if (req.user.id !== userId) {
+      throw new ForbiddenException('You can only access your own progression');
+    }
     return this.service.getUserProgression(userId);
   }
 }

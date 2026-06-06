@@ -48,8 +48,8 @@ export class SubspaceController {
   @Post('sessions/:sessionId/hazard')
   @ApiOperation({ summary: 'Rastgele tehlike olayı tetikle (oyun motoru çağrısı)' })
   @ApiParam({ name: 'sessionId', description: 'Oturum ID' })
-  triggerHazard(@Param('sessionId') sessionId: string) {
-    return this.subspaceService.applyHazard(sessionId);
+  triggerHazard(@Request() req: { user: { id: string } }, @Param('sessionId') sessionId: string) {
+    return this.subspaceService.applyHazard(req.user.id, sessionId);
   }
 
   @Post('battles')
@@ -62,10 +62,15 @@ export class SubspaceController {
   @ApiOperation({ summary: 'Subspace savaşını sonuçlandır' })
   @ApiParam({ name: 'battleId', description: 'Savaş ID' })
   resolveBattle(
+    @Request() req: { user: { id: string } },
     @Param('battleId') battleId: string,
     @Body() body: { defenderUnits: Record<string, unknown>[] },
   ) {
-    return this.subspaceService.resolveBattle(battleId, body.defenderUnits);
+    // C4-2: caller identity is forwarded so the service can assert the
+    // requester is actually a participant in this battle. Previously
+    // ANY authenticated user could resolve ANY pending battle by id —
+    // a griefing + reward-theft vector.
+    return this.subspaceService.resolveBattle(req.user.id, battleId, body.defenderUnits);
   }
 
   @Get('sessions')

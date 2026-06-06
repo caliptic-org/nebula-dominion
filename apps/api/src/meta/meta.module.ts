@@ -25,19 +25,23 @@ import { QuestProgressModule } from '../modules/quest-progress/quest-progress.mo
  * When the canonical modules land (LeaderboardModule from backend/src,
  * DailyEngagement, etc.), remove the matching stub here.
  *
- * ## S2 + F8 production gate
+ * ## Battles controller production status (cycle-3-03 + DRIFT-1 fix)
  *
- * BattlesStubController / BattlePrepStubController previously accepted a
- * client-controlled `outcome` field that minted real currency, and leaked
- * other users' battles via a device-global Map. The controllers themselves
- * now reject every request in production (404), but we also drop them from
- * the module wiring so they don't even register routes. Belt + braces:
- * if either gate fails open, the other still closes the surface. */
-const IS_PROD = process.env.NODE_ENV === 'production';
-
-const battleStubControllers = IS_PROD
-  ? []
-  : [BattlesStubController, BattlePrepStubController];
+ * Previously this module dropped `BattlesStubController` /
+ * `BattlePrepStubController` in production (NODE_ENV gate) because of the
+ * S2 + F8 history (client-controlled outcome, cross-user data leak). Those
+ * vulnerabilities are fixed: outcome is server-computed, rewards are
+ * server-stored, every entry is JWT-guarded + per-user scoped, and
+ * `claim-reward` signs its wallet fan-out with the internal service
+ * secret.
+ *
+ * The cycle-3 NODE_ENV gate meanwhile caused a regression: production
+ * 404'd /battles, BattleScreen swallowed the error, and every battle
+ * credited 0 to the wallet. Until a real `BattleModule` lands, this
+ * controller IS the production battles surface — we register it
+ * unconditionally. The "Stub" suffix in the class name is preserved only
+ * to avoid a noisy rename; the JSDoc on the controller documents the
+ * production-active status. */
 
 @Module({
   imports: [QuestProgressModule],
@@ -45,7 +49,8 @@ const battleStubControllers = IS_PROD
     LeaderboardStubController,
     MissionsStubController,
     TargetStubController,
-    ...battleStubControllers,
+    BattlesStubController,
+    BattlePrepStubController,
     ChatStubController,
     BuffsStubController,
     ResearchStubController,

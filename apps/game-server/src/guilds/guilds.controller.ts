@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -150,9 +151,30 @@ export class GuildsController {
   }
 
   // ─── User membership lookup ─────────────────────────────────────────────────
+  //
+  // F-CYCLE3-05 / C4-4 (IDOR fix): callers can only read THEIR OWN membership,
+  // essence balance, and weekly-cap usage. The caller is identified by the JWT
+  // subject claim via @CurrentUser(); the URL no longer accepts a userId path
+  // segment that could be spoofed.
+  //
+  // Legacy `/guilds/users/:userId/*` routes are retained as deprecated aliases
+  // that 403 when the URL userId does not match the JWT subject, so existing
+  // clients fail loudly instead of silently leaking another player's data. The
+  // aliases can be deleted in a follow-up once all callers migrate.
+
+  @Get('me/membership')
+  myMembership(@CurrentUser() userId: string) {
+    return this.guilds.getUserMembership(userId);
+  }
 
   @Get('users/:userId/membership')
-  membership(@Param('userId') userId: string) {
+  membership(
+    @Param('userId') pathUserId: string,
+    @CurrentUser() userId: string,
+  ) {
+    if (pathUserId !== userId) {
+      throw new ForbiddenException('Cannot read another user\'s membership');
+    }
     return this.guilds.getUserMembership(userId);
   }
 
@@ -199,13 +221,37 @@ export class GuildsController {
     return this.raids.resolveDrops(raidId);
   }
 
+  @Get('me/essence')
+  myEssenceBalance(@CurrentUser() userId: string) {
+    return this.raids.getEssenceBalance(userId);
+  }
+
+  @Get('me/essence/weekly')
+  myEssenceWeekly(@CurrentUser() userId: string) {
+    return this.raids.getWeeklyEssenceUsage(userId);
+  }
+
+  // Deprecated IDOR-safe aliases — see comment near `me/membership`.
+
   @Get('users/:userId/essence')
-  essenceBalance(@Param('userId') userId: string) {
+  essenceBalance(
+    @Param('userId') pathUserId: string,
+    @CurrentUser() userId: string,
+  ) {
+    if (pathUserId !== userId) {
+      throw new ForbiddenException('Cannot read another user\'s essence balance');
+    }
     return this.raids.getEssenceBalance(userId);
   }
 
   @Get('users/:userId/essence/weekly')
-  essenceWeekly(@Param('userId') userId: string) {
+  essenceWeekly(
+    @Param('userId') pathUserId: string,
+    @CurrentUser() userId: string,
+  ) {
+    if (pathUserId !== userId) {
+      throw new ForbiddenException('Cannot read another user\'s essence usage');
+    }
     return this.raids.getWeeklyEssenceUsage(userId);
   }
 
@@ -233,12 +279,16 @@ export class GuildsController {
 
   @Post(':id/research/start')
   @HttpCode(HttpStatus.CREATED)
-  startResearch(@Param('id') id: string, @Body() dto: StartResearchDto) {
+  startResearch(
+    @Param('id') id: string,
+    @Body() dto: StartResearchDto,
+    @CurrentUser() userId: string,
+  ) {
     return this.research.startResearch({
       guildId: id,
       researchId: dto.researchId,
       level: dto.level,
-      selectedBy: dto.selectedBy,
+      selectedBy: userId,
     });
   }
 

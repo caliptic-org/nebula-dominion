@@ -273,71 +273,100 @@ export class PremiumService {
   }
 
   async claimTierReward(userId: string, userPassId: string, tier: number): Promise<Record<string, unknown>> {
-    const userPass = await this.userPassRepository.findOne({
-      where: { id: userPassId, userId },
-      relations: ['premiumPass'],
+    // HIGH F4-econ — race-condition hardening.
+    //
+    // Previously this method did a non-transactional read of
+    // `claimedRewards`, an UPDATE to `user_currency`, and a save() back to
+    // the pass. Two parallel POSTs for the same (userPassId, tier) would
+    // both observe `alreadyClaimed === false`, both credit the wallet,
+    // and the last save() would just append a duplicate entry to
+    // claimedRewards. Net effect: double-credit.
+    //
+    // Fix: wrap the whole flow in a transaction and take a
+    // `pessimistic_write` row lock on `user_premium_pass` for the duration.
+    // The second concurrent request blocks at findOne until the first
+    // commits, then re-reads `claimedRewards` (now containing the tier)
+    // and short-circuits with a BadRequest. Wallet UPDATE + the
+    // claimedRewards save share the same tx, so they commit atomically.
+    //
+    // Deferred follow-up (documented, not implemented here): add a
+    // dedicated `user_premium_pass_claim` table with
+    // UNIQUE(user_pass_id, tier) and INSERT first to fail-fast on the
+    // duplicate-key violation. Cleaner and lock-free, but requires a
+    // migration + entity + read-side adjustments — out of scope for the
+    // minimal fix.
+    return this.dataSource.transaction(async (manager) => {
+      const userPass = await manager.findOne(UserPremiumPass, {
+        where: { id: userPassId, userId },
+        relations: ['premiumPass'],
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!userPass) throw new NotFoundException('Pass bulunamadı');
+      if (tier > userPass.currentTier) {
+        throw new BadRequestException(`Tier ${tier} henüz açılmadı. Mevcut tier: ${userPass.currentTier}`);
+      }
+
+      // Re-check under the lock — a parallel request that won the race
+      // has already mutated `claimedRewards` and committed.
+      const alreadyClaimed = userPass.claimedRewards.some(
+        (r: Record<string, unknown>) => r.tier === tier,
+      );
+      if (alreadyClaimed) {
+        throw new BadRequestException(`Tier ${tier} ödülü zaten alındı`);
+      }
+
+      const tierRewards = userPass.premiumPass.tierRewards as Array<{ tier: number; reward: Record<string, unknown> }>;
+      const tierData = tierRewards.find((t) => t.tier === tier);
+      if (!tierData) {
+        throw new NotFoundException(`Tier ${tier} için ödül tanımlanmamış`);
+      }
+
+      // Credit the reward into the player's wallet BEFORE marking it as
+      // claimed — better to retry on a wallet-update failure than to mark
+      // claimed and lose the reward entirely. The reward shape supports
+      // nebulaCoins / voidCrystals / premiumGems / xp keys (battle-pass
+      // tier rewards in the existing pass definitions follow this). Anything
+      // outside that set is silently skipped so the tier still completes
+      // and the FE toast doesn't lie.
+      const reward = tierData.reward as Partial<{
+        nebulaCoins: number; voidCrystals: number; premiumGems: number; xp: number;
+      }>;
+      const coins = Math.max(0, Math.floor(Number(reward.nebulaCoins ?? 0)));
+      const crystals = Math.max(0, Math.floor(Number(reward.voidCrystals ?? 0)));
+      const gems = Math.max(0, Math.floor(Number(reward.premiumGems ?? 0)));
+      if (coins + crystals + gems > 0) {
+        // Lazy-init the wallet row (mirrors the shop service pattern) so
+        // a player who's never touched the shop still gets their first
+        // tier claim credited. Both queries go through `manager` so they
+        // share the surrounding transaction and roll back atomically
+        // if the subsequent save() throws.
+        await manager.query(
+          `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
+             ON CONFLICT (user_id) DO NOTHING`,
+          [userId],
+        );
+        await manager.query(
+          `UPDATE user_currency
+              SET nebula_coins  = nebula_coins  + $2,
+                  void_crystals = void_crystals + $3,
+                  premium_gems  = premium_gems  + $4
+            WHERE user_id = $1::uuid`,
+          [userId, coins, crystals, gems],
+        );
+      }
+
+      userPass.claimedRewards = [
+        ...userPass.claimedRewards,
+        { tier, claimedAt: new Date(), reward: tierData.reward },
+      ];
+      await manager.save(UserPremiumPass, userPass);
+
+      this.logger.log(
+        `Tier ödülü alındı: kullanıcı=${userId}, tier=${tier}, +${coins} coins +${crystals} crystals +${gems} gems`,
+      );
+      return tierData.reward;
     });
-
-    if (!userPass) throw new NotFoundException('Pass bulunamadı');
-    if (tier > userPass.currentTier) {
-      throw new BadRequestException(`Tier ${tier} henüz açılmadı. Mevcut tier: ${userPass.currentTier}`);
-    }
-
-    const alreadyClaimed = userPass.claimedRewards.some(
-      (r: Record<string, unknown>) => r.tier === tier,
-    );
-    if (alreadyClaimed) {
-      throw new BadRequestException(`Tier ${tier} ödülü zaten alındı`);
-    }
-
-    const tierRewards = userPass.premiumPass.tierRewards as Array<{ tier: number; reward: Record<string, unknown> }>;
-    const tierData = tierRewards.find((t) => t.tier === tier);
-    if (!tierData) {
-      throw new NotFoundException(`Tier ${tier} için ödül tanımlanmamış`);
-    }
-
-    // Credit the reward into the player's wallet BEFORE marking it as
-    // claimed — better to retry on a wallet-update failure than to mark
-    // claimed and lose the reward entirely. The reward shape supports
-    // nebulaCoins / voidCrystals / premiumGems / xp keys (battle-pass
-    // tier rewards in the existing pass definitions follow this). Anything
-    // outside that set is silently skipped so the tier still completes
-    // and the FE toast doesn't lie.
-    const reward = tierData.reward as Partial<{
-      nebulaCoins: number; voidCrystals: number; premiumGems: number; xp: number;
-    }>;
-    const coins = Math.max(0, Math.floor(Number(reward.nebulaCoins ?? 0)));
-    const crystals = Math.max(0, Math.floor(Number(reward.voidCrystals ?? 0)));
-    const gems = Math.max(0, Math.floor(Number(reward.premiumGems ?? 0)));
-    if (coins + crystals + gems > 0) {
-      // Lazy-init the wallet row (mirrors the shop service pattern) so
-      // a player who's never touched the shop still gets their first
-      // tier claim credited.
-      await this.dataSource.query(
-        `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
-           ON CONFLICT (user_id) DO NOTHING`,
-        [userId],
-      );
-      await this.dataSource.query(
-        `UPDATE user_currency
-            SET nebula_coins  = nebula_coins  + $2,
-                void_crystals = void_crystals + $3,
-                premium_gems  = premium_gems  + $4
-          WHERE user_id = $1::uuid`,
-        [userId, coins, crystals, gems],
-      );
-    }
-
-    userPass.claimedRewards = [
-      ...userPass.claimedRewards,
-      { tier, claimedAt: new Date(), reward: tierData.reward },
-    ];
-    await this.userPassRepository.save(userPass);
-
-    this.logger.log(
-      `Tier ödülü alındı: kullanıcı=${userId}, tier=${tier}, +${coins} coins +${crystals} crystals +${gems} gems`,
-    );
-    return tierData.reward;
   }
 
   async cancelPass(userId: string, userPassId: string): Promise<UserPremiumPass> {

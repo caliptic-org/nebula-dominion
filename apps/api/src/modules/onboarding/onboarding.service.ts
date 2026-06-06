@@ -85,42 +85,75 @@ export class OnboardingService {
       throw new NotFoundException(`Tutorial adımı '${dto.stepId}' bulunamadı`);
     }
 
-    // The /tutorial UI collapses the 10 backend steps into 6 screens (see
-    // apps/web/src/app/tutorial/page.tsx UI_STEP_TO_BACKEND_STEP_ID).
-    // So a player walking the UI in order will report e.g. `welcome` →
-    // `first_building` → `resource_collection` → ... skipping the
-    // intermediate `race_selection`, `base_overview`, etc.
+    // Sequential progression rule (F-CYCLE3-02 fix):
     //
-    // Strict `currentStep === dto.stepId` would reject every UI advance
-    // past the first. Instead, accept any step that is forward-or-equal
-    // in the canonical order: we fast-forward `currentStep` to the
-    // requested step, marking every skipped intermediate as completed
-    // (without a reward — only the explicitly-reported step earns).
+    // The previous rule allowed any `targetIdx >= currentIdx` and
+    // fast-forwarded all intermediate steps to completed. That was the
+    // bypass vector — a tampered client could POST {stepId:"tutorial_complete"}
+    // from currentStep="welcome" and the server would mark every step
+    // completed, flip isCompleted=true, and grant the final-step gift.
     //
-    // Backward jumps are still rejected — that's the URL-tamper case the
-    // audit fix is closing.
+    // New rule: only accept `targetIdx <= currentIdx + 1`.
+    //   - target === current      → idempotent re-post of the current step
+    //                                (FE retry on flaky connection). The
+    //                                "already completed" guard below still
+    //                                blocks double-rewarding.
+    //   - target === current + 1  → normal forward advance, one step at a time.
+    //   - target  >  current + 1  → BadRequest. The player must walk the
+    //                                tutorial in order; no jumps.
+    //   - target  <  current      → BadRequest (backward jump).
+    //
+    // Coordinates with A3: race-select flow pre-completes welcome+race_selection
+    // server-side, so the FE never has to skip forward from welcome.
     const currentIdx = TUTORIAL_STEP_IDS.indexOf(record.currentStep);
     const targetIdx = TUTORIAL_STEP_IDS.indexOf(dto.stepId);
     if (targetIdx < 0) {
       // Defensive — getStepById already guarded this, but keep the safety.
       throw new NotFoundException(`Tutorial adımı '${dto.stepId}' bulunamadı`);
     }
+
+    // Idempotency safety net (audit blocker F1, 2026-06-06).
+    //
+    // Some progression chains complete a step server-side before the FE
+    // ever reports it. UserService.selectRace, for instance, calls
+    // completeStep({stepId:'race_selection'}) the moment the player picks
+    // a race — by the time the FE renders /tutorial?step=1 and tries to
+    // POST whatever it thinks step 1 should be, that step may already be
+    // in `completedSteps`. The same problem happens on naive retries
+    // (network flake, double-tap on Advance).
+    //
+    // Old behavior: 400 "Adım '...' zaten tamamlandı" — and depending on
+    // the FE map this could also trip the `targetIdx < currentIdx` guard,
+    // wedging the player on the current screen with no way forward.
+    //
+    // New behavior: pure no-op. Return 200 with current progress and
+    // `reward: null` (the step already paid out the first time, if it had
+    // a reward — we will not pay it again). No DB write, no currentStep
+    // movement. This must run BEFORE the order-rule guards below: an
+    // already-completed step is by definition behind currentStep, and we
+    // don't want to surface that as an error.
+    if (record.completedSteps.includes(dto.stepId)) {
+      this.logger.debug(
+        `completeStep idempotent no-op: user=${userId} step='${dto.stepId}' already completed`,
+      );
+      return { progress: record, reward: null };
+    }
+
     if (targetIdx < currentIdx) {
       throw new BadRequestException(
         `Mevcut adım '${record.currentStep}', '${dto.stepId}' değil`,
       );
     }
-
-    if (record.completedSteps.includes(dto.stepId)) {
-      throw new BadRequestException(`Adım '${dto.stepId}' zaten tamamlandı`);
+    if (targetIdx > currentIdx + 1) {
+      throw new BadRequestException(
+        'Adımları sırayla tamamla — bir tutorial adımı atlayamazsın',
+      );
     }
 
-    // Fast-forward: mark every step between current and target inclusive
-    // as completed (skipping already-completed ones — idempotent).
-    const newlyCompleted = TUTORIAL_STEP_IDS.slice(currentIdx, targetIdx + 1).filter(
-      (id) => !record.completedSteps.includes(id),
-    );
-    record.completedSteps = [...record.completedSteps, ...newlyCompleted];
+    // Only the explicitly-reported step is marked completed. The strict
+    // <= current+1 rule above guarantees there are no intermediate steps
+    // to fast-forward through.
+    record.completedSteps = [...record.completedSteps, dto.stepId];
 
     if (dto.stepId === 'race_selection' && dto.selectedRace) {
       record.selectedRace = dto.selectedRace;

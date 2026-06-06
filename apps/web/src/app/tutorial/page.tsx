@@ -24,32 +24,47 @@ import { api, FetchError } from '@/lib/api';
 const STORAGE_KEY = 'nebula:tutorial:v1';
 
 /**
- * Backend stepId for each of the 6 UI tutorial screens.
+ * Backend stepId(s) for each of the 6 UI tutorial screens.
  *
  * The backend (apps/api/src/modules/onboarding/onboarding.config.ts) defines
- * 10 named steps. The UI shows 6 condensed screens. Each UI advance reports
- * completion for the matching backend step so the api's TutorialProgress row
- * flips `isCompleted = true` only after all 6 UI taps have been logged in
- * order. game-server's tutorial-complete handler reads that flag before
- * granting the starter gift, which closes the URL-jump exploit
- * (`/tutorial?step=6` → Advance → harvest).
+ * 10 named steps in a strict linear order. The UI shows 6 condensed screens.
+ * Each UI advance reports completion for the matching backend step(s) so the
+ * api's TutorialProgress row flips `isCompleted = true` only after every
+ * backend step has been logged. game-server's tutorial-complete handler
+ * reads that flag before granting the starter gift, which closes the URL-
+ * jump exploit (`/tutorial?step=6` → Advance → harvest).
  *
- * We deliberately collapse the 10 backend steps to the 6 the UI actually
- * walks through; the missing intermediate steps stay unrecorded — that's
- * fine because the gate only checks the final `isCompleted` flag, which
- * flips on `tutorial_complete`.
+ * IMPORTANT: by the time the UI reaches /tutorial?step=1, the user has
+ * already completed `welcome` + `race_selection` server-side. That happens
+ * inside UserService.selectRace, which calls
+ * onboardingService.completeStep({stepId:'race_selection'}) immediately
+ * after persisting `user.race`. The backend's `currentStep` is therefore
+ * `base_overview` (not `welcome`) before the player ever taps Advance on
+ * the first tutorial screen. (Audit blocker F1, 2026-06-06 — old map
+ * pointed step 1 → `welcome`, which 400'd as both backward and already-
+ * completed and trapped fresh accounts.)
  *
- * Tuple uses the literal `tutorial_step_N` prefix the audit spec mandated
- * (kept as a comment marker so future readers can grep for the exploit
- * fix). The actual stepId sent to the api is the named backend value.
+ * onboarding.service.ts enforces a strict `targetIdx <= currentIdx + 1`
+ * rule (F-CYCLE3-02 anti-exploit fix) — no fast-forwarding past more than
+ * one step. So when a single UI screen needs to cover multiple backend
+ * steps, we POST them sequentially, one per call. Mapping is an array
+ * of stepIds in the order they should be reported.
+ *
+ * Mapping covers all 8 remaining backend steps across 6 UI screens:
+ *   screen 1: base_overview              (1)
+ *   screen 2: first_building             (1)
+ *   screen 3: resource_collection        (1)
+ *   screen 4: first_unit, combat_basics, first_pve_battle (3 — combat arc)
+ *   screen 5: progression_intro          (1)
+ *   screen 6: tutorial_complete          (1)
  */
-const UI_STEP_TO_BACKEND_STEP_ID: Record<number, string> = {
-  1: 'welcome', // tutorial_step_1
-  2: 'first_building', // tutorial_step_2
-  3: 'resource_collection', // tutorial_step_3
-  4: 'first_pve_battle', // tutorial_step_4
-  5: 'progression_intro', // tutorial_step_5
-  6: 'tutorial_complete', // tutorial_step_6
+const UI_STEP_TO_BACKEND_STEP_IDS: Record<number, string[]> = {
+  1: ['base_overview'], // tutorial_step_1 — welcome+race already done server-side
+  2: ['first_building'], // tutorial_step_2
+  3: ['resource_collection'], // tutorial_step_3
+  4: ['first_unit', 'combat_basics', 'first_pve_battle'], // tutorial_step_4 (combat arc)
+  5: ['progression_intro'], // tutorial_step_5
+  6: ['tutorial_complete'], // tutorial_step_6
 };
 
 interface TutorialProgress {
@@ -134,22 +149,31 @@ function TutorialFlow() {
     // surface that as a hint and block the navigation. NotFound (404) for an
     // unknown stepId follows the same path: don't advance, tell the player.
     if (hasSession()) {
-      const backendStepId = UI_STEP_TO_BACKEND_STEP_ID[step];
-      try {
-        await api.post('/onboarding/step/complete', {
-          stepId: backendStepId,
-        });
-      } catch (err) {
-        if (err instanceof FetchError && (err.status === 400 || err.status === 404)) {
-          // Out-of-order step or unknown stepId — don't move forward, surface
-          // the api's translated message so the player understands.
-          toast.info(err.message || tTutorial('stepBlocked'));
-          return;
+      // Some UI screens cover more than one backend step (e.g. screen 4's
+      // combat arc bundles `first_unit` + `combat_basics` + `first_pve_battle`).
+      // POST them sequentially — the api's strict targetIdx <= currentIdx+1
+      // rule rejects multi-step jumps. The api's idempotency safety net
+      // also means a retry of an already-completed step is a 200 no-op.
+      const backendStepIds = UI_STEP_TO_BACKEND_STEP_IDS[step] ?? [];
+      for (const backendStepId of backendStepIds) {
+        try {
+          await api.post('/onboarding/step/complete', {
+            stepId: backendStepId,
+          });
+        } catch (err) {
+          if (err instanceof FetchError && (err.status === 400 || err.status === 404)) {
+            // Out-of-order step or unknown stepId — don't move forward, surface
+            // the api's translated message so the player understands.
+            toast.info(err.message || tTutorial('stepBlocked'));
+            return;
+          }
+          // 401 already triggers a global redirect via api.ts. Other transport
+          // errors shouldn't trap the player — log via toast and let them keep
+          // going so a flaky network doesn't permanently lock the tutorial.
+          toast.info(tTutorial('stepSyncFailed'));
+          // Break out of the loop so we don't pile up errors; advance anyway.
+          break;
         }
-        // 401 already triggers a global redirect via api.ts. Other transport
-        // errors shouldn't trap the player — log via toast and let them keep
-        // going so a flaky network doesn't permanently lock the tutorial.
-        toast.info(tTutorial('stepSyncFailed'));
       }
     }
 

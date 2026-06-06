@@ -13,16 +13,18 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
- * Battle + battle-prep stub.
+ * Battle + battle-prep controller (production-active, name kept for history).
  *
  * Wraps the deterministic logic the /battle-prep, /battle and /battle-result
- * screens need so they can talk to a real endpoint while the full backend
- * BattleModule lands. State is in-memory only — battles created here vanish on
- * container restart.
+ * screens need. Until a real `BattleModule` lands with persistent battle
+ * tables, this controller IS the production battles surface — the "Stub"
+ * suffix is misleading and kept only to avoid a churny rename. State is
+ * in-memory only; battles vanish on container restart, but the wallet
+ * grants they fan out to game-server are persistent (server-authoritative).
  *
  * ## Security history (S2 + F8 fix)
  *
- * Before this fix the controller had **two critical vulnerabilities**:
+ * Before the cycle-3 fix the controller had **two critical vulnerabilities**:
  *
  * 1. **Client-controlled `outcome`** — POST /battles accepted
  *    `{ outcome: 'won' }` from the body and immediately returned a 'won'
@@ -38,29 +40,50 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
  *    users' battle outcomes / rewards to anyone. GET /battles/:id and
  *    /battles/history had the same scoping gap.
  *
+ * ## Cycle-3-03 + DRIFT-1 fix (this revision)
+ *
+ * After cycle 3 a third bug emerged: POST /battles returned
+ * `status="in-progress"` with `rewards={0,…,0}` and only `advance()` (on
+ * GET /battles/:id, rolled forward turn-by-turn) ever wrote real rewards.
+ * BattleScreen calls `claim-reward` immediately after POST — so the battle
+ * was never resolved, `claim-reward` 404'd on `status !== 'won' | 'lost'`,
+ * and every battle credited 0 to the wallet. Additionally, the module-level
+ * gate in `meta.module.ts` removed the controller in production entirely,
+ * so production 404'd outright. Net: zero-credit battles everywhere.
+ *
+ * Fix:
+ * - POST /battles now **resolves the battle synchronously**: outcome is
+ *   computed from `attacker.power vs defender.power + small mulberry32
+ *   jitter`, rewards are rolled from the existing victory/defeat tables,
+ *   and the returned `BattleState` has terminal `status="won"|"lost"` plus
+ *   non-zero rewards. `claim-reward` succeeds on the first call.
+ * - `assertNonProd()` is removed from every handler. The module-level gate
+ *   in `meta.module.ts` is loosened to always register the controller. This
+ *   IS the production battles module until a real one ships.
+ *
  * ## New contract
  *
  * - Every endpoint requires a valid JWT (`@UseGuards(JwtAuthGuard)` at the
  *   class level). Anonymous requests get 401.
  * - The `outcome` field in the POST body is **ignored**. The server
- *   randomizes a fair-feeling outcome (currently a 50/50 coin flip seeded
- *   off the new battle id). A real PvE/PvP battle module will replace this
- *   stub with deterministic simulation against actual unit data.
+ *   computes the outcome from per-race power values plus a mulberry32 jitter
+ *   seeded off the new battle id. A future real PvE/PvP battle module will
+ *   replace this with deterministic simulation against actual unit data.
  * - Battles are stored keyed by `${userId}:${battleId}` so one user can
  *   never read or roll forward another user's battle. GET /battles/:id
  *   returns 404 if the battle was created by a different user; GET
  *   /battles/me/last and /battles/history only look at the caller's own
  *   battles.
- * - In production (`NODE_ENV === 'production'`), every handler short-circuits
- *   with 404. The stub is dev/preview-only — the real BattleModule must own
- *   the production surface. Module-level gating lives in `meta.module.ts`
- *   but the runtime guard here is the belt-and-braces version.
+ * - Production-active: no `NODE_ENV` short-circuit. The cross-user scoping
+ *   + server-randomized outcome from S2/F8 still hold; only the "dev-only"
+ *   404 wrapper is dropped.
  *
  * Routes:
- * - POST /battles               → create + return new battle id (outcome server-randomized)
- * - GET  /battles/:id           → battle state (rolls forward each call, owner-scoped)
+ * - POST /battles               → create + immediately resolve battle (outcome server-computed)
+ * - GET  /battles/:id           → battle state (owner-scoped; resolves lazily if first read)
  * - GET  /battles/me/last       → most-recent battle for the caller
  * - GET  /battles/history       → caller's last 20 battles
+ * - POST /battles/:id/claim-reward → credit caller's wallet, idempotent
  * - GET  /battle-prep/formation → returns the saved formation (stub default)
  * - POST /battle-prep/formation → echo back (no persistence in stub)
  */
@@ -100,20 +123,6 @@ function storeKey(userId: string, battleId: string): string {
   return `${userId}:${battleId}`;
 }
 
-function isProd(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
-
-/**
- * Throws 404 if called in production. The stub is dev/preview-only —
- * production deployments must wire the real BattleModule instead.
- */
-function assertNonProd(): void {
-  if (isProd()) {
-    throw new NotFoundException('Not found');
-  }
-}
-
 function rand(seed: number): number {
   // mulberry32
   let t = seed + 0x6d2b79f5;
@@ -122,19 +131,105 @@ function rand(seed: number): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
+/**
+ * Per-race power proxy used by the synchronous outcome resolver. Real
+ * BattleModule will compute power from the player's actual fleet/units;
+ * for now these are flat balance-targeted values that keep the matchup
+ * close enough that the mulberry32 jitter still swings results either way.
+ */
+const RACE_POWER: Record<RaceKey, number> = {
+  insan:    5_280,
+  zerg:     5_120,
+  otomat:   5_400,
+  canavar:  5_360,
+  seytan:   5_200,
+};
+
+/**
+ * Hash the battle id into a stable seed for mulberry32. We can't use the
+ * raw string with our numeric rand(), so fold the char codes. The result
+ * differs per battle id so two POSTs in the same second still roll
+ * independent outcomes / rewards.
+ */
+function seedFromId(id: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Create + immediately resolve a battle.
+ *
+ * Cycle-3-03 fix: previously this returned `status="in-progress"` with
+ * zero rewards, leaving resolution to `advance()` (which only fires on
+ * GET /battles/:id polls). BattleScreen never polls — it claim-rewards
+ * straight after POST — so the battle stayed in-progress, claim-reward
+ * 404'd, and wallet credit was always 0.
+ *
+ * Outcome: attacker_power vs defender_power, with a ±15% mulberry32
+ * jitter so identical matchups still vary.
+ * Rewards: the same victory/defeat reward tables `advance()` used at
+ * `turnsElapsed >= maxTurns`. We surface `turnsElapsed = maxTurns` so the
+ * `winProb` chip in the UI matches the resolved outcome.
+ */
 function newBattle(attacker: RaceKey, defender: RaceKey): BattleState {
   const id = `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
-  const winProb = 50 + Math.floor(rand(id.length) * 30); // 50–80
+  const seed = seedFromId(id);
+
+  const attackerPower = RACE_POWER[attacker] ?? 5_000;
+  const defenderPower = RACE_POWER[defender] ?? 5_000;
+
+  // ±15% jitter on each side, sourced from mulberry32 so the outcome is
+  // deterministic given the battle id (helps reproducible bug triage).
+  const jitterA = 0.85 + rand(seed) * 0.30;
+  const jitterD = 0.85 + rand(seed ^ 0x9e3779b9) * 0.30;
+  const effectiveA = attackerPower * jitterA;
+  const effectiveD = defenderPower * jitterD;
+
+  const won = effectiveA >= effectiveD;
+  const winProb = Math.max(
+    20,
+    Math.min(95, Math.round((effectiveA / (effectiveA + effectiveD)) * 100)),
+  );
+
+  // Roll rewards from the same tables `advance()` used at terminal state.
+  // Re-seed the roll so it doesn't perfectly correlate with the outcome.
+  const roll = rand(seed ^ 0xdeadbeef);
+
+  const rewards = won
+    ? {
+        gold:    1500 + Math.floor(roll * 1000),
+        gems:    50,
+        xp:      320,
+        mineral: 400 + Math.floor(roll * 600),
+        gas:     120 + Math.floor(roll * 200),
+        science: 15  + Math.floor(roll * 20),
+      }
+    : { gold: 250, gems: 0, xp: 80, mineral: 60, gas: 20, science: 3 };
+
+  const log = [
+    { turn: 0, text: 'Filolar konuşlandı. İlk dalga geliyor.' },
+    {
+      turn: 1,
+      text: won
+        ? 'Düşman filosu yok edildi. Zafer.'
+        : 'Filomuz geri çekildi. Yenilgi kabul edildi.',
+    },
+  ];
+
   return {
     id,
     attackerRace: attacker,
     defenderRace: defender,
-    status: 'in-progress',
-    turnsElapsed: 0,
+    status: won ? 'won' : 'lost',
+    turnsElapsed: 1,
     maxTurns: 8,
     winProb,
-    log: [{ turn: 0, text: 'Filolar konuşlandı. İlk dalga geliyor.' }],
-    rewards: { gold: 0, gems: 0, xp: 0, mineral: 0, gas: 0, science: 0 },
+    log,
+    rewards,
     createdAt: new Date().toISOString(),
   };
 }
@@ -193,14 +288,14 @@ export class BattlesStubController {
       attackerRace?: RaceKey;
       defenderRace?: RaceKey;
       /**
-       * @deprecated Ignored by the server. Outcome is now server-randomized;
-       *  FE-supplied `outcome` field is ignored. A real PvE/PvP battle module
-       *  will replace this stub.
+       * @deprecated Ignored by the server. Outcome is now server-computed
+       *  (attacker power vs defender power + mulberry32 jitter) and the
+       *  battle resolves synchronously inside POST /battles. A real PvE/PvP
+       *  battle module will replace this stub.
        */
       outcome?: unknown;
     },
   ) {
-    assertNonProd();
     const userId: string = req.user.id;
 
     // Outcome is now server-randomized; FE-supplied 'outcome' field is
@@ -215,7 +310,6 @@ export class BattlesStubController {
   @Get('me/last')
   @ApiOperation({ summary: 'Last battle for the authenticated caller (stub)' })
   last(@Request() req: any) {
-    assertNonProd();
     const userId: string = req.user.id;
     const prefix = `${userId}:`;
     let latest: BattleState | null = null;
@@ -231,7 +325,6 @@ export class BattlesStubController {
   @Get('history')
   @ApiOperation({ summary: 'My last 20 battles (stub — caller-scoped)' })
   history(@Request() req: any) {
-    assertNonProd();
     const userId: string = req.user.id;
     const prefix = `${userId}:`;
     const mine: BattleState[] = [];
@@ -253,7 +346,6 @@ export class BattlesStubController {
   @Get(':id')
   @ApiOperation({ summary: 'Get battle state (rolls a turn forward, owner-scoped)' })
   get(@Request() req: any, @Param('id') id: string) {
-    assertNonProd();
     const userId: string = req.user.id;
     const key = storeKey(userId, id);
     let state = BATTLES.get(key);
@@ -303,8 +395,10 @@ export class BattlesStubController {
    *     `InternalServiceGuard` checks. The user JWT never reaches the
    *     wallet endpoint anymore.
    *
-   * The stub is dev/preview-only — `assertNonProd()` 404s in production
-   * so the placeholder economy can't leak into a live deploy.
+   * Production-active (cycle-3-03 fix): this controller is the real
+   * production battles surface until a dedicated BattleModule lands. The
+   * NODE_ENV gate is gone — server-randomized outcome + per-user scoping +
+   * server-stored rewards are sufficient to keep the economy honest.
    */
   @Post(':id/claim-reward')
   @ApiOperation({
@@ -321,7 +415,6 @@ export class BattlesStubController {
     walletCredited: boolean;
     rewards: BattleState['rewards'];
   }> {
-    assertNonProd();
     const userId: string = req.user.id;
     const key = storeKey(userId, id);
     const state = BATTLES.get(key);
@@ -425,7 +518,6 @@ export class BattlePrepStubController {
   @Get('formation')
   @ApiOperation({ summary: 'Saved formation for this player (stub default)' })
   getFormation() {
-    assertNonProd();
     return {
       id: 'fm_default',
       name: 'Saldırı Hattı',
@@ -443,7 +535,6 @@ export class BattlePrepStubController {
   @Post('formation')
   @ApiOperation({ summary: 'Save formation (stub — echoes input)' })
   setFormation(@Body() body: unknown) {
-    assertNonProd();
     return { saved: true, formation: body, at: new Date().toISOString() };
   }
 }

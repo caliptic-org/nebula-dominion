@@ -499,9 +499,11 @@ export const guildApi = {
 
   getMembership: async (): Promise<{ guildId: string; role: 'leader' | 'officer' | 'member' } | null> => {
     if (!isBackendReady()) return wait(null);
-    const userId = getCurrentUserId();
+    // F-CYCLE3-05: the caller's identity is taken from the JWT subject by the
+    // server (no userId path segment). Stops one player from reading another
+    // player's membership by guessing/spoofing the user id in the URL.
     try {
-      const m = await fetcher<BackendMember | null>(`/guilds/users/${encodeURIComponent(userId)}/membership`);
+      const m = await fetcher<BackendMember | null>(`/guilds/me/membership`);
       if (!m) return null;
       return { guildId: m.guildId, role: m.role };
     } catch (err) {

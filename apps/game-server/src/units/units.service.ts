@@ -35,6 +35,23 @@ const PRODUCTION_BUILDINGS = new Set<BuildingType>([
   BuildingType.ACADEMY,
 ]);
 
+/**
+ * Hard cap on the number of in-flight (not-yet-complete) training queue
+ * rows a single player can hold. Without this guard, trainUnit() only
+ * validated building + count and a determined client could stack thousands
+ * of parallel orders — each completed row grants CONSTRUCTION XP (80 base)
+ * via awardXp, so 10 000 rows = 800 000 XP burst, fast-tracking past the
+ * intended XP curve and bypassing the building-tier age gate.
+ *
+ * The cap pairs with the per-source XP daily cap in level-config.ts; queue
+ * cap is the first wall, XP daily cap the second. 50 is comfortably above
+ * what a normal player builds (a typical roster bottoms-up training session
+ * queues 5–15 at a time) but low enough that the XP exploit becomes
+ * insignificant: 50 × 80 = 4 000 XP per full-queue cycle, still under the
+ * 5 000 daily CONSTRUCTION cap.
+ */
+const MAX_TRAINING_QUEUE_PER_PLAYER = 50;
+
 @Injectable()
 export class UnitsService {
   private readonly logger = new Logger(UnitsService.name);
@@ -105,6 +122,23 @@ export class UnitsService {
     // wallet 5× and the queue row waits 5× as long before flipping
     // complete (worker then spawns 5 marines from this single row).
     const count = Math.max(1, Math.min(99, dto.count ?? 1));
+
+    // ── Queue cap guard (HIGH F6-econ) ──────────────────────────────
+    // Count in-flight (not-yet-complete) queue rows for this player and
+    // refuse the train order if adding `count` more rows would push past
+    // MAX_TRAINING_QUEUE_PER_PLAYER. Done BEFORE resource deduction so a
+    // refused order doesn't burn minerals/gas. The check is best-effort
+    // (race-safe enough for a single player's tab; not transactionally
+    // serialised) — even with concurrent clicks the worst case is a
+    // handful over the cap, which the XP daily cap still mops up.
+    const inFlightCount = await this.queueRepo.count({
+      where: { playerId, isComplete: false },
+    });
+    if (inFlightCount + count > MAX_TRAINING_QUEUE_PER_PLAYER) {
+      throw new BadRequestException(
+        `Eğitim kuyruğu doldu (max ${MAX_TRAINING_QUEUE_PER_PLAYER} birim). Mevcut: ${inFlightCount}`,
+      );
+    }
 
     // ── Commander bonus ─────────────────────────────────────────────
     // trainCostMultiplier: negative = discount (Azurath: -0.20 → -20%).
@@ -293,11 +327,24 @@ export class UnitsService {
    *  fixed so high-tier units don't outrun the grid. Persisted directly
    *  on the row so combat math doesn't have to re-derive scaling.
    *
-   *  No resource cost yet — when an "upgrade fee" mechanic lands, hook
-   *  it through ResourcesService.canAfford/deduct the same way
-   *  startConstruction does. For now this is the "free upgrade" demo
-   *  flow so the /inventory + /base/building YÜKSELT buttons actually
-   *  do something. */
+   *  Charges a 1.5^currentLevel-scaled resource cost (mineral/gas/energy
+   *  from UNIT_CONFIGS) AND writes a future `upgradeCompletedAt` whose
+   *  duration scales 60 * 2^level seconds (honouring
+   *  GAME_SPEED_MULTIPLIER). Mirrors buildings.service.upgradeBuilding's
+   *  cost+cooldown pattern — pre-fix this endpoint was free and
+   *  uncapped, letting a player chain 9 POSTs straight to L10 for free.
+   *
+   *  Errors:
+   *    - NotFound: unit missing / not alive / not owned by caller
+   *    - BadRequest: at max level (10)
+   *    - BadRequest: prior upgrade cooldown still ticking
+   *    - BadRequest: insufficient resources (M/G/E) for level cost
+   *
+   *  Merge-only units (Sniper/Mecha/Genetic/Captain etc.) carry
+   *  zeroed-out `cost` in UNIT_CONFIGS — they're explicitly free to
+   *  upgrade today (cost scales from 0 → 0 at every level). Cooldown
+   *  still applies so the rate-limit gate catches them even if the
+   *  wallet check is a no-op. */
   async upgradeUnit(playerId: string, unitId: string): Promise<PlayerUnit> {
     const unit = await this.unitRepo.findOne({
       where: { id: unitId, playerId, isAlive: true },
@@ -308,13 +355,81 @@ export class UnitsService {
     if (unit.level >= 10) {
       throw new BadRequestException(`Unit is already at max level (10).`);
     }
+
+    // Cooldown gate — reject if the previous upgrade's deadline hasn't
+    // elapsed. Mirrors buildings.service's constructionCompleteAt check.
+    // Units that have never been upgraded have upgradeCompletedAt=null
+    // and pass straight through.
+    const now = new Date();
+    if (
+      unit.upgradeCompletedAt &&
+      unit.upgradeCompletedAt.getTime() > now.getTime()
+    ) {
+      const remainingSec = Math.ceil(
+        (unit.upgradeCompletedAt.getTime() - now.getTime()) / 1000,
+      );
+      throw new BadRequestException(
+        `Bir önceki yükseltme henüz tamamlanmadı (${remainingSec}s kaldı).`,
+      );
+    }
+
+    // Per-level cost scaling — base cost from UNIT_CONFIGS times
+    // 1.5^currentLevel. Pre-fix the endpoint debited nothing and
+    // capped only at L10, so a player could fire 9 POSTs and reach
+    // max stats instantly. The 1.5× curve matches the building
+    // upgrade scale in buildings.service.
+    const baseCfg = UNIT_CONFIGS[unit.type];
+    const upgradeCost = (() => {
+      if (!baseCfg) {
+        // Defensive fallback: unknown unit type has no base cost
+        // record. Skip the wallet check (cooldown gate still applies)
+        // rather than 500 — same convention as completeTraining's
+        // `if (!config) continue` branch above.
+        return { mineral: 0, gas: 0, energy: 0 };
+      }
+      const scale = Math.pow(1.5, unit.level);
+      return {
+        mineral: Math.round((baseCfg.cost.mineral ?? 0) * scale),
+        gas: Math.round((baseCfg.cost.gas ?? 0) * scale),
+        energy: Math.round((baseCfg.cost.energy ?? 0) * scale),
+      };
+    })();
+
+    const hasCost =
+      upgradeCost.mineral > 0 ||
+      upgradeCost.gas > 0 ||
+      upgradeCost.energy > 0;
+    if (hasCost) {
+      const canAfford = await this.resources.canAfford(playerId, upgradeCost);
+      if (!canAfford) {
+        throw new BadRequestException(
+          `Insufficient resources. Required: ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E (upgrade ${unit.type} → L${unit.level + 1})`,
+        );
+      }
+      await this.resources.deduct(playerId, upgradeCost);
+    }
+
+    // Cooldown duration — 60 * 2^level seconds, scaled by
+    // GAME_SPEED_MULTIPLIER through scaledDurationSec. At L1→L2 the
+    // baseline is 120s; at L9→L10 it's 30720s (~8.5h). At 1000× game
+    // speed this collapses to ~30ms, keeping QA iteration fast.
+    const cooldownSec = scaledDurationSec(60 * Math.pow(2, unit.level));
+
     unit.level += 1;
     const mul = 1.1;
     unit.maxHp = Math.round(unit.maxHp * mul);
     unit.hp = Math.min(unit.hp + Math.round(unit.maxHp * 0.2), unit.maxHp);
     unit.attack = Math.round(unit.attack * mul);
     unit.defense = Math.round(unit.defense * mul);
-    return this.unitRepo.save(unit);
+    unit.upgradeCompletedAt =
+      cooldownSec === 0
+        ? null
+        : new Date(now.getTime() + cooldownSec * 1000);
+    const saved = await this.unitRepo.save(unit);
+    this.logger.log(
+      `Player ${playerId} upgraded unit ${unitId} (${unit.type}) to L${unit.level} (cost ${upgradeCost.mineral}M ${upgradeCost.gas}G ${upgradeCost.energy}E, cooldown ${cooldownSec}s).`,
+    );
+    return saved;
   }
 
   /**

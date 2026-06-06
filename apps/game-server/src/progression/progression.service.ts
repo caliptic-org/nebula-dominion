@@ -10,6 +10,7 @@ import {
   XP_BASE_AMOUNTS,
   XP_SOURCE_WEIGHTS,
   XP_SOURCE_MIN_AGE,
+  XP_DAILY_CAPS,
   getLevelDef,
   getMaxLevel,
   getFirstLevelForAge,
@@ -96,6 +97,34 @@ export class ProgressionService {
     // intended rate. Double-counting (×1000 timers AND ×1000 XP) made
     // Lv 54 reachable in ~12 trains. Fix: XP is fixed per source.
     const finalAmount = Math.round(baseAmount * multiplier);
+
+    // ── Per-source daily cap (HIGH F6-econ) ──────────────────────────
+    // Second wall after units.service's queue cap. Sum the player's XP
+    // from this source since UTC midnight; if already at/over cap, no-op
+    // success (don't 4xx — clients shouldn't have to special-case capped
+    // grants, and the dedup path below already returns leveledUp=false on
+    // benign skips). Caps are coarse-grained per UTC day; finer windows
+    // (rolling hour, per-hour buckets) are deferred until telemetry shows
+    // they matter.
+    const dailyCap = XP_DAILY_CAPS[dto.source];
+    if (dailyCap !== undefined && finalAmount > 0) {
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const sumRow = await this.xpTxRepo
+        .createQueryBuilder('tx')
+        .select('COALESCE(SUM(tx.final_amount), 0)', 'sum')
+        .where('tx.user_id = :userId', { userId: dto.userId })
+        .andWhere('tx.source = :source', { source: dto.source })
+        .andWhere('tx.created_at >= :todayStart', { todayStart })
+        .getRawOne<{ sum: string | number }>();
+      const earnedToday = Number(sumRow?.sum ?? 0);
+      if (earnedToday + finalAmount > dailyCap) {
+        this.logger.warn(
+          `XP daily cap hit: user=${dto.userId} source=${dto.source} earned=${earnedToday} attempt=${finalAmount} cap=${dailyCap}`,
+        );
+        return { progress: this.toDto(record), leveledUp: false };
+      }
+    }
 
     // Insert the xp_tx row FIRST so a duplicate (user_id, source,
     // reference_id) trips the UNIQUE constraint before we mutate

@@ -174,6 +174,22 @@ export class TutorialController {
    *   - network error → block. We prefer false-negatives (a legit player
    *     sees the gift-failed toast and can retry) over false-positives
    *     (anyone with a valid JWT harvests the gift).
+   *
+   * Skipped tutorials get NO gift (F-CYCLE3-01 / F2-econ): the api's
+   * `POST /onboarding/skip` sets BOTH `isCompleted=true` AND
+   * `skipped=true` on the TutorialProgress row. Without the `skipped`
+   * branch below, a fresh account could chain
+   * `POST /onboarding/start` → `POST /onboarding/skip` →
+   * `POST /players/me/tutorial-complete` and harvest the
+   * +500 mineral / +25 energy / +200 XP starter pack in under a second,
+   * without ever seeing a tutorial screen.
+   *
+   * Skipping is an explicit "I do not want the gift" choice — the player
+   * keeps full access to the game (base, units, PvP); they just forfeit
+   * the one-shot starter pack as the trade-off for not walking the
+   * onboarding flow. Re-running the tutorial via `POST /onboarding/start`
+   * resets `skipped` to false on the same row, so a player who later
+   * changes their mind can complete the steps properly and claim.
    */
   private async assertOnboardingComplete(userId: string): Promise<void> {
     const baseUrl = getApiBaseUrl();
@@ -219,6 +235,18 @@ export class TutorialController {
 
     if (body.isCompleted !== true) {
       throw new BadRequestException('Önce tüm tutorial adımlarını tamamla');
+    }
+
+    // F-CYCLE3-01 / F2-econ: skipped tutorials are isCompleted=true on the
+    // api side (so the player isn't gated out of the rest of the game),
+    // but they forfeit the starter pack. Check this AFTER the isCompleted
+    // check so the player-facing message is the more specific one when
+    // both flags are true (the skipped path is what we actually want to
+    // explain).
+    if (body.skipped === true) {
+      throw new BadRequestException(
+        'Önce tüm tutorial adımlarını tamamla (skip ile geçilen kullanıcılar başlangıç hediyesi alamaz)',
+      );
     }
   }
 }

@@ -594,23 +594,37 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
                 // rewards (from the BATTLES map keyed by userId+battleId)
                 // and signs the fan-out with the shared service secret.
                 // The FE no longer says *how much* — only *which battle*.
-                try {
-                  const claim = await api.post<{
-                    battleId: string;
-                    status: 'won' | 'lost' | 'in-progress' | 'pending';
-                    alreadyClaimed: boolean;
-                    walletCredited: boolean;
-                    rewards: {
-                      gold: number; gems: number; xp: number;
-                      mineral: number; gas: number; science: number;
-                    };
-                  }>(`/battles/${battle.id}/claim-reward`, {});
+                //
+                // Cycle-3-03 fix: POST /battles now resolves the battle
+                // synchronously (status="won"|"lost" with non-zero rewards),
+                // so this claim-reward call hits a terminal state on the
+                // first try. Defensive guard below stays in case an older
+                // api version is in the loop and still returns in-progress.
+                if (battle.status === 'won' || battle.status === 'lost') {
+                  try {
+                    const claim = await api.post<{
+                      battleId: string;
+                      status: 'won' | 'lost' | 'in-progress' | 'pending';
+                      alreadyClaimed: boolean;
+                      walletCredited: boolean;
+                      rewards: {
+                        gold: number; gems: number; xp: number;
+                        mineral: number; gas: number; science: number;
+                      };
+                    }>(`/battles/${battle.id}/claim-reward`, {});
+                    // eslint-disable-next-line no-console
+                    console.log('[battle] claim-reward result:', claim);
+                  } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('[battle] claim-reward exception:', err);
+                    /* swallow so navigation still happens */
+                  }
+                } else {
                   // eslint-disable-next-line no-console
-                  console.log('[battle] claim-reward result:', claim);
-                } catch (err) {
-                  // eslint-disable-next-line no-console
-                  console.error('[battle] claim-reward exception:', err);
-                  /* swallow so navigation still happens */
+                  console.warn(
+                    '[battle] POST /battles returned non-terminal status, skipping claim-reward:',
+                    battle.status,
+                  );
                 }
                 // Broadcast so the HUD picks up the new wallet totals.
                 refreshGameResources();

@@ -59,6 +59,19 @@ export class PlayerUnit {
   @Column({ type: 'int', default: 1 })
   level: number;
 
+  /** Cooldown deadline for the next /units/:id/upgrade call. Set to
+   *  `NOW() + scaledDuration` at upgrade time; rejected if a second
+   *  upgrade arrives before this timestamp. Mirrors the
+   *  `constructionCompleteAt`-as-cooldown pattern used by
+   *  buildings.service upgradeBuilding. Nullable: units that have never
+   *  been upgraded leave this null and the gate passes through. */
+  @Column({
+    name: 'upgrade_completed_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  upgradeCompletedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

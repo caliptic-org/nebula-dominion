@@ -63,6 +63,29 @@ export class UserService {
   }
 
   async selectRace(id: string, race: Race): Promise<Omit<User, 'password'>> {
+    // Playable-race whitelist.
+    //
+    // RACE_VALUES (enum DTO validation) accepts all 5 races because the
+    // FE catalog has lore, commanders, buildings and assets for every
+    // one. But UnitType enum + UNIT_CONFIGS in
+    // apps/game-server/src/units/constants/race-configs.constants.ts
+    // only carry trainable units for HUMAN + ZERG. AUTOMATON / BEAST /
+    // DEMON players land on a base that can't train a single unit
+    // (POST /units/train → "Unknown unit type"), can't merge, can't
+    // queue PvP. Audit (workflow wf_cea4d7f7-3f1) flagged this as the
+    // top "selectable but unplayable" trap.
+    //
+    // Until the 3-race unit kits ship (each needs ~6 unit configs +
+    // stat balance + MERGE_RECIPES + a player_units_type_enum
+    // migration), reject the unplayable races here so a new player
+    // never gets stuck mid-tutorial.
+    const PLAYABLE: Race[] = [Race.HUMAN, Race.ZERG];
+    if (!PLAYABLE.includes(race)) {
+      throw new BadRequestException(
+        `Bu ırk yakında oynanabilir olacak — şu an sadece ${PLAYABLE.join(', ')} aktif.`,
+      );
+    }
+
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException(`User ${id} not found`);
     if (user.race) {

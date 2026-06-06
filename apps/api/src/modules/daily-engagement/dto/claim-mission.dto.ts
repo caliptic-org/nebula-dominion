@@ -1,40 +1,25 @@
-import {
-  IsIn,
-  IsInt,
-  IsObject,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { MissionType } from '../entities/mission-claim.entity';
 
-export class ClaimRewardDto {
-  @ApiPropertyOptional({ description: 'Gold / mineral reward', example: 5000 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10_000_000)
-  gold?: number;
-
-  @ApiPropertyOptional({ description: 'Gem / science reward', example: 25 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10_000_000)
-  gems?: number;
-
-  @ApiPropertyOptional({ description: 'XP reward', example: 1200 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10_000_000)
-  xp?: number;
-}
-
+/**
+ * Mission claim request.
+ *
+ * Previously this DTO carried a `reward: ClaimRewardDto` field that the
+ * controller forwarded straight through to the wallet grant. A live
+ * playtest showed lv1→14 in 31 calls by passing `reward.xp: 50000` for
+ * arbitrary mission IDs. The fix is structural: the client can no
+ * longer specify reward amounts — the service looks them up in the
+ * server-side `missions.catalog.ts`. The shape is intentionally minimal
+ * (id + type) so any future request fields go through DTO validation
+ * with explicit intent.
+ *
+ * Backward compat: older clients still POSTing a `reward` payload have
+ * it stripped by the global ValidationPipe (`whitelist: true` is set in
+ * main.ts) — no 400, the legacy field is just ignored.
+ */
 export class ClaimMissionDto {
-  @ApiProperty({ description: 'Frontend mission id', example: 'story-2' })
+  @ApiProperty({ description: 'Mission id from the FE / server catalog', example: 'story-2' })
   @IsString()
   missionId: string;
 
@@ -45,8 +30,17 @@ export class ClaimMissionDto {
   @IsString()
   @IsIn(['story', 'weekly', 'achievement', 'daily'])
   missionType: MissionType;
+}
 
-  @ApiProperty({ type: ClaimRewardDto })
-  @IsObject()
-  reward: ClaimRewardDto;
+/**
+ * Server-internal reward shape returned from
+ * `missions.catalog.resolveMissionReward()`. The service result type
+ * and the mission_claims `rewardJson` column both reference it. Kept
+ * here (not just in the catalog file) so consumers don't have to import
+ * an additional module for a value-shape type.
+ */
+export interface CanonicalReward {
+  gold?: number;
+  gems?: number;
+  xp?: number;
 }

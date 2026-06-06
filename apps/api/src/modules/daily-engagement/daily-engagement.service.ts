@@ -6,13 +6,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
 import { MissionClaim, MissionType } from './entities/mission-claim.entity';
-import { ClaimRewardDto } from './dto/claim-mission.dto';
+import { CanonicalReward } from './dto/claim-mission.dto';
+import {
+  resolveMissionReward,
+  PER_USER_DAILY_XP_CAP,
+} from './missions.catalog';
 
 interface ClaimInput {
   userId: string;
   missionId: string;
   missionType: MissionType;
-  reward: ClaimRewardDto;
   /** Forwarded `Authorization: Bearer <jwt>` header so game-server can
    *  authenticate the wallet grant against the same player. */
   authorization?: string;
@@ -21,7 +24,7 @@ interface ClaimInput {
 export interface ClaimResult {
   claimed: boolean;
   alreadyClaimed: boolean;
-  rewards: ClaimRewardDto;
+  rewards: CanonicalReward;
   walletCredited: boolean;
   /** Whether the progression XP grant fired on game-server. False either
    *  because the mission paid no XP, the player's JWT was missing, or the
@@ -62,7 +65,7 @@ export class DailyEngagementService {
       missionId: string;
       missionType: MissionType;
       claimedAt: string;
-      reward: ClaimRewardDto;
+      reward: CanonicalReward;
     }>;
   }> {
     const rows = await this.claimRepo.find({
@@ -89,7 +92,18 @@ export class DailyEngagementService {
    * this at the DB level — the in-memory check is a fast path.
    */
   async claim(input: ClaimInput): Promise<ClaimResult> {
-    const { userId, missionId, missionType, reward, authorization } = input;
+    const { userId, missionId, missionType, authorization } = input;
+
+    // Server-side reward resolution. The DTO no longer carries reward
+    // amounts (see dto/claim-mission.dto.ts changelog); we trust the
+    // catalog or nothing. Unknown ids accept the claim with a zero
+    // reward (for forward-compat) but never grant resources.
+    const { reward, recognised } = resolveMissionReward(missionId, missionType);
+    if (!recognised) {
+      this.logger.warn(
+        `Mission claim with unknown id user=${userId} mission=${missionId} type=${missionType} — accepting with zero reward`,
+      );
+    }
 
     const existing = await this.claimRepo.findOne({
       where: { userId, missionId },
@@ -104,14 +118,38 @@ export class DailyEngagementService {
       };
     }
 
+    // Per-user daily XP ceiling — defensive against ID enumeration or
+    // catalog drift. The previous claim handler had no cap at all; a
+    // live playtest farmed lv1→14 in 31 calls before the structural
+    // fix (catalog lookup) landed. Now there's both a structural cap
+    // (the catalog can only mint defined values) AND a behavioural cap
+    // (a single user can't claim past PER_USER_DAILY_XP_CAP in a day).
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const todaysClaims = await this.claimRepo.find({
+      where: { userId },
+    });
+    const todaysXp = todaysClaims
+      .filter((c) => c.claimedAt >= dayStart)
+      .reduce((sum, c) => sum + (c.rewardJson?.xp ?? 0), 0);
+    let cappedReward: CanonicalReward = { ...reward };
+    if ((cappedReward.xp ?? 0) > 0 && todaysXp + (cappedReward.xp ?? 0) > PER_USER_DAILY_XP_CAP) {
+      const remaining = Math.max(0, PER_USER_DAILY_XP_CAP - todaysXp);
+      this.logger.warn(
+        `Mission claim XP capped user=${userId} mission=${missionId} ` +
+          `attempted=${cappedReward.xp} todaysXp=${todaysXp} remaining=${remaining}`,
+      );
+      cappedReward = { ...cappedReward, xp: remaining };
+    }
+
     const record = this.claimRepo.create({
       userId,
       missionId,
       missionType,
       rewardJson: {
-        ...(reward.gold ? { gold: reward.gold } : {}),
-        ...(reward.gems ? { gems: reward.gems } : {}),
-        ...(reward.xp ? { xp: reward.xp } : {}),
+        ...(cappedReward.gold ? { gold: cappedReward.gold } : {}),
+        ...(cappedReward.gems ? { gems: cappedReward.gems } : {}),
+        ...(cappedReward.xp ? { xp: cappedReward.xp } : {}),
       },
     });
 
@@ -144,20 +182,23 @@ export class DailyEngagementService {
     }
 
     let walletCredited = false;
-    if ((reward.gold || reward.gems || reward.xp) && authorization) {
-      walletCredited = await this.creditWallet(authorization, reward);
+    if ((cappedReward.gold || cappedReward.gems || cappedReward.xp) && authorization) {
+      walletCredited = await this.creditWallet(authorization, cappedReward);
     }
 
     // Progression XP grant — fires the +XP / level_up socket toast and
     // counts toward Lv/Çağ progression on game-server. Independent of the
     // wallet credit above (which writes raw resource numbers); this writes
-    // an xp_transactions row and recomputes player_level. We grant XP even
-    // when the mission's payload.xp is 0 because the *act of completing*
-    // the mission is the XP source — the wallet payload is a separate gold
-    // / gems concept. Missions with truly no progression value (e.g. a
-    // future "free re-roll") should opt out via a new missionType.
+    // an xp_transactions row and recomputes player_level.
+    //
+    // GATED on `recognised`: unknown mission ids no longer trigger the
+    // progression grant. Without this an attacker could rotate fake
+    // mission ids (each one bypasses the UNIQUE constraint) and farm
+    // the per-mission-type base XP from game-server forever. Now they
+    // get the wallet zero AND the XP zero — the claim row still persists
+    // (idempotent contract) but the grant is suppressed.
     let xpGranted = false;
-    if (authorization) {
+    if (authorization && recognised) {
       xpGranted = await this.creditXp({
         authorization,
         userId,
@@ -192,7 +233,7 @@ export class DailyEngagementService {
    */
   private async creditWallet(
     authorization: string,
-    reward: ClaimRewardDto,
+    reward: CanonicalReward,
   ): Promise<boolean> {
     const baseUrl = (
       process.env.GAME_SERVER_URL || 'http://localhost:5000'

@@ -347,22 +347,10 @@ function MissionCard({
       .join(' · ');
 
     // Map the UI's free-form reward labels (Turkish: "Kaynak", "Kristal",
-    // "XP", "Enerji", "Rozet") onto the api's canonical { gold, gems, xp }
-    // shape.  "Kaynak" / "Enerji" → gold (mineral on game-server),
-    // "Kristal" / "Rozet" → gems (science on game-server), "XP" → xp.
-    // Anything we don't recognise is dropped so the validator doesn't
-    // see surprise fields.
-    const rewardPayload: { gold?: number; gems?: number; xp?: number } = {};
-    for (const r of mission.rewards) {
-      const label = r.label.trim().toLowerCase();
-      if (label === 'kaynak' || label === 'enerji' || label === 'gold' || label === 'mineral') {
-        rewardPayload.gold = (rewardPayload.gold ?? 0) + r.amount;
-      } else if (label === 'kristal' || label === 'rozet' || label === 'gems' || label === 'kristaller') {
-        rewardPayload.gems = (rewardPayload.gems ?? 0) + r.amount;
-      } else if (label === 'xp') {
-        rewardPayload.xp = (rewardPayload.xp ?? 0) + r.amount;
-      }
-    }
+    // (The previous client-side rewardPayload mapping is gone — the
+    // backend now resolves rewards from its own missions.catalog.ts.
+    // What the FE shows in the mission card is purely cosmetic; whatever
+    // gets credited comes from the server-side entry keyed by mission.id.)
 
     // Backend daily mission ids come through questToMission as `daily-q1`,
     // `daily-q2`, … (q-prefixed). Static placeholder mission ids in this
@@ -389,9 +377,11 @@ function MissionCard({
         rewards: { gold?: number; gems?: number; xp?: number };
         walletCredited: boolean;
       }>('/daily-engagement/claim', {
+        // Backend resolves the reward from missions.catalog.ts; the
+        // legacy `reward` field on this request was a client-trust hole
+        // and is now stripped by the DTO whitelist (would 400 if sent).
         missionId: mission.id,
         missionType: mission.category,
-        reward: rewardPayload,
       });
 
       // If this is also a stub daily quest, mirror the claim into the
@@ -529,11 +519,12 @@ function AchievementCard({
         walletCredited: boolean;
         xpGranted: boolean;
       }>('/daily-engagement/claim', {
+        // The achievement's reward shape (gems/xp) now comes from the
+        // server-side missions.catalog.ts entry — the client no longer
+        // ships a reward payload (would 400 anyway since the DTO
+        // whitelist landed).
         missionId: a.id,
         missionType: 'achievement',
-        // No reward payload — achievement XP is granted on the server
-        // via the XpSource.ACHIEVEMENT base amount, no wallet credit.
-        reward: {},
       });
       onClaimed(a.id);
       refreshGameResources();

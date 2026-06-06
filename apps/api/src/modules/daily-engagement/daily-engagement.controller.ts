@@ -59,11 +59,14 @@ export class DailyEngagementController {
     @Headers('authorization') authorization: string | undefined,
     @Body() dto: ClaimMissionDto,
   ) {
+    // NB. The DTO used to carry a client-supplied `reward` field — the
+    // controller now intentionally does NOT forward it. The service
+    // resolves rewards from missions.catalog.ts. See
+    // dto/claim-mission.dto.ts changelog.
     return this.service.claim({
       userId: req.user.id,
       missionId: dto.missionId,
       missionType: dto.missionType,
-      reward: dto.reward ?? {},
       authorization,
     });
   }

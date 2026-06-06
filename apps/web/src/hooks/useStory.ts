@@ -78,16 +78,50 @@ export function useStory(race: NDRaceKey | null): UseStoryResult {
   return { chapters, loading, error };
 }
 
+/* Result of POST /api/v1/story/seen.
+ *
+ * Audit cycle 6 (STORY-COMPLETE-NO-ORDER-GATE) tightened the BE: the
+ * server now enforces a linear-order gate, a `player_levels.current_level`
+ * level gate, and runs the duplicate guard under a pessimistic-write
+ * tx — so the call can now reject with a 400 ("Çağ 3 gerekiyor",
+ * "Önce 'ch_05_iron_dawn' bölümünü tamamlamalısın", "Bölüm zaten
+ * tamamlandı"). Callers MUST surface `error` to the user when `ok`
+ * is false; the previous boolean-only contract dropped the BE message
+ * on the floor and made the FE look like it had silently no-op'd on
+ * a legitimate progression block. */
+export interface MarkStorySeenResult {
+  ok: boolean;
+  /** Translated BE error message (already in TR) when ok=false and the
+   *  failure came from the server. Empty for guest no-ops and network
+   *  errors (handled separately to avoid leaking SDK strings to UI). */
+  error: string | null;
+  /** HTTP status when ok=false. Lets callers distinguish a "guest, no
+   *  token" no-op (status=0) from a real BE block (400) from a network
+   *  hiccup (status=0 + error set). */
+  status: number;
+}
+
 /* Mark a chapter / scene as seen. POST /api/v1/story/seen requires a JWT;
  * if the player is a guest, the call no-ops silently. The server records
- * the userId + sceneId pair and unlocks the next chapter accordingly. */
-export async function markStorySeen(sceneId: string, choiceId?: string): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
+ * the userId + sceneId pair, enforces linear/level prerequisites, and
+ * unlocks the next chapter + persists any `reward.titleUnlock`. On a
+ * progression block the BE returns 400 with a Turkish hint; the caller
+ * is responsible for surfacing `result.error` to the player. */
+export async function markStorySeen(
+  sceneId: string,
+  choiceId?: string,
+): Promise<MarkStorySeenResult> {
+  if (typeof window === 'undefined') {
+    return { ok: false, error: null, status: 0 };
+  }
   // Analytics fires regardless of auth — even guests progress through the
   // story, and we want their funnel data too.
   track('story_chapter_view', { scene_id: sceneId, choice_id: choiceId });
   const token = window.localStorage.getItem('accessToken');
-  if (!token) return false;
+  if (!token) {
+    // Guest no-op — not an error worth toasting.
+    return { ok: false, error: null, status: 0 };
+  }
   try {
     const res = await fetch(`${API_BASE}/story/seen`, {
       method: 'POST',
@@ -97,11 +131,32 @@ export async function markStorySeen(sceneId: string, choiceId?: string): Promise
       },
       body: JSON.stringify({ sceneId, choiceId }),
     });
-    if (res.ok && choiceId) {
-      track('story_choice', { scene_id: sceneId, choice_id: choiceId });
+    if (res.ok) {
+      if (choiceId) {
+        track('story_choice', { scene_id: sceneId, choice_id: choiceId });
+      }
+      return { ok: true, error: null, status: res.status };
     }
-    return res.ok;
-  } catch {
-    return false;
+    // Pull the Nest error envelope ({ message: "..." | string[] }) so we
+    // can surface the gate hint directly. Fall back to the HTTP status
+    // when the body isn't a recognisable shape.
+    let message: string | null = null;
+    try {
+      const body = (await res.json()) as { message?: string | string[] };
+      if (Array.isArray(body?.message)) {
+        message = body.message.join(' ');
+      } else if (typeof body?.message === 'string') {
+        message = body.message;
+      }
+    } catch {
+      message = null;
+    }
+    return { ok: false, error: message ?? `HTTP ${res.status}`, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      status: 0,
+    };
   }
 }

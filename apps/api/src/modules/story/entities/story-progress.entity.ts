@@ -24,6 +24,22 @@ export class StoryProgress {
   })
   completedChapters: string[];
 
+  /**
+   * Story titles unlocked by completed chapters. Append-only — once
+   * `chapter.reward.titleUnlock` is granted by `StoryService.completeChapter()`
+   * inside the locked transaction, it stays for the lifetime of the
+   * account. Materialised in the SAME transaction that appends to
+   * `completedChapters`, so the two arrays cannot diverge after a crash.
+   * See migration AddStoryTitlesColumn1779925000000.
+   */
+  @Column({
+    name: 'titles',
+    type: 'text',
+    array: true,
+    default: '{}',
+  })
+  titles: string[];
+
   @Column({ name: 'current_chapter', length: 100, default: 'ch_01_arrival' })
   currentChapter: string;
 

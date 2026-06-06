@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Logger,
   UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
@@ -161,7 +162,22 @@ export class PaymentService {
     const amount = await this.resolveAmount(dto.itemSku, dto.passCode, 'TRY');
     if (!amount) throw new BadRequestException('Item veya pass bulunamadı');
 
-    const conversationId = `nebula-${userId.substring(0, 8)}-${Date.now()}`;
+    // BLOCKER fix — PAY-IYZICO-PREDICTABLE-CONVID (audit cycle 6).
+    // Earlier revisions built conversationId from
+    //   `nebula-${userId.substring(0,8)}-${Date.now()}`
+    // which is fully predictable for any authenticated attacker:
+    // they know their own userId prefix and the wall-clock, so they
+    // can forge a conversationId for a legitimate pending transaction
+    // and feed it to handleIyzicoCallback.  Combined with the (now-
+    // fixed) unverified-callback BLOCKER (PAY-IYZICO-UNVERIFIED-CALLBACK)
+    // this gave free wallet credits + VIP tier upgrades.
+    //
+    // Even with the signature gate now in place, a non-random
+    // conversationId opens replay-of-legitimate-completion windows
+    // (e.g. replay of an old SUCCESS callback whose timestamp the
+    // attacker can guess).  Switch to a crypto-secure random suffix
+    // — UUID equivalent, opaque to anyone without DB read access.
+    const conversationId = `nebula-${crypto.randomUUID()}`;
 
     // BLOCKER fix — see createStripePaymentIntent above for the
     // fulfillment-snapshot rationale.
@@ -448,7 +464,47 @@ export class PaymentService {
   /**
    * Handle an iyzico async callback. Idempotent on `paymentId`.
    *
-   * **Replay-safety contract** (the reason this method matters):
+   * **Signature verification contract** (BLOCKER fix —
+   * PAY-IYZICO-UNVERIFIED-CALLBACK, audit cycle 6):
+   *
+   *   Prior to this fix the handler computed `isVerified` from an HMAC
+   *   comparison, persisted that flag onto the webhook_event row, and
+   *   then UNCONDITIONALLY called `processIyzicoEvent` →
+   *   `completeTransaction` → `recordPurchaseAndUpgradeVip` +
+   *   `deliverPurchase`.  The `isVerified` boolean was never read
+   *   before crediting.
+   *
+   *   Combined with the (legacy) predictable conversationId
+   *     `nebula-${userId.substring(0,8)}-${Date.now()}`
+   *   any authenticated attacker could:
+   *     1. POST /payment/iyzico/create-payment to obtain a real pending
+   *        transaction with a known conversationId, OR forge a
+   *        conversationId for someone else's pending tx by guessing
+   *        their userId prefix + Date.now() window.
+   *     2. POST to /payment/iyzico/callback with
+   *        `{conversationId, paymentStatus:"SUCCESS", paymentId:"any",
+   *         token:"wrong"}`.
+   *     3. isVerified=false but completeTransaction still fired →
+   *        wallet credit + premium pass grant + VIP tier upgrade for
+   *        $0.
+   *
+   *   The fix has two halves, both in this file:
+   *     a) THIS METHOD now hard-gates `processIyzicoEvent` on
+   *        `isVerified===true`.  Mismatched signatures throw 401
+   *        UnauthorizedException (mirroring the Stripe path which
+   *        already throws on invalid signatures via
+   *        `stripe.webhooks.constructEvent`).  The webhook_event row
+   *        is still persisted with `isVerified=false` and
+   *        `isProcessed=false` so ops can audit forgery attempts after
+   *        the fact.
+   *     b) `createIyzicoPayment` no longer uses a predictable
+   *        conversationId — it's now `nebula-${crypto.randomUUID()}`.
+   *        Even with the signature gate, predictable conversationIds
+   *        opened replay-of-legitimate-completion windows (an
+   *        attacker who scraped one valid token could re-aim it at a
+   *        guessed-future conversationId).
+   *
+   * **Replay-safety contract** (cycle-5 BLOCKER ECON-PAY-IYZICO-EVENTID-REPLAY):
    *
    *   The webhook_event row's natural key is `(provider, eventId)` with a
    *   UNIQUE constraint at the DB level (see WebhookEvent entity).  For
@@ -457,17 +513,16 @@ export class PaymentService {
    *   key, second INSERT → Postgres 23505 → we short-circuit before
    *   `processIyzicoEvent` ever calls `recordPurchaseAndUpgradeVip`.
    *
-   *   Prior to this fix the eventId was built as
+   *   Prior to that earlier fix the eventId was built as
    *     `iyz-${callbackData.paymentId}-${Date.now()}`
    *   which embedded a wall-clock suffix in the key — every replay was a
    *   different key, every replay passed the constraint, every replay
    *   credited cumulative VIP spend a second time.  An attacker who
    *   captured one legitimate SUCCESS callback (or who got iyzico to
    *   re-deliver, which iyzico does on 5xx) could farm VIP tier
-   *   upgrades by re-POSTing the body N times.  HIGH severity —
-   *   cycle-5 audit BLOCKER ECON-PAY-IYZICO-EVENTID-REPLAY.
+   *   upgrades by re-POSTing the body N times.
    *
-   *   The new contract:
+   *   The current contract:
    *     eventId = `iyz-${paymentId}`        (no timestamp, deterministic)
    *
    *   Stripe path is unaffected — it already uses Stripe's own event id
@@ -516,6 +571,8 @@ export class PaymentService {
           payload: callbackData as unknown as Record<string, unknown>,
           signature: callbackData.token ?? null,
           isVerified,
+          // Stay isProcessed=false on bad signatures so the row sticks
+          // around as an audit breadcrumb for ops to inspect later.
           isProcessed: false,
         }),
       );
@@ -534,6 +591,28 @@ export class PaymentService {
         }
       }
       throw err;
+    }
+
+    // BLOCKER gate — PAY-IYZICO-UNVERIFIED-CALLBACK.  Before this guard,
+    // processIyzicoEvent fired regardless of signature validity, so a
+    // forged callback with a wrong token still triggered wallet credit
+    // + VIP upgrade.  Now: bad sig → 401, no side-effect downstream.
+    // The webhook_event row was already persisted above with
+    // isVerified=false / isProcessed=false so ops can audit attempts.
+    //
+    // 401 (vs. 400) mirrors the Stripe path which throws
+    // UnauthorizedException on `constructEvent` signature failure, and
+    // it signals iyzico's retry loop to stop hammering us with the
+    // same bad token (anything else, including 4xx and 5xx other than
+    // 401/403, makes them keep retrying).
+    if (!isVerified) {
+      this.logger.warn(
+        `iyzico callback signature mismatch — refusing to fulfill: ` +
+          `conversationId=${callbackData.conversationId} ` +
+          `paymentId=${callbackData.paymentId} ` +
+          `status=${callbackData.paymentStatus}`,
+      );
+      throw new UnauthorizedException('iyzico callback imza doğrulanamadı');
     }
 
     await this.processIyzicoEvent(event, callbackData);
@@ -667,6 +746,41 @@ export class PaymentService {
    * One-shot per-transactionId is the canonical contract: callers may
    * invoke completeTransaction(tx.id, …) any number of times; only
    * the first call delivers goods + credits VIP.
+   *
+   * FULFILLMENT-SPEC SAFETY GUARD (audit cycle 12 — HIGH CYCLE12-01)
+   * ─────────────────────────────────────────────────────────────────
+   * Before flipping status='completed', we sanity-check that the row
+   * actually has a fulfillment spec to deliver:
+   *
+   *   itemSku IS NOT NULL  OR  passCode IS NOT NULL
+   *
+   * If neither is set on a `purchase_*` transaction with amount > 0,
+   * the row was minted before migration 1779915000000 added the
+   * fulfillment columns (or by a future regression in create-intent
+   * that forgot to populate them).  Without a spec, deliverPurchase
+   * walks zero/null deltas → credits nothing → player paid but
+   * receives no gems / coins / inventory / pass, while VIP cumulative
+   * spend gets bumped and status flips to 'completed' anyway.  Net
+   * effect: silent theft.
+   *
+   * The guard throws InternalServerErrorException BEFORE the atomic
+   * UPDATE, so:
+   *   - status stays 'pending' (tx is not flipped)
+   *   - VIP ledger row is NOT inserted
+   *   - the player's FE can retry via create-intent, which mints a
+   *     fresh row WITH the spec populated
+   *   - a structured WARN is logged (tx.id, tx.userId, amount) so ops
+   *     can backfill / cancel the orphan in the DB.
+   *
+   * Mock-complete path (PAYMENT_MOCK_ENABLED) hits the same gate —
+   * devs must drive purchases via the /payment create-intent endpoints
+   * (which snapshot the spec) and NOT by hand-INSERTing transactions
+   * rows.
+   *
+   * Paired one-shot cleanup: migration 1779920000000 cancels
+   * stale pending rows older than 1 hour with no spec, so the
+   * existing pre-cycle-12 backlog can't trickle a webhook into this
+   * guard later.
    */
   private async completeTransaction(
     transactionId: string,
@@ -685,6 +799,52 @@ export class PaymentService {
     // would grab a fresh pool connection and deadlock on the outer
     // tx's FOR UPDATE.  `existingEm` is that hook.
     const runDelivery = async (em: import('typeorm').EntityManager) => {
+      // ── Fulfillment-spec safety guard (audit cycle 12 — HIGH CYCLE12-01)
+      //
+      // Pre-flight check before any state mutation.  A purchase
+      // transaction with status='pending', amount > 0, and BOTH
+      // itemSku AND passCode NULL is malformed: it predates the
+      // 1779915000000 fulfillment migration (orphaned in the DB) or
+      // a future create-intent regression dropped the spec.  Either
+      // way, completing it would credit VIP cumulative_spend, flip
+      // status to 'completed', and deliver nothing — silent theft.
+      //
+      // We read the row OUTSIDE the row lock (no UPDATE yet) and
+      // throw before touching state.  Status stays 'pending'; the
+      // player's FE can retry via create-intent (which mints a fresh
+      // row WITH the spec).  Ops sees a structured warn log they can
+      // act on (backfill the columns by hand, or cancel the row).
+      //
+      // The check is intentionally permissive on non-purchase rows
+      // (refunds, admin grants — transactionType doesn't start with
+      // 'purchase_') and on zero-amount rows (free grants, promo
+      // codes) so we don't break legitimate flows.
+      const preflightTx = await em.findOne(Transaction, {
+        where: { id: transactionId },
+      });
+      if (
+        preflightTx &&
+        preflightTx.status === 'pending' &&
+        preflightTx.transactionType?.startsWith('purchase_') &&
+        !preflightTx.itemSku &&
+        !preflightTx.passCode &&
+        ((preflightTx.amountUsd !== null && Number(preflightTx.amountUsd) > 0) ||
+          (preflightTx.amountTry !== null && Number(preflightTx.amountTry) > 0))
+      ) {
+        this.logger.warn(
+          `completeTransaction: fulfillment-spec eksik — teslimat reddedildi.` +
+            ` txn=${preflightTx.id} userId=${preflightTx.userId}` +
+            ` amountUsd=${preflightTx.amountUsd} amountTry=${preflightTx.amountTry}` +
+            ` transactionType=${preflightTx.transactionType}` +
+            ` provider=${preflightTx.provider}` +
+            ` createdAt=${preflightTx.createdAt?.toISOString?.() ?? preflightTx.createdAt}` +
+            ` — Ops: backfill item_sku/pass_code via create-intent veya iptal et.`,
+        );
+        throw new InternalServerErrorException(
+          'Tx fulfillment spec missing — cannot deliver. Ops: backfill or cancel.',
+        );
+      }
+
       // Layer 1: race-safe idempotency guard. Atomic conditional UPDATE
       // — the WHERE clause filters status='pending', so two concurrent
       // callers serialise on the row lock; only the first one matches

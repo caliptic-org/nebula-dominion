@@ -11,6 +11,7 @@ import {
   UseGuards,
   Request,
   ForbiddenException,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { StoryService } from './story.service';
@@ -63,8 +64,14 @@ export class StoryController {
   markSeen(
     @Request() req: { user: { id: string } },
     @Body() body: { sceneId: string; choiceId?: string },
+    @Headers('authorization') authorization?: string,
   ) {
-    return this.service.completeChapter(req.user.id, body.sceneId, body.choiceId);
+    return this.service.completeChapter(
+      req.user.id,
+      body.sceneId,
+      body.choiceId,
+      authorization,
+    );
   }
 
   // ─── Self-only endpoints (userId from JWT, not path) ──────────────────────
@@ -102,8 +109,14 @@ export class StoryController {
     @Request() req: { user: { id: string } },
     @Param('chapterId') chapterId: string,
     @Body('choiceId') choiceId?: string,
+    @Headers('authorization') authorization?: string,
   ) {
-    return this.service.completeChapter(req.user.id, chapterId, choiceId);
+    return this.service.completeChapter(
+      req.user.id,
+      chapterId,
+      choiceId,
+      authorization,
+    );
   }
 
   // ─── Legacy `:userId` paths kept as deprecated aliases ────────────────────
@@ -150,10 +163,16 @@ export class StoryController {
     @Param('userId') userId: string,
     @Param('chapterId') chapterId: string,
     @Body('choiceId') choiceId?: string,
+    @Headers('authorization') authorization?: string,
   ) {
     if (req.user.id !== userId) {
       throw new ForbiddenException('You can only complete chapters for yourself');
     }
-    return this.service.completeChapter(userId, chapterId, choiceId);
+    return this.service.completeChapter(
+      userId,
+      chapterId,
+      choiceId,
+      authorization,
+    );
   }
 }

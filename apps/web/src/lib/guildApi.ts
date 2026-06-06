@@ -440,12 +440,20 @@ export const guildApi = {
     });
   },
 
+  /**
+   * Create a new guild.
+   *
+   * Cycle 6 dropped `leaderId` from CreateGuildDto on the server: identity is
+   * now sourced from the JWT subject by the controller, and the game-server
+   * boots with `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })`,
+   * which rejects any extra property with HTTP 400 ("property leaderId should
+   * not exist"). The wire body MUST be only `{ name, tag }`.
+   */
   create: async (input: GuildCreateInput): Promise<GuildSummary> => {
     if (isBackendReady()) {
       const created = await fetcher<BackendGuild>('/guilds', {
         method: 'POST',
         body: JSON.stringify({
-          leaderId: getCurrentUserId(),
           name: input.name,
           tag: input.tag.toUpperCase(),
         }),
@@ -475,34 +483,50 @@ export const guildApi = {
     return wait(guild);
   },
 
+  /**
+   * Join a guild.
+   *
+   * Cycle 6 made JoinGuildDto empty on the server — the joining user's id is
+   * taken from the JWT subject, not the request body. Sending `{ userId }` is
+   * rejected by the global `forbidNonWhitelisted` ValidationPipe with HTTP 400.
+   * The body is an empty object. The local userId is only used to populate the
+   * return shape for the FE caller.
+   */
   joinGuild: async (guildId: string): Promise<JoinGuildResult> => {
-    const userId = getCurrentUserId();
     if (isBackendReady()) {
-      await fetcher<BackendMember>(`/guilds/${guildId}/join`, {
+      const member = await fetcher<BackendMember>(`/guilds/${guildId}/join`, {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({}),
       });
-    } else {
-      await wait(undefined);
+      return { guildId, userId: member.userId };
     }
-    return { guildId, userId };
+    await wait(undefined);
+    return { guildId, userId: getCurrentUserId() };
   },
 
+  /**
+   * Donate resources to the current guild.
+   *
+   * Cycle 6 dropped `userId` from DonateDto — the donator's identity is sourced
+   * from the JWT subject server-side. The global `forbidNonWhitelisted`
+   * ValidationPipe rejects any extra body property with HTTP 400. The wire body
+   * MUST be only `{ amount, resource }`. The returned BackendMember row carries
+   * the canonical userId, which we propagate to the FE caller.
+   */
   donate: async (guildId: string, amount: number, resource: 'mineral' | 'gas' = 'mineral'): Promise<DonateResult> => {
-    const userId = getCurrentUserId();
     if (isBackendReady()) {
       const updated = await fetcher<BackendMember>(`/guilds/${guildId}/donate`, {
         method: 'POST',
-        body: JSON.stringify({ userId, amount, resource }),
+        body: JSON.stringify({ amount, resource }),
       });
       return {
         guildId,
-        userId,
+        userId: updated.userId,
         amount,
         contributionPts: updated.contributionPts,
       };
     }
-    return wait({ guildId, userId, amount, contributionPts: amount });
+    return wait({ guildId, userId: getCurrentUserId(), amount, contributionPts: amount });
   },
 
   getMembership: async (): Promise<{ guildId: string; role: 'leader' | 'officer' | 'member' } | null> => {

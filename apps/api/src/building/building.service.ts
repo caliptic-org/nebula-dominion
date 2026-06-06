@@ -1,14 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Building, BuildingType } from './entities/building.entity';
+import { Building } from './entities/building.entity';
 import { Game } from '../game/entities/game.entity';
-
-export class CreateBuildingDto {
-  gameId: string;
-  type: BuildingType;
-  position?: { x: number; y: number };
-}
 
 @Injectable()
 export class BuildingService {
@@ -25,11 +19,14 @@ export class BuildingService {
     if (game.ownerId !== ownerId) throw new ForbiddenException();
   }
 
-  async create(ownerId: string, dto: CreateBuildingDto): Promise<Building> {
-    await this.assertGameOwner(dto.gameId, ownerId);
-    const building = this.buildingRepo.create(dto);
-    return this.buildingRepo.save(building);
-  }
+  // create() removed — see building.controller.ts changelog. The
+  // method saved a Building row with no resource cost, no position
+  // uniqueness, no maxPerPlayer cap, and no queue gate. Repeated
+  // POSTs instantiated dozens of free production buildings per
+  // gameId (ECON-C6-03, audit cycle 6). Canonical construction path:
+  // apps/game-server/src/buildings/buildings.service.ts
+  // -> startConstruction(), exposed as
+  // POST /api/buildings/start-construction on game-server.
 
   async findByGame(gameId: string, ownerId: string): Promise<Building[]> {
     await this.assertGameOwner(gameId, ownerId);

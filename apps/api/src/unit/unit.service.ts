@@ -11,12 +11,6 @@ import { Game } from '../game/entities/game.entity';
 import { User } from '../user/entities/user.entity';
 import { Race } from '../user/entities/race.enum';
 
-export class CreateUnitDto {
-  gameId: string;
-  type: UnitType;
-  count?: number;
-}
-
 export interface MutateOptions {
   unitId: string;
   targetType?: UnitType;
@@ -44,11 +38,13 @@ export class UnitService {
     if (game.ownerId !== ownerId) throw new ForbiddenException();
   }
 
-  async create(ownerId: string, dto: CreateUnitDto): Promise<Unit> {
-    await this.assertGameOwner(dto.gameId, ownerId);
-    const unit = this.unitRepo.create({ ...dto, count: dto.count ?? 1, status: UnitStatus.IDLE });
-    return this.unitRepo.save(unit);
-  }
+  // create() removed — see unit.controller.ts changelog. The method
+  // saved a Unit row with count=dto.count and no resource deduction,
+  // no race gate, no queue, and no upper bound on count. A live-audit
+  // POST {gameId, type:"marine", count:1_000_000} minted 1M marines
+  // free of charge. (ECON-C6-02, audit cycle 6.) Canonical training
+  // path: apps/game-server/src/units/units.service.ts -> trainUnit(),
+  // exposed as POST /api/units/train on game-server.
 
   async findByGame(gameId: string, ownerId: string): Promise<Unit[]> {
     await this.assertGameOwner(gameId, ownerId);

@@ -64,9 +64,11 @@ export function useAllianceWars(allianceId: string | null | undefined): UseAllia
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof FetchError && err.status === 401) {
-          // Guest read of an alliance's wars — treat as empty rather than
-          // surfacing a misleading "auth required" error to the panel.
+        if (err instanceof FetchError && (err.status === 401 || err.status === 403)) {
+          // 401 = guest read; 403 = authenticated but not a member of this
+          // alliance (audit cycle 7 closed the public war-ledger leak).
+          // Both surface as "no wars visible" rather than a scary error
+          // pill — the panel handles an empty list cleanly.
           setWars([]);
           return;
         }

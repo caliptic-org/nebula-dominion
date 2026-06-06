@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -139,9 +140,13 @@ export class ShopService {
       );
     }
 
-    if (item.isLimited && item.stockRemaining !== null && item.stockRemaining < quantity) {
-      throw new BadRequestException('Stok yetersiz');
-    }
+    // NOTE: The stock pre-check that lived here previously was advisory
+    // only — it ran against the un-locked `item` snapshot fetched
+    // outside the transaction. The authoritative stock check now runs
+    // INSIDE the transaction below, against a row locked FOR UPDATE,
+    // with the decrement performed as a single conditional SQL
+    // expression so two concurrent buyers can't both pass the same
+    // `stockRemaining=1` snapshot. See "ECON STOCK RACE" block below.
 
     const totalCost = price * quantity;
 
@@ -192,11 +197,68 @@ export class ShopService {
         [userId, totalCost],
       );
 
-      // Stock decrement (limited item only).
-      if (item.isLimited && item.stockRemaining !== null) {
-        await manager.update(ShopItem, item.id, {
-          stockRemaining: item.stockRemaining - quantity,
+      // ── ECON STOCK RACE ──────────────────────────────────────────────
+      // Prior implementation:
+      //   1. Read `item` BEFORE the transaction (un-locked snapshot)
+      //   2. Pre-check `item.stockRemaining < quantity`
+      //   3. Inside tx: manager.update(ShopItem, item.id,
+      //         { stockRemaining: item.stockRemaining - quantity })
+      //   --> step (3) wrote a value computed from the stale snapshot,
+      //       not an SQL increment. Two concurrent purchases for q=1
+      //       against stockRemaining=1 both saw 1, both passed, both
+      //       wrote `1-1=0`, both granted inventory — last legendary
+      //       item duplicated, audit ECON-C6-06.
+      //
+      // Fix: re-fetch the row INSIDE the tx with FOR UPDATE (lock the
+      // ShopItem row tail-of-the-line), then apply the decrement as a
+      // CONDITIONAL SQL UPDATE — the decrement only fires when stock
+      // can actually cover `quantity`. Treat affected-rows=0 as a
+      // race-loss / sold-out and bail with 409 Conflict so the wallet
+      // deduction rolls back with the rest of the tx.
+      //
+      // Note: we reuse the outer `item` only for the up-front
+      // category / price metadata (read-mostly fields). All
+      // stock-bearing logic now goes through `lockedItem`.
+      if (item.isLimited) {
+        const lockedItem = await manager.findOne(ShopItem, {
+          where: { id: item.id },
+          lock: { mode: 'pessimistic_write' },
         });
+        if (!lockedItem) {
+          // Item deleted between outer fetch and tx open.
+          throw new NotFoundException(`İtem '${dto.sku}' bulunamadı`);
+        }
+        if (lockedItem.stockRemaining !== null) {
+          if (lockedItem.stockRemaining < quantity) {
+            throw new ConflictException('Stok yetersiz');
+          }
+          // Conditional decrement — even with FOR UPDATE in place this
+          // belt-and-braces WHERE guards against any future code path
+          // that drops the lock (e.g. switching isolation level) and
+          // makes the intent obvious to readers.
+          const updateResult = (await manager.query(
+            `UPDATE shop_items
+                SET stock_remaining = stock_remaining - $1
+              WHERE id = $2::uuid
+                AND stock_remaining >= $1
+              RETURNING stock_remaining`,
+            [quantity, item.id],
+          )) as [Array<{ stock_remaining: number }>, number] | Array<{ stock_remaining: number }>;
+          // pg driver returns [rows, count] for parameterised queries
+          // via TypeORM's manager.query; older paths just rows. Handle
+          // both shapes defensively.
+          const affectedRows = Array.isArray(updateResult)
+            && Array.isArray((updateResult as unknown[])[0])
+              ? ((updateResult as [Array<unknown>, number])[0]).length
+              : (updateResult as Array<unknown>).length;
+          if (affectedRows === 0) {
+            // Another concurrent purchase drained the stock between our
+            // lock acquire and the conditional UPDATE — should be
+            // impossible with FOR UPDATE held, but treat as race-loss
+            // and roll the whole tx back so the wallet stays intact.
+            throw new ConflictException('Stok yetersiz');
+          }
+        }
       }
 
       // Grant inventory entry (upsert).

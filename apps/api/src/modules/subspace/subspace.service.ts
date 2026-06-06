@@ -11,6 +11,30 @@ import { SubspaceZone } from './entities/subspace-zone.entity';
 import { SubspaceSession } from './entities/subspace-session.entity';
 import { SubspaceBattle } from './entities/subspace-battle.entity';
 import { EnterSubspaceDto, StartSubspaceBattleDto } from './dto/enter-subspace.dto';
+import {
+  deriveSubspaceDefenders,
+  resolveSubspaceUnitStats,
+  SubspaceDefenderSnapshot,
+} from './subspace-unit-stats';
+import { Race } from '../../user/entities/race.enum';
+
+/**
+ * Server-side canonical shape stamped onto SubspaceBattle.attackerUnits at
+ * startBattle() time. resolveBattle() iterates this — never the inbound
+ * DTO — so client-supplied stat fields can't drive subspace combat math.
+ *
+ * Mirrors the BossService DeployedUnitSnapshot pattern from
+ * apps/api/src/modules/boss/boss.service.ts.
+ */
+interface SubspaceAttackerSnapshot {
+  unitId: string;
+  type: string;
+  count: number;
+  attack: number;
+  defense: number;
+  hp: number;
+  raceBonus: number;
+}
 
 @Injectable()
 export class SubspaceService {
@@ -130,7 +154,7 @@ export class SubspaceService {
   /**
    * Start a subspace battle.
    *
-   * SECURITY (C4-3):
+   * SECURITY (C4-3 + HIGH ECON-C6-05):
    *  - `defenderId` is NEVER taken from the client. Previously
    *    `dto.defenderId` was written straight into the row, which let any
    *    authenticated caller spoof an attack target (PvP grief vector).
@@ -142,6 +166,16 @@ export class SubspaceService {
    *  - Each `attackerUnits[i].unitId` is verified against `player_units`
    *    WHERE player_id = caller. Anything not owned by the caller causes
    *    a 403 — no partial successes, no silent drops.
+   *  - ECON-C6-05 fix: the persisted attackerUnits snapshot is the
+   *    SERVER-DERIVED {type, attack, defense, hp, raceBonus, count}
+   *    tuple from UNIT_STATS_BY_TYPE + RACE_BONUSES applied to the
+   *    player_units row. The dto's stat fields are stripped at the
+   *    ValidationPipe (whitelist: true) so they don't even arrive here,
+   *    and even if they did, resolveBattle would never read them.
+   *    Previously startBattle wrote the dto verbatim, and
+   *    computeBattleResult read `(u.attack as number) || 100` straight
+   *    from it — a guaranteed-win recipe with any positive `attack`
+   *    integer on the wire.
    */
   async startBattle(userId: string, dto: StartSubspaceBattleDto): Promise<SubspaceBattle> {
     const zone = await this.zoneRepository.findOne({ where: { id: dto.zoneId } });
@@ -169,54 +203,79 @@ export class SubspaceService {
       );
     }
 
-    // ─── Ownership check on attackerUnits ──────────────────────────────
-    // Each unit object must carry a `unitId` UUID, and every one of them
-    // must belong to the caller. Done in a single SELECT to avoid N+1.
-    const unitIds = dto.attackerUnits
-      .map((u) => (typeof u?.unitId === 'string' ? u.unitId : null))
-      .filter((x): x is string => x !== null);
-
-    if (unitIds.length !== dto.attackerUnits.length) {
-      throw new BadRequestException(
-        "attackerUnits içindeki her birim bir 'unitId' (uuid) alanı taşımalı.",
-      );
+    // ─── Dedup unit ids ────────────────────────────────────────────────
+    // Two slots referencing the same player_units row is a client bug —
+    // treat it as 400 instead of silently double-deploying.
+    const requestedIds = dto.attackerUnits.map((u) => u.unitId);
+    if (new Set(requestedIds).size !== requestedIds.length) {
+      throw new BadRequestException('Aynı birim ID birden fazla slot için gönderildi');
     }
 
-    // De-dup; if FE sends the same id twice we only need to verify once.
-    const uniqueUnitIds = Array.from(new Set(unitIds));
-
+    // ─── Ownership + stat lookup in a single round-trip ────────────────
+    // Same SQL shape BossService.startAttempt uses.
+    let ownedRows: Array<{
+      id: string;
+      type: string;
+      race: string;
+      attack: number;
+      defense: number;
+      hp: number;
+    }>;
     try {
-      const owned = await this.dataSource.query<Array<{ id: string }>>(
-        `SELECT id
+      ownedRows = await this.dataSource.query(
+        `SELECT id, type, race, attack, defense, hp
            FROM player_units
           WHERE player_id = $1
-            AND id = ANY($2::uuid[])`,
-        [userId, uniqueUnitIds],
+            AND id = ANY($2::uuid[])
+            AND is_alive = true`,
+        [userId, requestedIds],
       );
-      const ownedSet = new Set(owned.map((r) => r.id));
-      const missing = uniqueUnitIds.filter((id) => !ownedSet.has(id));
-      if (missing.length > 0) {
-        this.logger.warn(
-          `startBattle ownership reject: user=${userId} sent ${missing.length} non-owned unitId(s): ${missing.join(',')}`,
-        );
-        throw new ForbiddenException(
-          'attackerUnits içinde sahibi olmadığınız birimler var. Sadece kendi birimlerinizi savaşa sokabilirsiniz.',
-        );
-      }
     } catch (err) {
-      // Re-throw the auth errors we just raised, but treat a query failure
-      // (e.g. player_units missing in this DB) as a hard 500 — silently
-      // allowing the battle to start would defeat the purpose of the
-      // check. This differs from FormationsService.calculatePower which
-      // is read-only and falls back safely.
-      if (err instanceof ForbiddenException || err instanceof BadRequestException) {
-        throw err;
-      }
+      // Treat query failure (e.g. player_units missing in this DB) as a
+      // hard 400 — silently allowing the battle to start would defeat
+      // the purpose of the check. This differs from FormationsService
+      // .calculatePower which is read-only and falls back safely.
       this.logger.error(
         `unit ownership check failed for user=${userId}: ${err instanceof Error ? err.message : String(err)}`,
       );
       throw new BadRequestException('Birim sahipliği doğrulanamadı, lütfen tekrar deneyin.');
     }
+
+    if (ownedRows.length !== requestedIds.length) {
+      const ownedSet = new Set(ownedRows.map((r) => r.id));
+      const offending = requestedIds.filter((id) => !ownedSet.has(id));
+      this.logger.warn(
+        `startBattle ownership reject: user=${userId} sent ${offending.length} non-owned-or-dead unitId(s): ${offending.join(',')}`,
+      );
+      throw new ForbiddenException(
+        'attackerUnits içinde sahibi olmadığınız veya hayatta olmayan birimler var. Sadece kendi yaşayan birimlerinizi savaşa sokabilirsiniz.',
+      );
+    }
+
+    // ─── Stamp the canonical server-derived snapshot ───────────────────
+    // DTO order is preserved so the client can correlate slots after the
+    // response. Stat fields on the dto (if any survived the validation
+    // pipe) are IGNORED — every value below is server-side.
+    const ownedById = new Map(ownedRows.map((r) => [r.id, r]));
+    const snapshot: SubspaceAttackerSnapshot[] = dto.attackerUnits.map((slot) => {
+      const row = ownedById.get(slot.unitId)!;
+      const stats = resolveSubspaceUnitStats({
+        type: row.type,
+        race: row.race as Race,
+        attack: Number(row.attack),
+        defense: Number(row.defense),
+        hp: Number(row.hp),
+      });
+      return {
+        unitId: row.id,
+        type: stats.type,
+        count: slot.count,
+        attack: stats.attack,
+        defense: stats.defense,
+        hp: stats.hp,
+        raceBonus: stats.raceBonus,
+      };
+    });
 
     const battle = this.battleRepository.create({
       zoneId: dto.zoneId,
@@ -225,7 +284,7 @@ export class SubspaceService {
       // PvE: no human defender. Encoded as null on the row.
       defenderId: null,
       status: 'pending',
-      attackerUnits: dto.attackerUnits,
+      attackerUnits: snapshot as unknown as Record<string, unknown>[],
       subspaceEffects: this.resolveSubspaceEffects(zone),
     });
 
@@ -235,20 +294,33 @@ export class SubspaceService {
   /**
    * Resolve a pending subspace battle.
    *
-   * SECURITY (C4-2): the caller must be a participant in the battle —
-   * either the attacker, or (in a future PvP world) the defender. The
-   * previous version accepted ANY authenticated caller, which meant a
-   * third party could:
-   *   - end someone else's battle prematurely with garbage defenderUnits
-   *     to grief them, or
-   *   - end their OWN battle on a stranger's id to harvest rewards once
-   *     the result-rewards pipeline lands.
-   * Both are closed off by the participant assertion below.
+   * SECURITY (C4-2 + HIGH ECON-C6-05):
+   *  - C4-2: the caller must be a participant in the battle — either
+   *    the attacker, or (in a future PvP world) the defender. The
+   *    previous version accepted ANY authenticated caller, which meant
+   *    a third party could:
+   *      - end someone else's battle prematurely with garbage defenderUnits
+   *        to grief them, or
+   *      - end their OWN battle on a stranger's id to harvest rewards
+   *        once the result-rewards pipeline lands.
+   *  - ECON-C6-05: the `defenderUnits` argument from the controller is
+   *    IGNORED. Previously this jsonb was written straight to the row
+   *    and then summed by computeBattleResult, letting the attacker pick
+   *    their own opponent's stats (e.g. `[{attack: 0}]`) for a
+   *    guaranteed-win recipe. The defender roster is now synthesized
+   *    server-side from the zone tier via SUBSPACE_DEFENDER_TABLE.
+   *    PvP types were already rejected at startBattle (C4-3) so we
+   *    never need a "real opponent's roster" path here.
+   *
+   *    NOTE: the controller signature still accepts a body param for
+   *    backwards compatibility with the FE, but the service drops it
+   *    on the floor. A future change can remove the param entirely.
    */
   async resolveBattle(
     userId: string,
     battleId: string,
-    defenderUnits: Record<string, unknown>[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _defenderUnitsIgnored: Record<string, unknown>[] | undefined,
   ): Promise<SubspaceBattle> {
     const battle = await this.battleRepository.findOne({
       where: { id: battleId, status: 'pending' },
@@ -263,14 +335,23 @@ export class SubspaceService {
       throw new ForbiddenException('Bu savaşı sonuçlandırma yetkiniz yok.');
     }
 
+    // Server-derived defender roster, seeded by zone tier. Deterministic
+    // per (zone, battleId) so the row written is stable and re-resolves
+    // produce the same answer.
+    const defenderSnapshot = deriveSubspaceDefenders(battle.zone.tier, battle.id);
+
+    const attackerSnapshot = (battle.attackerUnits || []) as unknown as SubspaceAttackerSnapshot[];
+
     const result = this.computeBattleResult(
-      battle.attackerUnits,
-      defenderUnits,
+      attackerSnapshot,
+      defenderSnapshot,
       battle.zone.modifiers as Record<string, number>,
     );
 
     battle.status = 'completed';
-    battle.defenderUnits = defenderUnits;
+    // Persist the server-derived snapshot — useful for replay/audit and
+    // makes it obvious in the DB row that the defender wasn't client-supplied.
+    battle.defenderUnits = defenderSnapshot as unknown as Record<string, unknown>[];
     battle.result = result;
     battle.winnerId = result.winnerId as string;
     battle.startedAt = new Date(Date.now() - (result.durationMs as number));
@@ -310,22 +391,58 @@ export class SubspaceService {
     return Object.entries(modifiers).map(([key, value]) => ({ effect: key, value }));
   }
 
+  /**
+   * Compute the battle outcome.
+   *
+   * SECURITY (HIGH ECON-C6-05):
+   *   Both inputs are SERVER-DERIVED snapshots — `attackerUnits` is the
+   *   {type, attack, defense, hp, raceBonus, count} tuple written by
+   *   startBattle() from UNIT_STATS_BY_TYPE + RACE_BONUSES, and
+   *   `defenderUnits` is synthesized by deriveSubspaceDefenders() from
+   *   the zone tier. Neither comes off the wire. Even if a future
+   *   regression re-introduces client-supplied stats on the dto, this
+   *   reducer is typed against the snapshot shape and ignores anything
+   *   that isn't a finite non-negative number.
+   *
+   *   The old `(u.attack as number) || 100` per-unit reducer is gone —
+   *   that pattern let a client send `{attack: 99_999_999}` and crash
+   *   through any defender power. Now `attack * count * raceBonus` is
+   *   summed for attackers and `attack * count` for defenders, with
+   *   non-finite or negative values clamped to zero.
+   */
   private computeBattleResult(
-    attackerUnits: Record<string, unknown>[],
-    defenderUnits: Record<string, unknown>[],
+    attackerUnits: SubspaceAttackerSnapshot[],
+    defenderUnits: SubspaceDefenderSnapshot[],
     zoneModifiers: Record<string, number>,
   ): Record<string, unknown> {
-    const attackMod = zoneModifiers.attack_multiplier || 1.0;
-    const defMod = zoneModifiers.defense_penalty || 1.0;
+    const attackMod = Number(zoneModifiers.attack_multiplier) || 1.0;
+    const defMod = Number(zoneModifiers.defense_penalty) || 1.0;
 
-    let attackerPower = attackerUnits.reduce((sum, u) => sum + ((u.attack as number) || 100), 0);
-    let defenderPower = defenderUnits.reduce((sum, u) => sum + ((u.attack as number) || 100), 0);
+    const safe = (n: unknown): number => {
+      const v = Number(n);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    };
+
+    let attackerPower = 0;
+    for (const u of attackerUnits) {
+      const atk = safe(u?.attack);
+      const count = safe(u?.count);
+      const raceBonus = safe(u?.raceBonus) || 1;
+      attackerPower += atk * count * raceBonus;
+    }
+
+    let defenderPower = 0;
+    for (const d of defenderUnits) {
+      const atk = safe(d?.attack);
+      defenderPower += atk; // 1 per slot — slot count varies by tier
+    }
 
     attackerPower *= attackMod;
     defenderPower *= defMod;
 
     const attackerWins = attackerPower >= defenderPower;
-    const margin = Math.abs(attackerPower - defenderPower) / Math.max(attackerPower, defenderPower);
+    const maxPower = Math.max(attackerPower, defenderPower, 1);
+    const margin = Math.abs(attackerPower - defenderPower) / maxPower;
 
     return {
       attackerPower: Math.floor(attackerPower),

@@ -28,14 +28,37 @@ import { AllianceRole } from './entities/alliance-member.entity';
 export class AllianceController {
   constructor(private readonly allianceService: AllianceService) {}
 
+  // SECURITY (audit cycle 7): cycle 6 closed /:id/storage, /:id/members and
+  // /:id/wars but missed the two top-level handlers below (findAll, findOne).
+  // Both eager-loaded relations: ['members'] (and 'storage' on findOne), so
+  // an anonymous attacker could:
+  //   GET /api/v1/alliances              -> roster of EVERY alliance (top 50)
+  //   GET /api/v1/alliances/<uuid>       -> full member list + storage row
+  //                                         (mineral/gas/energy/capacity)
+  // i.e. the same recon-as-a-service vector cycle 6 thought it had closed.
+  //
+  // Fix combines two layers:
+  //   1. Service-side projection: findAll returns AllianceSummary (no relations,
+  //      memberCount via COUNT subquery) and findOne strips storage entirely
+  //      and trims member rows to {userId, role, joinedAt} — contribution
+  //      and other sensitive fields stay member-gated via /:id/members.
+  //   2. Auth: even with stripped projections, both endpoints now require a
+  //      JWT. Anonymous alliance-name enumeration is still recon (lets botters
+  //      pre-build target lists). The FE only renders this list for logged-in
+  //      players anyway (apps/web/src/hooks/useAlliances.ts already handles
+  //      401 gracefully).
   @Get()
-  @ApiOperation({ summary: 'Tüm ittifakları listele' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tüm ittifakları listele (özet projeksiyon)' })
   findAll() {
     return this.allianceService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'İttifak detayını al' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'İttifak detayını al (storage hariç)' })
   @ApiParam({ name: 'id', description: 'İttifak UUID' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.allianceService.findOne(id);

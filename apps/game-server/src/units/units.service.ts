@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -71,9 +72,52 @@ export class UnitsService {
   ) {}
 
   /**
+   * Look up the player's race from the api-owned `users.race` column.
+   * Game-server doesn't own a User entity; we hit the shared DB directly
+   * (same pattern BasesService.getPlayerRace and progression/gates.service.ts
+   * use to read `users.race`). Returns null if the user row is missing or
+   * race hasn't been set yet, in which case trainUnit() will reject the
+   * race-check defensively.
+   */
+  private async getPlayerRace(playerId: string): Promise<Race | null> {
+    const rows = await this.dataSource.query<{ race: string | null }[]>(
+      `SELECT race FROM users WHERE id = $1 LIMIT 1`,
+      [playerId],
+    );
+    const raw = rows[0]?.race;
+    if (!raw) return null;
+    // users.race is api's Race enum (english snake_case). Both apis agree
+    // on the string literals (human/zerg/automaton/beast/demon), so a
+    // direct cast through the game-server Race enum is safe.
+    const allowed = Object.values(Race) as string[];
+    return allowed.includes(raw) ? (raw as Race) : null;
+  }
+
+  /**
    * Queue a unit for training.
    * Validates the building type, checks affordability, deducts resources and
    * inserts a TrainingQueue entry.
+   *
+   * CHAIN-UNITS-TRAIN race fix: pre-fix this endpoint enforced only
+   * `requiredBuilding` (which keys to building.type) and `trainable!==false`
+   * — it never consulted users.race. So a Beast-race account whose
+   * users.race=='beast' could POST {unitType:'marine', buildingId:<their
+   * Human barracks>} and mint a Human marine, provided they had a Human
+   * barracks lying around (e.g. seeded by the legacy selectRace whitelist
+   * mitigations, or via the auto-base/dev seeders that drop a starter
+   * Barracks regardless of race). The frontend filters the catalog via
+   * getUnitConfigsByRace but the path /units/train was authoritative-blind
+   * to race. Sibling endpoint BasesService.queueUnit (cycle 6) already
+   * carries this race-match gate; this method mirrors it to close the
+   * /base/production UI's actual code path.
+   *
+   * New contract:
+   *   - BadRequestException if `users.race` is null/undefined (race not
+   *     chosen yet — pre-rated player should not be able to train units).
+   *   - ForbiddenException with "Bu birim ırkına uygun değil" if the
+   *     unit config's race doesn't match the player's persisted race.
+   *   - Existing requiredBuilding + trainable + queue-cap checks remain
+   *     untouched as the second / defense-in-depth layer.
    */
   async trainUnit(playerId: string, dto: TrainUnitDto): Promise<TrainingQueue> {
     const config = UNIT_CONFIGS[dto.unitType];
@@ -91,6 +135,21 @@ export class UnitsService {
       throw new BadRequestException(
         `${dto.unitType} eğitilemez — sadece birleştirme ile elde edilir (Promosyon Töreni).`,
       );
+    }
+
+    // ── Race-match gate (CHAIN-UNITS-TRAIN) ──────────────────────────
+    // Mirrors BasesService.queueUnit's race check. Pre-fix the only race
+    // signal the path consulted was the unit's own native race; the
+    // player's `users.race` was never read. A null/missing race row is
+    // rejected with BadRequestException (race must be chosen first); a
+    // mismatch is rejected with ForbiddenException so the FE can route
+    // to the race-selection screen vs. surface a generic 400 toast.
+    const playerRace = await this.getPlayerRace(playerId);
+    if (!playerRace) {
+      throw new BadRequestException('Irk seçilmemiş');
+    }
+    if (config.race !== playerRace) {
+      throw new ForbiddenException('Bu birim ırkına uygun değil');
     }
 
     // Validate building exists and belongs to this player

@@ -79,6 +79,32 @@ export interface RaceTheme {
   name: string;
   short: string;
   motto: string;
+  /**
+   * Whether this race is currently selectable for actual gameplay.
+   *
+   * The catalog (lore, sigils, units, commanders, story scenes, themes) is
+   * authored for all 5 races so they can render on /race-select and in the
+   * story handoff. But only HUMAN + ZERG ship with backend unit kits
+   * (apps/game-server/.../race-configs.constants.ts) and matchmaking
+   * support. POST /users/me/race rejects the other 3 with a
+   * `BadRequestException("Bu ırk yakında oynanabilir olacak …")`.
+   *
+   * Frontend uses this flag to:
+   *   1. Render a "YAKINDA" badge / grayscale on unplayable cards.
+   *   2. Block selection client-side so the user can't even reach
+   *      handleStart() with an unplayable race.
+   *   3. Keep the unplayable races visible so the player still sees the
+   *      catalog and gets the "coming soon" hint.
+   *
+   * Audit history: previously every race rendered as selectable and
+   * RaceSelectClient.handleStart treated *any* 400 from /select-race as
+   * "race already chosen, navigate to /race-confirm". Picking otomat /
+   * canavar / şeytan would silently fail the API call, then play the
+   * cinematic and drop the user on /base with `users.race = null`. The
+   * base couldn't queue production ("Irk seçilmemiş") and battles ran
+   * with placeholder data. See CLAUDE.md cycle-6 audit.
+   */
+  playable: boolean;
   /** Primary oklch colour, used for race-tinted surfaces. */
   primary: string;
   /** Slightly dimmer primary, for gradients & low-emphasis fills. */
@@ -156,6 +182,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     name: 'İnsanlar',
     short: 'İNS',
     motto: 'Bilim · İrade · Kardeşlik',
+    playable: true,
     primary: 'oklch(0.82 0.16 80)',
     primaryDim: 'oklch(0.62 0.13 80)',
     glow: 'oklch(0.85 0.18 80)',
@@ -216,6 +243,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     name: 'Zergler',
     short: 'ZRG',
     motto: 'Asimile · Evrim · Sürü',
+    playable: true,
     primary: 'oklch(0.66 0.24 340)',
     primaryDim: 'oklch(0.48 0.18 340)',
     glow: 'oklch(0.72 0.26 340)',
@@ -263,6 +291,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     name: 'Otomatlar',
     short: 'OTO',
     motto: 'Mantık · Optimizasyon · Ağ',
+    playable: false,
     primary: 'oklch(0.78 0.16 220)',
     primaryDim: 'oklch(0.58 0.13 220)',
     glow: 'oklch(0.82 0.18 220)',
@@ -317,6 +346,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     name: 'Canavarlar',
     short: 'CNV',
     motto: 'Güç · İçgüdü · Hiyerarşi',
+    playable: false,
     primary: 'oklch(0.72 0.18 50)',
     primaryDim: 'oklch(0.52 0.14 50)',
     glow: 'oklch(0.78 0.20 50)',
@@ -364,6 +394,7 @@ export const RACES: Record<RaceKey, RaceTheme> = {
     name: 'Şeytanlar',
     short: 'ŞYT',
     motto: 'Pakt · Arzu · Borç',
+    playable: false,
     primary: 'oklch(0.62 0.22 15)',
     primaryDim: 'oklch(0.45 0.18 15)',
     glow: 'oklch(0.70 0.24 15)',

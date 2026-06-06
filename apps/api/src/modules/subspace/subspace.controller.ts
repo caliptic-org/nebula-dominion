@@ -64,13 +64,15 @@ export class SubspaceController {
   resolveBattle(
     @Request() req: { user: { id: string } },
     @Param('battleId') battleId: string,
-    @Body() body: { defenderUnits: Record<string, unknown>[] },
+    // ECON-C6-05: the body is no longer trusted for combat math — the
+    // service synthesizes the defender roster server-side from the zone
+    // tier. We still accept the body to keep the wire format
+    // backwards-compatible with existing FE callers; it's dropped on the
+    // floor immediately. C4-2 still applies: the service asserts the
+    // caller is a participant in this battle.
+    @Body() body?: { defenderUnits?: Record<string, unknown>[] },
   ) {
-    // C4-2: caller identity is forwarded so the service can assert the
-    // requester is actually a participant in this battle. Previously
-    // ANY authenticated user could resolve ANY pending battle by id —
-    // a griefing + reward-theft vector.
-    return this.subspaceService.resolveBattle(req.user.id, battleId, body.defenderUnits);
+    return this.subspaceService.resolveBattle(req.user.id, battleId, body?.defenderUnits);
   }
 
   @Get('sessions')

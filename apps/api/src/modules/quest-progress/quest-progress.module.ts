@@ -3,9 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { QuestProgress } from './entities/quest-progress.entity';
 import { QuestProgressService } from './quest-progress.service';
 import { QuestProgressController } from './quest-progress.controller';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([QuestProgress])],
+  imports: [TypeOrmModule.forFeature([QuestProgress]), AuthModule],
   controllers: [QuestProgressController],
   providers: [QuestProgressService],
   exports: [QuestProgressService],

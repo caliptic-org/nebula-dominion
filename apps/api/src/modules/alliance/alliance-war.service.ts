@@ -88,13 +88,40 @@ export class AllianceWarService {
     return this.warRepo.save(war);
   }
 
-  /** Returns every war this alliance has ever been a part of, newest first. */
-  async listWars(allianceId: string): Promise<AllianceWar[]> {
+  /**
+   * Returns every war this alliance has ever been a part of, newest first.
+   *
+   * Audit cycle 7 (HIGH IDOR-ALLIANCE-WAR-LIST-02 / CHAIN-ALLIANCE-WARS-LEAK):
+   * previously this took only `allianceId` and the controller was completely
+   * unguarded — anonymous callers could enumerate any alliance's full war
+   * history (with attacker/defender entities eagerly loaded), exposing
+   * strategic intel like ongoing wars, recent defeats, and active rivalries.
+   * Cycle 6 fixed the analogous AllianceService.getWars path on
+   * /alliances/:id/wars but missed THIS service, which backs the
+   * /alliance-wars/:allianceId endpoint that the FE useAllianceWars hook
+   * actually consumes. Now requires that the caller is a member of the
+   * queried alliance — mirrors AllianceService.getWars / assertMembership.
+   */
+  async listWars(requesterId: string, allianceId: string): Promise<AllianceWar[]> {
+    await this.assertMembership(requesterId, allianceId);
     return this.warRepo.find({
       where: [{ attackerId: allianceId }, { defenderId: allianceId }],
       relations: ['attacker', 'defender'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Membership guard for the war ledger reader. Kept local to this service
+   * rather than calling into AllianceService to avoid a circular-injection
+   * footgun (AllianceWarService is mounted alongside AllianceService in
+   * AllianceModule). Throws 403 when the requester isn't in the alliance.
+   */
+  private async assertMembership(userId: string, allianceId: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { userId, allianceId } });
+    if (!member) {
+      throw new ForbiddenException('Bu ittifakın üyesi değilsiniz');
+    }
   }
 
   /** Active = DECLARED or ACTIVE. Ended/truce are excluded. */

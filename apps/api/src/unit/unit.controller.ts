@@ -13,11 +13,8 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID, IsInt, Min } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UnitService, CreateUnitDto } from './unit.service';
+import { UnitService } from './unit.service';
 import { MergePreviewService } from './merge-preview.service';
-import { UnitType } from './entities/unit.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MergeUnitsDto } from './dto/merge-units.dto';
 import { MutateUnitDto } from './dto/mutate-unit.dto';
@@ -25,22 +22,6 @@ import {
   MergePreviewRequestDto,
   MergePreviewResponseDto,
 } from './dto/merge-preview.dto';
-
-class CreateUnitBodyDto implements CreateUnitDto {
-  @ApiProperty()
-  @IsUUID()
-  gameId: string;
-
-  @ApiProperty({ enum: UnitType })
-  @IsEnum(UnitType)
-  type: UnitType;
-
-  @ApiPropertyOptional({ default: 1 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  count?: number;
-}
 
 @ApiTags('units')
 @ApiBearerAuth()
@@ -70,17 +51,30 @@ export class UnitController {
     return this.mergePreviewService.preview(req.user.id, dto);
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Train a unit' })
-  create(@Request() req: any, @Body() dto: CreateUnitBodyDto) {
-    return this.unitService.create(req.user.id, dto);
-  }
-
-  @Post('produce')
-  @ApiOperation({ summary: 'Alias of POST /units — produce a unit (mvp.txt contract)' })
-  produce(@Request() req: any, @Body() dto: CreateUnitBodyDto) {
-    return this.unitService.create(req.user.id, dto);
-  }
+  // NB. POST /units and POST /units/produce USED TO LIVE HERE — legacy
+  // shim handlers (mvp.txt contract era) that called
+  // UnitService.create(). They had **no resource cost check, no queue
+  // gate, no race gate, and no upper bound on `count`** (only @Min(1)).
+  // A live-audit smoke test minted 1,000,000 marines per request by
+  // POSTing { gameId, type: "marine", count: 1_000_000 } — instantly
+  // breaks the entire battle economy. (ECON-C6-02, audit cycle 6.)
+  //
+  // The canonical training path lives in
+  // apps/game-server/src/units/units.service.ts -> trainUnit() and is
+  // exposed as POST /api/units/train on game-server. It enforces:
+  //   - per-unit resource cost (canAfford + atomic deduct)
+  //   - training queue cap + cooldown
+  //   - race gate (cycle-6 race-vs-unit eligibility check)
+  //   - per-player unit-row cap
+  // The FE has never called the api shim — see grep history; the only
+  // /api/v1/units/* paths still in use are merge-preview (above), merge,
+  // mutate, GET list, GET by player, DELETE. Removing the routes closes
+  // the BLOCKER without breaking any client.
+  //
+  // If you ever need to re-introduce a training endpoint here, proxy to
+  // the game-server's trainUnit() — do not reimplement the create row
+  // pattern. A bare `repo.create(); repo.save()` for units must never
+  // ship from this service again.
 
   @Post('merge')
   @HttpCode(HttpStatus.OK)

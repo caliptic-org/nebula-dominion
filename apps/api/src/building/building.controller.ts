@@ -1,25 +1,7 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus, Request, Query } from '@nestjs/common';
+import { Controller, Get, Delete, Param, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID, IsObject } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BuildingService, CreateBuildingDto } from './building.service';
-import { BuildingType } from './entities/building.entity';
+import { BuildingService } from './building.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-
-class CreateBuildingBodyDto implements CreateBuildingDto {
-  @ApiProperty()
-  @IsUUID()
-  gameId: string;
-
-  @ApiProperty({ enum: BuildingType })
-  @IsEnum(BuildingType)
-  type: BuildingType;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsObject()
-  position?: { x: number; y: number };
-}
 
 @ApiTags('buildings')
 @ApiBearerAuth()
@@ -28,11 +10,26 @@ class CreateBuildingBodyDto implements CreateBuildingDto {
 export class BuildingController {
   constructor(private readonly buildingService: BuildingService) {}
 
-  @Post()
-  @ApiOperation({ summary: 'Construct a building' })
-  create(@Request() req: any, @Body() dto: CreateBuildingBodyDto) {
-    return this.buildingService.create(req.user.id, dto);
-  }
+  // NB. POST /buildings USED TO LIVE HERE — a legacy shim that called
+  // BuildingService.create(). It had **no resource cost, no position
+  // uniqueness check, no maxPerPlayer cap, and no construction queue
+  // gate**. A live-audit smoke test instantiated dozens of free
+  // production buildings on the same gameId by hammering the route.
+  // (ECON-C6-03, audit cycle 6.)
+  //
+  // The canonical construction path lives in
+  // apps/game-server/src/buildings/buildings.service.ts and is exposed
+  // as POST /api/buildings/start-construction on game-server. It
+  // enforces resource cost (canAfford + atomic deduct), per-base
+  // building slot rules, queue cap, and tech prereqs.
+  //
+  // The FE has never POSTed to /api/v1/buildings (grep apps/web/src),
+  // so removing the route is a no-op for clients. Same removal pattern
+  // as the cycle-2 building-upgrade shim deletion (see note below).
+  //
+  // If you re-introduce a construction endpoint here, proxy to the
+  // game-server's BuildingsService.startConstruction() — do not
+  // reimplement a bare repo.create()/save() ever again.
 
   @Get()
   @ApiOperation({ summary: 'List buildings in a game' })

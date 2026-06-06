@@ -282,6 +282,21 @@ export class AlliancePlayerService {
     return storage;
   }
 
+  /**
+   * Bağış akışı — /api/v1/alliance/donations bu metoda yönlenir.
+   *
+   * ── ECONOMY GUARD (cycle 6) ────────────────────────────────────────────
+   * Cycle 5'te wallet-deduct yalnız `AllianceService.deposit`'e eklenmişti.
+   * Bu metot ise storage + alliance_donations + member.contribution yazıp
+   * `player_resources`'a hiç dokunmuyordu — bir oyuncu {mineral:1M, gas:1M,
+   * energy:1M} POST'larıyla katkı leaderboard'unu ve lonca deposunu hiçbir
+   * kaynak harcamadan şişirebiliyordu (HIGH ECON-C6-04).
+   *
+   * Düzeltme: aynı tx içinde önce `player_resources` üzerinde
+   * pessimistic_write lock ile bakiye kontrolü + atomik düşüm yapılıyor,
+   * sonra storage / contribution / donation yazımları devam ediyor.
+   * `deposit` (alliance.service.ts L263-293) ile pattern bire bir uyumlu.
+   */
   async donate(userId: string, dto: DonateDto): Promise<AllianceDonation> {
     const member = await this.requireMembership(userId);
 
@@ -294,6 +309,39 @@ export class AlliancePlayerService {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      // ── ECONOMY GUARD ───────────────────────────────────────────────
+      // Önce oyuncunun kendi cüzdanından düş — yoksa free-mint.
+      // player_resources game-server schema'sında yaşıyor, aynı DB; raw SQL
+      // + FOR UPDATE trickle-tick contention'ına karşı atomik kalmasını
+      // sağlıyor. alliance.service.ts deposit ile aynı pattern.
+      const balRows = (await manager.query(
+        `SELECT mineral, gas, energy FROM player_resources
+           WHERE player_id = $1::uuid FOR UPDATE`,
+        [userId],
+      )) as Array<{ mineral: number; gas: number; energy: number }>;
+      const bal = balRows[0];
+      if (!bal) {
+        throw new BadRequestException('Oyuncu cüzdanı bulunamadı');
+      }
+      if (Number(bal.mineral) < mineral) {
+        throw new BadRequestException(`Yetersiz mineral kaynağın`);
+      }
+      if (Number(bal.gas) < gas) {
+        throw new BadRequestException(`Yetersiz gas kaynağın`);
+      }
+      if (Number(bal.energy) < energy) {
+        throw new BadRequestException(`Yetersiz energy kaynağın`);
+      }
+
+      await manager.query(
+        `UPDATE player_resources
+            SET mineral = mineral - $2,
+                gas = gas - $3,
+                energy = energy - $4
+          WHERE player_id = $1::uuid`,
+        [userId, mineral, gas, energy],
+      );
+
       // Pessimistic lock to prevent race conditions
       const storage = await manager
         .createQueryBuilder(AllianceStorage, 's')

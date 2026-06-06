@@ -54,9 +54,21 @@ export class QuestProgressNotifier {
     // arrow so we can swallow errors WITHOUT making the outer call async.
     (async () => {
       try {
+        // X-Internal-Service carries the shared secret the api side now
+        // requires (InternalServiceGuard, audit B1 fix). Prefer
+        // INTERNAL_SERVICE_SECRET; fall back to JWT_SECRET which both
+        // services already share for cross-service auth. Without either
+        // env var the api will reject the call — fail-closed by design.
+        const serviceSecret =
+          process.env.INTERNAL_SERVICE_SECRET || process.env.JWT_SECRET || '';
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(serviceSecret
+              ? { 'X-Internal-Service': `Bearer ${serviceSecret}` }
+              : {}),
+          },
           body: JSON.stringify(body),
         });
         if (!res.ok) {

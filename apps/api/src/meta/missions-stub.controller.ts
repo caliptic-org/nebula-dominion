@@ -133,12 +133,49 @@ export class MissionsStubController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Claim a quest reward (idempotent — second call returns alreadyClaimed)' })
-  claim(@Request() req: any, @Param('questId') questId: string) {
+  async claim(@Request() req: any, @Param('questId') questId: string) {
     const quest = QUESTS.find((q) => q.id === questId);
     if (!quest) {
       throw new HttpException('Görev bulunamadı.', HttpStatus.NOT_FOUND);
     }
     const userId: string = req.user?.id ?? 'unknown';
+
+    // Server-side progress check (audit B2 fix).
+    //
+    // Before this guard the claim handler only checked the in-memory
+    // CLAIMED set — Day-1 players could claim all 7 daily quests with
+    // 0/N progress because the FE was the only thing reading
+    // q.target. A live playtest grabbed all rewards instantly on a
+    // fresh account.
+    //
+    // For quests with a `liveCountQuestId` we consult QuestProgressService
+    // (game-server has been incrementing it via the
+    // X-Internal-Service-guarded /quest-progress/increment endpoint).
+    // For quests without a live counter (q3 merge, q4 donate) we trust
+    // the static seed value baked into the QUESTS catalog above — those
+    // event hooks aren't wired yet, so the safest read is the seed.
+    //
+    // The seed for q3 / q4 ships at progress=0 / target=1 (or higher),
+    // so unwired quests fail-closed: claim returns 400 "Görev henüz
+    // tamamlanmadı" until their event hook lands.
+    let progress = quest.progress;
+    if (quest.liveCountQuestId && this.questProgress) {
+      try {
+        const counters = await this.questProgress.getAllProgress(userId);
+        if (Object.prototype.hasOwnProperty.call(counters, quest.liveCountQuestId)) {
+          progress = counters[quest.liveCountQuestId];
+        }
+      } catch {
+        /* fall back to seed */
+      }
+    }
+    if (progress < quest.target) {
+      throw new HttpException(
+        `Görev henüz tamamlanmadı (${progress}/${quest.target}).`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     let set = CLAIMED.get(userId);
     if (!set) {
       set = new Set<string>();

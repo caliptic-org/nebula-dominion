@@ -7,10 +7,12 @@ import {
   Logger,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { QuestProgressService } from './quest-progress.service';
 import { ServerIncrementProgressDto } from './dto/server-increment.dto';
+import { InternalServiceGuard } from './guards/internal-service.guard';
 
 /**
  * Quest progress endpoints.
@@ -41,9 +43,11 @@ export class QuestProgressController {
 
   @Post('increment')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(InternalServiceGuard)
   @ApiOperation({
     summary:
-      'Bump a quest counter for a user. Idempotent on (userId, questId, idempotencyKey).',
+      'Bump a quest counter for a user. Idempotent on (userId, questId, idempotencyKey). ' +
+      'Requires the X-Internal-Service header (game-server only).',
   })
   async increment(@Body() dto: ServerIncrementProgressDto) {
     const amount = dto.amount ?? 1;

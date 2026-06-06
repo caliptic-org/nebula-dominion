@@ -95,7 +95,7 @@ export const COMMANDER_CATALOG: CommanderCatalogEntry[] = [
   // ── Zerg ──
   { id: 'vex',     name: "Ana Kraliçe Vex'thara", title: 'Kovan Bilinci',   race: 'zerg',  tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı',       startsUnlocked: true,  portrait: '/assets/characters/zerg/vex_thara.png' },
   { id: 'threnix', name: 'Genom Üstadı Threnix',  title: 'Evrim Mühendisi', race: 'zerg',  tier: 'TIER 3',      skill: 'Mutasyon hızı +28%',          startsUnlocked: true,  portrait: '/assets/characters/zerg/threnix.png' },
-  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Strateji',        race: 'zerg',  tier: 'TIER 4',      skill: 'AI saldırı puanı +20%',       startsUnlocked: true,  portrait: '/assets/characters/zerg/morgath.png' },
+  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Strateji',        race: 'zerg',  tier: 'TIER 4',      skill: 'AI saldırı puanı +20%',       startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
   { id: 'kthala',  name: 'Brood-Anne Kthala',     title: 'Üretim Lordu',    race: 'zerg',  tier: 'TIER 5',      skill: 'Kaynak üretimi +25%',         startsUnlocked: false, portrait: '/assets/characters/zerg/kthala.png' },
   // ── Otomat ──
   { id: 'prime',    name: 'Demiurge Prime',         title: 'Merkez YZ',      race: 'otomat', tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%',            startsUnlocked: true,  portrait: '/assets/characters/otomat/demiurge_prime.png' },

@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -68,8 +69,17 @@ export class UserController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Deactivate a user' })
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: 'Deactivate the current user (self-only)' })
+  // SEC/IDOR: self-only — a logged-in user must not be able to disable
+  // another user's account. No admin role exists yet; if one is added
+  // later, allow admins through here as well.
+  deactivate(
+    @Request() req: { user: { id: string } },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (req.user.id !== id) {
+      throw new ForbiddenException('You can only deactivate your own account');
+    }
     return this.userService.deactivate(id);
   }
 }

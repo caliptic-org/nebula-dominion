@@ -182,6 +182,19 @@ export class UnitsService {
    * Complete overdue training entries.
    * If playerId is provided, only completes for that player.
    * Called by the background worker on each resource tick.
+   *
+   * Race bonuses are baked into the persisted stats here — base stats from
+   * UNIT_CONFIGS run through applyRaceBonuses() (HUMAN +15% def +10% hp,
+   * ZERG +15% atk +30% spd -10% hp -15% def, etc.) BEFORE the commander hp
+   * multiplier composes on top of the post-bonus HP. Order matters:
+   *   final = round(round(base * raceMult) * commanderMult)
+   * for HP; attack/defense/speed get the race multiplier only (no
+   * commander stats yet for those four).
+   *
+   * NOTE: rows created before this fix (2026-06-06) carry pre-bonus stats
+   * and will read low compared to freshly-trained units. A backfill
+   * migration that normalizes historical rows is deferred — TODO if/when
+   * the gap is player-visible enough to matter.
    */
   async completeTraining(playerId?: string): Promise<number> {
     const now = new Date();
@@ -216,7 +229,10 @@ export class UnitsService {
       // upgradeUnit() which writes stats at upgrade time).
       const cmdBonus = await this.commanders.getActiveBonus(entry.playerId);
       const hpMul = 1 + (cmdBonus.hpMultiplier ?? 0);
-      const spawnHp = Math.round(config.hp * hpMul);
+      // Race bonus first (applyRaceBonuses.effectiveStats), commander hp
+      // multiplier composes on top of the race-adjusted HP.
+      const raced = applyRaceBonuses(config).effectiveStats;
+      const spawnHp = Math.round(raced.hp * hpMul);
       for (let i = 0; i < spawnCount; i += 1) {
         const unit = this.unitRepo.create({
           playerId: entry.playerId,
@@ -224,9 +240,9 @@ export class UnitsService {
           race: entry.race,
           hp: spawnHp,
           maxHp: spawnHp,
-          attack: config.attack,
-          defense: config.defense,
-          speed: config.speed,
+          attack: raced.attack,
+          defense: raced.defense,
+          speed: raced.speed,
           positionX: 0,
           positionY: 0,
           abilities: config.abilities,
@@ -354,6 +370,16 @@ export class UnitsService {
    * Effect:
    *   - DELETE the 3 source rows
    *   - INSERT 1 new row with result type + result tier's UNIT_CONFIG stats
+   *     run through applyRaceBonuses() so race multipliers (HUMAN +15% def
+   *     +10% hp, ZERG +15% atk +30% spd -10% hp -15% def, etc.) are baked
+   *     into the persisted row — same convention as completeTraining().
+   *     Commander hp multiplier does NOT compose here (mergeRoster has
+   *     never applied it; deferred until a UX decision is made about
+   *     whether merged units inherit the active commander's bonus).
+   *
+   * NOTE: rows created before this fix (2026-06-06) carry pre-bonus stats
+   * and will read low. Backfill migration deferred — TODO if/when the
+   * gap is player-visible enough to matter.
    *
    * Returns the freshly-spawned PlayerUnit so the FE can route to its
    * detail page or refresh the inventory.
@@ -416,15 +442,20 @@ export class UnitsService {
       }
 
       await txUnitRepo.remove(units);
+      // Apply race bonuses to the result tier's base stats before insert
+      // — keeps persisted rows consistent with completeTraining()'s
+      // post-fix convention. See JSDoc above for the deferred-backfill
+      // note on historical rows.
+      const racedResult = applyRaceBonuses(resultConfig).effectiveStats;
       const spawned = txUnitRepo.create({
         playerId,
         type: resultType,
         race: units[0].race,
-        hp: resultConfig.hp,
-        maxHp: resultConfig.hp,
-        attack: resultConfig.attack,
-        defense: resultConfig.defense,
-        speed: resultConfig.speed,
+        hp: racedResult.hp,
+        maxHp: racedResult.hp,
+        attack: racedResult.attack,
+        defense: racedResult.defense,
+        speed: racedResult.speed,
         positionX: 0,
         positionY: 0,
         abilities: resultConfig.abilities,

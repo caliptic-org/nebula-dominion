@@ -10,6 +10,7 @@ import { DataSource, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Race } from './entities/race.enum';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { OnboardingService } from '../modules/onboarding/onboarding.service';
 
 const PROFILE_FIELDS: (keyof User)[] = [
   'id',
@@ -31,6 +32,7 @@ export class UserService {
     private readonly userRepo: Repository<User>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   async findAll(): Promise<Omit<User, 'password'>[]> {
@@ -96,18 +98,33 @@ export class UserService {
     user.race = race;
     await this.userRepo.save(user);
 
+    // Onboarding sync — without this hook the tutorial's `race_selection`
+    // step stays "currentStep" forever even though the player has
+    // committed to a race via POST /users/me/race. The FE then either
+    // re-prompts for race on next /onboarding/progress poll or leaves
+    // the tutorial banner stuck. completeStep() throws if the player
+    // isn't currently on that step (e.g. they skipped tutorial, or
+    // already advanced); swallow non-fatally — race is already saved.
+    try {
+      await this.onboardingService.completeStep(id, {
+        stepId: 'race_selection',
+        selectedRace: race,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`onboarding.completeStep(race_selection) skipped for ${id}: ${msg}`);
+    }
+
     // Seed starter buildings — without this, fresh players land on /base
     // with an empty grid AND every downstream feature gated by an active
     // building stays locked: /base/production can't train (no barracks
     // → gate `production.train_marine` blocks the button), /merge has
     // nothing to merge (no units → demo placeholder cards only), /shop
-    // VIP claim works but the actual gameplay loop is dead.  4-building
-    // pack covers the immediate progression chain:
-    //
-    //   command_center  — always; HQ for tier gates
-    //   mineral_extractor — Kredi (mineral) trickle
-    //   solar_plant     — Enerji trickle
-    //   barracks        — unlocks /base/production train_marine
+    // VIP claim works but the actual gameplay loop is dead.  The pack
+    // covers the immediate progression chain plus every requiredBuilding
+    // referenced by UNIT_CONFIGS for the selected race (so MEDIC/GHOST/
+    // SIEGE_TANK for HUMAN and ULTRALISK/QUEEN for ZERG aren't locked
+    // out from day 0).
     //
     // Idempotent ON CONFLICT: a player who somehow already has a row of
     // a type keeps theirs (e.g. dev seed scripts ran on the same uid).
@@ -118,31 +135,47 @@ export class UserService {
   }
 
   private async seedStarterBuildings(userId: string, race: Race): Promise<void> {
-    // Race-specific production building (audit C1 fix).
+    // Race-specific full unit-roster coverage (audit C1 + USR follow-up).
     //
-    // Previously this seeded a flat `barracks` for every race — a zerg
-    // player landed on /base with an insan-only training building and
-    // POST /units/train zergling returned "Unknown requiredBuilding"
-    // because UNIT_CONFIGS[ZERGLING].requiredBuilding is SPAWNING_POOL.
-    // The full-audit playtest caught this as "select zerg, can't train".
+    // Previously seeded only 4 buildings (HQ + mineral + power + one
+    // training building). That covered the first trainable unit per race
+    // but every other UNIT_CONFIGS entry whose `requiredBuilding` was
+    // *not* barracks/spawning_pool failed at POST /units/train with
+    // "required building not found":
     //
-    // The other 3 starters (HQ + mineral + power) are race-neutral so
-    // they stay shared. The training building is the only one that has
-    // to branch.
+    //   HUMAN  → MEDIC, GHOST need ACADEMY; SIEGE_TANK needs FACTORY
+    //   ZERG   → ULTRALISK, QUEEN need HATCHERY
+    //
+    // (See apps/game-server/src/units/constants/race-configs.constants.ts
+    //  lines 125, 138, 151, 271, 284.) Without these the entire mid-tier
+    // unit lineup is locked behind a building the player has no UI to
+    // discover, let alone build — /base/production renders the card,
+    // taps return 400, the player gives up.
+    //
+    // Fix: seed the full race's `requiredBuilding` set up front. The
+    // base layout uses x∈[3..5], y∈[4..5]; new buildings extend into
+    // y=3 (north row) so the player still has clear footprint room
+    // around the spawn.
     //
     // When the 3-race kits ship (currently A5 whitelist blocks
-    // otomat/canavar/seytan), wire their training building here too:
-    //   otomat  → montaj_hatti
-    //   canavar → vahsi_cukur
-    //   seytan  → lanet_tapinagi
-    // For now those races never reach this point.
-    const trainingBuilding = race === Race.ZERG ? 'spawning_pool' : 'barracks';
-    const starters = [
-      { type: 'command_center',    x: 4, y: 4 },
-      { type: 'mineral_extractor', x: 3, y: 4 },
-      { type: 'solar_plant',       x: 5, y: 4 },
-      { type: trainingBuilding,    x: 4, y: 5 },
-    ];
+    // otomat/canavar/seytan), add their requiredBuilding rosters here.
+    const starters =
+      race === Race.ZERG
+        ? [
+            { type: 'command_center',    x: 4, y: 4 },
+            { type: 'mineral_extractor', x: 3, y: 4 },
+            { type: 'solar_plant',       x: 5, y: 4 },
+            { type: 'spawning_pool',     x: 4, y: 5 },
+            { type: 'hatchery',          x: 4, y: 3 },
+          ]
+        : [
+            { type: 'command_center',    x: 4, y: 4 },
+            { type: 'mineral_extractor', x: 3, y: 4 },
+            { type: 'solar_plant',       x: 5, y: 4 },
+            { type: 'barracks',          x: 4, y: 5 },
+            { type: 'academy',           x: 3, y: 3 },
+            { type: 'factory',           x: 5, y: 3 },
+          ];
     // Raw SQL — same Postgres DB as game-server, no entity import needed.
     // ON CONFLICT DO NOTHING via the partial unique pattern: skip insert
     // if the player already has a row at the same (player_id, type, x, y).

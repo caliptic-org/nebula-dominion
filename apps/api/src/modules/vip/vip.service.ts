@@ -150,16 +150,31 @@ export class VipService {
       { type: 'gems' as const, amount: gemReward, label: `${gemReward} 💎` },
     ];
 
-    spending.lastDailyClaimAt = now;
-    await this.vipSpendingRepo.save(spending);
+    // Credit the gems into the player's wallet AND mark the claim
+    // timestamp atomically — if the wallet write fails, the cooldown
+    // must not advance (otherwise the player loses their daily). Mirrors
+    // the lazy-init INSERT...ON CONFLICT pattern from
+    // premium.service.claimTierReward so a never-paid player who's never
+    // touched the shop still gets credited on their first claim.
+    const spendingRow = spending;
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
+           ON CONFLICT (user_id) DO NOTHING`,
+        [userId],
+      );
+      await manager.query(
+        `UPDATE user_currency
+            SET premium_gems = premium_gems + $2
+          WHERE user_id = $1::uuid`,
+        [userId, gemReward],
+      );
+      spendingRow.lastDailyClaimAt = now;
+      await manager.getRepository(UserVipSpending).save(spendingRow);
+    });
 
     this.logger.log(`VIP günlük ödül: kullanıcı=${userId} VIP${spending.vipLevel} → ${gemReward} gems`);
 
-    // TODO(payment-followup): grant the gems via PremiumCurrency.grant
-    // (or whichever shop ledger module handles the gem wallet).  For now
-    // the reward is "recorded" — the FE toasts the amount and the player
-    // sees confirmation, but the wallet credit is wired in the next
-    // commit alongside Battle Pass tier-reward claiming (same ledger).
     return {
       rewards,
       alreadyClaimed: false,

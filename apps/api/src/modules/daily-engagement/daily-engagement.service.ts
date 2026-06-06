@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, QueryFailedError } from 'typeorm';
+import { Repository, QueryFailedError, MoreThanOrEqual } from 'typeorm';
 import { MissionClaim, MissionType } from './entities/mission-claim.entity';
 import { CanonicalReward } from './dto/claim-mission.dto';
 import {
@@ -100,19 +100,34 @@ export class DailyEngagementService {
     // reward (for forward-compat) but never grant resources.
     const { reward, recognised } = resolveMissionReward(missionId, missionType);
     if (!recognised) {
+      // Unknown mission id — don't persist a junk row. Persisting would
+      // both pollute the table and burn the (userId, missionId) UNIQUE
+      // slot, blocking a legitimate id with the same string later. Return
+      // a no-op claim result; the FE optimistic update sees rewards={}
+      // and `claimed:false` so nothing is credited locally either.
       this.logger.warn(
-        `Mission claim with unknown id user=${userId} mission=${missionId} type=${missionType} — accepting with zero reward`,
+        `Mission claim with unknown id user=${userId} mission=${missionId} type=${missionType} — rejecting (no row persisted)`,
       );
+      return {
+        claimed: false,
+        alreadyClaimed: false,
+        rewards: {},
+        walletCredited: false,
+        xpGranted: false,
+      };
     }
 
     const existing = await this.claimRepo.findOne({
       where: { userId, missionId },
     });
     if (existing) {
+      // rewards:{} (not existing.rewardJson) — FE applies an optimistic
+      // wallet bump on any non-empty rewards payload, so echoing the
+      // already-credited amount here would double-credit on re-tap.
       return {
         claimed: false,
         alreadyClaimed: true,
-        rewards: existing.rewardJson ?? {},
+        rewards: {},
         walletCredited: false,
         xpGranted: false,
       };
@@ -127,11 +142,12 @@ export class DailyEngagementService {
     const dayStart = new Date();
     dayStart.setUTCHours(0, 0, 0, 0);
     const todaysClaims = await this.claimRepo.find({
-      where: { userId },
+      where: { userId, claimedAt: MoreThanOrEqual(dayStart) },
     });
-    const todaysXp = todaysClaims
-      .filter((c) => c.claimedAt >= dayStart)
-      .reduce((sum, c) => sum + (c.rewardJson?.xp ?? 0), 0);
+    const todaysXp = todaysClaims.reduce(
+      (sum, c) => sum + (c.rewardJson?.xp ?? 0),
+      0,
+    );
     let cappedReward: CanonicalReward = { ...reward };
     if ((cappedReward.xp ?? 0) > 0 && todaysXp + (cappedReward.xp ?? 0) > PER_USER_DAILY_XP_CAP) {
       const remaining = Math.max(0, PER_USER_DAILY_XP_CAP - todaysXp);
@@ -162,13 +178,13 @@ export class DailyEngagementService {
       if (err instanceof QueryFailedError) {
         const code = (err.driverError as { code?: string } | undefined)?.code;
         if (code === '23505') {
-          const existingRow = await this.claimRepo.findOne({
-            where: { userId, missionId },
-          });
+          // rewards:{} — same reasoning as the early `existing` branch:
+          // the parallel POST already credited the wallet, echoing the
+          // amount here would let the FE optimistic update double it.
           return {
             claimed: false,
             alreadyClaimed: true,
-            rewards: existingRow?.rewardJson ?? {},
+            rewards: {},
             walletCredited: false,
             xpGranted: false,
           };
@@ -191,14 +207,18 @@ export class DailyEngagementService {
     // wallet credit above (which writes raw resource numbers); this writes
     // an xp_transactions row and recomputes player_level.
     //
-    // GATED on `recognised`: unknown mission ids no longer trigger the
-    // progression grant. Without this an attacker could rotate fake
-    // mission ids (each one bypasses the UNIQUE constraint) and farm
-    // the per-mission-type base XP from game-server forever. Now they
-    // get the wallet zero AND the XP zero — the claim row still persists
-    // (idempotent contract) but the grant is suppressed.
+    // GATED on `recognised && cappedReward.xp > 0`:
+    //   - `recognised` — unknown mission ids never trigger a grant (the
+    //     early-return above also blocks them, kept here for defense in
+    //     depth).
+    //   - `cappedReward.xp > 0` — game-server reads its own XP_BASE_AMOUNTS
+    //     table per source, so calling award-xp here would credit the full
+    //     per-mission-type base ignoring our 150k daily cap and ignoring
+    //     reward.xp=0 missions (cosmetic daily-* rows). Only proceed when
+    //     the catalog actually intends XP to flow AND the cap left some
+    //     headroom.
     let xpGranted = false;
-    if (authorization && recognised) {
+    if (authorization && recognised && (cappedReward.xp ?? 0) > 0) {
       xpGranted = await this.creditXp({
         authorization,
         userId,

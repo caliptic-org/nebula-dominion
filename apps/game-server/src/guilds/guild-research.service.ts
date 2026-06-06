@@ -54,24 +54,98 @@ export class GuildResearchService {
     private readonly researchRepo: Repository<GuildResearchState>,
     @InjectRepository(GuildResearchContribution)
     private readonly contribRepo: Repository<GuildResearchContribution>,
+    @InjectRepository(GuildMember)
+    private readonly memberRepo: Repository<GuildMember>,
     private readonly emitter: EventEmitter2,
     private readonly dataSource: DataSource,
   ) {}
 
+  // ─── Membership guard (cycle 15 IDOR-GUILD-RESEARCH-ENUM-02) ─────────────
+  //
+  // HIGH IDOR-GUILD-RESEARCH-ENUM-02 (audit cycle 15):
+  //   The read-side research handlers
+  //   (`listGuildResearch`, `getActiveSlots`, `getGuildBuffs`,
+  //   `getResearchState`, `listContributions`) were gated only by
+  //   `HttpJwtGuard` and had NO caller-vs-target membership check. Any
+  //   logged-in player could `curl /api/guilds/<rival>/research/buffs`
+  //   (direct combat intel — what raid_damage_pct and member_capacity
+  //   buffs the rival has stacked), `/research/active` (which weekly
+  //   slots they've allocated → what tech they're about to unlock), or
+  //   `/research/<stateId>/contributions` (per-member xpContributed
+  //   roster → recon "weakest contributor" picks the same way the cycle
+  //   11 listMembers vulnerability allowed).
+  //
+  //   This is the SAME vulnerability class as cycle 15 A1
+  //   (IDOR-GUILD-RAIDS-ENUM-01, raids) + cycle 11
+  //   (IDOR-GUILDS-MEMBERS-ENUM-01, `/:id/members` + `/:id/events`) —
+  //   but the research endpoints were missed.
+  //
+  // Mitigation:
+  //   Every read method now takes the caller's userId (from JWT subject
+  //   via `@CurrentUser()`) as its first argument and asserts membership
+  //   in the target guild before returning rows. For stateId-keyed
+  //   methods we resolve the research state first (404 if missing) and
+  //   then membership-gate against `state.guildId`. Non-members get a
+  //   hard 403 with Turkish wording ("Bu guild araştırmalarına
+  //   erişemezsin") — same tone as the cycle 11 fix's "Bu guild üyesi
+  //   değilsin" and cycle 15 A1's "Bu guild raid bilgilerine
+  //   erişemezsin".
+  //
+  //   Hard 403 was chosen over a public projection because:
+  //     - there is no current FE caller for `/guilds/:id/research*` for
+  //       a foreign guild (a grep of `apps/web` returned zero hits — the
+  //       single-player `/research` page reads its own tech tree, not
+  //       guild research),
+  //     - the cycle 11 + cycle 15 A1 fixes set the precedent that
+  //       per-member PII (contributionPts, damageDealt, xpContributed)
+  //       is members-only,
+  //     - GuildBuffsSnapshot is direct combat intel — leaking it to
+  //       rivals leaks the guild's research-driven raid_damage_pct
+  //       advantage which the BE then applies as a multiplier on the
+  //       raid boss attack flow.
+  //
+  //   If a future product requirement needs a public "browse guilds →
+  //   research summary" view (showing only total completed count, not
+  //   per-member breakdown), add a SEPARATE public-projection endpoint
+  //   rather than relaxing this guard.
+  //
+  //   Kept private so all read-side research handlers funnel through
+  //   the same check — adding a new such handler later just means
+  //   calling this helper, not re-implementing the lookup.
+  private async assertGuildMembership(userId: string, guildId: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { userId, guildId } });
+    if (!member) {
+      throw new ForbiddenException('Bu guild araştırmalarına erişemezsin');
+    }
+  }
+
   // ─── Read API ─────────────────────────────────────────────────────────────
+  //
+  // All read methods below take `callerUserId` as their first argument and
+  // membership-gate against the target guild — see the
+  // `assertGuildMembership` block above for the cycle 15 IDOR write-up.
 
   catalog() {
     return GUILD_RESEARCH_CATALOG;
   }
 
-  async listGuildResearch(guildId: string): Promise<GuildResearchState[]> {
+  async listGuildResearch(
+    callerUserId: string,
+    guildId: string,
+  ): Promise<GuildResearchState[]> {
+    await this.assertGuildMembership(callerUserId, guildId);
     return this.researchRepo.find({
       where: { guildId },
       order: { startedAt: 'DESC' },
     });
   }
 
-  async getActiveSlots(guildId: string, now: Date = new Date()): Promise<GuildResearchState[]> {
+  async getActiveSlots(
+    callerUserId: string,
+    guildId: string,
+    now: Date = new Date(),
+  ): Promise<GuildResearchState[]> {
+    await this.assertGuildMembership(callerUserId, guildId);
     const weekStart = isoWeekStartUtc(now);
     return this.researchRepo.find({
       where: {
@@ -83,20 +157,34 @@ export class GuildResearchService {
     });
   }
 
-  async getResearchState(stateId: string): Promise<GuildResearchState> {
+  async getResearchState(
+    callerUserId: string,
+    stateId: string,
+  ): Promise<GuildResearchState> {
     const state = await this.researchRepo.findOne({ where: { id: stateId } });
     if (!state) throw new NotFoundException(`Research state ${stateId} not found`);
+    await this.assertGuildMembership(callerUserId, state.guildId);
     return state;
   }
 
-  async listContributions(stateId: string): Promise<GuildResearchContribution[]> {
+  async listContributions(
+    callerUserId: string,
+    stateId: string,
+  ): Promise<GuildResearchContribution[]> {
+    const state = await this.researchRepo.findOne({ where: { id: stateId } });
+    if (!state) throw new NotFoundException(`Research state ${stateId} not found`);
+    await this.assertGuildMembership(callerUserId, state.guildId);
     return this.contribRepo.find({
       where: { researchStateId: stateId },
       order: { xpContributed: 'DESC' },
     });
   }
 
-  async getGuildBuffs(guildId: string): Promise<GuildBuffsSnapshot> {
+  async getGuildBuffs(
+    callerUserId: string,
+    guildId: string,
+  ): Promise<GuildBuffsSnapshot> {
+    await this.assertGuildMembership(callerUserId, guildId);
     const completed = await this.researchRepo.find({
       where: { guildId, status: GuildResearchStatus.COMPLETED },
       select: ['researchId', 'level'],

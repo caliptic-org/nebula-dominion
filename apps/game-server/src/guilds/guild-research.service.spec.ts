@@ -177,11 +177,21 @@ async function makeService(store: Store) {
   const contribRepo = repoMock(store, 'contribs');
   const emitter = { emit: jest.fn() };
 
+  // Cycle 15 IDOR-GUILD-RESEARCH-ENUM-02: the service now injects
+  // GuildMember repo so its read methods can membership-gate.
+  const memberRepo = {
+    findOne: jest.fn(async (opts: any) => {
+      const where = opts?.where ?? {};
+      return store.members.get(memberKey(where.guildId, where.userId)) ?? null;
+    }),
+  };
+
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       GuildResearchService,
       { provide: getRepositoryToken(GuildResearchState), useValue: researchRepo },
       { provide: getRepositoryToken(GuildResearchContribution), useValue: contribRepo },
+      { provide: getRepositoryToken(GuildMember), useValue: memberRepo },
       { provide: EventEmitter2, useValue: emitter },
       { provide: DataSource, useValue: dataSource },
     ],
@@ -518,6 +528,7 @@ describe('GuildResearchService', () => {
     it('composes production_pct, raid_damage_pct, member_capacity from completed research', async () => {
       const store = freshStore();
       seedGuild(store);
+      seedMember(store, 'caller');
       const completed = (researchId: string, level: number, branch: GuildResearchBranch) =>
         ({
           id: `${researchId}-${level}`,
@@ -545,7 +556,7 @@ describe('GuildResearchService', () => {
       );
 
       const { service } = await makeService(store);
-      const buffs = await service.getGuildBuffs('g1');
+      const buffs = await service.getGuildBuffs('caller', 'g1');
 
       expect(buffs.productionPct).toBe(5 + 10); // L1 + L2
       expect(buffs.raidDamagePct).toBe(10);
@@ -557,11 +568,58 @@ describe('GuildResearchService', () => {
     it('returns the default member capacity when no expansion research is done', async () => {
       const store = freshStore();
       seedGuild(store);
+      seedMember(store, 'caller');
       const { service } = await makeService(store);
-      const buffs = await service.getGuildBuffs('g1');
+      const buffs = await service.getGuildBuffs('caller', 'g1');
       expect(buffs.memberCapacity).toBe(DEFAULT_MEMBER_CAPACITY);
       expect(buffs.productionPct).toBe(0);
       expect(buffs.raidDamagePct).toBe(0);
+    });
+
+    // Cycle 15 IDOR-GUILD-RESEARCH-ENUM-02 regression: non-members of the
+    // target guild must NOT be able to read its GuildBuffsSnapshot (direct
+    // combat intel).
+    it('rejects non-members trying to read guild buffs', async () => {
+      const store = freshStore();
+      seedGuild(store);
+      // Note: no seedMember for 'stranger'
+      const { service } = await makeService(store);
+      await expect(service.getGuildBuffs('stranger', 'g1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    // Cycle 15 IDOR-GUILD-RESEARCH-ENUM-02 regression: stateId-keyed reads
+    // resolve state.guildId first, then membership-gate. A non-member that
+    // managed to enumerate a stateId must still 403.
+    it('rejects non-members trying to read a research state by stateId', async () => {
+      const store = freshStore();
+      seedGuild(store);
+      store.research.push({
+        id: 's-leaked',
+        guildId: 'g1',
+        researchId: 'production_boost',
+        branch: GuildResearchBranch.PRODUCTION,
+        level: 1,
+        status: GuildResearchStatus.RESEARCHING,
+        xpRequired: 100_000,
+        xpContributed: 0,
+        slotWeekStart: isoWeekStartUtc(new Date()),
+        startedAt: new Date(),
+        deadlineAt: new Date(Date.now() + 86_400_000 * 7),
+        completedAt: null,
+        selectedBy: 'leader',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as GuildResearchState);
+      const { service } = await makeService(store);
+
+      await expect(
+        service.getResearchState('stranger', 's-leaked'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        service.listContributions('stranger', 's-leaked'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 

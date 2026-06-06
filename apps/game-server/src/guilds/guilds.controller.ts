@@ -288,35 +288,57 @@ export class GuildsController {
   }
 
   // ─── Raids (CAL-240) ────────────────────────────────────────────────────────
+  //
+  // HIGH IDOR-GUILD-RAIDS-ENUM-01 (audit cycle 15):
+  //   Previously these GET handlers had only `HttpJwtGuard` — any logged-in
+  //   player could `curl /api/guilds/<rival>/raids/current` (or the
+  //   `/raids/:raidId/...` subroutes after enumerating ids via `listRaids`)
+  //   and harvest every guild's weekly boss progress, per-member
+  //   `damageDealt` + `lastAttackAt` recon, and loot drop ledger. Same
+  //   class as cycle 11 IDOR-GUILDS-MEMBERS-ENUM-01 (which closed
+  //   `/:id/members` + `/:id/events` via `assertGuildMembership`) — but
+  //   the raid endpoints were missed in that pass.
+  //
+  // Mitigation:
+  //   Caller's userId is now taken from the JWT subject via `@CurrentUser()`
+  //   and forwarded as the first arg to each service method. The service
+  //   resolves the target guild (via `guildId` directly, or via
+  //   `raid.guildId` for raidId-keyed routes) and asserts the caller has a
+  //   `guild_members` row in it — mirroring the cycle 11 fix pattern. Non-
+  //   members get a hard 403 ("Bu guild raid bilgilerine erişemezsin").
 
   @Get(':id/raids/current')
   @UseGuards(HttpJwtGuard)
-  currentRaid(@Param('id') id: string) {
-    return this.raids.getCurrentRaid(id);
+  currentRaid(@Param('id') id: string, @CurrentUser() userId: string) {
+    return this.raids.getCurrentRaid(userId, id);
   }
 
   @Get(':id/raids')
   @UseGuards(HttpJwtGuard)
-  listRaids(@Param('id') id: string, @Query('limit') limit?: string) {
-    return this.raids.listRaids(id, limit ? parseInt(limit, 10) : undefined);
+  listRaids(
+    @Param('id') id: string,
+    @CurrentUser() userId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.raids.listRaids(userId, id, limit ? parseInt(limit, 10) : undefined);
   }
 
   @Get('raids/:raidId')
   @UseGuards(HttpJwtGuard)
-  getRaid(@Param('raidId') raidId: string) {
-    return this.raids.getRaid(raidId);
+  getRaid(@Param('raidId') raidId: string, @CurrentUser() userId: string) {
+    return this.raids.getRaid(userId, raidId);
   }
 
   @Get('raids/:raidId/contributions')
   @UseGuards(HttpJwtGuard)
-  raidContributions(@Param('raidId') raidId: string) {
-    return this.raids.listContributions(raidId);
+  raidContributions(@Param('raidId') raidId: string, @CurrentUser() userId: string) {
+    return this.raids.listContributions(userId, raidId);
   }
 
   @Get('raids/:raidId/drops')
   @UseGuards(HttpJwtGuard)
-  raidDrops(@Param('raidId') raidId: string) {
-    return this.raids.listDrops(raidId);
+  raidDrops(@Param('raidId') raidId: string, @CurrentUser() userId: string) {
+    return this.raids.listDrops(userId, raidId);
   }
 
   /**
@@ -433,6 +455,26 @@ export class GuildsController {
   }
 
   // ─── Research / Tech ağacı (CAL-240) ────────────────────────────────────────
+  //
+  // HIGH IDOR-GUILD-RESEARCH-ENUM-02 (audit cycle 15):
+  //   Previously these GET handlers had only `HttpJwtGuard` — any logged-in
+  //   player could `curl /api/guilds/<rival>/research/buffs` (combat-intel
+  //   leak: rival's stacked raid_damage_pct / member_capacity), or
+  //   `/research/<stateId>/contributions` (per-member xpContributed roster
+  //   — "weakest contributor" recon). Same vulnerability class as cycle 15
+  //   A1 (IDOR-GUILD-RAIDS-ENUM-01) + cycle 11 IDOR-GUILDS-MEMBERS-ENUM-01
+  //   (which closed `/:id/members` + `/:id/events` via
+  //   `assertGuildMembership`) — but the research endpoints were missed.
+  //
+  // Mitigation:
+  //   Caller's userId is now taken from the JWT subject via `@CurrentUser()`
+  //   and forwarded as the first arg to each service method. The service
+  //   resolves the target guild (via `guildId` directly, or via
+  //   `state.guildId` for stateId-keyed routes) and asserts the caller has
+  //   a `guild_members` row in it — mirroring the cycle 11 + cycle 15 A1
+  //   pattern. Non-members get a hard 403 ("Bu guild araştırmalarına
+  //   erişemezsin"). `research/catalog` stays open (static config — no
+  //   per-guild PII).
 
   @Get('research/catalog')
   @UseGuards(HttpJwtGuard)
@@ -442,20 +484,20 @@ export class GuildsController {
 
   @Get(':id/research')
   @UseGuards(HttpJwtGuard)
-  guildResearch(@Param('id') id: string) {
-    return this.research.listGuildResearch(id);
+  guildResearch(@Param('id') id: string, @CurrentUser() userId: string) {
+    return this.research.listGuildResearch(userId, id);
   }
 
   @Get(':id/research/active')
   @UseGuards(HttpJwtGuard)
-  guildResearchActive(@Param('id') id: string) {
-    return this.research.getActiveSlots(id);
+  guildResearchActive(@Param('id') id: string, @CurrentUser() userId: string) {
+    return this.research.getActiveSlots(userId, id);
   }
 
   @Get(':id/research/buffs')
   @UseGuards(HttpJwtGuard)
-  guildBuffs(@Param('id') id: string) {
-    return this.research.getGuildBuffs(id);
+  guildBuffs(@Param('id') id: string, @CurrentUser() userId: string) {
+    return this.research.getGuildBuffs(userId, id);
   }
 
   @Post(':id/research/start')
@@ -476,14 +518,17 @@ export class GuildsController {
 
   @Get('research/:stateId')
   @UseGuards(HttpJwtGuard)
-  getResearch(@Param('stateId') stateId: string) {
-    return this.research.getResearchState(stateId);
+  getResearch(@Param('stateId') stateId: string, @CurrentUser() userId: string) {
+    return this.research.getResearchState(userId, stateId);
   }
 
   @Get('research/:stateId/contributions')
   @UseGuards(HttpJwtGuard)
-  researchContributions(@Param('stateId') stateId: string) {
-    return this.research.listContributions(stateId);
+  researchContributions(
+    @Param('stateId') stateId: string,
+    @CurrentUser() userId: string,
+  ) {
+    return this.research.listContributions(userId, stateId);
   }
 
   @Post('research/:stateId/contribute')

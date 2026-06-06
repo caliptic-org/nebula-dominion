@@ -33,6 +33,19 @@
  * the legacy entry from the menu that just wants to show the race lore
  * without crediting anything). That's intentional — we don't want a
  * generic "DEVAM ET" tap to silently credit the user's `current_chapter`.
+ *
+ * ## Cycle 15: catalog-fetch race fix (DRIFT-14-02)
+ *
+ * Cycle 14 wired the BE pipeline correctly but `chapterId` was resolved
+ * by `chapters.find(c => c.id === param)` against a `useStory` hook
+ * whose initial state is `chapters=[]` / `loading=true`. A fast player
+ * who landed on `/story?chapter=ch_01_arrival`, skipped both acts with
+ * Enter, and tapped BİTİR before the `/story/chapters` GET resolved
+ * would have `chapterId` stuck on `undefined` — `ScrStoryScene` then
+ * hit its `if (!chapterId)` preview branch and called `onComplete()`
+ * with NO BE POST. Cycle 15 closes that race by trusting the URL param
+ * directly while the catalog is still in flight; the BE re-validates
+ * the id server-side so stale/typo links still get rejected.
  */
 
 import { Suspense, useCallback, useMemo } from 'react';
@@ -65,18 +78,43 @@ function StoryInner() {
   const chapterIdParam = params.get('chapter');
   const choiceIdParam = params.get('choice') ?? undefined;
 
+  /* ## Cycle 15: catalog-fetch race fix (DRIFT-14-02)
+   *
+   * Cycle 14 wired the BE complete pipeline through `ScrStoryScene` —
+   * but the cinematic mounts as soon as `/story?chapter=ch_…` resolves,
+   * while `useStory` is still in flight (initial `chapters=[]`,
+   * `loading=true`). A fast player who skips both acts with Enter and
+   * taps "BİTİR" before the `/api/v1/story/chapters` round-trip
+   * completes would land on the `if (!chapterId)` preview branch in
+   * `ScrStoryScene.completeAndExit` — which fires `onComplete()` with
+   * NO BE POST. Net effect: zero gold, zero gems, zero XP, no title.
+   *
+   * Fix: trust the URL param directly when the catalog hasn't arrived
+   * yet (`chapters.length === 0`). The BE re-validates the id against
+   * the catalog server-side and returns a 400 hint if it's bogus
+   * (already handled by `completeStoryChapter`'s error path). This
+   * avoids blocking the cinematic for the catalog round-trip while
+   * still rejecting typo'd / stale links once the list arrives. */
   const chapterId = useMemo(() => {
-    if (chapterIdParam) {
-      // Verify the param points at a chapter the BE actually serves
-      // for this race — drops typos / stale links to a no-op preview
-      // so we don't 404 the user with "Bölüm 'foo' bulunamadı".
-      const match = chapters.find((c) => c.id === chapterIdParam);
-      if (match) return match.id;
+    if (!chapterIdParam) {
+      // No param → preview / gallery embed; let ScrStoryScene skip
+      // the network call. The /story-gallery viewer is the authoritative
+      // entry for "complete a specific chapter".
+      return undefined;
     }
-    // No param (or invalid) → leave undefined so ScrStoryScene skips
-    // the network call. The /story-gallery viewer is the authoritative
-    // entry for "complete a specific chapter".
-    return undefined;
+    if (chapters.length === 0) {
+      // Catalog still mid-fetch (or fetch failed). Trust the URL —
+      // the BE will reject an invalid id with a 400 toast surfaced
+      // by completeStoryChapter's error path. This closes the cycle
+      // 15 race where a fast Enter+BİTİR before the catalog GET
+      // resolved silently exited with zero reward credited.
+      return chapterIdParam;
+    }
+    // Catalog loaded — verify the param resolves to a real chapter
+    // for this race; drops typos / stale links to a no-op preview
+    // so we don't 400 the user with "Bölüm 'foo' bulunamadı".
+    const match = chapters.find((c) => c.id === chapterIdParam);
+    return match?.id;
   }, [chapterIdParam, chapters]);
 
   const goBack = useCallback(() => {

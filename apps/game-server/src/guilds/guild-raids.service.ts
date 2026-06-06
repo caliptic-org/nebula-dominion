@@ -67,6 +67,8 @@ export class GuildRaidsService {
   constructor(
     @InjectRepository(Guild)
     private readonly guildRepo: Repository<Guild>,
+    @InjectRepository(GuildMember)
+    private readonly memberRepo: Repository<GuildMember>,
     @InjectRepository(GuildRaid)
     private readonly raidRepo: Repository<GuildRaid>,
     @InjectRepository(GuildRaidContribution)
@@ -81,6 +83,44 @@ export class GuildRaidsService {
     private readonly dataSource: DataSource,
   ) {
     this.rng = () => Math.random();
+  }
+
+  // ─── Membership guard (cycle 15 IDOR-GUILD-RAIDS-ENUM-01) ────────────────
+  //
+  // HIGH IDOR-GUILD-RAIDS-ENUM-01 (audit cycle 15):
+  //   The read-side raid handlers
+  //   (`getCurrentRaid`, `listRaids`, `getRaid`, `listContributions`,
+  //   `listDrops`) were gated only by `HttpJwtGuard` and had NO caller-
+  //   vs-target membership check. Any logged-in player could `curl`
+  //   `/api/guilds/<rival>/raids/current` (or `/raids/<raidId>/contributions`
+  //   after enumerating raid ids via `listRaids`) and harvest:
+  //     - every rival guild's weekly boss progress + tier + HP curve,
+  //     - per-member `damageDealt` + `lastAttackAt` recon ("pick the
+  //       weakest contributor"),
+  //     - loot drop ledger (mutation essence economy intelligence).
+  //
+  //   This is the same vulnerability class as cycle 11
+  //   IDOR-GUILDS-MEMBERS-ENUM-01 (closed for `/:id/members` +
+  //   `/:id/events` via `assertGuildMembership` in
+  //   `guilds.service.ts`) — but the raid endpoints were missed.
+  //
+  // Mitigation:
+  //   Every read method now takes the caller's userId (from JWT subject
+  //   via `@CurrentUser()`) as its first argument and asserts membership
+  //   in the target guild before returning rows. For raidId-keyed
+  //   methods we resolve the raid first (404 if missing) and then
+  //   membership-gate against `raid.guildId`. Non-members get a hard 403
+  //   with Turkish wording ("Bu guild raid bilgilerine erişemezsin") —
+  //   same tone as the cycle 11 fix's "Bu guild üyesi değilsin".
+  //
+  //   Kept private so all read-side raid handlers funnel through the
+  //   same check — adding a new such handler later just means calling
+  //   this helper, not re-implementing the lookup.
+  private async assertGuildMembership(userId: string, guildId: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { userId, guildId } });
+    if (!member) {
+      throw new ForbiddenException('Bu guild raid bilgilerine erişemezsin');
+    }
   }
 
   // ─── Scheduling ──────────────────────────────────────────────────────────
@@ -190,21 +230,28 @@ export class GuildRaidsService {
   }
 
   // ─── Read APIs ────────────────────────────────────────────────────────────
+  //
+  // All read methods below take `callerUserId` as their first argument and
+  // membership-gate against the target guild — see the
+  // `assertGuildMembership` block above for the cycle 15 IDOR write-up.
 
-  async getCurrentRaid(guildId: string): Promise<GuildRaid | null> {
+  async getCurrentRaid(callerUserId: string, guildId: string): Promise<GuildRaid | null> {
+    await this.assertGuildMembership(callerUserId, guildId);
     return this.raidRepo.findOne({
       where: { guildId, status: GuildRaidStatus.ACTIVE },
       order: { weekStart: 'DESC' },
     });
   }
 
-  async getRaid(raidId: string): Promise<GuildRaid> {
+  async getRaid(callerUserId: string, raidId: string): Promise<GuildRaid> {
     const raid = await this.raidRepo.findOne({ where: { id: raidId } });
     if (!raid) throw new NotFoundException(`Raid ${raidId} not found`);
+    await this.assertGuildMembership(callerUserId, raid.guildId);
     return raid;
   }
 
-  async listRaids(guildId: string, limit = 12): Promise<GuildRaid[]> {
+  async listRaids(callerUserId: string, guildId: string, limit = 12): Promise<GuildRaid[]> {
+    await this.assertGuildMembership(callerUserId, guildId);
     return this.raidRepo.find({
       where: { guildId },
       order: { weekStart: 'DESC' },
@@ -212,14 +259,20 @@ export class GuildRaidsService {
     });
   }
 
-  async listContributions(raidId: string): Promise<GuildRaidContribution[]> {
+  async listContributions(callerUserId: string, raidId: string): Promise<GuildRaidContribution[]> {
+    const raid = await this.raidRepo.findOne({ where: { id: raidId } });
+    if (!raid) throw new NotFoundException(`Raid ${raidId} not found`);
+    await this.assertGuildMembership(callerUserId, raid.guildId);
     return this.contribRepo.find({
       where: { raidId },
       order: { damageDealt: 'DESC' },
     });
   }
 
-  async listDrops(raidId: string): Promise<GuildRaidDrop[]> {
+  async listDrops(callerUserId: string, raidId: string): Promise<GuildRaidDrop[]> {
+    const raid = await this.raidRepo.findOne({ where: { id: raidId } });
+    if (!raid) throw new NotFoundException(`Raid ${raidId} not found`);
+    await this.assertGuildMembership(callerUserId, raid.guildId);
     return this.dropRepo.find({
       where: { raidId },
       order: { awardedAt: 'ASC' },

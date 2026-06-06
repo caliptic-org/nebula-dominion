@@ -7,10 +7,33 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { v5 as uuidv5 } from 'uuid';
 import { ShopItem } from './entities/shop-item.entity';
 import { UserInventory } from './entities/user-inventory.entity';
 import { VipService } from '../vip/vip.service';
 import { PurchaseDto } from './dto/purchase.dto';
+
+/**
+ * Stable UUIDv5 namespace for synthetic transactionIds minted by the
+ * in-game-currency purchase flow (see HIGH ECON-SHOP-VIP-SPEND-NO-
+ * IDEMPOTENCY-INGAME, audit cycle 6).
+ *
+ * The synthetic id is hashed (v5) from `userId:sku:inventoryRowId:
+ * acquiredAtMillis` so the SAME purchase event — when re-driven through
+ * the post-tx hook (controller retry, supervisor restart mid-hook, a
+ * future queued-job redelivery) — collapses to the SAME ledger row via
+ * vip_spend_ledger UNIQUE(transaction_id). A legitimately separate
+ * purchase event (new HTTP call, distinct acquiredAt epoch on a fresh
+ * inventory row OR a quantity bump that touches a different
+ * acquiredAtMillis cohort) still mints a fresh synthetic id and credits
+ * normally.
+ *
+ * Namespace UUID is a constant random v4 — no semantic meaning, just a
+ * v5 seed pinned for the project so synthetic ids stay stable across
+ * deploys.
+ */
+const SHOP_INGAME_VIP_TXID_NAMESPACE =
+  'b7f9c6e0-3a4d-4e6b-9c2f-7d1e4f8a5b21';
 
 interface ShopFilter {
   category?: string;
@@ -300,6 +323,39 @@ export class ShopService {
     // succeeded — VIP failure becomes a logged warning. The next
     // VipService.getVipStatus call will reflect the spend on the next
     // purchase (cumulativeSpendUsd is the SoT, not local state).
+    //
+    // ── HIGH ECON-SHOP-VIP-SPEND-NO-IDEMPOTENCY-INGAME (cycle 6) ──
+    // Previously we passed `transactionId: null` here. The 3-arg
+    // process_vip_spend() short-circuits the vip_spend_ledger INSERT
+    // when transaction_id IS NULL (migration 1779900000000 L121) and
+    // falls through to the unconditional `cumulative_spend_usd +=
+    // p_spend_usd` accumulate path. That makes the in-game-currency
+    // VIP-SKU flow trivially replay-amplifiable: any caller (controller
+    // retry, supervisor restart between commit and hook, a future
+    // queued-job redelivery, batch admin tooling) would re-credit the
+    // SAME purchase event into cumulative_spend_usd, inflating the
+    // player's VIP tier and polluting arppu_by_vip_cohort.
+    //
+    // Fix: mint a SYNTHETIC, DETERMINISTIC transactionId via UUIDv5 so
+    // (a) the ledger's UNIQUE(transaction_id) constraint engages for
+    // in-game purchases, and (b) re-driving the SAME purchase event
+    // collapses to a single ledger row (already_credited=true) instead
+    // of double-bumping. Two SEPARATE purchase events (different
+    // inventoryEntry.id or distinct acquiredAt epoch) still mint
+    // distinct synthetic ids and credit correctly — so 8 honest
+    // purchases of vip_vip-monthly across 8 separate HTTP calls still
+    // produce 8 ledger rows and 8 × $9.99 of cumulative spend.
+    //
+    // OPEN PRODUCT QUESTION (Option B follow-up): should in-game-
+    // currency purchases of premium_pass touch cumulative_spend_usd
+    // AT ALL? cumulative_spend_usd drives ARPPU dashboards, which are
+    // supposed to track REAL MONEY only. A player hoarding gems and
+    // converting them into VIP tier via the in-game shop currently
+    // pollutes those dashboards even with this idempotency fix in
+    // place. Decoupling (in-game premium_pass grants VIP via a separate
+    // progression path, leaves cumulative_spend_usd untouched) is the
+    // cleaner long-term shape but is a contract/product call — flagged
+    // for review, not in-scope for this audit cycle.
     try {
       const item = await this.shopItemRepository.findOne({
         where: { sku: dto.sku },
@@ -313,9 +369,33 @@ export class ShopService {
           item.priceRealUsd !== null
             ? Number(item.priceRealUsd)
             : (item.pricePremiumGems ?? 0) / 100;
+
+        // Synthetic transactionId — UUIDv5(userId:sku:inventoryRowId:
+        // post-upsert-quantity). The inventoryRowId is stable across
+        // the upsert path (same UserInventory row, quantity bumps each
+        // time); the POST-UPSERT quantity uniquely identifies *which*
+        // purchase event in the sequence we're crediting. Purchase #1
+        // sees quantity=1 → synth id A; purchase #2 (same row,
+        // qty++ → 2) → synth id B; … purchase #8 → synth id H. Eight
+        // distinct ids → eight ledger rows → 8 × $9.99 credited.
+        //
+        // A re-drive of the SAME purchase event (same call, same
+        // post-upsert quantity snapshot) produces the SAME synth id
+        // and collapses on UNIQUE(transaction_id) →
+        // already_credited=true, no double-bump.
+        //
+        // We also fold the inventoryRowId in so the v5 key stays
+        // stable across deletes-then-re-grants (a new row gets a new
+        // UUID; the quantity sequence restarts at 1 but the row id
+        // disambiguates from the old cohort's qty=1).
+        const syntheticTxId = uuidv5(
+          `${userId}:${item.sku}:${result.id}:${result.quantity}`,
+          SHOP_INGAME_VIP_TXID_NAMESPACE,
+        );
+
         await this.vipService.recordPurchaseAndUpgradeVip({
           userId,
-          transactionId: null,
+          transactionId: syntheticTxId,
           amountUsd: spendUsd,
           amountTry: null,
           currencyCode: 'USD',
@@ -323,7 +403,7 @@ export class ShopService {
           countryCode: null,
         });
         this.logger.log(
-          `VIP upgrade hook fired user=${userId} sku=${item.sku} spendUsd=${spendUsd}`,
+          `VIP upgrade hook fired user=${userId} sku=${item.sku} spendUsd=${spendUsd} synthTxn=${syntheticTxId}`,
         );
       }
     } catch (err) {

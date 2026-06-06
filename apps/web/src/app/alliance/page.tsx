@@ -24,6 +24,7 @@ import {
   Code,
   GatedButton,
   NDButton,
+  NDModal,
   BottomNav,
   toast,
   useNDRace,
@@ -121,6 +122,55 @@ export default function AlliancePage() {
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [warModalOpen, setWarModalOpen] = useState(false);
   const [declaringWarOn, setDeclaringWarOn] = useState<string | null>(null);
+  // Cycle 10 / CHAIN-09-A1: leave-flow state. The BE leave endpoint
+  // (DELETE /api/v1/alliances/leave → alliance.controller.ts L83) has been
+  // shipped since at least cycle 5, but no FE caller existed — players who
+  // joined a guild had no way back out without a DB hit. `leaveModalOpen`
+  // gates the NDModal confirm dialog; `leaving` blocks double-submits and
+  // shows the inflight state in the modal's confirm button.
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  /**
+   * Cycle 10 / CHAIN-09-A1: leave the player's current alliance.
+   *
+   * Closes the join → leave gameplay loop. Hits DELETE /alliances/leave
+   * (alliance.controller.ts L83-89 → allianceService.leave(req.user.id)),
+   * which removes the alliance_member row + clears profile.allianceTag.
+   *
+   * Post-success refresh chain mirrors handleJoin:
+   *   1. refreshProfile()  → flips `hasAlliance` to false on next render so
+   *                          the "İttifak Yok" empty state + discovery list
+   *                          show up immediately (otherwise the player
+   *                          stays staring at stale roster numbers).
+   *   2. refreshWars()     → clears the Savaş tab list. Without this the
+   *                          old projection still renders one render tick.
+   *   3. setTab('genel')   → if the player triggered leave from the Genel
+   *                          tab we just stay there, but normalising
+   *                          ensures the post-leave empty-state banner is
+   *                          visible regardless of where they were.
+   *
+   * Error surface: FetchError.message is the Turkish backend translation
+   * from translateBackendError (lib/api.ts L90) — toast it verbatim so
+   * "ittifak lideri ayrılamaz, devredilmeli" etc. surface to the player.
+   */
+  async function handleLeave() {
+    if (leaving) return;
+    setLeaving(true);
+    try {
+      await api.delete('/alliances/leave');
+      toast.success('İttifaktan ayrıldın');
+      setLeaveModalOpen(false);
+      refreshProfile();
+      refreshWars();
+      setTab('genel');
+    } catch (err) {
+      const msg = err instanceof FetchError ? err.message : 'İttifaktan ayrılamadı';
+      toast.error(msg);
+    } finally {
+      setLeaving(false);
+    }
+  }
 
   async function handleJoin(a: { id: string; name: string }) {
     if (joiningId) return;
@@ -414,6 +464,26 @@ export default function AlliancePage() {
                   </Caption>
                 </div>
               </div>
+              {/* Cycle 10 / CHAIN-09-A1: Leave-alliance action. Only
+               *  rendered when `hasAlliance` is true so guildless players
+               *  don't see a disabled "ayrıl" button on the discovery
+               *  view. Sits inside the summary NotchPanel because Genel
+               *  is the canonical alliance hub — surfacing it elsewhere
+               *  (e.g. Üyeler tab) duplicates a destructive control. The
+               *  confirm step uses NDModal (see leaveModalOpen render
+               *  below) — destructive verbs must never one-tap-fire. */}
+              {hasAlliance && (
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                  <NDButton
+                    race={race}
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setLeaveModalOpen(true)}
+                  >
+                    İttifaktan Ayrıl
+                  </NDButton>
+                </div>
+              )}
             </NotchPanel>
 
             {/* Stat row */}
@@ -511,6 +581,54 @@ export default function AlliancePage() {
             onPick={handleDeclareWar}
           />
         )}
+
+        {/* Cycle 10 / CHAIN-09-A1: leave-alliance confirm. NDModal already
+         *  handles ESC + backdrop dismissal + body scroll lock, so we only
+         *  need to provide the two CTAs. While leaving=true both buttons
+         *  stay mounted but the confirm button label flips and the cancel
+         *  button is disabled so a mid-flight cancel can't leave the modal
+         *  in an inconsistent state (request still resolves, profile then
+         *  refreshes, hasAlliance flips, and the modal would close on its
+         *  own — but disallowing the cancel button keeps the UX honest). */}
+        <NDModal
+          race={race}
+          open={leaveModalOpen}
+          onClose={() => {
+            if (leaving) return;
+            setLeaveModalOpen(false);
+          }}
+          eyebrow="İTTİFAK"
+          title="Ayrılma Onayı"
+          actions={
+            <>
+              <NDButton
+                race={race}
+                variant="ghost"
+                full
+                onClick={() => setLeaveModalOpen(false)}
+                disabled={leaving}
+              >
+                Vazgeç
+              </NDButton>
+              <NDButton
+                race={race}
+                variant="danger"
+                full
+                onClick={handleLeave}
+                disabled={leaving}
+              >
+                {leaving ? 'Ayrılıyor…' : 'Ayrıl'}
+              </NDButton>
+            </>
+          }
+        >
+          <Caption>
+            <strong style={{ color: ND.text }}>{summary.name}</strong>{' '}
+            ittifakından ayrılmak istediğine emin misin? Ayrıldıktan sonra
+            ortak araştırma, depo ve aktif savaş katkıların kaybolur. Tekrar
+            katılmak için ittifak listesinden başvurman gerekir.
+          </Caption>
+        </NDModal>
 
         {tab === 'uyeler' && hasAlliance && (
           <Panel race={race}>

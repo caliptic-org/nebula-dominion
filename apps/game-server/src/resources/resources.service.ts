@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import Redis from 'ioredis';
@@ -163,80 +163,218 @@ export class ResourcesService {
     return true;
   }
 
+  /**
+   * Atomically credits the player's wallet with `amounts`, clamping each
+   * resource to its current cap inline via LEAST(...). Mirrors the
+   * deduct() atomic contract — two concurrent grants on the same row
+   * cannot both read-modify-write the balance because the UPDATE runs
+   * as a single statement with row-level lock.
+   *
+   * Pre-fix flow ran getOrCreate → mutate in memory → repo.save(), which
+   * was the symmetric race to deduct (last write wins, one grant
+   * dropped). Caps are honoured via LEAST so granting past the cap is a
+   * no-op rather than overflow, matching the prior Math.min behaviour
+   * exactly.
+   */
   async grant(
     playerId: string,
     amounts: Partial<ResourceCost>,
   ): Promise<ResourceSnapshot> {
-    const resource = await this.getOrCreate(playerId);
+    await this.getOrCreate(playerId);
 
-    // Postgres `numeric(12,4)` round-trips through TypeORM as a STRING.
-    // Without an explicit Number() coercion `resource.mineral + amounts.mineral`
-    // performed string concatenation ("19130" + 100 → "19130100"), the
-    // resulting Math.min clamped to the cap, and the grant either no-op'd
-    // or jumped to the cap value — wallets stayed visually stuck even
-    // though the endpoint returned 200.  Mirror the science-block pattern
-    // by wrapping all reads in `Number(...)` so the arithmetic is real.
-    if (amounts.mineral) {
-      resource.mineral = Math.min(
-        Math.floor(Number(resource.mineral)) + amounts.mineral,
-        resource.mineralCap,
-      );
-    }
-    if (amounts.gas) {
-      resource.gas = Math.min(
-        Math.floor(Number(resource.gas)) + amounts.gas,
-        resource.gasCap,
-      );
-    }
-    if (amounts.energy) {
-      resource.energy = Math.min(
-        Math.floor(Number(resource.energy)) + amounts.energy,
-        resource.energyCap,
-      );
-    }
-    if (amounts.science) {
-      resource.science = Math.min(
-        Math.floor(Number(resource.science)) + amounts.science,
-        resource.scienceCap,
-      );
+    const mineralGrant = Math.max(0, Math.floor(Number(amounts.mineral) || 0));
+    const gasGrant     = Math.max(0, Math.floor(Number(amounts.gas)     || 0));
+    const energyGrant  = Math.max(0, Math.floor(Number(amounts.energy)  || 0));
+    const scienceGrant = Math.max(0, Math.floor(Number(amounts.science) || 0));
+
+    // No-op when every grant is zero — preserve previous behaviour where
+    // an empty grant just returned the current snapshot.
+    if (mineralGrant === 0 && gasGrant === 0 && energyGrant === 0 && scienceGrant === 0) {
+      return this.getSnapshot(playerId);
     }
 
-    await this.resourceRepo.save(resource);
-    const snapshot = this.toSnapshot(resource);
+    const rows = (await this.dataSource.query(
+      `
+      UPDATE player_resources
+         SET mineral = LEAST(mineral_cap,  FLOOR(mineral + $2)),
+             gas     = LEAST(gas_cap,      FLOOR(gas     + $3)),
+             energy  = LEAST(energy_cap,   FLOOR(energy  + $4)),
+             science = LEAST(science_cap,  FLOOR(science + $5))
+       WHERE player_id = $1
+      RETURNING id, player_id, mineral, gas, energy, population, science,
+                mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
+                mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
+                last_tick_at
+      `,
+      [playerId, mineralGrant, gasGrant, energyGrant, scienceGrant],
+    )) as Array<{
+      id: string;
+      player_id: string;
+      mineral: string | number;
+      gas: string | number;
+      energy: string | number;
+      population: string | number;
+      science: string | number;
+      mineral_cap: string | number;
+      gas_cap: string | number;
+      energy_cap: string | number;
+      population_cap: string | number;
+      science_cap: string | number;
+      mineral_per_tick: string | number;
+      gas_per_tick: string | number;
+      energy_per_tick: string | number;
+      population_per_tick: string | number;
+      last_tick_at: Date | null;
+    }>;
+
+    if (rows.length === 0) {
+      // Should be unreachable — getOrCreate just guaranteed the row.
+      // Fall back to a fresh snapshot read so we don't 500 if some
+      // upstream nuked the row between the two statements.
+      return this.getSnapshot(playerId);
+    }
+
+    const r = rows[0];
+    const snapshot: ResourceSnapshot = {
+      mineral:           Math.floor(Number(r.mineral)),
+      gas:               Math.floor(Number(r.gas)),
+      energy:            Math.floor(Number(r.energy)),
+      population:        Math.floor(Number(r.population)),
+      science:           Math.floor(Number(r.science ?? 0)),
+      mineralCap:        Number(r.mineral_cap),
+      gasCap:            Number(r.gas_cap),
+      energyCap:         Number(r.energy_cap),
+      populationCap:     Number(r.population_cap),
+      scienceCap:        Number(r.science_cap ?? 999999),
+      mineralPerTick:    Number(r.mineral_per_tick),
+      gasPerTick:        Number(r.gas_per_tick),
+      energyPerTick:     Number(r.energy_per_tick),
+      populationPerTick: Number(r.population_per_tick),
+      lastTickAt:        r.last_tick_at,
+    };
+
     await this.setCache(playerId, snapshot);
 
     this.logger.debug(
-      `Granted resources to player ${playerId}: +${amounts.mineral ?? 0}M +${amounts.gas ?? 0}G +${amounts.energy ?? 0}E +${amounts.science ?? 0}◈`,
+      `Granted resources to player ${playerId}: +${mineralGrant}M +${gasGrant}G +${energyGrant}E +${scienceGrant}◈`,
     );
     return snapshot;
   }
 
+  /**
+   * Atomically debits the player's wallet by `cost` using a single
+   * conditional UPDATE — the WHERE predicate forces row-level
+   * serialization in Postgres so two concurrent POSTs cannot both
+   * read the same balance, subtract, and last-write-wins the save.
+   *
+   * Pre-fix flow (ECON-CYC10-DEDUCT-RACE-01): getOrCreate() did a plain
+   * findOne (no FOR UPDATE), the service subtracted in memory, then
+   * repo.save() wrote back the row. N parallel POST /buildings or
+   * POST /units/train would all read balance B, all compute B-cost,
+   * and all save B-cost → only ONE deduction was persisted but every
+   * building/unit insert still succeeded (those inserts don't race on
+   * player_resources). Scripted clients could buy N actions for ~1× cost.
+   *
+   * Post-fix flow: one conditional UPDATE with the cost inlined into the
+   * WHERE clause. If the balance is short by the time the UPDATE runs,
+   * Postgres returns 0 rows and we throw BadRequestException("Yetersiz
+   * kaynak"). If 1 row, the row is debited and RETURNING gives us the
+   * new balance for the snapshot + cache refresh. Two concurrent calls
+   * with cost=50 against balance=100: first UPDATE acquires the row lock
+   * and writes mineral=50, second UPDATE re-checks the predicate
+   * mineral>=50 against the freshly written 50 (passes once it grabs
+   * the lock) — third call sees mineral=0 < 50 → 0 rows → 4xx.
+   *
+   * Signature is backward compatible — return type still
+   * Promise<ResourceSnapshot> so existing callers in buildings.service,
+   * units.service, and bases.service work unchanged.
+   */
   async deduct(playerId: string, cost: ResourceCost): Promise<ResourceSnapshot> {
-    const resource = await this.getOrCreate(playerId);
+    // Guarantee a row exists for the conditional UPDATE to target.
+    // getOrCreate() races on first-create are harmless: both attempts
+    // hit the unique(player_id) index, one wins, the other re-reads.
+    // Subsequent deduct calls on the same row are the ones that need
+    // the atomic guarantee, and the UPDATE below provides it.
+    await this.getOrCreate(playerId);
 
-    const scienceCost = cost.science ?? 0;
-    if (
-      Number(resource.mineral) < cost.mineral ||
-      Number(resource.gas) < cost.gas ||
-      Number(resource.energy) < cost.energy ||
-      Number(resource.science) < scienceCost
-    ) {
-      throw new Error(`Insufficient resources for player ${playerId}`);
+    const mineralCost = Math.max(0, Number(cost.mineral) || 0);
+    const gasCost = Math.max(0, Number(cost.gas) || 0);
+    const energyCost = Math.max(0, Number(cost.energy) || 0);
+    const scienceCost = Math.max(0, Number(cost.science) || 0);
+
+    // Single round-trip: predicate forces serialization, RETURNING gives
+    // us the full row for snapshot + cache priming without a follow-up
+    // SELECT. Numeric columns come back as strings — toSnapshot handles
+    // the coercion via Number().
+    const rows = (await this.dataSource.query(
+      `
+      UPDATE player_resources
+         SET mineral = mineral - $2,
+             gas     = gas     - $3,
+             energy  = energy  - $4,
+             science = science - $5
+       WHERE player_id = $1
+         AND mineral >= $2
+         AND gas     >= $3
+         AND energy  >= $4
+         AND science >= $5
+      RETURNING id, player_id, mineral, gas, energy, population, science,
+                mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
+                mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
+                last_tick_at
+      `,
+      [playerId, mineralCost, gasCost, energyCost, scienceCost],
+    )) as Array<{
+      id: string;
+      player_id: string;
+      mineral: string | number;
+      gas: string | number;
+      energy: string | number;
+      population: string | number;
+      science: string | number;
+      mineral_cap: string | number;
+      gas_cap: string | number;
+      energy_cap: string | number;
+      population_cap: string | number;
+      science_cap: string | number;
+      mineral_per_tick: string | number;
+      gas_per_tick: string | number;
+      energy_per_tick: string | number;
+      population_per_tick: string | number;
+      last_tick_at: Date | null;
+    }>;
+
+    if (rows.length === 0) {
+      // The balance was sufficient at canAfford() time but was drained
+      // by a concurrent debit (or never met the threshold once numeric
+      // rounding settled). Surface as a 400 so the frontend retries
+      // gracefully instead of bubbling a 500.
+      throw new BadRequestException('Yetersiz kaynak');
     }
 
-    resource.mineral = Number(resource.mineral) - cost.mineral;
-    resource.gas = Number(resource.gas) - cost.gas;
-    resource.energy = Number(resource.energy) - cost.energy;
-    if (scienceCost > 0) {
-      resource.science = Number(resource.science) - scienceCost;
-    }
+    const r = rows[0];
+    const snapshot: ResourceSnapshot = {
+      mineral:           Math.floor(Number(r.mineral)),
+      gas:               Math.floor(Number(r.gas)),
+      energy:            Math.floor(Number(r.energy)),
+      population:        Math.floor(Number(r.population)),
+      science:           Math.floor(Number(r.science ?? 0)),
+      mineralCap:        Number(r.mineral_cap),
+      gasCap:            Number(r.gas_cap),
+      energyCap:         Number(r.energy_cap),
+      populationCap:     Number(r.population_cap),
+      scienceCap:        Number(r.science_cap ?? 999999),
+      mineralPerTick:    Number(r.mineral_per_tick),
+      gasPerTick:        Number(r.gas_per_tick),
+      energyPerTick:     Number(r.energy_per_tick),
+      populationPerTick: Number(r.population_per_tick),
+      lastTickAt:        r.last_tick_at,
+    };
 
-    await this.resourceRepo.save(resource);
-    const snapshot = this.toSnapshot(resource);
     await this.setCache(playerId, snapshot);
 
     this.logger.debug(
-      `Deducted resources for player ${playerId}: -${cost.mineral}M -${cost.gas}G -${cost.energy}E -${scienceCost}◈`,
+      `Deducted resources for player ${playerId}: -${mineralCost}M -${gasCost}G -${energyCost}E -${scienceCost}◈`,
     );
     return snapshot;
   }

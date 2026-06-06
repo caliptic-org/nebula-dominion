@@ -36,13 +36,14 @@ export class BuildingService {
     return this.buildingRepo.find({ where: { gameId }, order: { createdAt: 'ASC' } });
   }
 
-  async upgrade(id: string, ownerId: string): Promise<Building> {
-    const building = await this.buildingRepo.findOne({ where: { id }, relations: ['game'] });
-    if (!building) throw new NotFoundException(`Building ${id} not found`);
-    if (building.game.ownerId !== ownerId) throw new ForbiddenException();
-    building.level += 1;
-    return this.buildingRepo.save(building);
-  }
+  // upgrade() removed — see building.controller.ts changelog. The
+  // method had no level cap and no resource cost so any authed user
+  // could PATCH /api/v1/buildings/:id/upgrade their way to Lv 68 in
+  // 36 seconds (live audit smoke test). The canonical upgrade path
+  // lives in apps/game-server/src/buildings/buildings.service.ts and
+  // enforces MAX_BUILDING_LEVEL = 54, scaled cost, queue. The FE has
+  // always called the game-server path; nothing breaks by removing
+  // this shim.
 
   async remove(id: string, ownerId: string): Promise<void> {
     const building = await this.buildingRepo.findOne({ where: { id }, relations: ['game'] });

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -41,11 +41,17 @@ export class BuildingController {
     return this.buildingService.findByGame(gameId, req.user.id);
   }
 
-  @Patch(':id/upgrade')
-  @ApiOperation({ summary: 'Upgrade a building level' })
-  upgrade(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
-    return this.buildingService.upgrade(id, req.user.id);
-  }
+  // NB. PATCH /buildings/:id/upgrade USED TO LIVE HERE — a legacy
+  // shim from an earlier api-owned scheme. It had no max-level guard,
+  // no resource cost, no queue: a live audit showed Lv 68 in 36 seconds
+  // by hitting it 68 times. The FE never used this path (it calls the
+  // game-server's POST /buildings/:id/upgrade which IS gated), so
+  // removing the route closes the exploit without breaking any client.
+  //
+  // If you re-introduce a building upgrade here, mirror the
+  // game-server's `buildings.service.ts:upgradeBuilding()` constraints
+  // (MAX_BUILDING_LEVEL = 54, scaled cost, queue) — don't ship a bare
+  // `level += 1; save()` ever again.
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -8,6 +8,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ShopItem } from './entities/shop-item.entity';
 import { UserInventory } from './entities/user-inventory.entity';
+import { VipService } from '../vip/vip.service';
 
 interface ShopFilter {
   category?: string;
@@ -33,6 +34,10 @@ export class ShopService {
     private readonly shopItemRepository: Repository<ShopItem>,
     @InjectRepository(UserInventory)
     private readonly inventoryRepository: Repository<UserInventory>,
+    /** Injected so premium_pass purchases (VIP SKUs) actually upgrade
+     *  the player's VIP tier instead of just adding an inventory row.
+     *  See purchaseWithInGameCurrency's post-transaction hook. */
+    private readonly vipService: VipService,
   ) {}
 
   async getShopItems(filter: ShopFilter = {}) {
@@ -136,7 +141,7 @@ export class ShopService {
       throw new BadRequestException(`Bilinmeyen para birimi: ${dto.currencyType}`);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // Lazy-init wallet row if absent.
       await manager.query(
         `INSERT INTO user_currency (user_id) VALUES ($1::uuid)
@@ -196,6 +201,55 @@ export class ShopService {
 
       return inventoryEntry;
     });
+
+    // Post-transaction VIP upgrade hook.
+    //
+    // `premium_pass` SKUs (vip_vip-monthly / -quarterly / -annual) need
+    // to actually bump the player's VIP tier — not just sit in their
+    // inventory. We resolve the SKU again here so we don't re-issue the
+    // grant on inventory equip; this branch fires once, on the
+    // successful purchase path.
+    //
+    // Run OUTSIDE the wallet/inventory transaction so a VIP-service
+    // hiccup doesn't roll back the deduction. The purchase already
+    // succeeded — VIP failure becomes a logged warning. The next
+    // VipService.getVipStatus call will reflect the spend on the next
+    // purchase (cumulativeSpendUsd is the SoT, not local state).
+    try {
+      const item = await this.shopItemRepository.findOne({
+        where: { sku: dto.sku },
+      });
+      if (item && item.category === 'premium_pass') {
+        // Spend USD value for VIP tier math. Prefer the configured
+        // price_real_usd column; fall back to the gem price ÷ 100 so a
+        // 1000-gem pass reads as ≈ $10 of cumulative spend. The
+        // VipService threshold table is the SoT for tier cutoffs.
+        const spendUsd =
+          item.priceRealUsd !== null
+            ? Number(item.priceRealUsd)
+            : (item.pricePremiumGems ?? 0) / 100;
+        await this.vipService.recordPurchaseAndUpgradeVip({
+          userId,
+          transactionId: null,
+          amountUsd: spendUsd,
+          amountTry: null,
+          currencyCode: 'USD',
+          purchaseType: 'premium_pass',
+          countryCode: null,
+        });
+        this.logger.log(
+          `VIP upgrade hook fired user=${userId} sku=${item.sku} spendUsd=${spendUsd}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `VIP upgrade hook failed user=${userId} sku=${dto.sku}: ${
+          err instanceof Error ? err.message : String(err)
+        } — purchase already committed`,
+      );
+    }
+
+    return result;
   }
 
   async getUserInventory(userId: string, category?: string) {

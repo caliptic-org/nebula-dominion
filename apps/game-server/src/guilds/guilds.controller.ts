@@ -122,16 +122,79 @@ export class GuildsController {
     return this.guilds.getGuild(id);
   }
 
+  /**
+   * GET /guilds/:id/members — list roster rows for the target guild.
+   *
+   * HIGH IDOR-GUILDS-MEMBERS-ENUM-01 (audit cycle 8 fix):
+   *   Previously this handler had only `HttpJwtGuard` and called
+   *   `guilds.listMembers(id)` with NO caller identity. That meant any
+   *   logged-in player could enumerate every rival guild's full roster —
+   *   each row exposes `{userId, role, joinedAt, contributionPts,
+   *   lastActiveAt}`. An attacker could trivially pick "the weakest +
+   *   most recently active member of guild X" and target them for raids,
+   *   alliance-war intelligence, or social-engineering.
+   *
+   *   Audit cycle 6 closed the API-side analog
+   *   (`AllianceController.getMembers` →
+   *   `AllianceService.assertMembership`) but the game-server's
+   *   `GuildsController.members` was missed.
+   *
+   * Mitigation:
+   *   - Extract the caller's userId from the JWT subject via
+   *     `@CurrentUser()` and forward it to the service.
+   *   - The service now requires the caller to be a member of the target
+   *     guild (`guild_members WHERE guild_id = :id AND user_id = :caller`)
+   *     and throws `ForbiddenException("Bu guild üyesi değilsin")`
+   *     otherwise — matching the alliance.service.ts `assertMembership`
+   *     pattern.
+   *
+   *   This is the harder of the two options on the table (public
+   *   projection was the alternative). It was chosen because:
+   *     a) it mirrors the alliance cycle 6 fix so the security surface is
+   *        consistent across both team-grouping subsystems,
+   *     b) the only FE caller of `getProfile` is `GuildDashboard`, which
+   *        is rendered exclusively when the viewer is `inGuild &&
+   *        activeGuildId === ownGuildId` — so the production FE never
+   *        needs roster data for a foreign guild, and
+   *     c) the public-facing "browse guilds" page already gets the
+   *        member-count summary from `GET /guilds` (no per-row PII).
+   *
+   * Legacy `/guilds/users/:userId/membership` IDOR-safe alias (cycle 3)
+   * is unaffected — it already 403s on URL-vs-JWT mismatch.
+   */
   @Get(':id/members')
   @UseGuards(HttpJwtGuard)
-  members(@Param('id') id: string) {
-    return this.guilds.listMembers(id);
+  members(@Param('id') id: string, @CurrentUser() userId: string) {
+    return this.guilds.listMembers(userId, id);
   }
 
+  /**
+   * GET /guilds/:id/events — activity feed (joins, leaves, donations).
+   *
+   * HIGH IDOR-GUILDS-MEMBERS-ENUM-01 (audit cycle 8 fix):
+   *   The same vulnerability class as `members` above. Each event row
+   *   carries `{userId, type, payload}` where `payload` includes donation
+   *   `amount` + `resource`. Anonymous-to-the-guild enumeration of this
+   *   feed lets attackers infer:
+   *     - Member-by-member contribution recency ("X hasn't donated in 9
+   *       days, probably inactive, hit them"),
+   *     - Per-resource economic profile of the target guild,
+   *     - Promote/demote/kick lifecycle leaks.
+   *
+   *   The fix is identical to `members`: pass the JWT subject down to the
+   *   service so it can membership-gate. Non-members get a 403, not a
+   *   sanitised projection — there is no production caller that needs the
+   *   foreign-guild event feed, and the cycle-6 alliance fix set this
+   *   precedent.
+   */
   @Get(':id/events')
   @UseGuards(HttpJwtGuard)
-  events(@Param('id') id: string, @Query('limit') limit?: string) {
-    return this.guilds.listEvents(id, limit ? parseInt(limit, 10) : undefined);
+  events(
+    @Param('id') id: string,
+    @CurrentUser() userId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.guilds.listEvents(userId, id, limit ? parseInt(limit, 10) : undefined);
   }
 
   @Post(':id/join')

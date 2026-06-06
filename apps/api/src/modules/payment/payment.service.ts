@@ -5,8 +5,8 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import Stripe from 'stripe';
 import { Transaction } from './entities/transaction.entity';
@@ -53,6 +53,8 @@ export class PaymentService {
     private readonly webhookRepository: Repository<WebhookEvent>,
     @InjectRepository(UserConsent)
     private readonly consentRepository: Repository<UserConsent>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly vipService: VipService,
   ) {}
 
@@ -247,6 +249,30 @@ export class PaymentService {
    * VIP pass on a real shipping build.
    *
    * Caller MUST be the owner of the transaction (controller enforces this).
+   *
+   * --------------------------------------------------------------------------
+   * Concurrency contract (engine audit cycle 6 — HIGH ECON-PAY-MOCKCOMPLETE-RACE)
+   * --------------------------------------------------------------------------
+   * Earlier revisions did a plain `findOne` → status==="pending" check →
+   * `completeTransaction(...)` with no row lock.  Two parallel POSTs to
+   * `/payment/mock/complete/:tx` with the same transactionId both observed
+   * status="pending" simultaneously and both went on to call
+   * `recordPurchaseAndUpgradeVip` — the user got their cumulative spend
+   * credited twice and could cross a VIP threshold for free.  The endpoint
+   * is gated behind PAYMENT_MOCK_ENABLED so it's not reachable in prod,
+   * but staging/playtest builds flip the flag and were exposed.
+   *
+   * The fix wraps the read+guard inside a `dataSource.transaction` and takes
+   * a `pessimistic_write` (SELECT … FOR UPDATE) lock on the transactions
+   * row.  PostgreSQL serialises the two contenders: the first holder sees
+   * status="pending" and flips it to "completed" before COMMIT.  The second
+   * caller's `findOne` blocks until that COMMIT, then reads the already-
+   * flipped row and returns `alreadyCompleted` without re-running the VIP
+   * credit path.
+   *
+   * This is defense-in-depth against the idempotency guard the audit added
+   * to `completeTransaction` (cycle A2): even if that downstream guard ever
+   * regresses, the lock here keeps the VIP spend from being double-counted.
    */
   async mockCompleteTransaction(userId: string, transactionId: string): Promise<Transaction> {
     // STRICT opt-in: explicit PAYMENT_MOCK_ENABLED=true required, no
@@ -261,15 +287,52 @@ export class PaymentService {
       throw new BadRequestException('Mock onayı kapalı (PAYMENT_MOCK_ENABLED!=true)');
     }
 
-    const tx = await this.transactionRepository.findOne({ where: { id: transactionId } });
-    if (!tx) throw new NotFoundException('İşlem bulunamadı');
-    if (tx.userId !== userId) throw new UnauthorizedException('Bu işlem size ait değil');
-    if (tx.status !== 'pending') {
-      throw new BadRequestException(`İşlem zaten ${tx.status} durumunda`);
-    }
+    // Take a row-level write lock on the transactions row so the
+    // status check and the downstream `completeTransaction` cannot
+    // interleave with a parallel POST for the same id.  Two callers
+    // SELECT … FOR UPDATE on the same row; PostgreSQL serialises them.
+    //
+    // Winner flow:
+    //   1. acquires the lock, observes status="pending"
+    //   2. inside the lock: flips status→"completed", saves, then runs
+    //      the VIP credit / pass grant pipeline via completeTransaction
+    //   3. COMMIT releases the lock
+    // Loser flow:
+    //   1. blocks on FOR UPDATE while winner is in flight
+    //   2. once winner COMMITs, loser's findOne returns the row with
+    //      status="completed" → falls through, no VIP re-credit
+    //
+    // We intentionally run `completeTransaction` INSIDE the transaction
+    // so the VIP-credit work and the status flip commit atomically; if
+    // the VIP write fails the status flip rolls back and the caller can
+    // retry safely.  completeTransaction uses the repository (not the
+    // locked entity manager) for its own writes, but those writes
+    // target child rows (vip_history, etc.) — the status row stays
+    // locked for the duration via the outer transaction.
+    await this.dataSource.transaction(async (em) => {
+      const tx = await em.findOne(Transaction, {
+        where: { id: transactionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!tx) throw new NotFoundException('İşlem bulunamadı');
+      if (tx.userId !== userId) throw new UnauthorizedException('Bu işlem size ait değil');
 
-    await this.completeTransaction(tx.id, `mock_${tx.id}`);
-    return (await this.transactionRepository.findOne({ where: { id: tx.id } }))!;
+      if (tx.status === 'completed') {
+        // Loser path: winner already flipped the row.  Return the
+        // already-completed row without re-running the grant pipeline.
+        return;
+      }
+      if (tx.status !== 'pending') {
+        // refunded / failed / cancelled — surface to caller
+        throw new BadRequestException(`İşlem zaten ${tx.status} durumunda`);
+      }
+
+      // Winner path: still pending under the lock.  Run the same
+      // completion pipeline a real Stripe/iyzico webhook would.
+      await this.completeTransaction(tx.id, `mock_${tx.id}`);
+    });
+
+    return (await this.transactionRepository.findOne({ where: { id: transactionId } }))!;
   }
 
   // ==========================================
@@ -321,6 +384,38 @@ export class PaymentService {
   // iyzico Webhook / Callback Handler
   // ==========================================
 
+  /**
+   * Handle an iyzico async callback. Idempotent on `paymentId`.
+   *
+   * **Replay-safety contract** (the reason this method matters):
+   *
+   *   The webhook_event row's natural key is `(provider, eventId)` with a
+   *   UNIQUE constraint at the DB level (see WebhookEvent entity).  For
+   *   the constraint to actually defend against replays, `eventId` MUST
+   *   be deterministic from the upstream event — same callback, same
+   *   key, second INSERT → Postgres 23505 → we short-circuit before
+   *   `processIyzicoEvent` ever calls `recordPurchaseAndUpgradeVip`.
+   *
+   *   Prior to this fix the eventId was built as
+   *     `iyz-${callbackData.paymentId}-${Date.now()}`
+   *   which embedded a wall-clock suffix in the key — every replay was a
+   *   different key, every replay passed the constraint, every replay
+   *   credited cumulative VIP spend a second time.  An attacker who
+   *   captured one legitimate SUCCESS callback (or who got iyzico to
+   *   re-deliver, which iyzico does on 5xx) could farm VIP tier
+   *   upgrades by re-POSTing the body N times.  HIGH severity —
+   *   cycle-5 audit BLOCKER ECON-PAY-IYZICO-EVENTID-REPLAY.
+   *
+   *   The new contract:
+   *     eventId = `iyz-${paymentId}`        (no timestamp, deterministic)
+   *
+   *   Stripe path is unaffected — it already uses Stripe's own event id
+   *   (`stripeEvent.id`) which is upstream-deterministic by design.
+   *
+   * On replay the response is `{ received: true, duplicate: true }` with
+   * HTTP 200 so iyzico's retry loop stops (anything else, including 409,
+   * makes them keep retrying).
+   */
   async handleIyzicoCallback(
     callbackData: IyzicoCallbackDto,
     rawBody: string,
@@ -345,17 +440,40 @@ export class PaymentService {
       );
     }
 
-    const event = await this.webhookRepository.save(
-      this.webhookRepository.create({
-        provider: 'iyzico',
-        eventId: `iyz-${callbackData.paymentId}-${Date.now()}`,
-        eventType: `payment.${callbackData.paymentStatus}`,
-        payload: callbackData as unknown as Record<string, unknown>,
-        signature: callbackData.token ?? null,
-        isVerified,
-        isProcessed: false,
-      }),
-    );
+    // Deterministic dedup key — DO NOT add a timestamp or random suffix.
+    // The UNIQUE(provider, eventId) index relies on this being stable
+    // across iyzico's redelivery attempts.  See JSDoc above.
+    const eventId = `iyz-${callbackData.paymentId}`;
+
+    let event: WebhookEvent;
+    try {
+      event = await this.webhookRepository.save(
+        this.webhookRepository.create({
+          provider: 'iyzico',
+          eventId,
+          eventType: `payment.${callbackData.paymentStatus}`,
+          payload: callbackData as unknown as Record<string, unknown>,
+          signature: callbackData.token ?? null,
+          isVerified,
+          isProcessed: false,
+        }),
+      );
+    } catch (err: unknown) {
+      // Replay path: another (identical) callback for the same paymentId
+      // already wrote the row. We MUST NOT re-run processIyzicoEvent — it
+      // would call completeTransaction → recordPurchaseAndUpgradeVip a
+      // second time and inflate cumulative spend → free VIP tier.
+      if (err instanceof QueryFailedError) {
+        const code = (err.driverError as { code?: string } | undefined)?.code;
+        if (code === '23505') {
+          this.logger.warn(
+            `iyzico callback replay ignored: paymentId=${callbackData.paymentId} conv=${callbackData.conversationId}`,
+          );
+          return { received: true, duplicate: true };
+        }
+      }
+      throw err;
+    }
 
     await this.processIyzicoEvent(event, callbackData);
     return { received: true };
@@ -428,34 +546,126 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Finalise a pending transaction and credit the VIP cumulative-spend
+   * ledger.
+   *
+   * IDEMPOTENCY CONTRACT (audit cycle 6, ECON-PAY-COMPLETETX-NO-IDEMPOTENCY)
+   * ─────────────────────────────────────────────────────────────────────
+   * Previous implementation had no `tx.status === 'completed'` guard,
+   * so any re-entry — a Stripe webhook re-delivery after a crash, a
+   * concurrent /payment/mock/complete race, a future admin "force
+   * re-grant" tool — would re-run
+   * vipService.recordPurchaseAndUpgradeVip, silently double-bumping
+   * the user's cumulative_spend_usd and potentially shoving them up
+   * an extra VIP tier per replay. Free VIP tier inflation = direct
+   * revenue impact.
+   *
+   * Two-layer defence:
+   *   1. SERVICE GUARD (here): if status is already 'completed', return
+   *      immediately without touching the VIP ledger. Catches the
+   *      common case (webhook resend after the row was already saved).
+   *   2. DEFENSE-IN-DEPTH (process_vip_spend SQL function +
+   *      UNIQUE(transaction_id) on vip_spend_ledger, migration
+   *      1779900000000-AddVipSpendIdempotencyLedger): a concurrent
+   *      caller that slipped past the JS guard — two parallel
+   *      processStripeEvent runs that both findOne() before either
+   *      save()s — will hit the unique-violation inside the DB
+   *      function and the INSERT is swallowed. Only the first call
+   *      credits the ledger.
+   *
+   * One-shot per-transactionId is the canonical contract: callers may
+   * invoke completeTransaction(tx.id, …) any number of times; only
+   * the first call mutates state.
+   */
   private async completeTransaction(
     transactionId: string,
     providerPaymentId: string,
-  ): Promise<void> {
-    const tx = await this.transactionRepository.findOne({ where: { id: transactionId } });
-    if (!tx) return;
+  ): Promise<{ alreadyCompleted: boolean; transactionId: string } | void> {
+    // Layer 1: race-safe idempotency guard. Atomic conditional UPDATE
+    // — the WHERE clause filters status='pending', so two concurrent
+    // callers serialise on the row lock; only the first one matches and
+    // gets a RETURNING row. The loser's UPDATE affects 0 rows and we
+    // bail. This closes the findOne→save TOCTOU that the previous
+    // implementation had (two parallel calls would both observe
+    // status='pending' and both proceed to VIP credit).
+    const updated = await this.dataSource.query<
+      Array<{ id: string; user_id: string }>
+    >(
+      `UPDATE transactions
+          SET status = 'completed',
+              provider_payment_id = $2,
+              updated_at = NOW()
+        WHERE id = $1::uuid
+          AND status = 'pending'
+        RETURNING id, user_id`,
+      [transactionId, providerPaymentId],
+    );
 
-    tx.status = 'completed';
-    tx.providerPaymentId = providerPaymentId;
-    await this.transactionRepository.save(tx);
+    if (updated.length === 0) {
+      // Either tx doesn't exist or it was already non-pending. Re-read
+      // to decide which.
+      const tx = await this.transactionRepository.findOne({
+        where: { id: transactionId },
+      });
+      if (!tx) {
+        this.logger.warn(`completeTransaction: tx bulunamadı: ${transactionId}`);
+        return;
+      }
+      this.logger.log(
+        `completeTransaction: yinelenen tamamlama atlandı (status=${tx.status}): txn=${transactionId}`,
+      );
+      return { alreadyCompleted: true, transactionId };
+    }
+
+    // We hold the "first completer" claim on this row. Re-read the full
+    // entity for the VIP credit payload (amount fields, country, etc.)
+    const tx = await this.transactionRepository.findOne({
+      where: { id: transactionId },
+    });
+    if (!tx) {
+      // Should never happen — we just UPDATE-RETURNING'd this row.
+      this.logger.error(
+        `completeTransaction: post-update lookup boş: ${transactionId}`,
+      );
+      return;
+    }
 
     this.logger.log(`Ödeme tamamlandı: txn=${transactionId}`);
 
-    // VIP cumulative spend update + per-user ARPPU telemetry
-    const vipResult = await this.vipService.recordPurchaseAndUpgradeVip({
-      userId: tx.userId,
-      transactionId: tx.id,
-      amountUsd: tx.amountUsd,
-      amountTry: tx.amountTry,
-      currencyCode: tx.currencyCode,
-      purchaseType: tx.transactionType,
-      countryCode: tx.countryCode,
-    });
+    // VIP cumulative spend update + per-user ARPPU telemetry. The SQL
+    // function's vip_spend_ledger UNIQUE(transaction_id) is layer 2:
+    // belt-and-braces in case a future caller bypasses the atomic
+    // UPDATE above (e.g. an admin "force re-grant" tool that flips
+    // status back to pending). QueryFailedError 23505 is the duplicate
+    // signal; swallow it so the rest of the flow proceeds.
+    try {
+      const vipResult = await this.vipService.recordPurchaseAndUpgradeVip({
+        userId: tx.userId,
+        transactionId: tx.id,
+        amountUsd: tx.amountUsd,
+        amountTry: tx.amountTry,
+        currencyCode: tx.currencyCode,
+        purchaseType: tx.transactionType,
+        countryCode: tx.countryCode,
+      });
 
-    if (vipResult.upgraded) {
-      this.logger.log(
-        `VIP yükseltme sonrası bildirim gönderilecek: kullanıcı=${tx.userId} VIP${vipResult.oldVipLevel}→VIP${vipResult.newVipLevel}`,
-      );
+      if (vipResult.upgraded) {
+        this.logger.log(
+          `VIP yükseltme sonrası bildirim gönderilecek: kullanıcı=${tx.userId} VIP${vipResult.oldVipLevel}→VIP${vipResult.newVipLevel}`,
+        );
+      }
+    } catch (err: unknown) {
+      if (
+        err instanceof QueryFailedError &&
+        (err as { code?: string }).code === '23505'
+      ) {
+        this.logger.warn(
+          `completeTransaction: VIP ledger duplicate caught (layer-2): txn=${transactionId}`,
+        );
+        return;
+      }
+      throw err;
     }
   }
 

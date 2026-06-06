@@ -66,6 +66,42 @@ export class ProgressionService {
     return this.toDto(record);
   }
 
+  /**
+   * Grants XP to a player, advancing level/age boundaries as appropriate.
+   *
+   * ── CONCURRENCY CONTRACT (HIGH ECON-PROG-AWARDXP-LOST-UPDATE fix) ──
+   * Pre-fix flow was getOrCreateProgress → ledger insert → mutate
+   * record.currentXp/totalXp in memory → playerLevelRepo.save(). With no
+   * row-level lock on player_levels, two concurrent awardXp(u, +X) calls
+   * (e.g. mission claim + battle reward landing within one RTT, distinct
+   * referenceIds so the ledger UNIQUE doesn't fire) both loaded the same
+   * baseline snapshot, both computed currentXp+amount against that stale
+   * read, and both .save() last-write-wins. The xp_transactions ledger
+   * stayed correct (cycle 3 UNIQUE preserves idempotency) but
+   * player_levels under-counted by exactly one grant per collision.
+   *
+   * Post-fix flow:
+   *   1. Ledger row goes in FIRST (cycle 3 UNIQUE rejects duplicates).
+   *   2. A single atomic SQL UPDATE bumps current_xp + total_xp on the
+   *      row, with RETURNING giving us the post-update authoritative
+   *      values. Postgres serializes the two UPDATEs at the row lock,
+   *      so both increments stick — exactly mirrors the
+   *      resources.service.grant() / deduct() pattern from cycle 10.
+   *   3. We rehydrate the in-memory record from the RETURNING row
+   *      (NOT the stale pre-UPDATE snapshot) before processLevelUps()
+   *      so the level-boundary computation sees the true post-increment
+   *      currentXp/totalXp.
+   *   4. processLevelUps() may decrement currentXp and increment
+   *      currentLevel/currentAge/unlocks; that save() is a separate
+   *      write. The level-up branch is rarer than the XP increment and
+   *      collisions are bounded (you can only consume each xpToNext
+   *      threshold once); a residual race there is a separate, lower-
+   *      severity concern tracked outside this fix.
+   *
+   * Verify: two concurrent awardXp(u, source X each granting 100),
+   * starting current_xp=0 → final current_xp=200 with two ledger rows,
+   * not 100 with one grant silently dropped.
+   */
   async awardXp(dto: AwardXpDto): Promise<{ progress: PlayerProgressDto; leveledUp: boolean }> {
     const record = await this.getOrCreateProgress(dto.userId);
 
@@ -84,7 +120,6 @@ export class ProgressionService {
     }
 
     const levelBefore = record.currentLevel;
-    const totalXpBefore = record.totalXp;
     const baseAmount = XP_BASE_AMOUNTS[dto.source] ?? 0;
     const levelDef = getLevelDef(record.currentLevel);
     const multiplier = levelDef?.xpMultiplier ?? 1.0;
@@ -169,15 +204,72 @@ export class ProgressionService {
       throw err;
     }
 
-    record.currentXp += finalAmount;
-    record.totalXp += finalAmount;
+    // ── ATOMIC INCREMENT (HIGH ECON-PROG-AWARDXP-LOST-UPDATE) ────────
+    // Single-statement UPDATE so concurrent grants serialize at the row
+    // lock and both increments stick. RETURNING gives us the
+    // post-update authoritative current_xp/total_xp — we MUST use these
+    // (not the pre-UPDATE in-memory snapshot) when computing level
+    // boundaries below, otherwise we'd re-introduce the same stale-read
+    // window we just closed.
+    const updRows = (await this.dataSource.query(
+      `
+      UPDATE player_levels
+         SET current_xp = current_xp + $1,
+             total_xp   = total_xp   + $1,
+             updated_at = NOW()
+       WHERE user_id = $2
+      RETURNING current_xp, total_xp, current_level, current_age, current_tier
+      `,
+      [finalAmount, dto.userId],
+    )) as Array<{
+      current_xp: string | number;
+      total_xp: string | number;
+      current_level: number;
+      current_age: number;
+      current_tier: number;
+    }>;
+
+    if (updRows.length === 0) {
+      // Unreachable under normal flow — getOrCreateProgress just created
+      // the row. Bail without crashing if some upstream nuked it.
+      this.logger.error(
+        `awardXp UPDATE matched 0 rows: user=${dto.userId} source=${dto.source}`,
+      );
+      return { progress: this.toDto(record), leveledUp: false };
+    }
+
+    const updated = updRows[0];
+    const totalXpBefore = Number(updated.total_xp) - finalAmount;
+
+    // Rehydrate the in-memory record from the RETURNING row so
+    // processLevelUps sees the true post-increment values (current_xp
+    // could reflect a concurrent grant's bump too — which is correct,
+    // we should consume those XP toward level boundaries here even if
+    // the other call hasn't run its own boundary check yet; the
+    // boundary is idempotent in the sense that each xpToNext threshold
+    // can only be crossed once before the level increments).
+    record.currentXp = Number(updated.current_xp);
+    record.totalXp   = Number(updated.total_xp);
+    // current_level/age/tier are not touched by the UPDATE itself, but
+    // a concurrent grant could have already advanced them — pick up
+    // whatever the row now holds so we don't roll back a sibling
+    // call's level-up.
+    record.currentLevel = updated.current_level;
+    record.currentAge   = updated.current_age;
+    record.currentTier  = updated.current_tier;
 
     // Emit telemetry for XP source breakdown calibration
     this.emitTelemetry(dto.userId, dto.source, baseAmount, finalAmount, record);
 
     const leveledUp = await this.processLevelUps(record);
 
-    await this.playerLevelRepo.save(record);
+    // Only save if processLevelUps actually advanced level/age/tier/
+    // unlocks/currentXp. The XP increment itself is already persisted
+    // by the atomic UPDATE above, so the common no-level-up path
+    // doesn't need a second write.
+    if (leveledUp) {
+      await this.playerLevelRepo.save(record);
+    }
 
     const xpEvent: XpGainedEvent = {
       userId: dto.userId,

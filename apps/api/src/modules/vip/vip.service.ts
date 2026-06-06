@@ -69,15 +69,25 @@ export class VipService {
       };
     }
 
-    // Call the atomic SQL function for spend accumulation + tier upgrade
+    // Call the atomic SQL function for spend accumulation + tier upgrade.
+    //
+    // The function takes p_transaction_id and writes it to
+    // vip_spend_ledger BEFORE bumping cumulative_spend_usd; the ledger
+    // has UNIQUE(transaction_id) so any duplicate call (Stripe webhook
+    // resend, concurrent /payment/mock/complete race, etc.) collapses
+    // to an `already_credited=true` result with cumulative_spend
+    // unchanged. See migration 1779900000000-AddVipSpendIdempotencyLedger
+    // and PaymentService.completeTransaction's two-layer contract.
     const rows = await this.dataSource.query<Array<{
       new_vip_level: number;
       old_vip_level: number;
       total_spend: string;
       upgraded: boolean;
+      already_credited: boolean;
     }>>(
-      'SELECT new_vip_level, old_vip_level, total_spend, upgraded FROM process_vip_spend($1, $2)',
-      [dto.userId, spendUsd],
+      `SELECT new_vip_level, old_vip_level, total_spend, upgraded, already_credited
+         FROM process_vip_spend($1::uuid, $2::numeric, $3::uuid)`,
+      [dto.userId, spendUsd, dto.transactionId],
     );
 
     const row = rows[0];
@@ -88,7 +98,11 @@ export class VipService {
       upgraded: row.upgraded,
     };
 
-    if (result.upgraded) {
+    if (row.already_credited) {
+      this.logger.warn(
+        `process_vip_spend: ledger duplicate atlandı: kullanıcı=${dto.userId} txn=${dto.transactionId} (layer-2 idempotency tetiklendi)`,
+      );
+    } else if (result.upgraded) {
       this.logger.log(
         `VIP yükseltme: kullanıcı=${dto.userId} VIP${result.oldVipLevel}→VIP${result.newVipLevel} toplam=$${result.totalSpendUsd}`,
       );

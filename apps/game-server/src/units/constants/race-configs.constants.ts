@@ -347,3 +347,77 @@ export const MERGE_RECIPES: Partial<Record<UnitType, UnitType>> = {
   [UnitType.HYDRALISK]:        UnitType.ULTRALISK,
   [UnitType.ULTRALISK]:        UnitType.QUEEN,
 };
+
+/**
+ * Source-type → source-tier mapping for the merge cost ladder.
+ *
+ * The merge cost (mineral / gas / science) scales linearly with the source
+ * tier, mirroring the api-side MergePreviewService.computeCosts contract:
+ *   mineral = 100 * sourceTier
+ *   gas     = 200 * sourceTier
+ *   science =   sourceTier - 3   (only at sourceTier >= 4)
+ *
+ * Pre-fix (ECON-MERGE-FREE-UPGRADE), mergeRoster never read these costs —
+ * the FE displayed them in the preview pane but the POST consumed 3 units
+ * and minted the next-tier unit for FREE. This table lets the service
+ * resolve "which tier am I promoting FROM" without re-running the api lex
+ * resolver (which lives in apps/api and resolves UUIDs differently).
+ *
+ * Keep in lockstep with MergePreviewService's `resolveTypeToTier`. Adding
+ * a new merge recipe row above means adding the source type's tier here
+ * too, otherwise mergeRoster's getMergeSourceTier() falls back to 1 and
+ * undercharges the merge.
+ */
+export const MERGE_SOURCE_TIERS: Partial<Record<UnitType, number>> = {
+  // Human T1 → result T2 (charge 1× base = 100M / 200G).
+  [UnitType.MARINE]:           1,
+  // Human T2 → result T3 (charge 2× base = 200M / 400G).
+  [UnitType.SNIPER]:           2,
+  [UnitType.ENGINEER]:         2,
+  // Human T3 → result T4 (charge 3× base = 300M / 600G).
+  [UnitType.MECHA_WALKER]:     3,
+  // Human T4 → result T5 (charge 4× base = 400M / 800G + 1 science).
+  [UnitType.GENETIC_WARRIOR]:  4,
+  // Zerg ladder mirrors the same tiering — Zergling T1, Hydralisk T2,
+  // Ultralisk T3. The Queen merge consumes 3× Ultralisks at T3 → result T4.
+  [UnitType.ZERGLING]:         1,
+  [UnitType.HYDRALISK]:        2,
+  [UnitType.ULTRALISK]:        3,
+};
+
+/**
+ * Computes the resource cost for merging 3× sourceType into the next tier.
+ *
+ * Wired identical to MergePreviewService.computeCosts in apps/api so the FE
+ * preview pane and the BE deduct agree to the last coin. `resourceA` /
+ * `resourceB` in the preview DTO map to `mineral` / `gas` per the race
+ * resource bindings in apps/web/src/lib/nd-tokens.ts; `crystal` (a future
+ * resource slot for tier 4+ merges) maps to `science` since the
+ * player_resources table doesn't carry a crystal column today.
+ *
+ * Returns a zero-cost shape when the sourceType isn't a known merge source.
+ * mergeRoster gates the recipe lookup BEFORE this, so a zero-cost return
+ * here is unreachable in practice — defensive belt-and-braces.
+ */
+export function computeMergeCost(sourceType: UnitType): {
+  mineral: number;
+  gas: number;
+  energy: number;
+  science: number;
+} {
+  const tier = MERGE_SOURCE_TIERS[sourceType] ?? 0;
+  if (tier <= 0) {
+    return { mineral: 0, gas: 0, energy: 0, science: 0 };
+  }
+  return {
+    mineral: 100 * tier,
+    gas:     200 * tier,
+    energy:  0,
+    // FE preview returns `crystal: tier-3` when tier >= 4. The wallet
+    // doesn't have a crystal column — bind it to science (the closest
+    // premium currency the player_resources schema knows about). When
+    // the dedicated crystal resource ships, swap this and audit the
+    // MergePreviewService catalog in lockstep.
+    science: tier >= 4 ? tier - 3 : 0,
+  };
+}

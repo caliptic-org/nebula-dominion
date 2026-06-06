@@ -251,8 +251,41 @@ export class GuildsService {
     this.logger.log(`User ${userId} left guild ${guildId}`);
   }
 
-  async listMembers(guildId: string): Promise<GuildMember[]> {
+  /**
+   * Roster lookup for a guild.
+   *
+   * HIGH IDOR-GUILDS-MEMBERS-ENUM-01 (audit cycle 8):
+   *   Previously the signature was `listMembers(guildId)` — no caller
+   *   identity — and the controller fired it on every request with only a
+   *   valid JWT. Any logged-in player could enumerate every rival guild's
+   *   full roster: `{userId, role, joinedAt, contributionPts,
+   *   lastActiveAt}`. Trivial recon for "pick the weakest active member
+   *   to raid". The api-side analog
+   *   (`AllianceService.getMembers` →
+   *   `assertMembership(requesterId, allianceId)`) was hardened in cycle
+   *   6 but this game-server counterpart was missed.
+   *
+   * Mitigation:
+   *   The caller's userId (from JWT subject) is now a required first
+   *   argument. We resolve the guild row (404s if it doesn't exist) and
+   *   then verify the caller has a `guild_members` row pointing at the
+   *   same guild. Non-members get a hard 403
+   *   ("Bu guild üyesi değilsin") — same wording as the alliance check
+   *   for security-message parity.
+   *
+   *   Hard 403 was chosen over a public projection because:
+   *     - the production FE only renders `GuildDashboard` for the
+   *       caller's OWN guild (see `apps/web/src/app/dashboard/guild/page.tsx`
+   *       — the `<GuildDashboard guildId={activeGuildId} />` mount is
+   *       gated behind `inGuild`), so foreign-guild rosters were never a
+   *       legitimate UX, and
+   *     - the browse-guilds page lists summaries from `listGuilds()`
+   *       which already returns capacity + memberCount with no per-row
+   *       PII.
+   */
+  async listMembers(callerUserId: string, guildId: string): Promise<GuildMember[]> {
     await this.getGuild(guildId);
+    await this.assertGuildMembership(callerUserId, guildId);
     return this.memberRepo.find({
       where: { guildId },
       order: { role: 'ASC', contributionPts: 'DESC' },
@@ -263,10 +296,47 @@ export class GuildsService {
     return this.memberRepo.findOne({ where: { userId } });
   }
 
+  /**
+   * Membership guard shared by `listMembers` and `listEvents`. Mirrors
+   * `AllianceService.assertMembership`. Throws ForbiddenException with a
+   * Turkish-language message ("Bu guild üyesi değilsin") if the caller
+   * does not hold a `guild_members` row in the target guild.
+   *
+   * Kept private so all read-side handlers exposing per-member PII funnel
+   * through the same check — adding a new such handler later just means
+   * calling this helper, not re-implementing the lookup.
+   */
+  private async assertGuildMembership(userId: string, guildId: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { userId, guildId } });
+    if (!member) {
+      throw new ForbiddenException('Bu guild üyesi değilsin');
+    }
+  }
+
   // ─── Activity / events ──────────────────────────────────────────────────────
 
-  async listEvents(guildId: string, limit = 50): Promise<GuildEvent[]> {
+  /**
+   * Guild activity feed (join/leave/donate events).
+   *
+   * HIGH IDOR-GUILDS-MEMBERS-ENUM-01 (audit cycle 8):
+   *   Same vulnerability class as `listMembers`. Each `GuildEvent` row
+   *   exposes `{userId, type, payload}` where the payload of DONATE
+   *   events includes the donation `amount` + `resource`. Anonymous-to-
+   *   the-guild enumeration of this feed was enough to fingerprint:
+   *     - per-member donation cadence / inactivity windows,
+   *     - per-resource economic profile (which resource the guild is
+   *       short on),
+   *     - promote/demote/kick churn.
+   *
+   * Mitigation:
+   *   Caller's userId (from JWT subject) is now required; we membership-
+   *   gate identically to `listMembers`. Non-members get a hard 403. No
+   *   FE caller (only e2e tests) reads this for a foreign guild — see
+   *   the controller-side comment for the impact analysis.
+   */
+  async listEvents(callerUserId: string, guildId: string, limit = 50): Promise<GuildEvent[]> {
     await this.getGuild(guildId);
+    await this.assertGuildMembership(callerUserId, guildId);
     return this.eventRepo.find({
       where: { guildId },
       order: { createdAt: 'DESC' },

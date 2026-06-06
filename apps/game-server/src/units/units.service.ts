@@ -13,6 +13,7 @@ import {
   UnitType,
   UNIT_CONFIGS,
   MERGE_RECIPES,
+  computeMergeCost,
   getUnitConfigsByRace,
   applyRaceBonuses,
 } from './constants/race-configs.constants';
@@ -540,8 +541,16 @@ export class UnitsService {
    *     simple; FE already enforces same-tier slot picks but BE is the
    *     authoritative gate)
    *   - source type appears in MERGE_RECIPES (i.e. there IS a next tier)
+   *   - player can afford computeMergeCost(sourceType) — mineral/gas/
+   *     science scaled by source tier (100M/200G per tier; +1 science at
+   *     tier 4+). Mirrors the FE preview pane's cost line so the player
+   *     never sees a "100M" cost in the UI and gets debited 0M by the
+   *     backend (the ECON-MERGE-FREE-UPGRADE exploit, see below).
    *
-   * Effect:
+   * Effect (in transaction):
+   *   - DEDUCT the merge cost via ResourcesService.deduct (atomic
+   *     conditional UPDATE — throws BadRequest "Yetersiz kaynak" if the
+   *     balance is short, in which case the source units stay intact).
    *   - DELETE the 3 source rows
    *   - INSERT 1 new row with result type + result tier's UNIT_CONFIG stats
    *     run through applyRaceBonuses() so race multipliers (HUMAN +15% def
@@ -550,6 +559,33 @@ export class UnitsService {
    *     Commander hp multiplier does NOT compose here (mergeRoster has
    *     never applied it; deferred until a UX decision is made about
    *     whether merged units inherit the active commander's bonus).
+   *
+   * EXPLOIT FIX (ECON-MERGE-FREE-UPGRADE, audit cycle 6): pre-fix the
+   * mergeRoster body computed `resultType` from MERGE_RECIPES and dove
+   * straight into remove/save with no resource debit. apps/api's
+   * MergePreviewService.computeCosts (apps/api/src/unit/merge-preview.
+   * service.ts:177) displayed `mineral = 100*sourceTier, gas = 200*
+   * sourceTier, crystal = sourceTier-3` to the player in the merge
+   * preview pane, but the actual POST /units/merge-roster path never
+   * read those costs. A determined player could grind starter Marines
+   * (50M / 10E each) and stack-merge all the way to Captain (T5) for
+   * the cost of the source training alone — bypassing the 100/200/300/
+   * 400 M+G ladder that the FE economy curve assumes. With Marine cost
+   * 50M × 3 = 150M for the bottom rung versus the intended 100M+200G
+   * merge cost, the exploit roughly halved the cost AND traded zero
+   * gas where 200G was meant to gate progression.
+   *
+   * New contract (POST):
+   *   1. resolve sourceType & resultType (unchanged)
+   *   2. computeMergeCost(sourceType) → { mineral, gas, energy, science }
+   *   3. resources.deduct(playerId, cost) — throws BadRequest "Yetersiz
+   *      kaynak" if balance is insufficient; the FE catches & surfaces.
+   *      The atomic conditional UPDATE inside deduct serialises concurrent
+   *      merges so two parallel POSTs can't both pass the predicate
+   *      against a balance that only covers one merge.
+   *   4. only AFTER successful deduct: remove the 3 source units, insert
+   *      the spawned result. Order is critical — a deduct failure must
+   *      not consume the source roster.
    *
    * NOTE: rows created before this fix (2026-06-06) carry pre-bonus stats
    * and will read low. Backfill migration deferred — TODO if/when the
@@ -566,12 +602,20 @@ export class UnitsService {
       throw new BadRequestException('Aynı birim birden çok slotta seçilemez.');
     }
 
-    // Wrap the find-validate-delete-insert in a single transaction so a
-    // mid-flight failure can't leave the player short 3 units with no
-    // result spawned.  Replaces the previous "no transaction, retry fixes
+    // Wrap the find-validate-deduct-delete-insert in a single transaction
+    // so a mid-flight failure can't leave the player short 3 units with no
+    // result spawned. Replaces the previous "no transaction, retry fixes
     // it" trade-off comment — engine audit flagged MEDIUM, but the user
     // loses the merge cost AND the source units on a partial failure
     // which is worse than the simple retry case.
+    //
+    // Note on the cost deduct: ResourcesService.deduct runs its own atomic
+    // conditional UPDATE on player_resources (cycle-10 fix). That UPDATE
+    // is implicitly enrolled in this transaction because TypeORM 0.3's
+    // dataSource.transaction binds the manager to a per-tx connection and
+    // ResourcesService reads the same shared DataSource. The deduct's
+    // UPDATE participates in the same tx, so a downstream throw rolls back
+    // the resource debit alongside the (yet-unstarted) unit consumption.
     // findBy { id: In(...) } is the TypeORM 0.3 form for the deprecated
     // findByIds — kept simple via the manager.findBy call below.
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -615,6 +659,25 @@ export class UnitsService {
         );
       }
 
+      // ── Cost deduct BEFORE consuming source units ──────────────────
+      // ECON-MERGE-FREE-UPGRADE fix: charge the player the same cost the
+      // FE preview pane shows BEFORE we remove anything. If deduct throws
+      // BadRequest("Yetersiz kaynak"), the transaction rolls back and the
+      // source units stay alive — the player just sees a 400 toast and
+      // can keep gathering resources.
+      const mergeCost = computeMergeCost(sourceType);
+      const hasCost =
+        mergeCost.mineral > 0 ||
+        mergeCost.gas > 0 ||
+        mergeCost.energy > 0 ||
+        mergeCost.science > 0;
+      if (hasCost) {
+        // resources.deduct surfaces BadRequest("Yetersiz kaynak") on
+        // insufficient balance — propagate as-is so the FE's existing
+        // translate-backend-error mapping picks it up.
+        await this.resources.deduct(playerId, mergeCost);
+      }
+
       await txUnitRepo.remove(units);
       // Apply race bonuses to the result tier's base stats before insert
       // — keeps persisted rows consistent with completeTraining()'s
@@ -638,7 +701,7 @@ export class UnitsService {
       });
       const result = await txUnitRepo.save(spawned);
       this.logger.log(
-        `Roster merge: player=${playerId} 3× ${sourceType} → 1× ${resultType} (id=${result.id})`,
+        `Roster merge: player=${playerId} 3× ${sourceType} → 1× ${resultType} (id=${result.id}, cost ${mergeCost.mineral}M ${mergeCost.gas}G ${mergeCost.energy}E ${mergeCost.science}◈)`,
       );
       return result;
     });

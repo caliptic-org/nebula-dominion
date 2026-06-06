@@ -10,6 +10,16 @@ interface VipUpgradeResult {
   newVipLevel: number;
   totalSpendUsd: number;
   upgraded: boolean;
+  /**
+   * Surface for callers that need to know the ledger swallowed the
+   * insert (Stripe webhook replay, /payment/mock/complete race, etc.).
+   * PaymentService.completeTransaction reads this to gate the
+   * wallet/inventory delivery — when already_credited=true, we ALSO
+   * skip user_currency credit so a 30-day replay can't double-deliver.
+   * Defaults to false on the no-spend branch (returns early before
+   * touching the SQL function).
+   */
+  alreadyCredited?: boolean;
 }
 
 interface RecordPurchaseDto {
@@ -41,8 +51,24 @@ export class VipService {
   // Purchase Recording + VIP Upgrade (atomic)
   // ==========================================
 
-  async recordPurchaseAndUpgradeVip(dto: RecordPurchaseDto): Promise<VipUpgradeResult> {
+  async recordPurchaseAndUpgradeVip(
+    dto: RecordPurchaseDto,
+    /**
+     * Optional EntityManager handle for callers that want the VIP
+     * credit to participate in their outer transaction's atomicity
+     * envelope.  PaymentService.completeTransaction passes this so a
+     * downstream wallet/inventory failure rolls back the VIP ledger
+     * row too — closing a window where VIP could be credited but the
+     * player never received the gems they paid for (BLOCKER
+     * PAYMENT-COMPLETETX-NO-FULFILLMENT, audit cycle 6).
+     *
+     * When omitted, falls back to the global DataSource (a
+     * standalone, auto-committing connection — historic behaviour).
+     */
+    em?: import('typeorm').EntityManager,
+  ): Promise<VipUpgradeResult> {
     const spendUsd = dto.amountUsd ?? this.tryToUsd(dto.amountTry);
+    const queryRunner = em ?? this.dataSource;
 
     // Get current VIP level before spend for telemetry
     const current = await this.vipSpendingRepo.findOne({ where: { userId: dto.userId } });
@@ -78,7 +104,7 @@ export class VipService {
     // to an `already_credited=true` result with cumulative_spend
     // unchanged. See migration 1779900000000-AddVipSpendIdempotencyLedger
     // and PaymentService.completeTransaction's two-layer contract.
-    const rows = await this.dataSource.query<Array<{
+    const rows = await queryRunner.query<Array<{
       new_vip_level: number;
       old_vip_level: number;
       total_spend: string;
@@ -96,6 +122,7 @@ export class VipService {
       newVipLevel: Number(row.new_vip_level),
       totalSpendUsd: parseFloat(row.total_spend),
       upgraded: row.upgraded,
+      alreadyCredited: row.already_credited,
     };
 
     if (row.already_credited) {

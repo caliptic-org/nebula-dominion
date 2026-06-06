@@ -81,7 +81,47 @@ function mergeHint(race: NDRaceKey, sourceTier: number): string {
 }
 
 const SLOT_COUNT = 3;
-const COST_B = 200;
+
+/**
+ * Local mirror of the game-server `computeMergeCost(sourceType)` formula
+ * (apps/game-server/.../race-configs.constants.ts) AND the api-side
+ * `MergePreviewService.computeCosts(sourceTier)`. Used as the fallback
+ * for the bottom CTA label BEFORE the player has filled all 3 slots and
+ * the backend preview round-trip has returned authoritative numbers.
+ *
+ * Background — prior bug (FE-MERGE-COST-STALE-LABEL, cycle 11):
+ *   The button label was hardcoded `Birleştir · 200 GAS` from a top-of-
+ *   file `COST_B = 200` constant regardless of `sourceTier`. After
+ *   cycle 11 turned the BE mergeRoster cost into a tier-scaled formula
+ *   (T2 source costs 200M + 400G, T3 source costs 300M + 600G,
+ *   T4 source costs 400M + 800G + 1 science), the sticker became a lie:
+ *   the player tapped expecting 200 gas, got debited mineral they were
+ *   never warned about, OR the BE rejected with "Yetersiz kaynak" with
+ *   no in-UI explanation of why 200G wasn't actually enough.
+ *
+ * Authoritative number always comes from `useMergePreviewBackend`'s
+ * `preview.costs` (computed server-side) once 3 slots are filled — see
+ * the cost rendering below. This helper only covers the 0/1/2-slot
+ * pre-preview state so the label can SHOW the real cost the player will
+ * be charged the moment they tap.
+ *
+ * Shape mirrors the BE: T1→T2 source costs 100M + 200G, scaling linearly
+ * with `sourceTier`. T4→T5 source additionally costs 1 science (the
+ * crystal slot, surfaced as the BE binds crystal to science in
+ * player_resources today — see computeMergeCost JSDoc in BE).
+ */
+function computeMergeCostLocal(sourceTier: number): {
+  resourceA: number;
+  resourceB: number;
+  crystal?: number;
+} {
+  const t = Math.max(1, sourceTier);
+  return {
+    resourceA: 100 * t,
+    resourceB: 200 * t,
+    ...(t >= 4 ? { crystal: t - 3 } : {}),
+  };
+}
 
 const BOTTOM_NAV_ROUTES: Record<string, string> = {
   base:     '/base',
@@ -179,6 +219,16 @@ export default function MergePage() {
     [pool, selected],
   );
   const { preview: liveMerge } = useMergePreviewBackend(race.key, slotUnitIds);
+  // Authoritative cost line for the CTA + the "Yetersiz kaynak" toast.
+  // When the BE preview has answered, use its `costs` shape (already
+  // mirrors the BE mergeRoster formula via MergePreviewService.computeCosts).
+  // Before 3 slots are filled, fall back to the local mirror so the
+  // button always shows the REAL cost — never the legacy hardcoded 200G.
+  // See computeMergeCostLocal JSDoc above for the prior bug context.
+  const displayCost = useMemo<{ resourceA: number; resourceB: number; crystal?: number }>(
+    () => liveMerge?.costs ?? computeMergeCostLocal(sourceTier),
+    [liveMerge, sourceTier],
+  );
   const promotedTier = liveMerge?.resultTier ?? preview.promotedTier;
   const promotedName =
     (liveMerge?.resultUnitId &&
@@ -246,7 +296,28 @@ export default function MergePage() {
       // Restore selection so the player can retry without re-picking.
       setSelected(snapshot);
       const msg = err instanceof FetchError ? err.message : 'Birleştirme reddedildi';
-      toast.error(msg);
+      // BE throws plain "Yetersiz kaynak" with no resource breakdown for
+      // merge (mirrors resources.deduct's generic message — see
+      // resources.service.ts L352). Surface the FE-known per-resource
+      // amounts so the player knows what to gather instead of guessing.
+      // The numbers come from the same `displayCost` value the button
+      // label shows, so the toast can't drift from the sticker.
+      if (msg === 'Yetersiz kaynak' || /Yetersiz kaynak/i.test(msg)) {
+        const parts: string[] = [];
+        if (displayCost.resourceA > 0) {
+          parts.push(`${displayCost.resourceA} ${race.resourceA.name}`);
+        }
+        if (displayCost.resourceB > 0) {
+          parts.push(`${displayCost.resourceB} ${race.resourceB.name}`);
+        }
+        if (displayCost.crystal && displayCost.crystal > 0) {
+          parts.push(`${displayCost.crystal} Bilim`);
+        }
+        const need = parts.length > 0 ? parts.join(', ') : msg;
+        toast.error(`Yetersiz kaynak. Gerekli: ${need}.`);
+      } else {
+        toast.error(msg);
+      }
     }
   }
 
@@ -712,12 +783,35 @@ export default function MergePage() {
             İPTAL
           </NDButton>
           <NDButton race={race} size="md" style={{ flex: 2 }} disabled={!canMerge || mergingAll} onClick={performMerge}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {isDemoMode ? 'Önce birim eğit' : `${MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'} · ${COST_B}`}
-              {!isDemoMode && (
+            {/* Cost sticker — previously hardcoded `· 200 GAS` from the
+             *  removed COST_B constant, regardless of sourceTier. Cycle 11
+             *  scaled the BE cost to (100 * tier) mineral + (200 * tier) gas
+             *  (+1 science at T4 source). Label now drives off `displayCost`
+             *  which is the BE preview's authoritative `costs` once 3 slots
+             *  are filled, or computeMergeCostLocal(sourceTier) before that.
+             *  Both resources are always rendered inline so the player can
+             *  never be surprised by a silent mineral debit. */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {isDemoMode ? (
+                <span>Önce birim eğit</span>
+              ) : (
                 <>
-                  <ResIcon kind={race.resourceB.icon} size={12} color="var(--color-bg-elevated)" />
-                  <span style={{ letterSpacing: '0.06em' }}>{race.resourceB.name.toUpperCase()}</span>
+                  <span>{MERGE_VERB[race.key as NDRaceKey] ?? 'Birleştir'}</span>
+                  <span style={{ opacity: 0.7 }}>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>{displayCost.resourceA}</span>
+                    <ResIcon kind={race.resourceA.icon} size={11} color="var(--color-bg-elevated)" />
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>{displayCost.resourceB}</span>
+                    <ResIcon kind={race.resourceB.icon} size={11} color="var(--color-bg-elevated)" />
+                  </span>
+                  {displayCost.crystal !== undefined && displayCost.crystal > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <span>{displayCost.crystal}</span>
+                      <ResIcon kind="sci" size={11} color="var(--color-bg-elevated)" />
+                    </span>
+                  )}
                 </>
               )}
             </span>

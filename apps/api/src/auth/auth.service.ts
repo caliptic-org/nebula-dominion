@@ -159,9 +159,40 @@ export class AuthService {
     }
   }
 
+  /**
+   * Register a new account.
+   *
+   * EMAIL NORMALIZATION CONTRACT (HIGH AUTH-REGISTER-EMAIL-NO-LOWERCASE)
+   * ────────────────────────────────────────────────────────────────────
+   * users.email is stored in lower-case + trimmed form. RegisterDto runs
+   * a class-transformer @Transform that already lower-cases dto.email
+   * before validation, but we re-normalize here as defense-in-depth so
+   * the contract holds even if:
+   *   - a future caller bypasses the global ValidationPipe
+   *     (transform: true) and calls register() directly,
+   *   - a test wires up a mock DTO without going through the pipe,
+   *   - somebody disables class-transformer globally.
+   *
+   * Prior to this fix register() saved dto.email verbatim while
+   * AuthService.login + forgotPassword both lower-cased on lookup. A
+   * user who registered "Foo@x.com" could not log back in (case-sensitive
+   * Postgres UNIQUE missed the row), AND a different actor could
+   * re-register "foo@x.com" as a brand-new account because the UNIQUE
+   * constraint saw the two strings as distinct.
+   *
+   * Migration 1779910000000 backfilled lower(email) for any pre-existing
+   * mixed-case rows and added a UNIQUE expression index on LOWER(email)
+   * as a belt-and-braces guarantee at the DB layer.
+   */
   async register(dto: RegisterDto): Promise<AuthResult> {
+    // Defense-in-depth — DTO @Transform already does this, but we re-run
+    // so the invariant holds even if the validation pipe is misconfigured.
+    const email = typeof dto.email === 'string'
+      ? dto.email.toLowerCase().trim()
+      : dto.email;
+
     const existing = await this.userRepo.findOne({
-      where: [{ email: dto.email }, { username: dto.username }],
+      where: [{ email }, { username: dto.username }],
     });
     if (existing) {
       throw new ConflictException('Email or username already taken');
@@ -171,7 +202,7 @@ export class AuthService {
     const hashed = await bcrypt.hash(dto.password, rounds);
 
     const user = this.userRepo.create({
-      email: dto.email,
+      email,
       username: dto.username,
       password: hashed,
     });

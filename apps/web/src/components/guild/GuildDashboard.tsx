@@ -21,15 +21,39 @@ export function GuildDashboard({ guildId }: GuildDashboardProps) {
   const [profile, setProfile] = useState<GuildProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Fetch guild profile (combines /guilds/:id + /guilds/:id/members).
+   *
+   * Cycle 11 made /guilds/:id/members return 403 for non-members, so this
+   * effect MUST handle the rejection path: otherwise a stale activeGuildId
+   * (e.g. after a leave-race) or a manual URL hit produces a Promise that
+   * never resolves, leaving the panel stuck on "Lonca paneli yükleniyor…"
+   * forever. On 403 (and any other error) we clear the profile so the
+   * graceful `!profile` fallback ("Lonca bulunamadı…") renders.
+   */
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    guildApi.getProfile(guildId).then((p) => {
-      if (!cancelled) {
-        setProfile(p);
-        setLoading(false);
-      }
-    });
+    guildApi
+      .getProfile(guildId)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setProfile(null);
+          if (err?.status === 403) {
+            // eslint-disable-next-line no-console
+            console.warn('GuildDashboard: 403 — user is not a member of this guild');
+          } else {
+            // eslint-disable-next-line no-console
+            console.error('GuildDashboard fetch error:', err);
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };

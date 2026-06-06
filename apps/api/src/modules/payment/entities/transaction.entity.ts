@@ -23,6 +23,30 @@ export class Transaction {
   @Column({ name: 'premium_pass_id', type: 'varchar', nullable: true })
   premiumPassId: string | null;
 
+  // ── Fulfillment anchors (audit cycle 6 — BLOCKER PAYMENT-COMPLETETX-NO-FULFILLMENT)
+  //
+  // The create-intent path now snapshots `dto.itemSku` / `dto.passCode`
+  // into these columns so the post-webhook completeTransaction can look
+  // up shop_items.content / premium_passes.rewards and credit the
+  // player's wallet + inventory.  Prior to this the columns didn't
+  // exist and the only fulfillment was the VIP cumulative-spend bump —
+  // the player never received the gems / items they paid for.
+  //
+  // Catalog-drift safe: once the row is written, a later edit to
+  // shop_items pricing or content doesn't change what gets delivered —
+  // the webhook reads `quantity` + the *_delta columns (or re-reads
+  // shop_items.content keyed by the snapshotted SKU, which is fine if
+  // content is treated as immutable per SKU).  See migration
+  // 1779910000000-AddTransactionFulfillmentFields.
+  @Column({ name: 'item_sku', type: 'varchar', length: 100, nullable: true })
+  itemSku: string | null;
+
+  @Column({ name: 'pass_code', type: 'varchar', length: 50, nullable: true })
+  passCode: string | null;
+
+  @Column({ type: 'int', default: 1 })
+  quantity: number;
+
   @Column({ name: 'amount_usd', type: 'decimal', precision: 10, scale: 2, nullable: true })
   amountUsd: number | null;
 

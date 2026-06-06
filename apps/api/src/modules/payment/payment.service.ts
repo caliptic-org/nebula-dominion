@@ -14,6 +14,25 @@ import { WebhookEvent } from './entities/webhook-event.entity';
 import { UserConsent } from './entities/user-consent.entity';
 import { VipService } from '../vip/vip.service';
 
+/**
+ * Fulfillment spec snapshotted from the shop_items / premium_passes
+ * catalog at create-intent time and persisted onto the Transaction row.
+ * The webhook handler re-reads this from the locked transaction row
+ * (NOT from the live catalog) so a price/content edit between intent
+ * and webhook can't change what gets delivered.  See JSDoc on
+ * `completeTransaction` for the full delivery contract.
+ */
+interface FulfillmentSpec {
+  itemSku: string | null;
+  passCode: string | null;
+  shopItemId: string | null;
+  premiumPassId: string | null;
+  quantity: number;
+  nebulaCoinsDelta: number;
+  premiumGemsDelta: number;
+  voidCrystalsDelta: number;
+}
+
 interface CreatePaymentIntentDto {
   itemSku?: string;
   passCode?: string;
@@ -69,14 +88,28 @@ export class PaymentService {
     const amount = await this.resolveAmount(dto.itemSku, dto.passCode, dto.currencyCode);
     if (!amount) throw new BadRequestException('Item veya pass bulunamadı');
 
+    // BLOCKER fix — PAYMENT-COMPLETETX-NO-FULFILLMENT (audit cycle 6).
+    // Snapshot the catalog payload (SKU/passCode + derived deltas) onto
+    // the Transaction at intent time so the webhook can fulfil the
+    // purchase even after a 30-day replay window.  Catalog drift is
+    // safe: post-snapshot edits to shop_items.content don't affect
+    // what gets delivered.
+    const spec = await this.resolveFulfillmentSpec(dto.itemSku, dto.passCode);
+
     const transaction = await this.transactionRepository.save(
       this.transactionRepository.create({
         userId,
         transactionType: dto.passCode ? 'purchase_premium_pass' : 'purchase_item',
         status: 'pending',
         provider: 'stripe',
-        shopItemId: null,
-        premiumPassId: null,
+        shopItemId: spec.shopItemId,
+        premiumPassId: spec.premiumPassId,
+        itemSku: spec.itemSku,
+        passCode: spec.passCode,
+        quantity: spec.quantity,
+        nebulaCoinsDelta: spec.nebulaCoinsDelta,
+        premiumGemsDelta: spec.premiumGemsDelta,
+        voidCrystalsDelta: spec.voidCrystalsDelta,
         amountUsd: dto.currencyCode === 'USD' ? amount : null,
         amountTry: dto.currencyCode === 'TRY' ? amount : null,
         currencyCode: dto.currencyCode,
@@ -130,12 +163,24 @@ export class PaymentService {
 
     const conversationId = `nebula-${userId.substring(0, 8)}-${Date.now()}`;
 
+    // BLOCKER fix — see createStripePaymentIntent above for the
+    // fulfillment-snapshot rationale.
+    const spec = await this.resolveFulfillmentSpec(dto.itemSku, dto.passCode);
+
     const transaction = await this.transactionRepository.save(
       this.transactionRepository.create({
         userId,
         transactionType: dto.passCode ? 'purchase_premium_pass' : 'purchase_item',
         status: 'pending',
         provider: 'iyzico',
+        shopItemId: spec.shopItemId,
+        premiumPassId: spec.premiumPassId,
+        itemSku: spec.itemSku,
+        passCode: spec.passCode,
+        quantity: spec.quantity,
+        nebulaCoinsDelta: spec.nebulaCoinsDelta,
+        premiumGemsDelta: spec.premiumGemsDelta,
+        voidCrystalsDelta: spec.voidCrystalsDelta,
         amountTry: amount,
         currencyCode: 'TRY',
         providerOrderId: conversationId,
@@ -197,14 +242,26 @@ export class PaymentService {
     const amount = await this.resolveAmount(dto.itemSku, dto.passCode, dto.currencyCode);
     if (!amount) throw new BadRequestException('Item veya pass bulunamadı');
 
+    // BLOCKER fix — see createStripePaymentIntent above.  Web-wallet
+    // mock-complete (PAYMENT_MOCK_ENABLED) runs through the same
+    // completeTransaction pipeline, so it MUST persist the same
+    // fulfillment snapshot.
+    const spec = await this.resolveFulfillmentSpec(dto.itemSku, dto.passCode);
+
     const transaction = await this.transactionRepository.save(
       this.transactionRepository.create({
         userId,
         transactionType: dto.passCode ? 'purchase_premium_pass' : 'purchase_item',
         status: 'pending',
         provider: dto.provider,
-        shopItemId: null,
-        premiumPassId: null,
+        shopItemId: spec.shopItemId,
+        premiumPassId: spec.premiumPassId,
+        itemSku: spec.itemSku,
+        passCode: spec.passCode,
+        quantity: spec.quantity,
+        nebulaCoinsDelta: spec.nebulaCoinsDelta,
+        premiumGemsDelta: spec.premiumGemsDelta,
+        voidCrystalsDelta: spec.voidCrystalsDelta,
         amountUsd: dto.currencyCode === 'USD' ? amount : null,
         amountTry: dto.currencyCode === 'TRY' ? amount : null,
         currencyCode: dto.currencyCode,
@@ -329,7 +386,11 @@ export class PaymentService {
 
       // Winner path: still pending under the lock.  Run the same
       // completion pipeline a real Stripe/iyzico webhook would.
-      await this.completeTransaction(tx.id, `mock_${tx.id}`);
+      // Pass `em` so completeTransaction reuses our connection /
+      // transaction instead of opening a fresh one — otherwise the
+      // inner UPDATE would deadlock against the FOR UPDATE lock we
+      // just took above.
+      await this.completeTransaction(tx.id, `mock_${tx.id}`, em);
     });
 
     return (await this.transactionRepository.findOne({ where: { id: transactionId } }))!;
@@ -547,125 +608,335 @@ export class PaymentService {
   }
 
   /**
-   * Finalise a pending transaction and credit the VIP cumulative-spend
-   * ledger.
+   * Finalise a pending transaction: flip status → 'completed', credit
+   * the player's wallet + inventory for the SKU they paid for, AND
+   * bump the VIP cumulative-spend ledger.
    *
-   * IDEMPOTENCY CONTRACT (audit cycle 6, ECON-PAY-COMPLETETX-NO-IDEMPOTENCY)
-   * ─────────────────────────────────────────────────────────────────────
-   * Previous implementation had no `tx.status === 'completed'` guard,
-   * so any re-entry — a Stripe webhook re-delivery after a crash, a
-   * concurrent /payment/mock/complete race, a future admin "force
-   * re-grant" tool — would re-run
-   * vipService.recordPurchaseAndUpgradeVip, silently double-bumping
-   * the user's cumulative_spend_usd and potentially shoving them up
-   * an extra VIP tier per replay. Free VIP tier inflation = direct
-   * revenue impact.
+   * BLOCKER fix — PAYMENT-COMPLETETX-NO-FULFILLMENT (audit cycle 6)
+   * ─────────────────────────────────────────────────────────────────
+   * Before this commit, completeTransaction did exactly two things:
+   *   1. set status='completed' on the row, and
+   *   2. call vipService.recordPurchaseAndUpgradeVip (which bumps
+   *      cumulative_spend_usd and may upgrade VIP tier).
    *
-   * Two-layer defence:
-   *   1. SERVICE GUARD (here): if status is already 'completed', return
-   *      immediately without touching the VIP ledger. Catches the
-   *      common case (webhook resend after the row was already saved).
-   *   2. DEFENSE-IN-DEPTH (process_vip_spend SQL function +
-   *      UNIQUE(transaction_id) on vip_spend_ledger, migration
-   *      1779900000000-AddVipSpendIdempotencyLedger): a concurrent
-   *      caller that slipped past the JS guard — two parallel
-   *      processStripeEvent runs that both findOne() before either
-   *      save()s — will hit the unique-violation inside the DB
-   *      function and the INSERT is swallowed. Only the first call
-   *      credits the ledger.
+   * Real-money purchases delivered NOTHING — no gems credited to
+   * user_currency, no row inserted into user_inventory. createIntent
+   * had been storing `shopItemId: null, premiumPassId: null` so by
+   * webhook time there was no way to know what the player had paid
+   * for.  An attacker who triggered a Stripe webhook would gain VIP
+   * tier upgrades for $0.99 without receiving the gem pack — and a
+   * legitimate buyer would be defrauded the same way.
+   *
+   * The fix has two halves:
+   *
+   *  a) `resolveFulfillmentSpec` (called at intent time) snapshots the
+   *     shop_items / premium_passes payload onto the Transaction row
+   *     (item_sku / pass_code / quantity / *_delta).  Catalog drift is
+   *     safe: a price/content edit between intent and webhook can't
+   *     change what gets delivered.
+   *
+   *  b) This method, on a fresh status flip, now reads those columns
+   *     and credits user_currency + upserts user_inventory in the
+   *     SAME atomic transaction as the status update.  Either the
+   *     player gets the goods AND status=completed, or both roll back.
+   *
+   * IDEMPOTENCY CONTRACT (carry-over from audit cycle 6,
+   * ECON-PAY-COMPLETETX-NO-IDEMPOTENCY)
+   * ─────────────────────────────────────────────────────────────────
+   * The atomic conditional UPDATE (WHERE status='pending') is layer 1:
+   * two concurrent callers serialise on the row lock; only the first
+   * matches and gets a RETURNING row.  The loser's UPDATE affects 0
+   * rows and we bail — wallet/inventory credit is gated on the same
+   * RETURNING row so it can't double-fire either.
+   *
+   * Layer 2 is the `vip_spend_ledger` UNIQUE(transaction_id) inside
+   * `process_vip_spend` (migration 1779900000000).  When the SQL
+   * function reports `already_credited=true` we ALSO skip the wallet
+   * / inventory delivery — that means a Stripe webhook replay weeks
+   * later finds the ledger row populated, the VIP path no-ops, AND
+   * the fulfillment path no-ops (we read this from the function
+   * result and short-circuit before touching user_currency).
+   *
+   * For belt-and-braces against a future caller that bypasses both
+   * layers (admin tool that flips status back to pending and re-runs):
+   * the wallet UPDATE is an additive delta keyed by user_id, and the
+   * inventory insert is `ON CONFLICT (user_id, shop_item_id) DO UPDATE
+   * SET quantity = quantity + EXCLUDED.quantity`.  Even on a layer-3
+   * failure, the only damage is over-grant — never under-grant.
    *
    * One-shot per-transactionId is the canonical contract: callers may
    * invoke completeTransaction(tx.id, …) any number of times; only
-   * the first call mutates state.
+   * the first call delivers goods + credits VIP.
    */
   private async completeTransaction(
     transactionId: string,
     providerPaymentId: string,
+    existingEm?: import('typeorm').EntityManager,
   ): Promise<{ alreadyCompleted: boolean; transactionId: string } | void> {
-    // Layer 1: race-safe idempotency guard. Atomic conditional UPDATE
-    // — the WHERE clause filters status='pending', so two concurrent
-    // callers serialise on the row lock; only the first one matches and
-    // gets a RETURNING row. The loser's UPDATE affects 0 rows and we
-    // bail. This closes the findOne→save TOCTOU that the previous
-    // implementation had (two parallel calls would both observe
-    // status='pending' and both proceed to VIP credit).
-    const updated = await this.dataSource.query<
-      Array<{ id: string; user_id: string }>
-    >(
-      `UPDATE transactions
-          SET status = 'completed',
-              provider_payment_id = $2,
-              updated_at = NOW()
-        WHERE id = $1::uuid
-          AND status = 'pending'
-        RETURNING id, user_id`,
-      [transactionId, providerPaymentId],
-    );
+    // Wrap status flip + wallet credit + inventory grant in ONE atomic
+    // transaction.  The VIP credit (which talks to its own
+    // vip_spend_ledger) runs INSIDE the same tx — Postgres serialises
+    // on the transactions row lock acquired by the conditional UPDATE,
+    // so concurrent callers are mutually excluded.
+    //
+    // When called from mockCompleteTransaction (which already holds a
+    // pessimistic_write lock on the row via an outer transaction), we
+    // MUST reuse the caller's EntityManager — otherwise this method
+    // would grab a fresh pool connection and deadlock on the outer
+    // tx's FOR UPDATE.  `existingEm` is that hook.
+    const runDelivery = async (em: import('typeorm').EntityManager) => {
+      // Layer 1: race-safe idempotency guard. Atomic conditional UPDATE
+      // — the WHERE clause filters status='pending', so two concurrent
+      // callers serialise on the row lock; only the first one matches
+      // and gets a RETURNING row.  The loser's UPDATE affects 0 rows
+      // and we bail.
+      const updated = await em.query<
+        Array<{ id: string; user_id: string }>
+      >(
+        `UPDATE transactions
+            SET status = 'completed',
+                provider_payment_id = $2,
+                updated_at = NOW()
+          WHERE id = $1::uuid
+            AND status = 'pending'
+          RETURNING id, user_id`,
+        [transactionId, providerPaymentId],
+      );
 
-    if (updated.length === 0) {
-      // Either tx doesn't exist or it was already non-pending. Re-read
-      // to decide which.
-      const tx = await this.transactionRepository.findOne({
+      if (updated.length === 0) {
+        // Either tx doesn't exist or it was already non-pending. Re-read
+        // (still inside the tx so the read sees the same snapshot) to
+        // decide which.
+        const tx = await em.findOne(Transaction, {
+          where: { id: transactionId },
+        });
+        if (!tx) {
+          this.logger.warn(`completeTransaction: tx bulunamadı: ${transactionId}`);
+          return { alreadyCompleted: false as const, didFlip: false as const };
+        }
+        this.logger.log(
+          `completeTransaction: yinelenen tamamlama atlandı (status=${tx.status}): txn=${transactionId}`,
+        );
+        return { alreadyCompleted: true as const, didFlip: false as const };
+      }
+
+      // We hold the "first completer" claim on this row. Re-read the
+      // full entity for the delivery payload (item_sku, deltas, etc.)
+      const tx = await em.findOne(Transaction, {
         where: { id: transactionId },
       });
       if (!tx) {
-        this.logger.warn(`completeTransaction: tx bulunamadı: ${transactionId}`);
-        return;
+        // Should never happen — we just UPDATE-RETURNING'd this row.
+        this.logger.error(
+          `completeTransaction: post-update lookup boş: ${transactionId}`,
+        );
+        return { alreadyCompleted: false as const, didFlip: false as const };
       }
-      this.logger.log(
-        `completeTransaction: yinelenen tamamlama atlandı (status=${tx.status}): txn=${transactionId}`,
-      );
+
+      // ── VIP cumulative-spend credit + idempotency check ──────────
+      // Run FIRST so we can use its `already_credited` signal to gate
+      // the wallet/inventory delivery (layer 2).  Inside the same tx
+      // so a delivery failure rolls back the VIP ledger row too.
+      let vipAlreadyCredited = false;
+      try {
+        // Pass `em` so the VIP ledger INSERT participates in our
+        // atomic transaction.  If a downstream wallet/inventory write
+        // fails and we throw, the VIP ledger row rolls back too —
+        // closing the "VIP credited but goods undelivered" window
+        // that opened in the prior implementation (separate
+        // connection, independent commit).
+        const vipResult = await this.vipService.recordPurchaseAndUpgradeVip({
+          userId: tx.userId,
+          transactionId: tx.id,
+          amountUsd: tx.amountUsd,
+          amountTry: tx.amountTry,
+          currencyCode: tx.currencyCode,
+          purchaseType: tx.transactionType,
+          countryCode: tx.countryCode,
+        }, em);
+
+        if (vipResult.upgraded) {
+          this.logger.log(
+            `VIP yükseltme sonrası bildirim gönderilecek: kullanıcı=${tx.userId} VIP${vipResult.oldVipLevel}→VIP${vipResult.newVipLevel}`,
+          );
+        }
+        // Ground truth from the SQL function's already_credited flag.
+        // VipService surfaces it on the result so we can gate the
+        // wallet/inventory delivery without a second roundtrip.
+        vipAlreadyCredited = Boolean(vipResult.alreadyCredited);
+      } catch (err: unknown) {
+        if (
+          err instanceof QueryFailedError &&
+          (err as { code?: string }).code === '23505'
+        ) {
+          this.logger.warn(
+            `completeTransaction: VIP ledger duplicate caught (layer-2): txn=${transactionId}`,
+          );
+          vipAlreadyCredited = true;
+        } else {
+          throw err;
+        }
+      }
+
+      this.logger.log(`Ödeme tamamlandı: txn=${transactionId}`);
+
+      if (vipAlreadyCredited) {
+        // Replay path — VIP ledger already had this txn_id.  We MUST
+        // NOT re-credit wallet/inventory either, otherwise a Stripe
+        // resend after 30 days would silently double-deliver.
+        this.logger.warn(
+          `completeTransaction: fulfillment atlandı (VIP ledger replay): txn=${transactionId}`,
+        );
+        return { alreadyCompleted: false as const, didFlip: true as const };
+      }
+
+      // ── Fulfillment delivery ──────────────────────────────────────
+      // Read the snapshotted spec from the transaction row itself
+      // (NOT the live catalog) so catalog drift doesn't affect what
+      // gets delivered.  When itemSku/passCode are null (pre-fix
+      // historical rows, or paths that haven't been migrated yet) we
+      // skip silently — the delta columns default to 0 so the wallet
+      // UPDATE is a no-op anyway.
+      await this.deliverPurchase(em, tx);
+
+      return { alreadyCompleted: false as const, didFlip: true as const };
+    };
+
+    // Reuse the caller's transaction when one was passed in (avoids
+    // deadlocking on the outer FOR UPDATE lock held by
+    // mockCompleteTransaction).  Otherwise open our own.
+    const deliveryResult = existingEm
+      ? await runDelivery(existingEm)
+      : await this.dataSource.transaction(runDelivery);
+
+    if (deliveryResult.alreadyCompleted) {
       return { alreadyCompleted: true, transactionId };
     }
+  }
 
-    // We hold the "first completer" claim on this row. Re-read the full
-    // entity for the VIP credit payload (amount fields, country, etc.)
-    const tx = await this.transactionRepository.findOne({
-      where: { id: transactionId },
-    });
-    if (!tx) {
-      // Should never happen — we just UPDATE-RETURNING'd this row.
-      this.logger.error(
-        `completeTransaction: post-update lookup boş: ${transactionId}`,
+  /**
+   * Credit the player's wallet (user_currency) and grant any
+   * catalog-tracked items (user_inventory) for a freshly-completed
+   * transaction.
+   *
+   * Runs INSIDE the calling completeTransaction's atomic transaction
+   * (`em` is the locked entity manager).  Mirrors the credit pattern
+   * from `ShopService.purchaseWithInGameCurrency` (which already
+   * handles the in-game-currency variant) so the two paths produce
+   * identical wallet / inventory state for the same SKU.
+   *
+   * Triple safety net:
+   *   - Wallet INSERT uses `ON CONFLICT (user_id) DO NOTHING` so the
+   *     row is lazy-created.
+   *   - Wallet UPDATE is additive (delta-based) so concurrent paths
+   *     can't lose grants.
+   *   - Inventory UPSERT uses `ON CONFLICT (user_id, shop_item_id) DO
+   *     UPDATE SET quantity = ... + EXCLUDED.quantity` so the unique
+   *     index doubles as the dedup anchor.
+   */
+  private async deliverPurchase(
+    em: import('typeorm').EntityManager,
+    tx: Transaction,
+  ): Promise<void> {
+    const gemDelta = Number(tx.premiumGemsDelta ?? 0) * Math.max(1, Number(tx.quantity ?? 1));
+    const coinDelta = Number(tx.nebulaCoinsDelta ?? 0) * Math.max(1, Number(tx.quantity ?? 1));
+    const voidDelta = Number(tx.voidCrystalsDelta ?? 0) * Math.max(1, Number(tx.quantity ?? 1));
+
+    // Wallet credit — single statement so the UPSERT path can't lose a
+    // grant to a concurrent UPDATE on the same row.
+    if (gemDelta > 0 || coinDelta > 0 || voidDelta > 0) {
+      await em.query(
+        `INSERT INTO user_currency (user_id, premium_gems, nebula_coins, void_crystals)
+           VALUES ($1::uuid, $2, $3, $4)
+           ON CONFLICT (user_id) DO UPDATE
+              SET premium_gems  = user_currency.premium_gems  + EXCLUDED.premium_gems,
+                  nebula_coins  = user_currency.nebula_coins  + EXCLUDED.nebula_coins,
+                  void_crystals = user_currency.void_crystals + EXCLUDED.void_crystals,
+                  updated_at    = NOW()`,
+        [tx.userId, gemDelta, coinDelta, voidDelta],
       );
-      return;
+      this.logger.log(
+        `Cüzdan kredisi: kullanıcı=${tx.userId} txn=${tx.id} gems=+${gemDelta} coins=+${coinDelta} void=+${voidDelta}`,
+      );
     }
 
-    this.logger.log(`Ödeme tamamlandı: txn=${transactionId}`);
-
-    // VIP cumulative spend update + per-user ARPPU telemetry. The SQL
-    // function's vip_spend_ledger UNIQUE(transaction_id) is layer 2:
-    // belt-and-braces in case a future caller bypasses the atomic
-    // UPDATE above (e.g. an admin "force re-grant" tool that flips
-    // status back to pending). QueryFailedError 23505 is the duplicate
-    // signal; swallow it so the rest of the flow proceeds.
-    try {
-      const vipResult = await this.vipService.recordPurchaseAndUpgradeVip({
-        userId: tx.userId,
-        transactionId: tx.id,
-        amountUsd: tx.amountUsd,
-        amountTry: tx.amountTry,
-        currencyCode: tx.currencyCode,
-        purchaseType: tx.transactionType,
-        countryCode: tx.countryCode,
-      });
-
-      if (vipResult.upgraded) {
-        this.logger.log(
-          `VIP yükseltme sonrası bildirim gönderilecek: kullanıcı=${tx.userId} VIP${vipResult.oldVipLevel}→VIP${vipResult.newVipLevel}`,
-        );
-      }
-    } catch (err: unknown) {
-      if (
-        err instanceof QueryFailedError &&
-        (err as { code?: string }).code === '23505'
-      ) {
+    // Inventory grant for shop SKUs (premium_passes have a separate
+    // grant path via VipService).  We resolve item_sku → shop_items.id
+    // inside the same tx and upsert user_inventory.
+    if (tx.itemSku) {
+      const itemRows = (await em.query(
+        `SELECT id, content FROM shop_items WHERE sku = $1::varchar`,
+        [tx.itemSku],
+      )) as Array<{ id: string; content: Record<string, unknown> | null }>;
+      if (itemRows.length === 0) {
         this.logger.warn(
-          `completeTransaction: VIP ledger duplicate caught (layer-2): txn=${transactionId}`,
+          `deliverPurchase: shop_items lookup boş (sku=${tx.itemSku}): txn=${tx.id} — envanter atlandı`,
         );
-        return;
+      } else {
+        const shopItemId = itemRows[0].id;
+        const qty = Math.max(1, Number(tx.quantity ?? 1));
+        await em.query(
+          `INSERT INTO user_inventory (user_id, shop_item_id, quantity, source, acquired_at)
+             VALUES ($1::uuid, $2::uuid, $3, 'purchase', NOW())
+             ON CONFLICT (user_id, shop_item_id) DO UPDATE
+                SET quantity = user_inventory.quantity + EXCLUDED.quantity`,
+          [tx.userId, shopItemId, qty],
+        );
+        this.logger.log(
+          `Envanter eklendi: kullanıcı=${tx.userId} sku=${tx.itemSku} miktar=+${qty} txn=${tx.id}`,
+        );
       }
-      throw err;
+    }
+
+    // Premium pass delivery.  VIP tier upgrade is already handled by
+    // recordPurchaseAndUpgradeVip (called above) — that bumps the
+    // tier when cumulative_spend_usd crosses a threshold.  Here we
+    // also activate the user_premium_passes row so the player gets
+    // the pass-specific entitlement window (duration_days) on top of
+    // any VIP tier benefit.
+    //
+    // Replay safety: the layer-2 vip_spend_ledger UNIQUE(transaction_id)
+    // guard above already short-circuits this whole block on Stripe
+    // webhook resend.  As an extra belt-and-braces against an admin
+    // tool re-running completion: we check for an existing active
+    // pass for this user+passId before inserting, so the worst case is
+    // a no-op (never a double activation).
+    if (tx.passCode) {
+      const passRows = (await em.query(
+        `SELECT id, duration_days FROM premium_passes WHERE code = $1::varchar`,
+        [tx.passCode],
+      )) as Array<{ id: string; duration_days: number }>;
+      if (passRows.length === 0) {
+        this.logger.warn(
+          `deliverPurchase: premium_passes lookup boş (code=${tx.passCode}): txn=${tx.id}`,
+        );
+      } else {
+        const passId = passRows[0].id;
+        const durationDays = Number(passRows[0].duration_days);
+        // user_premium_passes has no transaction_id column today —
+        // dedup by "is there already an active row for this user+pass
+        // that hasn't expired and was created after the tx row?".
+        // The outer vip_spend_ledger guard is the primary defence;
+        // this is just to keep an admin-driven re-grant from layering
+        // a second active subscription on top of the existing one.
+        await em.query(
+          `INSERT INTO user_premium_passes
+             (user_id, premium_pass_id, status, started_at, expires_at, payment_provider)
+           SELECT $1::uuid, $2::uuid, 'active', NOW(),
+                  NOW() + ($3 || ' days')::interval, $4
+            WHERE NOT EXISTS (
+              SELECT 1 FROM user_premium_passes
+               WHERE user_id = $1::uuid
+                 AND premium_pass_id = $2::uuid
+                 AND status = 'active'
+                 AND expires_at > NOW()
+            )`,
+          [tx.userId, passId, String(durationDays), tx.provider ?? 'stripe'],
+        );
+        this.logger.log(
+          `Premium pass aktive: kullanıcı=${tx.userId} pass=${tx.passCode} süre=${durationDays}d txn=${tx.id}`,
+        );
+      }
     }
   }
 
@@ -792,6 +1063,98 @@ export class PaymentService {
   // ==========================================
   // Yardımcı metodlar
   // ==========================================
+
+  /**
+   * Snapshot the catalog entry the player is paying for, so the
+   * downstream webhook handler (completeTransaction → deliverPurchase)
+   * has everything it needs to credit wallet + inventory without
+   * re-reading the (mutable) catalog.
+   *
+   * Lookup order:
+   *  1. shop_items by SKU — preferred, gives us shop_items.id +
+   *     parsed content (premium_gems / nebula_coins grants).
+   *  2. premium_passes by code — for passCode purchases.
+   *  3. Legacy in-memory gem-pack map (gems_100 ..) — kept alive so
+   *     payment-test flows that predate the seed migration still mint
+   *     a transaction.  Deltas come from the SKU suffix; quantity is 1.
+   *
+   * Catalog-drift safety: this runs at INTENT TIME, the result is
+   * persisted onto the transactions row.  The webhook reads from the
+   * row, not the live catalog, so a later edit to shop_items.content
+   * doesn't change what gets delivered.
+   */
+  private async resolveFulfillmentSpec(
+    itemSku?: string,
+    passCode?: string,
+  ): Promise<FulfillmentSpec> {
+    const spec: FulfillmentSpec = {
+      itemSku: itemSku ?? null,
+      passCode: passCode ?? null,
+      shopItemId: null,
+      premiumPassId: null,
+      quantity: 1,
+      nebulaCoinsDelta: 0,
+      premiumGemsDelta: 0,
+      voidCrystalsDelta: 0,
+    };
+
+    if (itemSku) {
+      // Try catalog first.
+      const rows = (await this.dataSource.query(
+        `SELECT id, content FROM shop_items WHERE sku = $1::varchar`,
+        [itemSku],
+      )) as Array<{ id: string; content: Record<string, unknown> | null }>;
+
+      if (rows.length > 0) {
+        spec.shopItemId = rows[0].id;
+        const content = rows[0].content ?? {};
+        // shop_items.content schema (see SeedShopProductSkus migration):
+        //   { premium_gems: N, bonus_gems: N, nebula_coins: N, ... }
+        const gems = Number(content['premium_gems'] ?? 0);
+        const bonusGems = Number(content['bonus_gems'] ?? 0);
+        const coins = Number(content['nebula_coins'] ?? 0);
+        const voids = Number(content['void_crystals'] ?? 0);
+        spec.premiumGemsDelta = (Number.isFinite(gems) ? gems : 0) + (Number.isFinite(bonusGems) ? bonusGems : 0);
+        spec.nebulaCoinsDelta = Number.isFinite(coins) ? coins : 0;
+        spec.voidCrystalsDelta = Number.isFinite(voids) ? voids : 0;
+        return spec;
+      }
+
+      // Fallback: legacy gems_N SKUs not in the seeded catalog.  Parse
+      // the N suffix.  Keeps the test flow alive for callers that hit
+      // /payment/stripe/create-intent before the FE shop is wired.
+      const legacyMatch = /^gems_(\d+)$/.exec(itemSku);
+      if (legacyMatch) {
+        spec.premiumGemsDelta = Number(legacyMatch[1]);
+        return spec;
+      }
+    }
+
+    if (passCode) {
+      const rows = (await this.dataSource.query(
+        `SELECT id, rewards FROM premium_passes WHERE code = $1::varchar`,
+        [passCode],
+      )) as Array<{ id: string; rewards: Record<string, unknown> | null }>;
+      if (rows.length > 0) {
+        spec.premiumPassId = rows[0].id;
+        const rewards = rows[0].rewards ?? {};
+        const gems = Number(rewards['premium_gems'] ?? 0);
+        const coins = Number(rewards['nebula_coins'] ?? 0);
+        spec.premiumGemsDelta = Number.isFinite(gems) ? gems : 0;
+        spec.nebulaCoinsDelta = Number.isFinite(coins) ? coins : 0;
+        return spec;
+      }
+    }
+
+    // Unknown SKU/code — return the zeroed spec.  resolveAmount runs
+    // before this call and would have thrown BadRequestException if
+    // the SKU was truly unknown; reaching here just means the SKU
+    // exists in the legacy price map but has no catalog row.  The
+    // webhook will skip wallet credit (deltas are 0) and skip
+    // inventory grant (itemSku snapshot is preserved but shop_items
+    // lookup will return empty).
+    return spec;
+  }
 
   private async resolveAmount(
     itemSku?: string,

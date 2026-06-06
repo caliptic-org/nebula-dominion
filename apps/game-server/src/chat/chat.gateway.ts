@@ -66,6 +66,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: true };
   }
 
+  /**
+   * Send a message to a non-private channel (GLOBAL, ALLIANCE, SYSTEM).
+   *
+   * SECURITY (CYC7-CHAT-SEND-ALLIANCE-NO-MEMBERSHIP + IDOR-CHAT-WS-ALLIANCE-SEND-02,
+   * fixed 2026-06-06):
+   * Cycle 7 closed the READ path (get_history + join_alliance_channel both
+   * verify guild membership), but the WRITE path was still wide open. Any
+   * authenticated client could emit
+   *   send_message {channelType:"ALLIANCE", channelId:"<any-guild-uuid>", content:"spam"}
+   * which (a) persisted the message to chat_messages with that channelId AND
+   * (b) broadcast it via `this.server.to("chat:alliance:" + channelId)` to
+   * every legitimate member of that alliance. This let attackers spoof
+   * leadership announcements, spam-flood raid coordination rooms, and
+   * generally undermine inter-guild trust.
+   *
+   * Authorization matrix now enforced BEFORE the message is persisted /
+   * broadcast (defense-in-depth duplicate inside ChatService.sendMessage):
+   *  - GLOBAL  : channelId discarded (anti-probe); only emit to GLOBAL_ROOM.
+   *  - SYSTEM  : not writable from clients here (defensive — discard channelId).
+   *  - ALLIANCE: caller MUST be a current member of dto.channelId (guild).
+   *  - PRIVATE : not allowed via this event (caller must use
+   *              `send_private_message`, which derives channelId server-side
+   *              from JWT sub + recipientId).
+   */
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('send_message')
   async handleSendMessage(
@@ -73,30 +97,73 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SendMessageDto,
   ): Promise<{ success: boolean; messageId: string }> {
     const userId = client.data.user.sub;
+    if (!userId) {
+      throw new WsException('Yetkisiz erişim');
+    }
 
     if (dto.content?.length > 500) {
       throw new WsException('Mesaj en fazla 500 karakter olabilir');
     }
 
+    if (!dto.channelType) {
+      throw new WsException('channelType zorunludur');
+    }
+
+    // PRIVATE not allowed here — clients MUST use send_private_message so the
+    // server derives channelId from the JWT sub + recipientId instead of
+    // trusting a client-supplied channelId (which would otherwise enable
+    // sender-id spoofing inside a DM pair).
     if (dto.channelType === ChannelType.PRIVATE) {
       throw new WsException('Özel mesaj için send_private_message eventini kullanın');
     }
 
-    const message = await this.chatService.sendMessage(userId, dto);
+    // Per-channel authorization — gate write access BEFORE persisting.
+    let effectiveChannelId: string | null = null;
+    switch (dto.channelType) {
+      case ChannelType.ALLIANCE: {
+        if (!dto.channelId) {
+          throw new WsException('İttifak kanalı için channelId zorunludur');
+        }
+        const isMember = await this.chatService.isGuildMember(userId, dto.channelId);
+        if (!isMember) {
+          this.logger.warn(
+            `User ${userId} attempted to send into alliance channel ${dto.channelId} without membership`,
+          );
+          throw new WsException('İttifak kanalına yazma izniniz yok');
+        }
+        effectiveChannelId = dto.channelId;
+        break;
+      }
+      case ChannelType.GLOBAL:
+      case ChannelType.SYSTEM: {
+        // Discard any client-supplied channelId so attackers cannot use this
+        // path to probe / poison arbitrary channels (anti-probe).
+        effectiveChannelId = null;
+        break;
+      }
+      default:
+        throw new WsException('Bilinmeyen channelType');
+    }
+
+    const message = await this.chatService.sendMessage(userId, {
+      channelType: dto.channelType,
+      channelId: effectiveChannelId ?? undefined,
+      content: dto.content,
+    });
 
     const payload = {
       id: message.id,
       senderId: userId,
       channelType: dto.channelType,
-      channelId: dto.channelId ?? null,
+      channelId: effectiveChannelId,
       content: dto.content,
       createdAt: message.createdAt,
     };
 
     if (dto.channelType === ChannelType.GLOBAL) {
       this.server.to(GLOBAL_ROOM).emit('new_message', payload);
-    } else if (dto.channelType === ChannelType.ALLIANCE && dto.channelId) {
-      this.server.to(`chat:alliance:${dto.channelId}`).emit('new_message', payload);
+    } else if (dto.channelType === ChannelType.ALLIANCE && effectiveChannelId) {
+      this.server.to(`chat:alliance:${effectiveChannelId}`).emit('new_message', payload);
     }
 
     return { success: true, messageId: message.id };

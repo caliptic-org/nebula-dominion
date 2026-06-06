@@ -106,8 +106,10 @@ interface BattleState {
   /** True once `claim-reward` has fanned the wallet grant out to game-server.
    *  Acts as in-memory idempotency until a real BattleModule with a
    *  battle_grants table ships. Cleared whenever the in-memory store is
-   *  reset (container restart) — which is the only place re-grants can
-   *  happen, and the unsigned-reward flow is gone so there's no exploit. */
+   *  reset (container restart) — see the BATTLES Map JSDoc below for the
+   *  full restart-vs-re-claim analysis (HIGH ECON-C8-02). Short version:
+   *  the flag clears together with the battle row that carried it, so a
+   *  post-restart claim-reward 404s before the `granted` check matters. */
   granted?: boolean;
 }
 
@@ -117,6 +119,38 @@ interface BattleState {
  * Previously a flat `Map<string, BattleState>` keyed only by battle id,
  * which is what enabled the cross-user data leak. The composite key keeps
  * the lookup O(1) without needing a nested Map.
+ *
+ * ## Restart semantics (HIGH ECON-C8-02 note)
+ *
+ * The Map is module-level and in-memory — every entry, including the
+ * `granted` idempotency flag, is wiped on container restart. The cycle-8
+ * audit asked whether an attacker who recorded an old `battleId` while
+ * `granted=true` could replay claim-reward after a restart and re-credit
+ * (because `granted` clears to `undefined`).
+ *
+ * The answer is no, **provided POST /battles is the only mint path**:
+ *
+ *   1. POST /battles is the only endpoint that calls `newBattle()` with a
+ *      fresh server-minted id, scoped under the caller's userId. The
+ *      attacker cannot influence that id.
+ *   2. GET /battles/:id with an id the caller never POSTed currently
+ *      lazy-creates (see `get()` below). Post-A2 strict-no-lazy-create
+ *      fix that lazy branch is removed and GET/claim 404 on missing keys.
+ *      Until that lands, the lazy branch always produces a *fresh*
+ *      `BattleState` with `granted=undefined` — i.e. a fresh battle owned
+ *      by the caller, not a re-grant of an old battle.
+ *   3. claim-reward only credits when the requested key exists in the
+ *      Map AND `granted !== true`. After restart, the old key is gone
+ *      entirely, so claim 404s before the `granted` check matters.
+ *
+ * In short: clearing `granted` on restart is harmless because the
+ * battle row that carried it is cleared in the same step. No cross-restart
+ * re-claim path exists today; the strict A2 fix forecloses the
+ * post-restart "lazy-mint a winning battle" path as defense in depth.
+ *
+ * A real `battle_grants(battle_id UNIQUE, user_id, granted_at)` table is
+ * the long-term answer (survives restart, blocks any future mint path),
+ * tracked under the deferred BattleModule work — not needed today.
  */
 const BATTLES = new Map<string, BattleState>();
 
@@ -175,6 +209,20 @@ function seedFromId(id: string): number {
  * Rewards: the same victory/defeat reward tables `advance()` used at
  * `turnsElapsed >= maxTurns`. We surface `turnsElapsed = maxTurns` so the
  * `winProb` chip in the UI matches the resolved outcome.
+ *
+ * ## Cycle-5 / ECON-C8-01 hardening (this revision)
+ *
+ * `newBattle` is now invoked **only from POST /battles**. The previous
+ * lazy-create branch in GET /:id is gone — see the controller's GET
+ * handler for the vulnerability writeup. Because the only caller is the
+ * POST path, and the POST path is the single place that wires
+ * `granted`-flag idempotency + quest-progress notify, every materialized
+ * battle goes through the same audit path.
+ *
+ * The seed source is still the freshly-minted server `id` (not any
+ * client-supplied path id), so an attacker cannot massage outcome
+ * probability by retrying with hand-picked ids. The new id is the only
+ * value subsequently bound to the per-user store key.
  */
 function newBattle(attacker: RaceKey, defender: RaceKey): BattleState {
   const id = `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
@@ -397,26 +445,58 @@ export class BattlesStubController {
     return { total: entries.length, entries };
   }
 
+  /**
+   * GET /battles/:id
+   *
+   * Returns the per-user resolved battle state. Strict POST-then-GET
+   * contract — see vulnerability writeup below.
+   *
+   * ## ECON-C8-01 fix (cycle 8)
+   *
+   * Before this revision, GET /:id had a "lazy create" branch: if
+   * `BATTLES.get(${userId}:${id})` was undefined the handler **minted a
+   * fresh battle** via `newBattle('insan','zerg')`, overwrote its id with
+   * the URL `:id`, and stored it under the caller's namespace. Because
+   * `newBattle`'s outcome derives from the auto-generated server id (NOT
+   * the URL id), every GET to a previously-unseen id materialized a
+   * brand-new battle whose outcome was effectively a fresh ~50% coin
+   * flip. An attacker could:
+   *
+   *   1. Loop GET /battles/<random-uuid> with their JWT until the
+   *      response showed `status: "won"` with non-zero rewards;
+   *   2. Then POST /battles/<that-uuid>/claim-reward to credit the
+   *      server-stored rewards via the internal-service fan-out.
+   *
+   * There was no POST consent, no per-call rate limit, and the in-memory
+   * `granted` idempotency flag only blocks repeated claims on the **same
+   * minted battle** — the attacker simply moved to the next random id.
+   * The quest-progress notify (cycle-5 F3 fix) also lived in POST only,
+   * so this path bypassed quest tracking entirely.
+   *
+   * Strict contract going forward: battles MUST originate from POST
+   * /battles. POST is the single point where (a) outcome is rolled,
+   * (b) per-battle `granted` idempotency is bound, and (c) the
+   * `battles_won` / `pve_won` quest-progress events fire. If the battle
+   * does not exist under the caller's namespace, this handler returns
+   * 404 with a Turkish-localized message — no implicit creation, no
+   * leakage of cross-user ids (the lookup is owner-scoped and a miss
+   * here is indistinguishable from "owned by a different user", which
+   * is the desired behaviour).
+   */
   @Get(':id')
   @ApiOperation({ summary: 'Get battle state (rolls a turn forward, owner-scoped)' })
   get(@Request() req: any, @Param('id') id: string) {
     const userId: string = req.user.id;
     const key = storeKey(userId, id);
-    let state = BATTLES.get(key);
+    const state = BATTLES.get(key);
     if (!state) {
-      // Two cases here:
-      //   (a) The battle id exists but belongs to a different user — we
-      //       MUST NOT leak it. Treat the same as "not found".
-      //   (b) The id is genuinely new (e.g. the FE deep-linked into a
-      //       fresh battle screen after a server restart). Lazily create
-      //       it scoped to the caller so the screen still functions.
-      // We can't distinguish (a) from (b) cheaply without a secondary
-      // index, so always lazy-create under the caller's namespace. This
-      // means the worst case is the caller gets a fresh battle with their
-      // own randomized outcome — never another user's resolved one.
-      state = newBattle('insan', 'zerg');
-      state.id = id;
-      BATTLES.set(key, state);
+      // Strict POST-then-GET. Either the id is genuinely unknown, or it
+      // belongs to a different user — both surface as 404 so an attacker
+      // cannot probe other users' battle ids. The previous lazy-create
+      // branch was the ECON-C8-01 vulnerability described in the JSDoc
+      // above. Do not reintroduce it without re-auditing the
+      // claim-reward flow.
+      throw new NotFoundException('Bu savaş bulunamadı');
     }
     return advance(state);
   }

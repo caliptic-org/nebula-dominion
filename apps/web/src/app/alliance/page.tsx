@@ -153,16 +153,20 @@ export default function AlliancePage() {
   // a "yakında" button that goes nowhere.
   const { alliances: discoverableAlliances, loading: alliancesLoading } = useAlliances();
 
-  // Resolve the player's own alliance id from the public list using their
-  // profile tag. There's no dedicated "my alliance" public endpoint yet, so
-  // for MVP we match `profile.allianceTag` against the discovery list — the
-  // tag is unique. Once a /me/alliance endpoint lands, swap this for a
-  // direct lookup so guildless players aren't forced through the list call.
+  // Resolve the player's own alliance id directly from the profile. After
+  // the BLOCKER CHAIN-PROFILE-ALLIANCETAG-MISSING fix, GET /users/profile
+  // LEFT JOINs alliance_members → alliances, so profile.allianceId is
+  // authoritative whenever the player is in a guild. We fall back to a
+  // tag-match against the public /alliances list only if the backend
+  // somehow returned the tag without an id (defence-in-depth for older
+  // cached responses or a partial join failure) — this keeps the page
+  // from breaking during a rolling deploy.
   const myAllianceId = useMemo(() => {
+    if (profile?.allianceId) return profile.allianceId;
     if (!profile?.allianceTag) return null;
     const own = discoverableAlliances.find((a) => a.tag === profile.allianceTag);
     return own?.id ?? null;
-  }, [profile?.allianceTag, discoverableAlliances]);
+  }, [profile?.allianceId, profile?.allianceTag, discoverableAlliances]);
 
   // Real wars list for the player's alliance. Falls back to [] for guests
   // and guildless players; the empty-state banner already handles those.

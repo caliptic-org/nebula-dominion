@@ -64,13 +64,77 @@ export class UserService {
     return user as Omit<User, 'password'>;
   }
 
-  async getProfile(id: string): Promise<Omit<User, 'password'>> {
-    // /users/profile is always self — return PRIVATE_FIELDS directly so
-    // an accidental signature change upstream can't silently downgrade
-    // this to the public projection.
-    const user = await this.userRepo.findOne({ where: { id }, select: PRIVATE_FIELDS });
-    if (!user) throw new NotFoundException(`User ${id} not found`);
-    return user as Omit<User, 'password'>;
+  /**
+   * Fetch the full self-profile for GET /users/profile.
+   *
+   * BLOCKER CHAIN-PROFILE-ALLIANCETAG-MISSING fix
+   * ----------------------------------------------
+   * Previously this returned only the `users` row columns (PRIVATE_FIELDS).
+   * The alliance UI at apps/web/src/app/alliance/page.tsx derives
+   * `hasAlliance = Boolean(profile?.allianceTag)` — a value the API never
+   * sent — so after a player successfully joined an alliance the page
+   * stayed pinned to the "İttifak Yok" empty state, every tab (Savaş /
+   * Üyeler / Haberler) rendered the guildless banner, the war list never
+   * loaded, and the declare-war modal was unreachable. From the player's
+   * perspective they joined an alliance into a black hole.
+   *
+   * Fix: LEFT JOIN `alliance_members` → `alliances` so a single round-trip
+   * brings back the player's alliance id, tag, name and role alongside
+   * their private user columns. Players without an alliance get `null`
+   * for those four fields (LEFT JOIN preserves the user row), so the
+   * existing `Boolean(profile?.allianceTag)` derive on the FE keeps
+   * working unchanged for guildless players.
+   *
+   * The four alliance fields are critical because:
+   *  - `allianceTag` drives the `hasAlliance` empty-state gate on
+   *    /alliance and is rendered in the page header chip.
+   *  - `allianceId` lets the FE skip a fragile tag-match scan over the
+   *    public /alliances discovery list (see page.tsx myAllianceId
+   *    useMemo) and fetch wars for the player's own alliance directly.
+   *  - `allianceName` saves a second round-trip just to render the
+   *    summary tile header.
+   *  - `allianceRole` unlocks role-gated FE actions (kick / promote /
+   *    declare-war) — without it the FE has to assume "member".
+   *
+   * Raw SQL is used rather than queryBuilder to mirror the seed/seedUnit
+   * patterns elsewhere in this service and to keep the column projection
+   * tight (no `password_hash` ever leaves the DB).
+   */
+  async getProfile(id: string): Promise<Omit<User, 'password'> & {
+    allianceId: string | null;
+    allianceTag: string | null;
+    allianceName: string | null;
+    allianceRole: string | null;
+  }> {
+    const sql = `
+      SELECT
+        u.id,
+        u.email,
+        u.username,
+        u.is_active        AS "isActive",
+        u.race,
+        u.last_login_at    AS "lastLoginAt",
+        u.created_at       AS "createdAt",
+        u.updated_at       AS "updatedAt",
+        am.alliance_id     AS "allianceId",
+        am.role            AS "allianceRole",
+        a.tag              AS "allianceTag",
+        a.name             AS "allianceName"
+      FROM users u
+      LEFT JOIN alliance_members am ON am.user_id = u.id
+      LEFT JOIN alliances a         ON a.id = am.alliance_id
+      WHERE u.id = $1
+      LIMIT 1
+    `;
+    const rows = await this.dataSource.query(sql, [id]);
+    const row = rows?.[0];
+    if (!row) throw new NotFoundException(`User ${id} not found`);
+    return row as Omit<User, 'password'> & {
+      allianceId: string | null;
+      allianceTag: string | null;
+      allianceName: string | null;
+      allianceRole: string | null;
+    };
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto): Promise<Omit<User, 'password'>> {

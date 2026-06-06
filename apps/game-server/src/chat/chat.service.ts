@@ -44,12 +44,47 @@ export class ChatService {
     return parts[0] === callerUserId || parts[1] === callerUserId;
   }
 
+  /**
+   * Persist a chat message after applying channel-level authorization.
+   *
+   * SECURITY (CYC7-CHAT-SEND-ALLIANCE-NO-MEMBERSHIP + IDOR-CHAT-WS-ALLIANCE-SEND-02,
+   * defense-in-depth, 2026-06-06):
+   * ChatGateway.handleSendMessage is the primary auth gate, but we duplicate
+   * the ALLIANCE membership check here so that:
+   *   1. any future caller (REST controller, internal cron, system-event
+   *      pipeline, future gateway) that forwards user-supplied channelId
+   *      cannot silently bypass the cycle 7 authorization;
+   *   2. a regression in the gateway (e.g. someone removes the guard)
+   *      cannot reopen the spam/spoof vector without a parallel removal
+   *      here being noticed in review.
+   *
+   * `senderId` is treated as authoritative (must come from a verified JWT).
+   * For ALLIANCE channels we re-check guild membership before insert. For
+   * PRIVATE channels we re-verify the senderId is one of the two encoded
+   * participants in channelId.
+   */
   async sendMessage(senderId: string, dto: SendMessageDto): Promise<ChatMessage> {
+    if (!senderId) {
+      throw new BadRequestException('Gönderici ID gereklidir');
+    }
     if (dto.channelType === ChannelType.PRIVATE && !dto.channelId) {
       throw new BadRequestException('Özel mesaj için alıcı ID gereklidir');
     }
     if (dto.channelType === ChannelType.ALLIANCE && !dto.channelId) {
       throw new BadRequestException('İttifak kanalı için ittifak ID gereklidir');
+    }
+
+    if (dto.channelType === ChannelType.ALLIANCE) {
+      const isMember = await this.isGuildMember(senderId, dto.channelId as string);
+      if (!isMember) {
+        throw new BadRequestException('İttifak kanalına yazma izniniz yok');
+      }
+    }
+
+    if (dto.channelType === ChannelType.PRIVATE) {
+      if (!this.isPrivateChannelParticipant(senderId, dto.channelId as string)) {
+        throw new BadRequestException('Özel mesaj kanalına yazma izniniz yok');
+      }
     }
 
     const message = this.messageRepo.create({

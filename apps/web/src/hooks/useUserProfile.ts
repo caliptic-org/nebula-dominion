@@ -18,7 +18,17 @@ export interface UserProfileDto {
   level?: number;
   xp?: number;
   race?: string;
+  // Alliance fields (BLOCKER CHAIN-PROFILE-ALLIANCETAG-MISSING fix):
+  // the API now LEFT JOINs alliance_members → alliances in getProfile()
+  // so a single /users/profile call returns the player's guild context.
+  // All four are nullable — guildless players get `null`. The alliance
+  // page derives `hasAlliance = Boolean(profile?.allianceTag)` and uses
+  // `profile.allianceId` to fetch its war list, so these four fields
+  // jointly drive the entire /alliance UI state.
+  allianceId?: string | null;
   allianceTag?: string | null;
+  allianceName?: string | null;
+  allianceRole?: string | null;
   createdAt?: string;
   [key: string]: unknown;
 }

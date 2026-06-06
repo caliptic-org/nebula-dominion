@@ -1,7 +1,10 @@
 'use client'
 
 import { io, Socket } from 'socket.io-client'
-import { FetchError, fetcher } from '@/lib/fetcher'
+// DRIFT-01: All `/guilds/*` REST paths target the game-server, not the api
+// service. Route through fetcher-game (NEXT_PUBLIC_GAME_SERVER_URL + /api).
+// FetchError is re-exported there so `instanceof` checks continue to work.
+import { FetchError, gameFetcher as fetcher } from '@/lib/fetcher-game'
 import { guildApi } from '@/lib/guildApi'
 import { Race } from '@/types/units'
 import type {
@@ -766,7 +769,10 @@ export function getGuildClient(ctx?: GuildClientContext): GuildClient {
   const key = `${ctx.guildId}:${ctx.userId}`
   let client = clients.get(key)
   if (!client) {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
+    // DRIFT-01: The /guild-chat socket.io namespace is registered on the
+    // game-server (same process that owns /guilds/*), so the WS handshake
+    // must point at NEXT_PUBLIC_GAME_SERVER_URL — not NEXT_PUBLIC_API_URL.
+    const baseUrl = process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? 'http://localhost:3001'
     client = new BackendGuildClient(ctx, baseUrl)
     clients.set(key, client)
   }

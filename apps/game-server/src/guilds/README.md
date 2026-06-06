@@ -26,11 +26,13 @@ Migration: `apps/game-server/migrations/002_create_guild_tables.sql`.
 ### Guild lifecycle
 
 #### `POST /guilds`
-Create a new guild. Leader becomes the first member.
+Create a new guild. The authenticated caller (JWT subject) becomes the
+leader and the first member. `leaderId` is NO LONGER accepted from the
+request body — see `BLOCKER IDOR-GUILDS-CREATE-LEADER` (audit cycle 6).
 
 ```json
-// Request
-{ "leaderId": "uuid", "name": "Yıldız Loncası", "tag": "YLDZ" }
+// Request — Authorization: Bearer <jwt>
+{ "name": "Yıldız Loncası", "tag": "YLDZ" }
 
 // 201 Created
 {
@@ -307,7 +309,7 @@ Hot-reloadable game-balance constants live in:
 | GET    | `/guilds/raids/:raidId`             | Single raid detail                                |
 | GET    | `/guilds/raids/:raidId/contributions` | Damage leaderboard for a raid                   |
 | GET    | `/guilds/raids/:raidId/drops`       | Drop ledger for a completed raid                  |
-| POST   | `/guilds/raids/:raidId/attack`      | `{ userId, damage }` — apply damage; auto-completes on kill |
+| POST   | `/guilds/raids/:raidId/attack`      | **Internal-service only** (`X-Internal-Service` header). `{ userId, damage }` — apply server-computed damage; auto-completes on kill. `damage` is capped at 1_000_000 in the DTO. See HIGH ECON-CYC6-02. |
 | POST   | `/guilds/raids/:raidId/resolve-drops` | Idempotent drop-grant trigger (also runs every 5 min via cron) |
 | GET    | `/guilds/users/:userId/essence`     | `{ balance }` — mutation essence wallet           |
 | GET    | `/guilds/users/:userId/essence/weekly` | `{ weekStart, granted, remaining }` — current ISO week cap usage |

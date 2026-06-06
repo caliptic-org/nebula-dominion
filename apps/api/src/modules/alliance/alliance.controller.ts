@@ -65,11 +65,21 @@ export class AllianceController {
     return this.allianceService.leave(req.user.id);
   }
 
+  // SECURITY (audit cycle 6): previously this handler had NO @UseGuards
+  // and any anonymous caller could enumerate every alliance's roster by
+  // UUID — a recon goldmine for targeting weak alliances pre-attack. The
+  // member-scoped /api/v1/alliance/members endpoint already exists for
+  // legitimate in-app use; this :id variant is kept for cross-alliance
+  // diplomacy UI but is now JWT-gated AND membership-checked in the
+  // service. Removal was considered (no FE caller in apps/web/src) but
+  // kept guarded for the planned diplomacy panel.
   @Get(':id/members')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'İttifak üyelerini listele' })
   @ApiParam({ name: 'id', description: 'İttifak UUID' })
-  getMembers(@Param('id', ParseUUIDPipe) id: string) {
-    return this.allianceService.getMembers(id);
+  getMembers(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.allianceService.getMembers(req.user.id, id);
   }
 
   @Patch(':id/members/:userId/role')
@@ -110,18 +120,37 @@ export class AllianceController {
     return this.allianceService.declareWar(req.user.id, dto);
   }
 
+  // SECURITY (audit cycle 6): previously unguarded — anonymous callers
+  // could pull every alliance's war ledger (active fronts, attacker/
+  // defender pairs, history). That's strategic intel; in particular it
+  // lets non-members see who is currently at war with whom and pick
+  // distracted alliances to attack. Now JWT-gated + membership-checked.
   @Get(':id/wars')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'İttifak savaşlarını listele' })
   @ApiParam({ name: 'id', description: 'İttifak UUID' })
-  getWars(@Param('id', ParseUUIDPipe) id: string) {
-    return this.allianceService.getWars(id);
+  getWars(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.allianceService.getWars(req.user.id, id);
   }
 
+  // SECURITY (audit cycle 6): BLOCKER — previously had no @UseGuards, so
+  // GET /api/v1/alliances/<uuid>/storage returned every alliance's full
+  // resource balance to anonymous attackers (mineral/energy/capacity).
+  // Combined with the public alliance list, anyone could enumerate the
+  // wealthiest alliances and time raid windows around their stockpiles.
+  // Now JWT-gated + service-level membership check (only members of the
+  // queried alliance can read its storage). A member-scoped variant
+  // already exists at /api/v1/alliance/storage (alliance-player.controller
+  // L134) which derives allianceId from req.user.id; kept this :id form
+  // for symmetry with deposit but it now refuses non-members.
   @Get(':id/storage')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'İttifak depo durumunu al' })
   @ApiParam({ name: 'id', description: 'İttifak UUID' })
-  getStorage(@Param('id', ParseUUIDPipe) id: string) {
-    return this.allianceService.getStorage(id);
+  getStorage(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.allianceService.getStorage(req.user.id, id);
   }
 
   @Post(':id/storage/deposit')

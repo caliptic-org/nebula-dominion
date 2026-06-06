@@ -240,6 +240,28 @@ export class GuildResearchService {
   /**
    * Contribute XP to an active research. Auto-completes when xpContributed
    * reaches xpRequired. Member must belong to the guild.
+   *
+   * ── ECONOMY GUARD (C6-04) ────────────────────────────────────────────────
+   * Before this commit, contribute() read `input.xp` straight from the
+   * client, clamped it to `xpRequired - xpContributed`, and advanced the
+   * research + bumped `member.contribution_pts` accordingly — never
+   * touching any wallet. A single POST `{xp: 9_999_999}` instantly
+   * completed a research track (and minted contribution_pts for the
+   * exploiter). There is no `guild_xp_pool` table in this codebase
+   * (grepped — none); `player_resources.science` is the canonical
+   * research currency that already accumulates from battles + garrisoned
+   * relay/colony/mine nodes (see entities/resource.entity.ts L46).
+   *
+   * Fix mirrors AllianceService.deposit (apps/api/src/modules/alliance/
+   * alliance.service.ts L202-260):
+   *   1. Take a pessimistic row lock on the contributor's
+   *      `player_resources` row (`FOR UPDATE`).
+   *   2. Verify `science >= accepted` (the post-clamp value).
+   *   3. UPDATE-deduct the science.
+   *   4. Only then increment `state.xpContributed`, bump
+   *      `member.contributionPts`, and save the contribution log row.
+   * Order matters: if any step throws, the whole transaction rolls back
+   * and the player's science is untouched.
    */
   async contribute(input: ContributeInput): Promise<{
     state: GuildResearchState;
@@ -247,6 +269,12 @@ export class GuildResearchService {
     completed: boolean;
   }> {
     if (input.xp <= 0) throw new BadRequestException('xp must be > 0');
+    // Defence-in-depth: DTO already enforces @Max(100_000), but the
+    // service may be invoked from non-HTTP paths (cron, internal RPC)
+    // that bypass class-validator. Clamp here too.
+    if (input.xp > 100_000) {
+      throw new BadRequestException('xp must be <= 100000 per call');
+    }
 
     return this.dataSource.transaction(async (manager) => {
       const state = await manager.findOne(GuildResearchState, {
@@ -267,6 +295,32 @@ export class GuildResearchService {
       // Cap contribution at remaining xp so we never overshoot.
       const remaining = state.xpRequired - state.xpContributed;
       const accepted = Math.min(input.xp, remaining);
+
+      // ── ECONOMY GUARD: lock + verify + debit science wallet ──────────
+      // player_resources lives in the same Postgres DB. Raw SQL with
+      // FOR UPDATE keeps the deduct atomic against the resource-tick
+      // worker (which UPDATEs the same row every 30s).
+      const balRows = (await manager.query(
+        `SELECT science FROM player_resources
+           WHERE player_id = $1::uuid FOR UPDATE`,
+        [input.userId],
+      )) as Array<{ science: number | string }>;
+      const bal = balRows[0];
+      if (!bal) {
+        throw new BadRequestException('Oyuncu cüzdanı bulunamadı');
+      }
+      const science = Number(bal.science);
+      if (science < accepted) {
+        throw new BadRequestException(
+          `Yetersiz bilim (need: ${accepted}, have: ${science})`,
+        );
+      }
+      await manager.query(
+        `UPDATE player_resources
+            SET science = science - $2
+          WHERE player_id = $1::uuid`,
+        [input.userId, accepted],
+      );
 
       state.xpContributed += accepted;
       const completed = state.xpContributed >= state.xpRequired;

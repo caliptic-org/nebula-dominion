@@ -293,8 +293,40 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
 
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState(race, enemy));
 
+  // DRIFT-02 fix: the cinematic FE simulation (`state.status`) may disagree
+  // with the BE-rolled outcome (cycle 5 made the server authoritative). We
+  // hold the end-of-battle overlay headline until we receive the BE verdict,
+  // and pop a brief "Sonuç hesaplanıyor…" loader during the round-trip so
+  // the user never sees a "ZAFER" banner that flips to "YENİLGİ" on
+  // /battle-result (or vice versa).
+  type BackendStatus = 'won' | 'lost' | 'in-progress' | 'pending';
+  const [resolvedStatus, setResolvedStatus] = useState<BackendStatus | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [disagreementToast, setDisagreementToast] = useState<string | null>(null);
+  const battleResultRef = useRef<{
+    id: string;
+    rewards: {
+      gold: number;
+      gems: number;
+      xp: number;
+      mineral?: number;
+      gas?: number;
+      science?: number;
+    };
+    status: BackendStatus;
+  } | null>(null);
+  const submitOnceRef = useRef(false);
+
   useEffect(() => {
     dispatch({ type: 'reset', us: race, them: enemy });
+    // Reset post-battle state too — the player started a fresh fight.
+    setResolvedStatus(null);
+    setSubmitting(false);
+    setSubmitError(null);
+    setDisagreementToast(null);
+    battleResultRef.current = null;
+    submitOnceRef.current = false;
   }, [race, enemy]);
 
   // RAF loop. When reduced motion is on we sample at 4 Hz instead of 60.
@@ -319,6 +351,174 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
     }, 250);
     return () => window.clearInterval(interval);
   }, [animMode, state.status]);
+
+  // Kick off the BE round-trip the moment the cinematic simulation reaches
+  // a terminal state. Previously this lived inside the overlay's
+  // "SONUÇLARI GÖR" onClick which meant the user saw the FE-decided banner
+  // first and could be jolted by a different /battle-result. Doing it here
+  // lets the overlay headline read from `resolvedStatus` (BE truth) before
+  // we even render it. submitOnceRef guards against React StrictMode double
+  // invokes and post-resolve re-renders.
+  useEffect(() => {
+    if (state.status === 'fighting') return;
+    if (submitOnceRef.current) return;
+    submitOnceRef.current = true;
+
+    if (!hasSession()) {
+      // Offline / deep-link demo path — no BE truth available, fall back to
+      // the FE outcome so the overlay can render its banner immediately.
+      setResolvedStatus(state.status === 'victory' ? 'won' : 'lost');
+      return;
+    }
+
+    setSubmitting(true);
+    // Snapshot the FE outcome the moment the sim terminates so the BE round-
+    // trip's `outcome` body matches what the player just witnessed.
+    const feStatus: 'victory' | 'defeat' = state.status === 'victory' ? 'victory' : 'defeat';
+
+    (async () => {
+      // Real simulation stats — collected per-tick inside the sim and rolled
+      // up here so /battle-result can drop the mock makeMockData() numbers
+      // and show what actually happened.
+      const unitsKilled  = state.theirs.filter((u) => u.hp <= 0).length;
+      const unitsLost    = state.ours.filter((u) => u.hp <= 0).length;
+      const damageDealt  = state.ours.reduce((s, u) => s + u.damageDealt, 0);
+      const damageTaken  = state.theirs.reduce((s, u) => s + u.damageDealt, 0);
+      const durationSeconds = Math.round(state.elapsed);
+      const survivalBonus = state.ours.filter((u) => u.hp > 0)
+        .reduce((s, u) => s + u.tier * 200, 0);
+      const score = unitsKilled * 800 + damageDealt * 50 + survivalBonus;
+
+      const ourSorted = [...state.ours].sort(
+        (a, b) => b.damageDealt - a.damageDealt || b.tier - a.tier,
+      );
+      const mvpUnit = ourSorted[0];
+      const realStats = {
+        unitsKilled,
+        unitsLost,
+        damageDealt,
+        damageTaken,
+        durationSeconds,
+        score,
+      };
+      const realMvp = mvpUnit
+        ? {
+            name:        mvpUnit.name,
+            tier:        mvpUnit.tier,
+            kills:       mvpUnit.kills,
+            damageDealt: mvpUnit.damageDealt,
+          }
+        : null;
+
+      try {
+        const battle = await api.post<{
+          id: string;
+          status: BackendStatus;
+          rewards: {
+            gold: number;
+            gems: number;
+            xp: number;
+            mineral?: number;
+            gas?: number;
+            science?: number;
+          };
+        }>('/battles', {
+          attackerRace: race.key,
+          defenderRace: enemy.key,
+          outcome: feStatus === 'victory' ? 'won' : 'lost',
+        });
+
+        battleResultRef.current = {
+          id: battle.id,
+          rewards: battle.rewards,
+          status: battle.status,
+        };
+
+        // BE/FE disagreement — promote the prior console.warn into a real
+        // UX signal so the player understands why the headline differs from
+        // what the cinematic implied. The headline itself comes from BE.
+        const beWon = battle.status === 'won';
+        const beLost = battle.status === 'lost';
+        if (
+          (beWon && feStatus !== 'victory') ||
+          (beLost && feStatus !== 'defeat')
+        ) {
+          const verdict = beWon ? 'galibiyet' : 'yenilgi';
+          setDisagreementToast(`Sunucu karar verdi: ${verdict}`);
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[battle] BE outcome disagrees with FE simulation — BE wins:',
+            { be: battle.status, fe: feStatus },
+          );
+        }
+
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(
+              'nebula:last-battle-result:v1',
+              JSON.stringify({
+                id: battle.id,
+                rewards: battle.rewards,
+                status: battle.status,
+                stats: realStats,
+                mvp: realMvp,
+                savedAt: Date.now(),
+              }),
+            );
+          } catch {
+            /* private mode — best effort */
+          }
+        }
+
+        // Credit mineral + gas + science via api fan-out (audit S3 + F3:
+        // server owns the reward map, FE only names the battle id).
+        if (battle.status === 'won' || battle.status === 'lost') {
+          try {
+            const claim = await api.post<{
+              battleId: string;
+              status: BackendStatus;
+              alreadyClaimed: boolean;
+              walletCredited: boolean;
+              rewards: {
+                gold: number; gems: number; xp: number;
+                mineral: number; gas: number; science: number;
+              };
+            }>(`/battles/${battle.id}/claim-reward`, {});
+            // eslint-disable-next-line no-console
+            console.log('[battle] claim-reward result:', claim);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('[battle] claim-reward exception:', err);
+          }
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[battle] POST /battles returned non-terminal status, skipping claim-reward:',
+            battle.status,
+          );
+        }
+        refreshGameResources();
+        setResolvedStatus(battle.status);
+      } catch (err) {
+        // BE call failed — fall back to FE truth so the player isn't stuck
+        // on the loader. /battle-result will use its mock fallback path.
+        if (err instanceof FetchError) {
+          console.warn('battle history record failed:', err.message);
+        }
+        setSubmitError('Sunucu sonucu alınamadı, simülasyon sonucu gösteriliyor.');
+        setResolvedStatus(feStatus === 'victory' ? 'won' : 'lost');
+      } finally {
+        setSubmitting(false);
+      }
+    })();
+  }, [state.status, state.ours, state.theirs, state.elapsed, race, enemy]);
+
+  // Auto-dismiss the disagreement toast after a few seconds.
+  useEffect(() => {
+    if (!disagreementToast) return;
+    const t = window.setTimeout(() => setDisagreementToast(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [disagreementToast]);
 
   const elapsedLabel = useMemo(() => {
     const s = Math.floor(state.elapsed);
@@ -489,181 +689,27 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
         <BattleBoard state={state} race={race} enemy={enemy} animMode={animMode} />
       </main>
 
-      {/* End-of-battle overlay */}
+      {/* End-of-battle overlay. The cinematic + animations still drive from
+          state.status (visual flair, audio cues), but the headline + CTA
+          wait for `resolvedStatus` so the player never sees a "ZAFER" banner
+          that flips to "YENİLGİ" on /battle-result. While the POST /battles
+          round-trip is in flight we show a brief "Sonuç hesaplanıyor…"
+          spinner instead of an authoritative banner. */}
       {state.status !== 'fighting' && (
         <BattleOverlay
-          status={state.status}
+          status={state.status === 'victory' ? 'victory' : 'defeat'}
+          resolvedStatus={resolvedStatus}
+          submitting={submitting}
+          submitError={submitError}
           race={race}
           enemy={enemy}
-          onContinue={async () => {
-            // Record the battle on the backend before navigating so the
-            // /profile Geçmiş tab + /battles/history endpoint pick it up,
-            // AND so /battle-result shows real reward numbers instead of
-            // the mock makeMockData() table.  We pass the client-side
-            // simulation outcome via `outcome` — the stub immediately
-            // resolves the battle with proper rewards (gold/gems/xp).
-            //
-            // Stashes the response in sessionStorage so /battle-result can
-            // read it without another network round-trip; clears the key
-            // after read so a back-button revisit doesn't show stale data.
-
-            // Real simulation stats — collected per-tick inside the sim
-            // and rolled up here so /battle-result can drop the mock
-            // makeMockData() numbers and show what actually happened.
-            const unitsKilled  = state.theirs.filter((u) => u.hp <= 0).length;
-            const unitsLost    = state.ours.filter((u) => u.hp <= 0).length;
-            const damageDealt  = state.ours.reduce((s, u) => s + u.damageDealt, 0);
-            const damageTaken  = state.theirs.reduce((s, u) => s + u.damageDealt, 0);
-            const durationSeconds = Math.round(state.elapsed);
-            // Score: kill weight scaled by tier + survival bonus.  Mirrors
-            // the rough shape of the mock numbers (~18k victory / ~4k loss)
-            // so existing UX assumptions stay intact.
-            const survivalBonus = state.ours.filter((u) => u.hp > 0)
-              .reduce((s, u) => s + u.tier * 200, 0);
-            const score = unitsKilled * 800 + damageDealt * 50 + survivalBonus;
-
-            // MVP = our unit with the most damage dealt; if no one fired
-            // (very short fight) fall back to the highest-tier survivor.
-            const ourSorted = [...state.ours].sort(
-              (a, b) => b.damageDealt - a.damageDealt || b.tier - a.tier,
-            );
-            const mvpUnit = ourSorted[0];
-            const realStats = {
-              unitsKilled,
-              unitsLost,
-              damageDealt,
-              damageTaken,
-              durationSeconds,
-              score,
-            };
-            const realMvp = mvpUnit
-              ? {
-                  name:        mvpUnit.name,
-                  tier:        mvpUnit.tier,
-                  kills:       mvpUnit.kills,
-                  damageDealt: mvpUnit.damageDealt,
-                }
-              : null;
-
-            // `backendStatus` is the source of truth for the headline /
-            // reward tier on /battle-result. The cinematic FE simulation
-            // (`state.status`) drives the overlay banner + cinematic, but
-            // the BE rolls its own outcome server-side (cycle 4) and may
-            // disagree. We stash the BE status AND mirror it into the URL
-            // outcome param so /battle-result never shows "GALİBİYET" with
-            // loss-tier rewards (or vice versa).
-            let backendStatus: 'won' | 'lost' | 'in-progress' | 'pending' | null = null;
-            if (hasSession()) {
-              try {
-                const battle = await api.post<{
-                  id: string;
-                  status: 'won' | 'lost' | 'in-progress' | 'pending';
-                  rewards: {
-                    gold: number;
-                    gems: number;
-                    xp: number;
-                    mineral?: number;
-                    gas?: number;
-                    science?: number;
-                  };
-                }>('/battles', {
-                  attackerRace: race.key,
-                  defenderRace: enemy.key,
-                  outcome: state.status === 'victory' ? 'won' : 'lost',
-                });
-                backendStatus = battle.status;
-                if (
-                  (battle.status === 'won' && state.status !== 'victory') ||
-                  (battle.status === 'lost' && state.status !== 'defeat')
-                ) {
-                  // eslint-disable-next-line no-console
-                  console.warn(
-                    '[battle] BE outcome disagrees with FE simulation — BE wins:',
-                    { be: battle.status, fe: state.status },
-                  );
-                }
-                if (typeof window !== 'undefined') {
-                  try {
-                    window.sessionStorage.setItem(
-                      'nebula:last-battle-result:v1',
-                      JSON.stringify({
-                        id: battle.id,
-                        rewards: battle.rewards,
-                        status: battle.status,
-                        // Real simulation stats — drives /battle-result tiles
-                        // (kills / losses / damage / score / duration) instead
-                        // of the legacy mock numbers.
-                        stats: realStats,
-                        mvp: realMvp,
-                        savedAt: Date.now(),
-                      }),
-                    );
-                  } catch {
-                    /* private mode — best effort */
-                  }
-                }
-                // Credit mineral + gas + science to the player's wallet by
-                // asking the api to fan out to game-server.
-                //
-                // Previously the FE POSTed the rewards object straight to
-                // game-server's `/api/buildings/resources/battle-reward`,
-                // which trusted the body — any logged-in player could
-                // curl a 9999999999 grant and cap their wallet on demand
-                // (audit S3 + F3). The api now owns the server-stored
-                // rewards (from the BATTLES map keyed by userId+battleId)
-                // and signs the fan-out with the shared service secret.
-                // The FE no longer says *how much* — only *which battle*.
-                //
-                // Cycle-3-03 fix: POST /battles now resolves the battle
-                // synchronously (status="won"|"lost" with non-zero rewards),
-                // so this claim-reward call hits a terminal state on the
-                // first try. Defensive guard below stays in case an older
-                // api version is in the loop and still returns in-progress.
-                if (battle.status === 'won' || battle.status === 'lost') {
-                  try {
-                    const claim = await api.post<{
-                      battleId: string;
-                      status: 'won' | 'lost' | 'in-progress' | 'pending';
-                      alreadyClaimed: boolean;
-                      walletCredited: boolean;
-                      rewards: {
-                        gold: number; gems: number; xp: number;
-                        mineral: number; gas: number; science: number;
-                      };
-                    }>(`/battles/${battle.id}/claim-reward`, {});
-                    // eslint-disable-next-line no-console
-                    console.log('[battle] claim-reward result:', claim);
-                  } catch (err) {
-                    // eslint-disable-next-line no-console
-                    console.error('[battle] claim-reward exception:', err);
-                    /* swallow so navigation still happens */
-                  }
-                } else {
-                  // eslint-disable-next-line no-console
-                  console.warn(
-                    '[battle] POST /battles returned non-terminal status, skipping claim-reward:',
-                    battle.status,
-                  );
-                }
-                // Broadcast so the HUD picks up the new wallet totals.
-                refreshGameResources();
-              } catch (err) {
-                // Silent fail — /battle-result will fall back to mock
-                // values, matching the old behaviour.
-                if (err instanceof FetchError) {
-                  console.warn('battle history record failed:', err.message);
-                }
-              }
-            }
-            // Prefer the BE-rolled outcome for the URL param so
-            // /battle-result shows a consistent headline + reward tier even
-            // when the cinematic FE simulation reached a different result.
-            // Fall back to the FE status only when the BE call failed or
-            // the player isn't logged in (offline / deep-link demo path).
+          onContinue={() => {
+            // BE was already called in the post-battle effect; just navigate
+            // with the resolved outcome (or FE fallback if BE was skipped).
             const urlOutcome: 'victory' | 'defeat' =
-              backendStatus === 'won'
+              resolvedStatus === 'won'
                 ? 'victory'
-                : backendStatus === 'lost'
+                : resolvedStatus === 'lost'
                   ? 'defeat'
                   : state.status === 'victory'
                     ? 'victory'
@@ -671,6 +717,32 @@ export function BattleScreen({ forcedRace, liveBattle }: Props) {
             router.push(`/battle-result?race=${race.key}&outcome=${urlOutcome}`);
           }}
         />
+      )}
+
+      {/* Disagreement toast — surfaces the prior console.warn as actual UX */}
+      {disagreementToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'absolute',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            padding: '8px 14px',
+            borderRadius: 8,
+            background: 'rgba(6,8,15,0.92)',
+            border: `1px solid ${ND.border}`,
+            color: ND.text,
+            fontFamily: ND.body,
+            fontSize: 13,
+            letterSpacing: 0.4,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+          }}
+        >
+          {disagreementToast}
+        </div>
       )}
     </div>
   );
@@ -917,16 +989,38 @@ function DamageDot({
 
 function BattleOverlay({
   status,
+  resolvedStatus,
+  submitting,
+  submitError,
   race,
   enemy,
   onContinue,
 }: {
+  /** Cinematic-side outcome from the FE simulation. Used only as a fallback
+   *  banner when the BE call was skipped (offline / unauthenticated path)
+   *  or failed — the BE-rolled `resolvedStatus` always wins when present. */
   status: 'victory' | 'defeat';
+  /** Authoritative BE outcome from POST /battles. While null and submitting
+   *  is true we show a "Sonuç hesaplanıyor…" placeholder so the player
+   *  never sees a banner that flips on /battle-result. */
+  resolvedStatus: 'won' | 'lost' | 'in-progress' | 'pending' | null;
+  submitting: boolean;
+  submitError: string | null;
   race: NDRace;
   enemy: NDRace;
   onContinue: () => void;
 }) {
-  const isV = status === 'victory';
+  // BE outcome wins when present; otherwise (BE skipped / failed) we fall
+  // back to the FE cinematic verdict so the player still gets a banner.
+  const beIsVictory = resolvedStatus === 'won';
+  const beIsDefeat  = resolvedStatus === 'lost';
+  const showLoader  = submitting && !resolvedStatus;
+  const effective: 'victory' | 'defeat' = beIsVictory
+    ? 'victory'
+    : beIsDefeat
+      ? 'defeat'
+      : status;
+  const isV = effective === 'victory';
   const color = isV ? race.primary : ND.danger;
   return (
     <div
@@ -944,20 +1038,49 @@ function BattleOverlay({
       }}
     >
       <Panel race={race} glow style={{ padding: 24, maxWidth: 360, textAlign: 'center' }}>
-        <Eyebrow color={color}>{isV ? 'GALİBİYET' : 'YENİLGİ'}</Eyebrow>
-        <H2 style={{ marginTop: 6, color, textShadow: `0 0 18px ${color}66` }}>
-          {isV ? 'ZAFER BİZİM' : 'SAVAŞ KAYBEDİLDİ'}
-        </H2>
-        <Caption style={{ color: ND.textDim, marginTop: 6 }}>
-          {isV
-            ? `${enemy.allianceName} filosu dağıldı.`
-            : `${race.allianceName} geri çekildi.`}
-        </Caption>
-        <div style={{ marginTop: 16 }}>
-          <NDButton race={race} variant="primary" size="lg" full onClick={onContinue}>
-            SONUÇLARI GÖR →
-          </NDButton>
-        </div>
+        {showLoader ? (
+          <>
+            <Eyebrow color={ND.textDim}>SONUÇ DOĞRULANIYOR</Eyebrow>
+            <H2 style={{ marginTop: 6, color: ND.text }}>Sonuç hesaplanıyor…</H2>
+            <Caption style={{ color: ND.textDim, marginTop: 6 }}>
+              Sunucu galibiyet/yenilgi kararını veriyor.
+            </Caption>
+            <div
+              aria-hidden
+              style={{
+                marginTop: 16,
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                border: `3px solid ${ND.border}`,
+                borderTopColor: race.primary,
+                margin: '16px auto 0',
+                animation: 'nd-spin 0.9s linear infinite',
+              }}
+            />
+            <style>{`@keyframes nd-spin { to { transform: rotate(360deg); } }`}</style>
+          </>
+        ) : (
+          <>
+            <Eyebrow color={color}>{isV ? 'GALİBİYET' : 'YENİLGİ'}</Eyebrow>
+            <H2 style={{ marginTop: 6, color, textShadow: `0 0 18px ${color}66` }}>
+              {isV ? 'ZAFER BİZİM' : 'SAVAŞ KAYBEDİLDİ'}
+            </H2>
+            <Caption style={{ color: ND.textDim, marginTop: 6 }}>
+              {isV
+                ? `${enemy.allianceName} filosu dağıldı.`
+                : `${race.allianceName} geri çekildi.`}
+            </Caption>
+            {submitError && (
+              <Caption style={{ color: ND.danger, marginTop: 6 }}>{submitError}</Caption>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <NDButton race={race} variant="primary" size="lg" full onClick={onContinue}>
+                SONUÇLARI GÖR →
+              </NDButton>
+            </div>
+          </>
+        )}
       </Panel>
     </div>
   );

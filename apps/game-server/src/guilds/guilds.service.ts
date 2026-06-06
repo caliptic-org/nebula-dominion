@@ -19,6 +19,7 @@ import {
 } from './entities/guild-tutorial-state.entity';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { ResourcesService } from '../resources/resources.service';
+import { DONATABLE_RESOURCES, type DonatableResource } from './dto/membership.dto';
 import {
   EVENT_GUILD_TUTORIAL_REQUIRED,
   TELEMETRY_GUILD_LIFECYCLE,
@@ -64,12 +65,29 @@ export class GuildsService {
 
   // ─── Guild lifecycle ────────────────────────────────────────────────────────
 
-  async createGuild(dto: CreateGuildDto): Promise<Guild> {
+  /**
+   * Create a new guild owned by `leaderId`.
+   *
+   * SECURITY CONTRACT (BLOCKER IDOR-GUILDS-CREATE-LEADER, audit cycle 6):
+   *   `leaderId` MUST come from the JWT subject claim — never from the
+   *   request body. The previous signature was
+   *   `createGuild(dto)` where `dto.leaderId` was a body-supplied string,
+   *   which let any authenticated player forge a guild with an arbitrary
+   *   victim as the leader (see CreateGuildDto + guilds.controller.ts
+   *   `create()` for the full attack writeup). Callers that need to seed
+   *   guilds in tests/fixtures must explicitly pass the leader id as the
+   *   second argument; there is no longer a body field to fall back on.
+   */
+  async createGuild(dto: CreateGuildDto, leaderId: string): Promise<Guild> {
+    if (!leaderId) {
+      throw new BadRequestException('leaderId is required');
+    }
+
     const existingMembership = await this.memberRepo.findOne({
-      where: { userId: dto.leaderId },
+      where: { userId: leaderId },
     });
     if (existingMembership) {
-      throw new ConflictException(`User ${dto.leaderId} is already in a guild`);
+      throw new ConflictException(`User ${leaderId} is already in a guild`);
     }
 
     const tag = dto.tag.toUpperCase();
@@ -86,7 +104,7 @@ export class GuildsService {
       const guild = manager.create(Guild, {
         name: dto.name,
         tag,
-        leaderId: dto.leaderId,
+        leaderId,
         memberCount: 1,
         tierScore: 0,
       });
@@ -95,7 +113,7 @@ export class GuildsService {
       await manager.save(
         manager.create(GuildMember, {
           guildId: guild.id,
-          userId: dto.leaderId,
+          userId: leaderId,
           role: GuildRole.LEADER,
           contributionPts: 0,
         }),
@@ -104,21 +122,21 @@ export class GuildsService {
       await manager.save(
         manager.create(GuildEvent, {
           guildId: guild.id,
-          userId: dto.leaderId,
+          userId: leaderId,
           type: GuildEventType.JOIN,
           payload: { role: GuildRole.LEADER, lifecycle: 'created' },
         }),
       );
 
       this.emitTelemetry(TELEMETRY_GUILD_LIFECYCLE, {
-        userId: dto.leaderId,
+        userId: leaderId,
         guildId: guild.id,
         kind: 'created',
         age: null,
         tierBadge: null,
       });
 
-      this.logger.log(`Guild created: ${guild.name} [${guild.tag}] leader=${dto.leaderId}`);
+      this.logger.log(`Guild created: ${guild.name} [${guild.tag}] leader=${leaderId}`);
       return guild;
     });
   }
@@ -256,11 +274,93 @@ export class GuildsService {
     });
   }
 
-  async recordDonation(guildId: string, userId: string, amount: number): Promise<GuildEvent> {
+  /**
+   * Records a guild donation: debits the caller's player_resources wallet
+   * by `amount` of the named `resource`, then credits the same amount as
+   * contribution points to the caller's GuildMember row.
+   *
+   * ── ECONOMY GUARD (audit ECON-CYC6-03, HIGH) ──────────────────────────
+   * Before this commit, recordDonation() bumped `member.contributionPts`
+   * by `amount` and wrote a DONATE GuildEvent — but NEVER touched
+   * `player_resources`. A player could POST
+   *     { amount: 1_000_000, resource: 'mineral' }
+   * to /guilds/<id>/donate and farm contribution_pts (and the FIRST_DONATION
+   * tutorial step + its reward) for free, with no mineral debit at all.
+   *
+   * This implementation mirrors the alliance.service.ts `deposit()` fix
+   * (apps/api/src/modules/alliance/alliance.service.ts:223-260):
+   *
+   *   1. Lock the player_resources row FOR UPDATE inside the same tx so a
+   *      concurrent trickle-tick / buildings.controller deduct can't race
+   *      and let the wallet go negative.
+   *   2. Verify `balance[resource] >= amount` — reject with
+   *      BadRequestException("Yetersiz <resource>") otherwise.
+   *   3. UPDATE player_resources SET <col> = <col> - amount.
+   *   4. ONLY THEN bump contributionPts + write the GuildEvent row.
+   *
+   * `resource` is constrained to {mineral, gas, energy} by the
+   * DonateDto @IsIn validator. We also re-validate here as a server-side
+   * belt-and-braces against future callers (e.g. internal services)
+   * skipping the DTO pipe.
+   *
+   * Defence-in-depth: DonateDto enforces @Max(10_000_000) on `amount`.
+   */
+  async recordDonation(
+    guildId: string,
+    userId: string,
+    amount: number,
+    resource: DonatableResource = 'mineral',
+  ): Promise<GuildEvent> {
     const member = await this.memberRepo.findOne({ where: { guildId, userId } });
     if (!member) throw new ForbiddenException(`User ${userId} is not a member of guild ${guildId}`);
 
+    if (!DONATABLE_RESOURCES.includes(resource)) {
+      throw new BadRequestException(`Geçersiz kaynak: ${resource}`);
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Bağış miktarı pozitif olmalı');
+    }
+
     return this.dataSource.transaction(async (manager) => {
+      // ── 1. Lock the player_resources row + verify balance ──────────────
+      // Use a parameterised raw SELECT...FOR UPDATE on the underlying
+      // table (same approach the alliance deposit fix uses) so we don't
+      // depend on the entity's column-name camelCase mapping at runtime,
+      // and we only fetch the column the caller is debiting.
+      const balRows = (await manager.query(
+        `SELECT mineral, gas, energy FROM player_resources
+           WHERE player_id = $1::uuid FOR UPDATE`,
+        [userId],
+      )) as Array<{ mineral: string | number; gas: string | number; energy: string | number }>;
+      const bal = balRows[0];
+      if (!bal) {
+        throw new BadRequestException('Oyuncu cüzdanı bulunamadı');
+      }
+
+      const have = Number(bal[resource]);
+      if (have < amount) {
+        throw new BadRequestException(
+          `Yetersiz ${resource}: cüzdanda ${have}, talep edilen ${amount}`,
+        );
+      }
+
+      // ── 2. Debit the wallet inside the same transaction ────────────────
+      // Column name is whitelisted via DONATABLE_RESOURCES so it's safe to
+      // interpolate into the SQL (no user-controlled identifier reaches
+      // this line — `resource` was validated against the constant tuple
+      // above). The amount itself is parameterised.
+      await manager.query(
+        `UPDATE player_resources
+            SET ${resource} = ${resource} - $2
+          WHERE player_id = $1::uuid`,
+        [userId, amount],
+      );
+
+      // Invalidate the Redis snapshot cache so the next /resources read
+      // doesn't serve a stale wallet.
+      await this.resources.invalidateCache(userId);
+
+      // ── 3. Credit contribution points + write the GuildEvent ───────────
       member.contributionPts += amount;
       member.lastActiveAt = new Date();
       await manager.save(member);
@@ -270,7 +370,7 @@ export class GuildsService {
           guildId,
           userId,
           type: GuildEventType.DONATE,
-          payload: { amount },
+          payload: { amount, resource },
         }),
       );
 

@@ -98,7 +98,7 @@ describe('GuildsService', () => {
     it('rejects when leader already has a membership', async () => {
       memberRepo.findOne.mockResolvedValueOnce({ userId: 'u1' });
       await expect(
-        service.createGuild({ leaderId: 'u1', name: 'Foo', tag: 'FOO' }),
+        service.createGuild({ name: 'Foo', tag: 'FOO' }, 'u1'),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -106,7 +106,7 @@ describe('GuildsService', () => {
       memberRepo.findOne.mockResolvedValueOnce(null);
       guildRepo.findOne.mockResolvedValueOnce({ id: 'g1', tag: 'FOO' });
       await expect(
-        service.createGuild({ leaderId: 'u1', name: 'Foo', tag: 'FOO' }),
+        service.createGuild({ name: 'Foo', tag: 'FOO' }, 'u1'),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -114,7 +114,7 @@ describe('GuildsService', () => {
       memberRepo.findOne.mockResolvedValue(null);
       guildRepo.findOne.mockResolvedValue(null);
 
-      await service.createGuild({ leaderId: 'u1', name: 'Lonca Foo', tag: 'foo' });
+      await service.createGuild({ name: 'Lonca Foo', tag: 'foo' }, 'u1');
 
       expect(emitter.emit).toHaveBeenCalledWith(
         TELEMETRY_GUILD_LIFECYCLE,

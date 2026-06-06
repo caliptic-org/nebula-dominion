@@ -11,7 +11,15 @@ import {
   TIER_CAPACITY,
   TutorialStep,
 } from '@/types/guild';
-import { fetcher, FetchError } from './fetcher';
+// DRIFT-01: Guild endpoints live on the **game-server** under the
+// `/api/guilds/*` prefix (see apps/game-server/src/main.ts setGlobalPrefix +
+// guilds.controller.ts @Controller('guilds')), not on the `api` service.
+// `fetcher.ts` targets NEXT_PUBLIC_API_URL with no `/api/v1` suffix, which
+// 404'd every guild call when NEXT_PUBLIC_GUILD_BACKEND_READY=true. We route
+// guild calls through `fetcher-game.ts` (NEXT_PUBLIC_GAME_SERVER_URL + /api)
+// instead. `FetchError` is the same class as before — re-exported from
+// fetcher.ts so `instanceof` checks in callers keep working.
+import { gameFetcher as fetcher, FetchError } from './fetcher-game';
 import { getCurrentUserId } from './currentUser';
 
 const FAKE_DELAY = 320;

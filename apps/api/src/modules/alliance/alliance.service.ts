@@ -97,11 +97,29 @@ export class AllianceService {
     await this.memberRepo.remove(member);
   }
 
-  async getMembers(allianceId: string): Promise<AllianceMember[]> {
+  /**
+   * Roster lookup. Audit cycle 6: this used to be public (no requesterId
+   * arg, no controller guard) and let anonymous callers enumerate every
+   * alliance's member list. Now membership-gated.
+   */
+  async getMembers(requesterId: string, allianceId: string): Promise<AllianceMember[]> {
+    await this.assertMembership(requesterId, allianceId);
     return this.memberRepo.find({
       where: { allianceId },
       order: { role: 'ASC', joinedAt: 'ASC' },
     });
+  }
+
+  /**
+   * Membership guard shared by getMembers / getWars / getStorage. Throws
+   * ForbiddenException if the requester isn't in the target alliance.
+   * Kept private so the read-side handlers all funnel through one check.
+   */
+  private async assertMembership(userId: string, allianceId: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { userId, allianceId } });
+    if (!member) {
+      throw new ForbiddenException('Bu alliance üyesi değilsin');
+    }
   }
 
   async promoteMember(
@@ -185,7 +203,14 @@ export class AllianceService {
     return this.warRepo.save(war);
   }
 
-  async getWars(allianceId: string): Promise<AllianceWar[]> {
+  /**
+   * War ledger. Audit cycle 6: previously public — any anonymous client
+   * could pull every alliance's active and historical war list, which
+   * leaks strategic state (who is distracted, who just lost a war, etc.).
+   * Now requires that the caller is a member of the queried alliance.
+   */
+  async getWars(requesterId: string, allianceId: string): Promise<AllianceWar[]> {
+    await this.assertMembership(requesterId, allianceId);
     return this.warRepo.find({
       where: [{ attackerId: allianceId }, { defenderId: allianceId }],
       relations: ['attacker', 'defender'],
@@ -193,7 +218,16 @@ export class AllianceService {
     });
   }
 
-  async getStorage(allianceId: string): Promise<AllianceStorage> {
+  /**
+   * Alliance storage readout. Audit cycle 6 BLOCKER: previously this
+   * had no controller guard and no membership check, so anonymous
+   * attackers could `curl /api/v1/alliances/<uuid>/storage` and read
+   * every alliance's mineral/energy balance + capacity. That's a direct
+   * raid-target oracle. Now the controller requires JWT and this method
+   * refuses non-members.
+   */
+  async getStorage(requesterId: string, allianceId: string): Promise<AllianceStorage> {
+    await this.assertMembership(requesterId, allianceId);
     const storage = await this.storageRepo.findOne({ where: { allianceId } });
     if (!storage) throw new NotFoundException('İttifak deposu bulunamadı');
     return storage;

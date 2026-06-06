@@ -30,6 +30,10 @@ type Store = {
   members: Map<string, GuildMember>;
   research: GuildResearchState[];
   contribs: Map<string, GuildResearchContribution>; // key: `${stateId}|${userId}`
+  // C6-04: contribute() now debits player_resources.science. The raw-SQL
+  // path goes through manager.query() — we shim a tiny in-memory wallet
+  // keyed by userId so the unit tests cover the new debit logic too.
+  wallets: Map<string, { science: number }>;
 };
 
 function memberKey(g: string, u: string) {
@@ -45,7 +49,12 @@ function freshStore(): Store {
     members: new Map(),
     research: [],
     contribs: new Map(),
+    wallets: new Map(),
   };
+}
+
+function seedWallet(store: Store, userId: string, science: number) {
+  store.wallets.set(userId, { science });
 }
 
 function whereMatches(row: any, where: any): boolean {
@@ -116,6 +125,23 @@ function buildManager(store: Store): EntityManager {
         return store.research.filter((r) => whereMatches(r, where)).length;
       }
       return 0;
+    }) as any,
+    // Raw SQL shim: contribute() locks + reads + debits
+    // player_resources via manager.query(). We pattern-match on the SQL
+    // text so the unit tests can exercise the new debit path without
+    // standing up Postgres.
+    query: jest.fn(async (sql: string, params: any[] = []) => {
+      const text = sql.replace(/\s+/g, ' ').trim();
+      if (text.startsWith('SELECT science FROM player_resources')) {
+        const w = store.wallets.get(params[0]);
+        return w ? [{ science: w.science }] : [];
+      }
+      if (text.startsWith('UPDATE player_resources') && text.includes('SET science')) {
+        const w = store.wallets.get(params[0]);
+        if (w) w.science -= Number(params[1]);
+        return [];
+      }
+      return [];
     }) as any,
   };
   return m as EntityManager;
@@ -312,6 +338,9 @@ describe('GuildResearchService', () => {
       seedGuild(store);
       seedMember(store, 'leader', GuildRole.LEADER);
       seedMember(store, 'u1');
+      // C6-04: contribute() now debits player_resources.science. Seed
+      // u1's wallet with enough to cover both calls (60k + 40k clamp).
+      seedWallet(store, 'u1', 200_000);
 
       const state: GuildResearchState = {
         id: 's1',
@@ -411,6 +440,76 @@ describe('GuildResearchService', () => {
 
       await expect(
         service.contribute({ researchStateId: 's1', userId: 'u1', xp: 1000 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // C6-04 regression: without the wallet debit, a player could mint
+    // contribution_pts for free by posting a positive xp. The fix locks
+    // + reads player_resources.science and rejects with 400 when the
+    // balance is below the accepted (post-clamp) amount.
+    it('rejects contributing when player has insufficient science', async () => {
+      const store = freshStore();
+      seedGuild(store);
+      seedMember(store, 'u1');
+      seedWallet(store, 'u1', 50); // way under the 1000 xp request
+      const state: GuildResearchState = {
+        id: 's1',
+        guildId: 'g1',
+        researchId: 'production_boost',
+        branch: GuildResearchBranch.PRODUCTION,
+        level: 1,
+        status: GuildResearchStatus.RESEARCHING,
+        xpRequired: 100_000,
+        xpContributed: 0,
+        slotWeekStart: isoWeekStartUtc(new Date()),
+        startedAt: new Date(),
+        deadlineAt: new Date(Date.now() + 86_400_000 * 7),
+        completedAt: null,
+        selectedBy: 'leader',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as GuildResearchState;
+      store.research.push(state);
+      const { service } = await makeService(store);
+
+      await expect(
+        service.contribute({ researchStateId: 's1', userId: 'u1', xp: 1000 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      // Research state must be untouched — transaction should roll back.
+      expect(store.research[0].xpContributed).toBe(0);
+      // Wallet must be untouched.
+      expect(store.wallets.get('u1')!.science).toBe(50);
+    });
+
+    // C6-04 regression: the DTO @Max(100_000) is the primary guard, but
+    // the service clamps too in case a non-HTTP path bypasses the DTO.
+    it('rejects xp values above the per-call ceiling', async () => {
+      const store = freshStore();
+      seedGuild(store);
+      seedMember(store, 'u1');
+      seedWallet(store, 'u1', 10_000_000);
+      const state: GuildResearchState = {
+        id: 's1',
+        guildId: 'g1',
+        researchId: 'production_boost',
+        branch: GuildResearchBranch.PRODUCTION,
+        level: 1,
+        status: GuildResearchStatus.RESEARCHING,
+        xpRequired: 1_000_000,
+        xpContributed: 0,
+        slotWeekStart: isoWeekStartUtc(new Date()),
+        startedAt: new Date(),
+        deadlineAt: new Date(Date.now() + 86_400_000 * 7),
+        completedAt: null,
+        selectedBy: 'leader',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as GuildResearchState;
+      store.research.push(state);
+      const { service } = await makeService(store);
+
+      await expect(
+        service.contribute({ researchStateId: 's1', userId: 'u1', xp: 9_999_999 }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

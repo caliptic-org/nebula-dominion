@@ -19,6 +19,7 @@ import { AdvanceTutorialDto } from './dto/advance-tutorial.dto';
 import { RaidAttackDto } from './dto/raid.dto';
 import { ResearchContributeDto, StartResearchDto } from './dto/research.dto';
 import { HttpJwtGuard } from '../auth/http-jwt.guard';
+import { InternalServiceGuard } from '../auth/internal-service.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 /**
@@ -35,11 +36,21 @@ import { CurrentUser } from '../auth/current-user.decorator';
  *     fake raid damage against another player's account, etc.
  *
  * Mitigation:
- *   1. @UseGuards(HttpJwtGuard) at the class level — every endpoint now
- *      requires a valid Bearer token signed with the shared JWT secret.
+ *   1. @UseGuards(HttpJwtGuard) applied per-endpoint — every player-
+ *      facing endpoint requires a valid Bearer token signed with the
+ *      shared JWT secret. (Previously this was a class-level decorator;
+ *      audit cycle 6 HIGH ECON-CYC6-02 forced us to move it to per-route
+ *      so the new `/raids/:raidId/attack` endpoint can be gated by
+ *      `InternalServiceGuard` instead — Nest composes class-level + method-
+ *      level guards with AND semantics, so a single endpoint cannot
+ *      override the class-level one. Mirroring the per-route pattern
+ *      buildings.controller.ts already uses.)
  *   2. The acting user identity is taken EXCLUSIVELY from the JWT
  *      subject claim via @CurrentUser(). The body/path userId fields
- *      have been removed from the DTOs (see dto/*.ts).
+ *      have been removed from the DTOs (see dto/*.ts). The lone
+ *      exception is the internal-service-only attackRaid endpoint,
+ *      which takes `userId` from the body because internal callers do
+ *      not carry a player JWT.
  *   3. Tutorial endpoints lost their /:userId path segment — the user
  *      is derived from the token, not the URL.
  *
@@ -51,7 +62,6 @@ import { CurrentUser } from '../auth/current-user.decorator';
  * scope reduction; we can relax specific GETs later if a logged-out
  * "browse" UX becomes a product requirement.
  */
-@UseGuards(HttpJwtGuard)
 @Controller('guilds')
 export class GuildsController {
   constructor(
@@ -62,13 +72,37 @@ export class GuildsController {
 
   // ─── Guild lifecycle ────────────────────────────────────────────────────────
 
+  /**
+   * Create a new guild with the caller as its leader.
+   *
+   * BLOCKER IDOR-GUILDS-CREATE-LEADER (audit cycle 6):
+   *   Previously this handler trusted `dto.leaderId` from the request body
+   *   and passed it to GuildsService.createGuild as the new guild's
+   *   leader. That meant any authenticated player could POST
+   *   `{name, tag, leaderId: <victim_uuid>}` and conscript the victim as
+   *   the leader of a guild the attacker had just created — pinning the
+   *   victim to that guild (the service's `existingMembership` check then
+   *   prevented them from joining any real guild), forging GuildEvent
+   *   rows in the victim's name, and emitting telemetry attributed to
+   *   the victim.
+   *
+   * Mitigation:
+   *   `leaderId` has been removed from CreateGuildDto. The leader is now
+   *   taken from the JWT subject claim via @CurrentUser() and passed as
+   *   the second argument to GuildsService.createGuild(). This mirrors
+   *   the pattern already used by `join`, `leave`, and `donate` below
+   *   (and `attackRaid`, `startResearch`, `contributeResearch` further
+   *   down), where the URL/body never carries a userId.
+   */
   @Post()
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateGuildDto) {
-    return this.guilds.createGuild(dto);
+  create(@Body() dto: CreateGuildDto, @CurrentUser() userId: string) {
+    return this.guilds.createGuild(dto, userId);
   }
 
   @Get()
+  @UseGuards(HttpJwtGuard)
   list(@Query('limit') limit?: string, @Query('offset') offset?: string) {
     return this.guilds.listGuilds(
       limit ? parseInt(limit, 10) : undefined,
@@ -77,26 +111,31 @@ export class GuildsController {
   }
 
   @Get('tag/:tag')
+  @UseGuards(HttpJwtGuard)
   byTag(@Param('tag') tag: string) {
     return this.guilds.findByTag(tag);
   }
 
   @Get(':id')
+  @UseGuards(HttpJwtGuard)
   get(@Param('id') id: string) {
     return this.guilds.getGuild(id);
   }
 
   @Get(':id/members')
+  @UseGuards(HttpJwtGuard)
   members(@Param('id') id: string) {
     return this.guilds.listMembers(id);
   }
 
   @Get(':id/events')
+  @UseGuards(HttpJwtGuard)
   events(@Param('id') id: string, @Query('limit') limit?: string) {
     return this.guilds.listEvents(id, limit ? parseInt(limit, 10) : undefined);
   }
 
   @Post(':id/join')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   join(
     @Param('id') id: string,
@@ -107,6 +146,7 @@ export class GuildsController {
   }
 
   @Post(':id/leave')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   async leave(
     @Param('id') id: string,
@@ -118,13 +158,14 @@ export class GuildsController {
   }
 
   @Post(':id/donate')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   donate(
     @Param('id') id: string,
     @Body() dto: DonateDto,
     @CurrentUser() userId: string,
   ) {
-    return this.guilds.recordDonation(id, userId, dto.amount);
+    return this.guilds.recordDonation(id, userId, dto.amount, dto.resource);
   }
 
   // ─── Tutorial state machine ─────────────────────────────────────────────────
@@ -134,17 +175,20 @@ export class GuildsController {
   // comes from the JWT.
 
   @Get('tutorial')
+  @UseGuards(HttpJwtGuard)
   getTutorial(@CurrentUser() userId: string) {
     return this.guilds.getTutorialState(userId);
   }
 
   @Post('tutorial/advance')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   advance(@Body() dto: AdvanceTutorialDto, @CurrentUser() userId: string) {
     return this.guilds.advanceTutorial(userId, dto.toStep);
   }
 
   @Post('tutorial/reward')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   reward(@CurrentUser() userId: string) {
     return this.guilds.grantTutorialReward(userId);
@@ -163,11 +207,13 @@ export class GuildsController {
   // aliases can be deleted in a follow-up once all callers migrate.
 
   @Get('me/membership')
+  @UseGuards(HttpJwtGuard)
   myMembership(@CurrentUser() userId: string) {
     return this.guilds.getUserMembership(userId);
   }
 
   @Get('users/:userId/membership')
+  @UseGuards(HttpJwtGuard)
   membership(
     @Param('userId') pathUserId: string,
     @CurrentUser() userId: string,
@@ -181,52 +227,118 @@ export class GuildsController {
   // ─── Raids (CAL-240) ────────────────────────────────────────────────────────
 
   @Get(':id/raids/current')
+  @UseGuards(HttpJwtGuard)
   currentRaid(@Param('id') id: string) {
     return this.raids.getCurrentRaid(id);
   }
 
   @Get(':id/raids')
+  @UseGuards(HttpJwtGuard)
   listRaids(@Param('id') id: string, @Query('limit') limit?: string) {
     return this.raids.listRaids(id, limit ? parseInt(limit, 10) : undefined);
   }
 
   @Get('raids/:raidId')
+  @UseGuards(HttpJwtGuard)
   getRaid(@Param('raidId') raidId: string) {
     return this.raids.getRaid(raidId);
   }
 
   @Get('raids/:raidId/contributions')
+  @UseGuards(HttpJwtGuard)
   raidContributions(@Param('raidId') raidId: string) {
     return this.raids.listContributions(raidId);
   }
 
   @Get('raids/:raidId/drops')
+  @UseGuards(HttpJwtGuard)
   raidDrops(@Param('raidId') raidId: string) {
     return this.raids.listDrops(raidId);
   }
 
+  /**
+   * POST /guilds/raids/:raidId/attack — internal-service only.
+   *
+   * ## Security history (HIGH ECON-CYC6-02 — audit cycle 6 fix)
+   *
+   * Previously gated by `HttpJwtGuard`. The DTO had `@IsInt @Min(1)` on
+   * `damage` but no upper bound, so any logged-in player could POST
+   * `{damage: 999999999}` and one-shot any raid boss. Even the cycle 3
+   * raid_damage_pct buff multiplier didn't help — the FE-supplied
+   * `damage` was applied verbatim against `boss_current_hp`.
+   *
+   * Concrete impact:
+   *   curl -X POST $GAME/guilds/raids/$RAID/attack \
+   *     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+   *     -d '{"damage": 999999999}'
+   *   → boss dies in one hit → caller credited with the full
+   *   `damageDealt` → top-5 contributor bonus to the same caller →
+   *   guild gets `RAID_TIER_SCORE_REWARD[tier]` tierScore → essence
+   *   drops resolved → wallet fills up to the weekly cap.
+   *
+   * ## The fix
+   *
+   * Mirrors the cycle 3 B1 pattern used by
+   * `/buildings/resources/battle-reward` and
+   * `/progression/award-xp`:
+   *
+   *   1. Swap guard from `HttpJwtGuard` to `InternalServiceGuard`
+   *      (header `X-Internal-Service: Bearer <secret>`).
+   *      The endpoint is no longer reachable by player tokens.
+   *   2. Take `userId` from the request body — the player's JWT is no
+   *      longer the source of identity because internal-service callers
+   *      don't carry one. The trusted backend asserts WHICH player is
+   *      being credited.
+   *   3. Cap `damage` at 1M in the DTO (`@Max(1_000_000)`) as
+   *      defense-in-depth: a leaked internal secret still can't one-shot
+   *      bosses in one POST.
+   *
+   * ## Who calls this now
+   *
+   * Today: nobody in production. A grep of `apps/web` confirmed no
+   * frontend code path POSTs to this endpoint — only e2e tests under
+   * `apps/web/e2e/guild.api.spec.ts` (which are being updated to send
+   * the internal-service header).
+   *
+   * Tomorrow: a future battle-resolution path (PvE finishGame,
+   * BossService.attackBoss for raid bosses, or a dedicated
+   * `GuildRaidBattleService`) will call this server-side AFTER
+   * computing `rawDamage` from the attacker's unit stats via the same
+   * stamped-stats / unit-cap pipeline boss.service.ts already uses. The
+   * caller will set the `X-Internal-Service` header and supply
+   * `{userId, damage}` in the body.
+   *
+   * If a real "player taps a button on the FE → instant raid damage"
+   * UX becomes a product requirement later, the right shape is a
+   * NEW public endpoint that takes a battle-session id (not raw
+   * damage) and recomputes damage server-side from the participating
+   * units. Do not relax this guard back to HttpJwtGuard.
+   */
   @Post('raids/:raidId/attack')
+  @UseGuards(InternalServiceGuard)
   @HttpCode(HttpStatus.OK)
   attackRaid(
     @Param('raidId') raidId: string,
     @Body() dto: RaidAttackDto,
-    @CurrentUser() userId: string,
   ) {
-    return this.raids.attack(raidId, userId, dto.damage);
+    return this.raids.attack(raidId, dto.userId, dto.damage);
   }
 
   @Post('raids/:raidId/resolve-drops')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   resolveDrops(@Param('raidId') raidId: string) {
     return this.raids.resolveDrops(raidId);
   }
 
   @Get('me/essence')
+  @UseGuards(HttpJwtGuard)
   myEssenceBalance(@CurrentUser() userId: string) {
     return this.raids.getEssenceBalance(userId);
   }
 
   @Get('me/essence/weekly')
+  @UseGuards(HttpJwtGuard)
   myEssenceWeekly(@CurrentUser() userId: string) {
     return this.raids.getWeeklyEssenceUsage(userId);
   }
@@ -234,6 +346,7 @@ export class GuildsController {
   // Deprecated IDOR-safe aliases — see comment near `me/membership`.
 
   @Get('users/:userId/essence')
+  @UseGuards(HttpJwtGuard)
   essenceBalance(
     @Param('userId') pathUserId: string,
     @CurrentUser() userId: string,
@@ -245,6 +358,7 @@ export class GuildsController {
   }
 
   @Get('users/:userId/essence/weekly')
+  @UseGuards(HttpJwtGuard)
   essenceWeekly(
     @Param('userId') pathUserId: string,
     @CurrentUser() userId: string,
@@ -258,26 +372,31 @@ export class GuildsController {
   // ─── Research / Tech ağacı (CAL-240) ────────────────────────────────────────
 
   @Get('research/catalog')
+  @UseGuards(HttpJwtGuard)
   researchCatalog() {
     return this.research.catalog();
   }
 
   @Get(':id/research')
+  @UseGuards(HttpJwtGuard)
   guildResearch(@Param('id') id: string) {
     return this.research.listGuildResearch(id);
   }
 
   @Get(':id/research/active')
+  @UseGuards(HttpJwtGuard)
   guildResearchActive(@Param('id') id: string) {
     return this.research.getActiveSlots(id);
   }
 
   @Get(':id/research/buffs')
+  @UseGuards(HttpJwtGuard)
   guildBuffs(@Param('id') id: string) {
     return this.research.getGuildBuffs(id);
   }
 
   @Post(':id/research/start')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.CREATED)
   startResearch(
     @Param('id') id: string,
@@ -293,16 +412,19 @@ export class GuildsController {
   }
 
   @Get('research/:stateId')
+  @UseGuards(HttpJwtGuard)
   getResearch(@Param('stateId') stateId: string) {
     return this.research.getResearchState(stateId);
   }
 
   @Get('research/:stateId/contributions')
+  @UseGuards(HttpJwtGuard)
   researchContributions(@Param('stateId') stateId: string) {
     return this.research.listContributions(stateId);
   }
 
   @Post('research/:stateId/contribute')
+  @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
   contributeResearch(
     @Param('stateId') stateId: string,

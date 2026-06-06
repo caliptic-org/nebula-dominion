@@ -1,14 +1,17 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Building, BuildingType } from '../../buildings/entities/building.entity';
 import { UnitType } from '../../units/constants/race-configs.constants';
 import { PlayerUnit } from '../../units/entities/player-unit.entity';
+import { CommandersService } from '../../commanders/commanders.service';
+import { ResourcesService } from '../../resources/resources.service';
 import { BasesService } from '../bases.service';
 import { BaseProductionQueueEntry } from '../entities/base-production-queue.entity';
 
@@ -38,14 +41,40 @@ describe('BasesService', () => {
   let queueRepo: jest.Mocked<Repository<BaseProductionQueueEntry>>;
   let buildingRepo: jest.Mocked<Repository<Building>>;
   let unitRepo: jest.Mocked<Repository<PlayerUnit>>;
+  let resources: { canAfford: jest.Mock; deduct: jest.Mock };
+  let commanders: { getActiveBonus: jest.Mock };
+  let dataSourceQuery: jest.Mock;
 
   beforeEach(async () => {
+    resources = {
+      canAfford: jest.fn().mockResolvedValue(true),
+      deduct: jest.fn().mockResolvedValue(undefined),
+    };
+    commanders = {
+      // No active commander → zero multipliers; queueUnit clamps to 1.0×.
+      getActiveBonus: jest.fn().mockResolvedValue({
+        trainCostMultiplier: 0,
+        trainSpeedMultiplier: 0,
+        hpMultiplier: 0,
+      }),
+    };
+    // Default: player has race=human so 'marine' orders pass the
+    // race-match gate. Tests that exercise the cross-race rejection
+    // override this on a per-test basis.
+    dataSourceQuery = jest.fn().mockResolvedValue([{ race: 'human' }]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BasesService,
         { provide: getRepositoryToken(BaseProductionQueueEntry), useFactory: mockRepo },
         { provide: getRepositoryToken(Building), useFactory: mockRepo },
         { provide: getRepositoryToken(PlayerUnit), useFactory: mockRepo },
+        { provide: ResourcesService, useValue: resources },
+        { provide: CommandersService, useValue: commanders },
+        {
+          provide: getDataSourceToken(),
+          useValue: { query: dataSourceQuery } as unknown as DataSource,
+        },
       ],
     }).compile();
 
@@ -167,6 +196,9 @@ describe('BasesService', () => {
 
     it('chains subsequent items behind the current tail', async () => {
       buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+      // Player race = zerg for this case so a 'zergling' order clears
+      // the race-match gate.
+      dataSourceQuery.mockResolvedValueOnce([{ race: 'zerg' }]);
       const tailCompletesAt = new Date(Date.now() + 60_000);
       queueRepo.find.mockResolvedValueOnce([
         {
@@ -200,18 +232,95 @@ describe('BasesService', () => {
       expect(dto.totalDurationSeconds).toBe(28);
     });
 
-    it('falls back to a default duration for unknown unitType', async () => {
+    it('rejects with 400 when unitType is not in UNIT_CONFIGS', async () => {
+      // Pre-fix this path silently accepted arbitrary types and let the
+      // worker swallow them at mint time. Now the catalog gate fires
+      // first so the player gets immediate feedback (and a wallet
+      // debit can't sneak through for an off-catalog name).
+      buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+
+      await expect(
+        service.queueUnit(BASE_ID, PLAYER_ID, { unitType: 'shadow_lord', level: 1 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(resources.deduct).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 403 when unit race != player race (ECON-CYC6-01)', async () => {
+      // Zerg account trying to queue Human marine — the exact exploit
+      // pattern flagged in the audit. Pre-fix this minted a free L20
+      // human marine; post-fix it has to be a ForbiddenException and the
+      // wallet stays untouched.
+      buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+      dataSourceQuery.mockResolvedValueOnce([{ race: 'zerg' }]);
+
+      await expect(
+        service.queueUnit(BASE_ID, PLAYER_ID, { unitType: 'marine', level: 20 }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(resources.canAfford).not.toHaveBeenCalled();
+      expect(resources.deduct).not.toHaveBeenCalled();
+      expect(queueRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 403 when the player has no race set', async () => {
+      buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+      dataSourceQuery.mockResolvedValueOnce([{ race: null }]);
+
+      await expect(
+        service.queueUnit(BASE_ID, PLAYER_ID, { unitType: 'marine', level: 1 }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(resources.deduct).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 400 when the player cannot afford the scaled cost', async () => {
+      buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+      resources.canAfford.mockResolvedValueOnce(false);
+      queueRepo.find.mockResolvedValueOnce([]);
+
+      await expect(
+        service.queueUnit(BASE_ID, PLAYER_ID, { unitType: 'marine', level: 5 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(resources.deduct).not.toHaveBeenCalled();
+      expect(queueRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('charges scaled cost (1.5^(level-1)) and deducts before saving', async () => {
+      // Marine base cost: 50M 0G 0E (from UNIT_CONFIGS). L3 scale = 1.5²
+      // = 2.25 → 113M deducted. canAfford passes, deduct receives the
+      // computed cost object, and only then is the queue row persisted.
       buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
       queueRepo.find.mockResolvedValueOnce([]);
 
-      const dto = await service.queueUnit(BASE_ID, PLAYER_ID, {
-        unitType: 'shadow_lord',
-        level: 1,
+      await service.queueUnit(BASE_ID, PLAYER_ID, {
+        unitType: 'marine',
+        level: 3,
       });
 
-      expect(dto.totalDurationSeconds).toBe(30);
-      expect(dto.unitName).toBe('Shadow Lord');
-      expect(dto.unitEmoji).toBe('⚔️');
+      expect(resources.canAfford).toHaveBeenCalledWith(
+        PLAYER_ID,
+        expect.objectContaining({ mineral: expect.any(Number) }),
+      );
+      expect(resources.deduct).toHaveBeenCalledTimes(1);
+      const [, deductCost] = resources.deduct.mock.calls[0];
+      // 50 × 1.5² = 112.5 → rounded to 113. Don't pin the exact value
+      // brittle-style; assert the scaling shape (> base, < base × 1.5^3).
+      expect(deductCost.mineral).toBeGreaterThan(50);
+      expect(deductCost.mineral).toBeLessThan(Math.round(50 * Math.pow(1.5, 3)));
+      // Deduct must fire BEFORE save so a refused queue insert wouldn't
+      // skip the wallet check on retry.
+      const deductOrder = resources.deduct.mock.invocationCallOrder[0];
+      const saveOrder = queueRepo.save.mock.invocationCallOrder[0];
+      expect(deductOrder).toBeLessThan(saveOrder);
+    });
+
+    it('rejects merge-only units (trainable=false) with 400', async () => {
+      // Sniper is a merge-result type (T2, see MERGE_RECIPES). Even on a
+      // Human account with infinite resources, a direct POST must bounce.
+      buildingRepo.findOne.mockResolvedValueOnce(makeOwnedBase());
+
+      await expect(
+        service.queueUnit(BASE_ID, PLAYER_ID, { unitType: 'sniper', level: 1 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(resources.deduct).not.toHaveBeenCalled();
     });
   });
 

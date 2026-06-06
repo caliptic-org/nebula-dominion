@@ -26,7 +26,8 @@ import {
 } from '@/components/handoff';
 import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
-import { useGameResources, refreshGameResources } from '@/hooks/useGameResources';
+import { refreshGameResources } from '@/hooks/useGameResources';
+import { useUserWallet, refreshUserWallet } from '@/hooks/useUserWallet';
 import { useVipStatus } from '@/hooks/useVip';
 import { useGates, gateAllows } from '@/lib/gates';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -134,10 +135,18 @@ const TAG_COLOR: Record<Tag, string> = {
 };
 
 /* Wallet + VIP placeholders — kept as fallbacks for guest/loading state.
- * Live values come from useGameResources (energy = gem in HUD lore) and
- * useVipStatus inside the component. The shop renders 0-stats during the
- * brief flash before hooks resolve so the player never sees a fake
- * 1250-gem wallet they don't actually own. */
+ * Live currency values come from useUserWallet (BLOCKER CHAIN-08-A1 fix:
+ * previously read game-server `energy` via useGameResources, which is a
+ * COMPLETELY DIFFERENT WALLET from the api-side `user_currency.premium_gems`
+ * column that POST /shop/purchase actually debits — so the HUD showed
+ * 250 gems but every purchase failed with "Yetersiz bakiye: premium_gems
+ * 0 < 200"). useGameResources is still the right hook for mineral/gas/
+ * energy production HUDs elsewhere; it is NOT the right hook for the
+ * shop's premium currency pill.
+ *
+ * VIP comes from useVipStatus inside the component. The shop renders
+ * 0-stats during the brief flash before hooks resolve so the player
+ * never sees a fake 1250-gem wallet they don't actually own. */
 const GUEST_CURRENCY = { gem: 0, gold: 0 };
 const GUEST_VIP_LEVEL = 0;
 const GUEST_VIP_XP = 0;
@@ -193,13 +202,17 @@ function ShopPageInner() {
   const [currency, setCurrency] = useState<Currency>('gem');
   const promoTimer = useCountdown(2 * 86_400 + 4 * 3_600);
 
-  // Live wallet — game-server's energy column doubles as "gem" in HUD lore
-  // (Kristal/Nebula Kristali). Gold has no backend column yet; fall back to
-  // 0 until a gold ledger lands. Loading → 0 so the header never flashes
-  // the legacy 1250/8400 mock values.
-  const { data: liveResources } = useGameResources();
-  const playerCurrency = liveResources
-    ? { gem: liveResources.energy, gold: GUEST_CURRENCY.gold }
+  // Live wallet — api-side `user_currency` table (the same row that POST
+  // /shop/purchase debits). premium_gems → 💎 pill (Kristal), nebula_coins
+  // → 🪙 pill (Altın). Previously this read game-server's `energy` field
+  // and called it "gem", which is a completely separate wallet that the
+  // purchase endpoint does NOT debit — every fresh account showed 250
+  // gems in the HUD and got "Yetersiz bakiye: premium_gems 0 < 200" on
+  // tap (BLOCKER CHAIN-08-A1). Loading → 0 so the header never flashes
+  // legacy mock values.
+  const { data: liveWallet } = useUserWallet();
+  const playerCurrency = liveWallet
+    ? { gem: liveWallet.premium_gems, gold: liveWallet.nebula_coins }
     : GUEST_CURRENCY;
   // Live VIP — uses real GET /api/vip/status. Falls back to "VIP 0 / 0 XP"
   // when the player isn't a VIP yet so the section honestly shows "not
@@ -482,7 +495,12 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
                 currencyType: useGem ? 'premium_gems' : 'nebula_coins',
               });
               toast.success(`${product.name} alındı`);
-              // Wallet just changed — pop the HUD without waiting for poll.
+              // Wallet just changed — pop both HUDs without waiting for poll.
+              // refreshUserWallet drives the shop currency pill (the one we
+              // just debited); refreshGameResources keeps mineral/gas/energy
+              // pills in sync because some SKUs grant in-game resources too
+              // (resource-pack → +mineral/+gas/+energy).
+              refreshUserWallet();
               refreshGameResources();
             } catch (err) {
               const msg = err instanceof FetchError ? err.message : 'Satın alma başarısız';
@@ -608,6 +626,9 @@ function VipSection({
                   try {
                     await api.post('/shop/purchase', { sku: `vip_${p.id}`, currencyType: 'premium_gems' });
                     toast.success(`VIP ${p.label} satın alındı`);
+                    // VIP purchase also debits premium_gems — refresh the
+                    // pill so the HUD reflects the deduction immediately.
+                    refreshUserWallet();
                   } catch (err) {
                     const msg = err instanceof FetchError ? err.message : 'Yükseltme başarısız';
                     toast.error(msg);
@@ -759,6 +780,8 @@ function BattlePassSection({ race }: { race: NDRace }) {
           try {
             await api.post('/shop/purchase', { sku: 'battle_pass_premium', currencyType: 'premium_gems' });
             toast.success(tShop('premiumActivated'));
+            // Refresh the gem pill — battle pass debit is premium_gems.
+            refreshUserWallet();
           } catch (err) {
             const msg = err instanceof FetchError ? err.message : tShop('premiumFailed');
             toast.error(msg);

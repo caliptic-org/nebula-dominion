@@ -320,12 +320,30 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  /**
+   * Handle a MERGE_UNITS action.
+   *
+   * Defense-in-depth against duplicate-id exploit (ECON-CYC9-MERGE-DUP-01):
+   * a malicious client could send `unitIds: [X, X]` to a same-type recipe
+   * (soldier+soldier, drone+drone, ravager+ravager, combat-bot+combat-bot,
+   * artillery+artillery).  `unitIds.map(id => find(u => u.id === id))` would
+   * then resolve both slots to the *same* UnitState object, `sourceUnits.length`
+   * would still equal `unitIds.length`, `findRecipe([soldier, soldier])` would
+   * match, the merge would succeed, and `removedUnitIds = [X, X]` would only
+   * remove the single source unit once — netting a free tier-up.
+   *
+   * The DTO layer already rejects duplicates via `@ArrayUnique()` (400 from
+   * ValidationPipe), but we also guard here because `processAction` is invoked
+   * from internal call-sites (sockets, bots, replay) that bypass the HTTP DTO.
+   * Mirrors the dedup guard in subspace.service.ts startBattle().
+   */
   private async handleMerge(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.currentPlayerId !== userId) return fail('Not your turn');
     if (room.phase !== TurnPhase.ACTION) return fail('Not action phase');
 
     const { unitIds } = dto.payload as { unitIds: string[] };
     if (!Array.isArray(unitIds) || unitIds.length < 2) return fail('Merge requires at least 2 unit IDs');
+    if (new Set(unitIds).size !== unitIds.length) return fail('Duplicate unit IDs in merge payload');
 
     const playerUnits = room.players[userId].units;
     const sourceUnits = unitIds.map((id) => playerUnits.find((u) => u.id === id)).filter(Boolean) as UnitState[];

@@ -11,7 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsString, ArrayMinSize, IsNumberString } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize, IsNumberString, ArrayUnique } from 'class-validator';
 import { HttpJwtGuard } from '../../auth/http-jwt.guard';
 import { MergeService } from './merge.service';
 import { GameService } from '../game.service';
@@ -25,6 +25,7 @@ class MergeUnitsDto {
 
   @IsArray()
   @ArrayMinSize(2)
+  @ArrayUnique()
   @IsString({ each: true })
   unitIds: string[];
 

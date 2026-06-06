@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpException,
   HttpStatus,
@@ -11,6 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
@@ -28,6 +31,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
  *  - 'dm' is partitioned per recipient userId: a player only reads/writes
  *    their OWN dm buffer. Without this, /chat/dm leaked every DM in the
  *    process to every authenticated reader.
+ *  - HIGH CHAIN-08-A3: the 'guild' channel was JWT-guarded but did NOT
+ *    verify alliance_members membership. A freshly-created Lv1 account
+ *    with no guild affiliation could POST /chat/guild and pollute the
+ *    shared ring buffer that every legitimate alliance member reads.
+ *    send() now consults alliance_members and 403s non-members.
  */
 
 type Channel = 'global' | 'guild' | 'dm';
@@ -72,9 +80,23 @@ function nextMessageId(): string {
   return `m_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
+/** Per-user sliding window for guild-channel posts. Keys are userId, values
+ *  are the timestamps (ms) of the last <=GUILD_RATE_LIMIT_MAX writes inside
+ *  the rolling GUILD_RATE_LIMIT_WINDOW_MS window. Stops one chatty member
+ *  from drowning out the shared ring buffer even after the membership gate
+ *  passes. Lives in process memory only — fine for the stub. */
+const GUILD_RATE_LIMIT_MAX = 5;
+const GUILD_RATE_LIMIT_WINDOW_MS = 10_000;
+const GUILD_RATE_LIMIT: Map<string, number[]> = new Map();
+
 @ApiTags('chat (stub)')
 @Controller('chat')
 export class ChatStubController {
+  constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+  ) {}
+
   /**
    * GET /chat/:channel — read the last N messages.
    *
@@ -116,13 +138,25 @@ export class ChatStubController {
    * 'dm' writes target the CALLER's own dm buffer in this stub. The full
    * DB-backed module (task #200) will add per-recipient routing; right now
    * we just need to make sure messages don't fan out to every user.
+   *
+   * HIGH CHAIN-08-A3 — guild membership gate:
+   *   Before this fix the 'guild' channel was JWT-guarded but accepted
+   *   writes from ANY authenticated user, regardless of alliance_members
+   *   membership. A brand-new Lv1 account with no guild affiliation could
+   *   POST /chat/guild and pollute the shared ring buffer that every
+   *   legitimate alliance member reads — a one-line spam-cannon against
+   *   every player on /chat. We now resolve the caller's row in
+   *   `alliance_members`; non-members get a 403 with a TR-localised
+   *   reason. Members also get a per-user sliding rate limit
+   *   (GUILD_RATE_LIMIT_MAX writes per GUILD_RATE_LIMIT_WINDOW_MS) so a
+   *   compromised member account can't drown the buffer either.
    */
   @Post(':channel')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Append a message to a channel (auth required)' })
   @ApiParam({ name: 'channel', enum: CHANNELS })
-  send(
+  async send(
     @Request() req: any,
     @Param('channel') channel: string,
     @Body() body: { content?: string },
@@ -135,6 +169,38 @@ export class ChatStubController {
       throw new HttpException('İçerik boş olamaz.', HttpStatus.BAD_REQUEST);
     }
     const userId: string = req.user?.id ?? 'unknown';
+
+    // CHAIN-08-A3: hard gate on guild membership. Without a row in
+    // alliance_members the caller has no business writing to the guild
+    // ring buffer — that surface is read by every guild-affiliated player
+    // in the process. We treat 'alliance' identically as defence-in-depth
+    // for any future routing that aliases the two names.
+    if (channel === 'guild' || (channel as string) === 'alliance') {
+      const rows: Array<{ alliance_id: string }> = await this.dataSource.query(
+        'SELECT alliance_id FROM alliance_members WHERE user_id = $1 LIMIT 1',
+        [userId],
+      );
+      if (!rows || rows.length === 0) {
+        throw new ForbiddenException(
+          'İttifak üyesi olmayan oyuncular ittifak sohbetine yazamaz',
+        );
+      }
+
+      // Per-user sliding rate limit (member-side abuse guard).
+      const now = Date.now();
+      const stamps = (GUILD_RATE_LIMIT.get(userId) ?? []).filter(
+        (t) => now - t < GUILD_RATE_LIMIT_WINDOW_MS,
+      );
+      if (stamps.length >= GUILD_RATE_LIMIT_MAX) {
+        throw new HttpException(
+          'Çok hızlı mesaj gönderiyorsun, biraz bekle.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      stamps.push(now);
+      GUILD_RATE_LIMIT.set(userId, stamps);
+    }
+
     const message: ChatMessage = {
       id: nextMessageId(),
       userId,

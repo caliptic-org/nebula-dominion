@@ -20,6 +20,7 @@ import {
 } from '@/components/handoff';
 import { api, FetchError } from '@/lib/api';
 import { useChatChannel, type ChatChannelMessage } from '@/hooks/useChatChannel';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -591,6 +592,13 @@ const CHAT_NAV_ROUTES: Record<string, string> = {
 export default function ChatPage() {
   const race = useNDRace();
   const router = useRouter();
+  // HIGH CHAIN-08-A3 — mirror the /alliance page's hasAlliance gate so
+  // guildless players can't see (let alone post to) the guild tab. The
+  // backend ChatStubController.send() also enforces this with a 403,
+  // but the FE gate cleans up the UX (no broken-input toast loop) and
+  // hides the surface entirely from new Lv1 accounts.
+  const { profile } = useUserProfile();
+  const hasAlliance = Boolean(profile?.allianceTag);
   const [activeTab, setActiveTab] = useState<ChatTab>('global');
   const [input, setInput] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
@@ -673,9 +681,27 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [activeTab]);
 
+  // If the player is on the guild tab but has no alliance (e.g. they
+  // were in a guild, opened this page, then left the guild via /alliance),
+  // bounce them back to global so the input bar stops baiting them into
+  // a 403 round-trip.
+  useEffect(() => {
+    if (activeTab === 'guild' && !hasAlliance && profile !== null) {
+      setActiveTab('global');
+    }
+  }, [activeTab, hasAlliance, profile]);
+
   async function handleSend() {
     const text = input.trim();
     if (!text) return;
+    // CHAIN-08-A3 client guard: refuse to even attempt the POST when the
+    // player is on the guild tab without an alliance. The backend would
+    // 403 anyway (alliance_members check) but doing it client-side avoids
+    // a useless network round-trip and a confusing error toast.
+    if (activeTab === 'guild' && !hasAlliance) {
+      toast.error('Önce bir ittifaka katıl.');
+      return;
+    }
     // Optimistic local append: even with the live POST below, we want the
     // player's bubble on screen instantly rather than waiting for the
     // server round-trip + next 5s poll. The de-dup filter above drops the
@@ -713,9 +739,15 @@ export default function ChatPage() {
     }
   }
 
+  // CHAIN-08-A3: hide the Lonca tab entirely from guildless players —
+  // mirrors the hasAlliance gate /alliance uses to conditionally render
+  // its summary panels. Once they join an alliance the tab reappears
+  // on the next profile poll.
   const tabs: { id: ChatTab; label: string; icon: string; badge?: number }[] = [
     { id: 'global', label: 'Global', icon: '🌌' },
-    { id: 'guild',  label: 'Lonca',  icon: '🤝', badge: 3 },
+    ...(hasAlliance
+      ? [{ id: 'guild' as ChatTab, label: 'Lonca', icon: '🤝', badge: 3 }]
+      : []),
     { id: 'dm',     label: 'Özel',   icon: '📨', badge: DM_CONVERSATIONS.reduce((n, c) => n + c.unread, 0) },
   ];
 
@@ -758,7 +790,7 @@ export default function ChatPage() {
         role="tablist"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
           gap: 6,
           padding: '12px 16px 0',
           flexShrink: 0,

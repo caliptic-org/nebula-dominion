@@ -128,11 +128,14 @@ export default function AlliancePage() {
     try {
       await api.post('/alliances/join', { allianceId: a.id });
       toast.success(`${a.name} ittifakına katıldın`);
-      // Refresh profile-derived "hasAlliance" so the empty state disappears
-      // and the summary panels render with the new allianceTag on the very
-      // next render — router.refresh() re-runs server components which
-      // useUserProfile reads from. (No-op for client-only renders.)
-      router.refresh();
+      // Cycle 8 / DRIFT-2: re-fetch /users/profile so `hasAlliance` flips
+      // to true and the summary header/panels render the freshly-joined
+      // guild on the next render. `useUserProfile` previously only fetched
+      // on mount (deps: []), so without `refreshProfile()` the page stayed
+      // wedged in the "İttifak Yok" empty state until the player reloaded
+      // manually. `router.refresh()` alone doesn't help here — the data is
+      // read client-side, not by a server component.
+      refreshProfile();
     } catch (err) {
       const msg = err instanceof FetchError ? err.message : 'İttifağa katılamadı';
       toast.error(msg);
@@ -146,7 +149,12 @@ export default function AlliancePage() {
   // and ortak objectives are still demo data — backend guild endpoints
   // for those are next, but at minimum the page should stop pretending
   // every player is in a 7-member alliance from day 1.
-  const { profile } = useUserProfile();
+  // `refresh` re-runs GET /users/profile so the next render reflects the
+  // post-join guild context — see useUserProfile.ts JSDoc for the contract.
+  // handleJoin below calls it on success so `hasAlliance` flips immediately
+  // instead of waiting for a full reload. Any future leave/kick mutation
+  // must invoke refreshProfile() the same way.
+  const { profile, refresh: refreshProfile } = useUserProfile();
   const hasAlliance = Boolean(profile?.allianceTag);
   // Public alliance list — surfaces under "Henüz bir ittifaka katılmadın"
   // empty state so the player can scroll real options instead of clicking
@@ -231,8 +239,12 @@ export default function AlliancePage() {
     }
   }
 
+  // Cycle 8 / DRIFT-1: the player's actual guild name/tag live on the
+  // profile (LEFT JOIN alliance_members → alliances). `race.allianceName`
+  // is a cosmetic lore string from the race catalog and must not be used
+  // as a substitute when the player has actually joined a guild.
   const summary = {
-    name: profile?.allianceTag ? race.allianceName : 'İttifak Yok',
+    name: profile?.allianceName ?? 'İttifak Yok',
     tag: profile?.allianceTag ?? '—',
     tier: hasAlliance ? 'BÜYÜK İTTİFAK' : '—',
     tierScore: hasAlliance ? 24_120 : 0,
@@ -264,8 +276,12 @@ export default function AlliancePage() {
         <Link href="/base" aria-label="Geri" style={iconBtn()}>‹</Link>
         <Sigil race={race} size={28} glow />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Eyebrow color={race.primary}>{race.allianceTag} · İTTİFAK</Eyebrow>
-          <H2 style={{ marginTop: 2 }}>{race.allianceName}</H2>
+          {/* Cycle 8 / DRIFT-1: read from profile, not race. The race
+              catalog's allianceTag/Name are cosmetic lore — they would
+              otherwise show "INS · İTTİFAK / Insan Konseyi" to a guildless
+              player and look like real membership. */}
+          <Eyebrow color={race.primary}>{profile?.allianceTag ?? '—'} · İTTİFAK</Eyebrow>
+          <H2 style={{ marginTop: 2 }}>{profile?.allianceName ?? 'İttifak Yok'}</H2>
         </div>
         <Link href="/chat?tab=guild" aria-label="Lonca Salonu" style={iconBtn()}>💬</Link>
       </header>

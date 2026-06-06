@@ -45,6 +45,33 @@ export interface InventoryCapacity {
   max: number;
 }
 
+export interface UserWalletBalance {
+  /** Premium gem balance — what the shop HUD's 💎 pill should read. */
+  premium_gems: number;
+  /** Soft currency (gold) — what the shop HUD's 🪙 pill should read. */
+  nebula_coins: number;
+  /** Tertiary currency (event/lore). Kept for future HUD pills. */
+  void_crystals: number;
+}
+
+/**
+ * Starter wallet balance handed out to a fresh user the first time the
+ * api-side `user_currency` row is materialised — either by `auth.register()`
+ * or by the lazy-init inside `getWallet()`.
+ *
+ * 100 premium_gems lets a tester buy at least one of the cheaper SKUs
+ * (`speed-boost` @ 50, `shield-8h` @ 80) without grinding XP conversion;
+ * 1000 nebula_coins covers a couple of gold-priced bundles
+ * (`gem-small` @ 800, `shield-8h` @ 640) so the gold tab is exercisable
+ * too. Numbers chosen to be visibly non-zero but not so generous they
+ * mask balance-checking bugs in QA.
+ *
+ * REMOVE before public launch (or gate behind isYopmail) — paying players
+ * shouldn't get free premium currency on account creation.
+ */
+const STARTER_PREMIUM_GEMS = 100;
+const STARTER_NEBULA_COINS = 1000;
+
 export interface UseItemResponse {
   success: boolean;
   remainingQuantity: number;
@@ -237,6 +264,53 @@ export class InventoryService {
       where: { userId },
     });
     return { used, max: INVENTORY_CAPACITY };
+  }
+
+  /**
+   * BLOCKER CHAIN-08-A1 fix
+   *
+   * Return the authoritative api-side wallet that POST /shop/purchase
+   * actually debits. Used by the shop HUD's currency pill.
+   *
+   * Lazy-create with a starter balance the FIRST time a user touches
+   * this endpoint. Auth's register() also seeds, but:
+   *   - existing accounts created before this commit have no row yet
+   *   - the auth seed runs best-effort; a transient DB hiccup at signup
+   *     would leave the wallet uninitialised forever
+   * The ON CONFLICT DO NOTHING clause is what makes this idempotent —
+   * if the row already exists from a sellItem credit or a prior
+   * purchase, we don't reset the balance to the starter values.
+   */
+  async getWallet(userId: string): Promise<UserWalletBalance> {
+    await this.dataSource.query(
+      `INSERT INTO user_currency
+         (user_id, premium_gems, nebula_coins, void_crystals, updated_at)
+       VALUES ($1::uuid, $2, $3, 0, NOW())
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId, STARTER_PREMIUM_GEMS, STARTER_NEBULA_COINS],
+    );
+
+    const rows = (await this.dataSource.query(
+      `SELECT premium_gems, nebula_coins, void_crystals
+         FROM user_currency
+        WHERE user_id = $1::uuid
+        LIMIT 1`,
+      [userId],
+    )) as Array<{
+      premium_gems: number | string;
+      nebula_coins: number | string;
+      void_crystals: number | string;
+    }>;
+
+    const row = rows[0];
+    // Defensive zero-default for the edge case where the INSERT failed
+    // (e.g. RLS misconfiguration) but the SELECT still ran. Numbers come
+    // back as strings on some pg driver versions for int4 columns; coerce.
+    return {
+      premium_gems: Number(row?.premium_gems ?? 0),
+      nebula_coins: Number(row?.nebula_coins ?? 0),
+      void_crystals: Number(row?.void_crystals ?? 0),
+    };
   }
 
   private toInventoryItem(inv: UserInventory): InventoryItem {

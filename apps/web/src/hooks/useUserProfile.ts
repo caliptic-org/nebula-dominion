@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, FetchError } from '@/lib/api';
 import { hasSession } from '@/lib/session';
 
@@ -9,7 +9,30 @@ import { hasSession } from '@/lib/session';
  * Uses the shared `api` helper so token + base URL + 401 handling stay
  * consistent with `useSession`. Returns `profile: null` for guests; the
  * consumer falls back to the race-derived placeholder (handle/title from
- * `RACES[race]`). */
+ * `RACES[race]`).
+ *
+ * Cycle 8 / DRIFT-1 + DRIFT-2 notes — alliance shape extension and the
+ * refresh contract:
+ *
+ *   The API's /users/profile route now LEFT JOINs alliance_members →
+ *   alliances and returns four authoritative alliance fields (allianceId,
+ *   allianceTag, allianceName, allianceRole). All four are nullable —
+ *   guildless players get `null` for every one of them. Consumers MUST
+ *   read these directly off `profile.*` instead of falling back to the
+ *   race-derived placeholders (`race.allianceName` / `race.allianceTag`),
+ *   which are cosmetic lore strings and have nothing to do with the
+ *   player's actual guild state.
+ *
+ *   The hook also exposes `refresh()` — a stable callback that re-fires
+ *   GET /users/profile and updates state. Pages that mutate guild
+ *   membership during their lifetime (e.g. /alliance after POST
+ *   /alliances/join or /alliances/leave) must call `refresh()` on
+ *   success so `hasAlliance = Boolean(profile?.allianceTag)` flips
+ *   without forcing the player through a full page reload. The previous
+ *   implementation only fetched once on mount (deps: []), so joining an
+ *   alliance left the screen stuck in the "İttifak Yok" empty state until
+ *   the user reloaded manually.
+ */
 
 export interface UserProfileDto {
   id: string;
@@ -38,6 +61,16 @@ interface UseUserProfileResult {
   loading: boolean;
   error: string | null;
   authenticated: boolean;
+  /**
+   * Re-fetch GET /users/profile on demand. Returns a Promise that resolves
+   * once state has been updated, so callers can `await refresh()` before
+   * navigating or reading derived values. Safe to call repeatedly; the
+   * hook handles in-flight cancellation through `refreshKey`.
+   *
+   * Call sites: /alliance after join/leave mutations, anywhere else that
+   * mutates guild context and needs the next render to reflect it.
+   */
+  refresh: () => void;
 }
 
 export function useUserProfile(): UseUserProfileResult {
@@ -45,6 +78,15 @@ export function useUserProfile(): UseUserProfileResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
+  // refreshKey bump → effect re-runs → fresh /users/profile fetch. Using
+  // a state-based trigger (not a ref to the fetch function) keeps the
+  // cancellation semantics from the original effect intact: any in-flight
+  // request gets `cancelled = true` before the new one starts.
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     if (!hasSession()) {
@@ -53,6 +95,7 @@ export function useUserProfile(): UseUserProfileResult {
       return;
     }
     setAuthenticated(true);
+    setLoading(true);
     let cancelled = false;
     api
       .get<UserProfileDto>('/users/profile')
@@ -75,7 +118,7 @@ export function useUserProfile(): UseUserProfileResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
-  return { profile, loading, error, authenticated };
+  return { profile, loading, error, authenticated, refresh };
 }

@@ -177,8 +177,14 @@ export default function ProfilePage() {
       handle: live?.username ?? race.handle,
       title: race.title,
       avatar: race.avatar,
-      allianceTag: live?.allianceTag ?? race.allianceTag,
-      allianceName: race.allianceName,
+      // Cycle 8 / DRIFT-1: the API now ships authoritative alliance
+      // fields on /users/profile (allianceTag / allianceName / allianceId
+      // / allianceRole). Read those directly — `race.allianceTag` and
+      // `race.allianceName` are cosmetic lore strings ("Insan Konseyi")
+      // that masquerade as guild membership when the player has none.
+      // Guildless players see "—" / "İttifak Yok" instead.
+      allianceTag: live?.allianceTag ?? '—',
+      allianceName: live?.allianceName ?? 'İttifak Yok',
       capitalBase: race.capitalBase,
       level: liveTier?.tier?.currentLevel ?? live?.level ?? 1,
       power: livePower ?? 0,

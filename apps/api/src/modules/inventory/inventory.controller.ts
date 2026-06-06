@@ -51,6 +51,33 @@ export class InventoryController {
     return this.inventoryService.getCapacity(req.user.id);
   }
 
+  /**
+   * BLOCKER CHAIN-08-A1 fix
+   * ----------------------------------------------
+   * Shop HUD used to show game-server `energy` (default 250) as gem balance,
+   * but POST /shop/purchase debits api-side `user_currency.premium_gems`
+   * (default 0). Two completely different wallets → every fresh-account
+   * purchase failed with "Yetersiz bakiye: premium_gems 0 < 200" and all
+   * cycle-8-seeded SKUs were unbuyable.
+   *
+   * Fix: expose the REAL api-side wallet via a thin GET endpoint the shop
+   * HUD can read. Lazy-creates the row with a starter balance the first
+   * time a player hits it so anyone whose `register()` predates the auth
+   * seed (or skipped it) still gets a usable balance instead of all-zero.
+   *
+   * Lives on /api/v1/inventory/wallet because InventoryModule already owns
+   * the UserCurrency entity (used by sellItem to credit gems). Adding a
+   * second module/controller just to host this would duplicate the
+   * TypeOrmModule.forFeature registration.
+   */
+  @Get('wallet')
+  @ApiOperation({ summary: 'Kullanıcının premium wallet bakiyesi (premium_gems, nebula_coins, void_crystals)' })
+  @ApiResponse({ status: 200, description: 'Wallet bakiyesi' })
+  @ApiResponse({ status: 401, description: 'Kimlik doğrulama gerekli' })
+  getWallet(@Request() req: ExpressRequest & { user: { id: string } }) {
+    return this.inventoryService.getWallet(req.user.id);
+  }
+
   @Get(':itemId')
   @ApiOperation({ summary: 'Tekil envanter item detayı' })
   @ApiParam({ name: 'itemId', description: 'Envanter item UUID' })

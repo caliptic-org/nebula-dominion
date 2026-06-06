@@ -112,6 +112,53 @@ export class AuthService {
     }
   }
 
+  /**
+   * BLOCKER CHAIN-08-A1 fix — starter premium wallet.
+   *
+   * Without this, every fresh account had `user_currency.premium_gems = 0`
+   * the first time the shop HUD rendered, and every Satın Al attempt
+   * 400'd with "Yetersiz bakiye: premium_gems 0 < 200". The shop HUD
+   * (previously reading game-server energy) made it LOOK like the player
+   * had 250 gems, so the failure read as a scam.
+   *
+   * Now we materialise the api-side wallet row on registration with a
+   * small starter balance (100 premium_gems + 1000 nebula_coins). This
+   * is the same balance InventoryService.getWallet() seeds for legacy
+   * accounts; the two paths share the constants conceptually so a tester
+   * can buy at least the cheap SKUs (speed-boost @ 50 gems) without
+   * going through XP-conversion grind first.
+   *
+   * Idempotent: ON CONFLICT DO NOTHING preserves any pre-existing row
+   * (e.g. inventory.sellItem already credited the player before signup
+   * raced the wallet insert).
+   *
+   * Best-effort: a failed seed becomes a warn log. The user can still
+   * play — InventoryService.getWallet() will self-heal on first /wallet
+   * fetch.
+   */
+  private async seedStarterWallet(userId: string): Promise<void> {
+    const STARTER_PREMIUM_GEMS = 100;
+    const STARTER_NEBULA_COINS = 1000;
+    try {
+      await this.dataSource.query(
+        `INSERT INTO user_currency
+           (user_id, premium_gems, nebula_coins, void_crystals, updated_at)
+         VALUES ($1::uuid, $2, $3, 0, NOW())
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId, STARTER_PREMIUM_GEMS, STARTER_NEBULA_COINS],
+      );
+      this.logger.log(
+        `seed wallet: +${STARTER_PREMIUM_GEMS} premium_gems, +${STARTER_NEBULA_COINS} nebula_coins for user=${userId}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `seedStarterWallet failed for ${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        } — InventoryService.getWallet will self-heal on first /wallet fetch`,
+      );
+    }
+  }
+
   async register(dto: RegisterDto): Promise<AuthResult> {
     const existing = await this.userRepo.findOne({
       where: [{ email: dto.email }, { username: dto.username }],
@@ -129,6 +176,11 @@ export class AuthService {
       password: hashed,
     });
     await this.userRepo.save(user);
+
+    // Seed the api-side premium wallet so the shop HUD has a non-zero
+    // balance to show and the FIRST purchase doesn't bounce with
+    // "Yetersiz bakiye". See seedStarterWallet block comment.
+    await this.seedStarterWallet(user.id);
 
     // TEMPORARY playtest rule (remove before launch) — @yopmail accounts
     // skip the early-game resource grind so testers can immediately try

@@ -177,23 +177,36 @@ export class BuildingsService {
   /**
    * Per-level upgrade COST exponent: cost = baseCost × EXP^level.
    *
-   * cycle 17 BAL-01 — lowered 1.5 → 1.22 to track the 1.18 yield curve
-   * applied in recalculateProductionRates (`1.18^(level-1)`). Old 1.5
-   * exponent outpaced yield by 1.5/1.18 = 1.271×/level, so past ~Lv30 a
-   * single building could never out-earn its own next upgrade — a
-   * perpetual-deficit wall (Lv40→41 payback was ~112 days). At 1.22 the
-   * cost/yield ratio is 1.22/1.18 = 1.034×/level, keeping payback under
-   * ~3 days at Lv50 and the upgrade loop self-funding all the way to the
-   * Lv54 cap.
+   * cycle 20 ECON-BAL-01/02 — the production-curve rebalance.
    *
-   * NOTE: first-pass retune. The final value should be confirmed against
-   * playtest / telemetry (median upgrade cadence, wallet net-flow) before
-   * being treated as locked.
+   * The cycle-17 pair (cost 1.22 / yield 1.18) claimed "payback ~3 days at
+   * Lv50", but the audit re-derived it as ~1 HOUR: the 2880-ticks/day income
+   * multiplier dwarfs the tiny 1.22/1.18 = 1.034×/level cost-vs-yield drift,
+   * so a Lv54 extractor self-funded its next upgrade almost instantly AND
+   * compounded to ~279M mineral/day (base-wide income in the BILLIONS/day,
+   * which hit the 10T storage cap in under a day and made every sink trivial
+   * — the economy stopped being a constraint by mid-Age-2).
    *
-   * Tunable in ONE place — both the live cost calc (L~250) and any future
-   * cost-estimate helper should read this constant, not a literal.
+   * Fix: lower the yield exponent to BUILDING_YIELD_EXP = 1.10 (1.10^53 = 148×
+   * vs the old 6451× → a Lv54 extractor now earns ~6.4M/day, base-wide income
+   * in the low-tens-of-millions/day) and set cost = 1.17 so the cost/yield
+   * ratio is 1.17/1.10 = 1.0636×/level — over the 0→54 span cost outpaces a
+   * single building's income by ~29×, putting a late upgrade's payback back
+   * in the intended multi-day window. The change is self-targeting: at low
+   * level 1.10 vs 1.18 differ little (L5: 1.46× vs 1.94×), so early-game
+   * pacing is roughly preserved; the compounding only bites at high level
+   * where the inflation lived.
+   *
+   * Tunable in ONE place — both the live cost calc (L~250) and the production
+   * scaling (recalculateProductionRates) read these constants, not literals.
    */
-  private static readonly BUILDING_UPGRADE_COST_EXP = 1.22;
+  private static readonly BUILDING_UPGRADE_COST_EXP = 1.17;
+
+  /** Per-level production YIELD exponent: rate = base × EXP^(level-1).
+   *  Lowered 1.18 → 1.10 in cycle 20 (ECON-BAL-01) — see the cost-exponent
+   *  JSDoc above. Shared by the mineral/gas/energy AND science legacy-fallback
+   *  scaling so they stay in lockstep with the cost curve. */
+  private static readonly BUILDING_YIELD_EXP = 1.1;
 
   async upgradeBuilding(playerId: string, buildingId: string): Promise<Building> {
     const building = await this.buildingRepo.findOne({ where: { id: buildingId, playerId } });
@@ -462,7 +475,7 @@ export class BuildingsService {
       // production branch the currencies take below.
       const scienceBase = BUILDING_CONFIGS[building.type].production.sciencePerTick ?? 0;
       if (scienceBase > 0) {
-        const sciLevelScale = Math.pow(1.18, Math.max(0, building.level - 1));
+        const sciLevelScale = Math.pow(BuildingsService.BUILDING_YIELD_EXP, Math.max(0, building.level - 1));
         sciencePerTick += Math.round(scienceBase * sciLevelScale);
       }
 
@@ -490,16 +503,19 @@ export class BuildingsService {
         // gives the player the intended +18% per-level gain.
         // Lv 1 → 1.0× · Lv 5 → 1.94× · Lv 10 → 4.43× · Lv 20 → 24×
         const legacyCfg = BUILDING_CONFIGS[building.type];
-        const legacyScale = Math.pow(1.18, Math.max(0, building.level - 1));
+        const legacyScale = Math.pow(BuildingsService.BUILDING_YIELD_EXP, Math.max(0, building.level - 1));
         mineralPerTick += Math.round(legacyCfg.production.mineralPerTick * legacyScale);
         gasPerTick     += Math.round(legacyCfg.production.gasPerTick * legacyScale);
-        // Energy: only the production side scales. Consumption stays
-        // flat — a Lv 10 factory still drains the same power but
-        // outputs more, which lines up with how upgrades feel in
-        // real-time strategy genre conventions.
+        // cycle 20 ECON-BAL-03 — energy CONSUMPTION now scales with level too
+        // (at the same yield exponent), so a leveled factory / defense_matrix
+        // actually pressures the grid instead of draining a flat amount
+        // forever (energy used to flip to surplus-forever by ~Age 2). Scaling
+        // the NET (production − consumption) by the same factor preserves the
+        // SIGN of a net-positive base at every level — it can never flip the
+        // cycle-19 HUMAN starter's +energy budget negative — while making
+        // high-level consumers a real draw.
         energyPerTick  += Math.round(
-          legacyCfg.production.energyPerTick * legacyScale -
-            legacyCfg.energyConsumptionPerTick,
+          (legacyCfg.production.energyPerTick - legacyCfg.energyConsumptionPerTick) * legacyScale,
         );
       }
     }

@@ -64,12 +64,12 @@ import { scaledDurationSec } from '@/lib/game-speed';
 
 // Building upgrade cost exponent — FE mirror of
 // BuildingsService.BUILDING_UPGRADE_COST_EXP (game-server). cost estimate
-// shown here = baseCost × EXP^level. cycle 17 BAL-01: lowered 1.5 → 1.22
-// so the displayed "next level" price matches what the server actually
-// charges AND tracks the 1.18 yield curve (upgrades stay self-funding past
-// Lv30). Keep this in lock-step with the backend constant — a mismatch
-// makes the UI overstate or understate the upgrade price.
-const BUILDING_UPGRADE_COST_EXP = 1.22;
+// shown here = baseCost × EXP^level. cycle 20 ECON-BAL-01/02: lowered
+// 1.22 → 1.17 in lockstep with the BE production-curve rebalance (yield
+// exponent 1.18 → 1.10) so a late upgrade is a multi-day decision instead of
+// self-funding in ~1 hour. MUST stay in lock-step with the backend constant —
+// a mismatch makes the UI overstate or understate the upgrade price.
+const BUILDING_UPGRADE_COST_EXP = 1.17;
 
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a

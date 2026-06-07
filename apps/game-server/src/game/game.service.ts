@@ -20,6 +20,23 @@ const GRID_WIDTH = 8;
 const GRID_HEIGHT = 6;
 const SKILL_COOLDOWNS: Record<number, number> = { 0: 2, 1: 3, 2: 4, 3: 5 };
 
+// ── cycle 19 BAL-DEPTH-2 / BAL-DEPTH-6 — ability effects ──────────────────
+// Abilities used to spend 10 mana + the unit's action for ZERO board effect
+// (a strict-worse-than-attack trap; optimal play was to never press the
+// button, and mutation `unlocksAbility` nodes were therefore half-vestigial).
+// Now an ability resolves the unit's ACTUAL unlocked ability (from
+// race-configs unit kits + mutation unlocks, carried on UnitState.abilities)
+// and applies a real immediate effect — SUPPORT abilities heal the caster +
+// nearby allies; everything else is an AoE strike on nearby enemies. Effects
+// are self/AoE so no target param is needed (the ability action carries only
+// unitId + skillIndex). A unit with no named ability in the slot still gets a
+// generic AoE so the action is never a no-op (and the PvE bot, which uses
+// slot 0, never stalls on a failed ability).
+const ABILITY_RADIUS = 2; // Manhattan radius for AoE damage / heal
+const ABILITY_AOE_FACTOR = 0.6; // per-target AoE damage = attack · dmgMul · this · defReduction
+const ABILITY_HEAL_PCT = 0.3; // heal = 30% of each ally's maxHp
+const ABILITY_SUPPORT_PATTERN = /heal|regen|repair|restor|transfus|shield|plating|rally|tactical/i;
+
 export interface GameCreatedEvent {
   match: MatchResult;
   room: GameRoom;
@@ -309,19 +326,65 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     unit.skillCooldownMax[skillIndex] = cooldown;
     unit.actionUsed = true;
     room.players[userId].lastActionSequence = dto.sequenceNumber;
-    await this.rooms.save(room);
 
-    return {
-      success: true,
-      room,
-      events: [
-        { type: 'ability_used', data: { unitId, skillIndex, cooldown } },
-        {
-          type: 'battle_event',
-          data: { type: 'ability', actorName: unit.type, targetName: '', value: 0, isCrit: false },
-        },
-      ],
-    };
+    // ── cycle 19 BAL-DEPTH-2/6 — apply a REAL ability effect ──────────────
+    const abilityId = unit.abilities?.[skillIndex];
+    const isSupport = abilityId ? ABILITY_SUPPORT_PATTERN.test(abilityId) : false;
+    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    const events: GameEvent[] = [];
+
+    if (isSupport) {
+      // SUPPORT — heal the caster + allies within ABILITY_RADIUS.
+      const allies = room.players[userId].units;
+      let healed = 0;
+      for (const a of allies) {
+        if (dist(a.position, unit.position) <= ABILITY_RADIUS && a.hp < a.maxHp) {
+          const before = a.hp;
+          a.hp = Math.min(a.maxHp, a.hp + Math.round(a.maxHp * ABILITY_HEAL_PCT));
+          healed += a.hp - before;
+        }
+      }
+      events.push({ type: 'ability_used', data: { unitId, skillIndex, abilityId: abilityId ?? null, cooldown, kind: 'heal', value: healed } });
+      events.push({ type: 'battle_event', data: { type: 'ability', actorName: unit.type, targetName: 'allies', value: healed, isCrit: false } });
+      room.players[userId].lastActionSequence = dto.sequenceNumber;
+      await this.rooms.save(room);
+      return { success: true, room, events };
+    }
+
+    // OFFENSIVE — AoE strike on enemy units within ABILITY_RADIUS of the caster.
+    const opponentId = this.opponentOf(room, userId);
+    const attackerCmd = await this.commanders.getActiveBonus(userId);
+    const dmgMul = 1 + (attackerCmd.damageMultiplier ?? 0);
+    const enemies = room.players[opponentId]?.units ?? [];
+    let totalDmg = 0;
+    for (const e of enemies) {
+      if (dist(e.position, unit.position) <= ABILITY_RADIUS) {
+        const dmg = Math.max(
+          1,
+          Math.round((unit.attack * dmgMul * ABILITY_AOE_FACTOR * 40) / (40 + Math.max(0, e.defense))),
+        );
+        e.hp -= dmg;
+        totalDmg += dmg;
+      }
+    }
+    const killed = enemies.filter((e) => e.hp <= 0).map((e) => e.id);
+    if (killed.length > 0) {
+      room.players[opponentId].units = enemies.filter((e) => e.hp > 0);
+      for (const id of killed) {
+        events.push({ type: 'unit_died', data: { unitId: id, ownerId: opponentId } });
+      }
+    }
+    events.push({ type: 'ability_used', data: { unitId, skillIndex, abilityId: abilityId ?? null, cooldown, kind: 'damage', value: totalDmg } });
+    events.push({ type: 'battle_event', data: { type: 'ability', actorName: unit.type, targetName: 'enemies', value: totalDmg, isCrit: false } });
+
+    if ((room.players[opponentId]?.units.length ?? 0) === 0) {
+      return this.finishGame(userId, opponentId, room, events, dto.sequenceNumber, 'all_units_destroyed');
+    }
+
+    room.players[userId].lastActionSequence = dto.sequenceNumber;
+    await this.rooms.save(room);
+    return { success: true, room, events };
   }
 
   private async handleEndTurn(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {

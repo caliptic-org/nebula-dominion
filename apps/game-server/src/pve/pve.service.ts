@@ -35,11 +35,19 @@ export class PveService {
     const botId = makeBotId();
     const selectedBotRace = botRace ?? this.pickBotRace(playerRace);
 
+    // Cycle-19 BAL-DEPTH-1 — the player fights with their real trained/merged
+    // roster, and the bot MIRRORS that formation (at PVE_BOT_DIFFICULTY) so
+    // PvE scales with the player's development instead of a developed roster
+    // one-shotting a fixed template weakling. Both fall back to race templates
+    // when the player has no roster (fresh account / load hiccup).
+    const playerUnits = await this.gameService.loadFormation(playerId, playerRace);
+    const botUnits = this.rooms.buildBotMirror(playerUnits, selectedBotRace);
+
     const matchId = uuidv4();
     const room = await this.rooms.create(
       matchId,
-      { userId: playerId, socketId: playerSocketId, race: playerRace, elo: playerElo, gamesPlayed: playerGamesPlayed },
-      { userId: botId, socketId: '', race: selectedBotRace, elo: playerElo, gamesPlayed: 10 },
+      { userId: playerId, socketId: playerSocketId, race: playerRace, elo: playerElo, gamesPlayed: playerGamesPlayed, units: playerUnits },
+      { userId: botId, socketId: '', race: selectedBotRace, elo: playerElo, gamesPlayed: 10, units: botUnits },
       'pve',
     );
 

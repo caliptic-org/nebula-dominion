@@ -12,6 +12,8 @@ import { XpSource } from '../progression/config/level-config';
 import { MergeService } from './merge/merge.service';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { CommandersService } from '../commanders/commanders.service';
+import { UnitsService } from '../units/units.service';
+import { Race } from '../matchmaking/dto/join-queue.dto';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 const GRID_WIDTH = 8;
@@ -65,8 +67,27 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     private readonly mergeService: MergeService,
     private readonly questProgress: QuestProgressNotifier,
     private readonly commanders: CommandersService,
+    private readonly units: UnitsService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
+  }
+
+  /**
+   * Cycle-19 BAL-DEPTH-1 — load a player's persisted roster and build their
+   * battle formation. Returns undefined on any failure so RoomService.create
+   * falls back to the race template (a battle must never fail to start on a
+   * roster-read hiccup). PUBLIC so the PvE path can reuse it.
+   */
+  async loadFormation(userId: string, race: Race): Promise<UnitState[] | undefined> {
+    try {
+      const roster = await this.units.getUnits(userId);
+      return this.rooms.buildFormationUnits(roster, race);
+    } catch (err) {
+      this.logger.warn(
+        `formation load failed user=${userId}: ${(err as Error)?.message ?? err}`,
+      );
+      return undefined;
+    }
   }
 
   onModuleInit(): void {
@@ -82,10 +103,19 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   async onMatchFound(match: MatchResult): Promise<void> {
     const { matchId, player1, player2 } = match;
 
+    // Cycle-19 BAL-DEPTH-1 — both players fight with their actual trained/
+    // merged rosters (matchmaking is ELO-paired, so development is symmetric
+    // and the fight stays fair). A roster-load failure → undefined → template
+    // fallback inside create().
+    const [units1, units2] = await Promise.all([
+      this.loadFormation(player1.userId, player1.race),
+      this.loadFormation(player2.userId, player2.race),
+    ]);
+
     const room = await this.rooms.create(
       matchId,
-      { userId: player1.userId, socketId: player1.socketId, race: player1.race, elo: player1.elo, gamesPlayed: player1.gamesPlayed },
-      { userId: player2.userId, socketId: player2.socketId, race: player2.race, elo: player2.elo, gamesPlayed: player2.gamesPlayed },
+      { userId: player1.userId, socketId: player1.socketId, race: player1.race, elo: player1.elo, gamesPlayed: player1.gamesPlayed, units: units1 },
+      { userId: player2.userId, socketId: player2.socketId, race: player2.race, elo: player2.elo, gamesPlayed: player2.gamesPlayed, units: units2 },
       player1.mode,
     );
 

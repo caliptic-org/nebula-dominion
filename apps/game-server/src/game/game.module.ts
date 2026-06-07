@@ -4,6 +4,7 @@ import { MatchmakingModule } from '../matchmaking/matchmaking.module';
 import { AntiCheatModule } from '../anti-cheat/anti-cheat.module';
 import { ProgressionModule } from '../progression/progression.module';
 import { CommandersModule } from '../commanders/commanders.module';
+import { UnitsModule } from '../units/units.module';
 import { GameGateway } from './game.gateway';
 import { GameService } from './game.service';
 import { RoomService } from './room.service';
@@ -12,7 +13,7 @@ import { MergeService } from './merge/merge.service';
 import { MergeController } from './merge/merge.controller';
 
 @Module({
-  imports: [AuthModule, MatchmakingModule, AntiCheatModule, ProgressionModule, CommandersModule],
+  imports: [AuthModule, MatchmakingModule, AntiCheatModule, ProgressionModule, CommandersModule, UnitsModule],
   // `MergeController` was previously listed under `providers` which makes
   // NestJS register it as an injectable class but DOES NOT mount its HTTP
   // routes — every @Get/@Post/@Put on it 404'd silently.  Controllers go

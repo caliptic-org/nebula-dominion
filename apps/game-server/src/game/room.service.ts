@@ -70,6 +70,36 @@ const ROOM_KEY = (id: string) => `game:room:${id}`;
 const USER_ROOM_KEY = (uid: string) => `user:room:${uid}`;
 const ACTIVE_ROOMS_KEY = 'game:active_rooms';
 
+/**
+ * Cycle-19 BAL-DEPTH-1 — max units a side fields in a battle. A player can own
+ * dozens of trained units; the turn-based engine + battle UI expect a bounded
+ * roster, so we field the strongest N. 6 mirrors the size of the old per-race
+ * UNIT_TEMPLATES rosters (4-6 units) the engine was tuned around.
+ */
+export const BATTLE_FORMATION_SIZE = 6;
+
+/** Default PvE bot strength relative to the player's formation (fair-but-winnable). */
+export const PVE_BOT_DIFFICULTY = 0.9;
+
+/** Minimal persisted-roster shape buildFormationUnits accepts (a subset of
+ *  PlayerUnit) so RoomService stays decoupled from the units entity. */
+export interface RosterUnitInput {
+  type: string;
+  hp: number;
+  maxHp?: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  abilities?: string[];
+}
+
+/** A player input to RoomService.create — optionally carrying a pre-built
+ *  battle roster (cycle-19 BAL-DEPTH-1). */
+export type CreatePlayerInput = Pick<
+  PlayerState,
+  'userId' | 'socketId' | 'race' | 'elo' | 'gamesPlayed'
+> & { units?: UnitState[] };
+
 const UNIT_TEMPLATES: Record<Race, Omit<UnitState, 'id' | 'position' | 'actionUsed'>[]> = {
   [Race.HUMAN]: [
     { type: 'soldier', hp: 30, maxHp: 30, attack: 8, defense: 5, speed: 3 },
@@ -136,19 +166,27 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
 
   async create(
     matchId: string,
-    p1: Pick<PlayerState, 'userId' | 'socketId' | 'race' | 'elo' | 'gamesPlayed'>,
-    p2: Pick<PlayerState, 'userId' | 'socketId' | 'race' | 'elo' | 'gamesPlayed'>,
+    p1: CreatePlayerInput,
+    p2: CreatePlayerInput,
     mode: string,
   ): Promise<GameRoom> {
     const roomId = uuidv4();
     const players: Record<string, PlayerState> = {};
 
     for (const p of [p1, p2]) {
+      // Cycle-19 BAL-DEPTH-1 — fight with the player's actual trained/merged
+      // roster when supplied; fall back to the race template otherwise (fresh
+      // account / roster-load failure) so a battle always has units. The
+      // `units` field never reaches the persisted PlayerState beyond here.
+      const { units: providedUnits, ...rest } = p;
       players[p.userId] = {
-        ...p,
+        ...rest,
         hp: 100,
         mana: 50,
-        units: this.buildStartingUnits(p.race),
+        units:
+          providedUnits && providedUnits.length > 0
+            ? providedUnits
+            : this.buildStartingUnits(p.race),
         connected: true,
         lastActionSequence: -1,
       };
@@ -267,6 +305,81 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
       position: { x: 0, y: i },
       actionUsed: false,
     }));
+  }
+
+  /**
+   * Cycle-19 BAL-DEPTH-1 — build a battle formation from a player's persisted
+   * trained/merged roster. Previously every battle used a fixed UNIT_TEMPLATES
+   * roster, so training, the 5-tier merge ladder, per-unit upgrades and race
+   * bonuses had ZERO effect on who won — character development was decoupled
+   * from combat. Now the player fights with the strongest BATTLE_FORMATION_SIZE
+   * of their ACTUAL units (PlayerUnit hp/attack/defense/speed already bake in
+   * upgrade +10%/level, merge results, and race multipliers). Units enter at
+   * full health (maxHp). An empty roster (fresh account) or a load failure
+   * upstream falls back to the race template so a battle always has units —
+   * the engine and FE behave exactly as before for those cases.
+   */
+  buildFormationUnits(roster: RosterUnitInput[] | null | undefined, race: Race): UnitState[] {
+    const valid = (roster ?? []).filter(
+      (u) =>
+        !!u &&
+        Number.isFinite(Number(u.hp)) &&
+        Number(u.hp) > 0 &&
+        Number.isFinite(Number(u.attack)),
+    );
+    if (valid.length === 0) return this.buildStartingUnits(race);
+
+    const power = (u: RosterUnitInput) =>
+      Math.max(0, Number(u.hp)) * Math.max(0, Number(u.attack));
+    const top = [...valid].sort((a, b) => power(b) - power(a)).slice(0, BATTLE_FORMATION_SIZE);
+
+    return top.map((u, i) => {
+      const full = Math.max(1, Math.round(Number(u.maxHp ?? u.hp)));
+      return {
+        id: uuidv4(),
+        type: String(u.type ?? 'unit'),
+        hp: full,
+        maxHp: full,
+        attack: Math.max(0, Math.round(Number(u.attack))),
+        defense: Math.max(0, Math.round(Number(u.defense))),
+        speed: Math.max(0, Math.round(Number(u.speed))),
+        position: { x: 0, y: i },
+        actionUsed: false,
+        abilities: Array.isArray(u.abilities) ? u.abilities : [],
+      };
+    });
+  }
+
+  /**
+   * Cycle-19 BAL-DEPTH-1 — PvE bot roster. Mirrors the player's formation at
+   * `difficulty` strength so the bot scales WITH the player's development (a
+   * developed roster no longer one-shots a fixed template weakling) and the
+   * fight stays fair-but-winnable. Falls back to the bot's race template when
+   * the player has no formation (fresh account).
+   */
+  buildBotMirror(
+    playerFormation: UnitState[] | null | undefined,
+    botRace: Race,
+    difficulty = PVE_BOT_DIFFICULTY,
+  ): UnitState[] {
+    const src = (playerFormation ?? []).filter((u) => !!u && Number(u.maxHp) > 0);
+    if (src.length === 0) return this.buildStartingUnits(botRace);
+    const f = Math.min(1.5, Math.max(0.1, Number(difficulty) || PVE_BOT_DIFFICULTY));
+    return src.map((u, i) => {
+      const full = Math.max(1, Math.round(Number(u.maxHp) * f));
+      return {
+        id: uuidv4(),
+        type: u.type,
+        hp: full,
+        maxHp: full,
+        attack: Math.max(1, Math.round(Number(u.attack) * f)),
+        defense: Math.max(0, Math.round(Number(u.defense))),
+        speed: Math.max(0, Math.round(Number(u.speed))),
+        position: { x: 0, y: i },
+        actionUsed: false,
+        abilities: Array.isArray(u.abilities) ? [...u.abilities] : [],
+      };
+    });
   }
 
   onModuleDestroy(): void {

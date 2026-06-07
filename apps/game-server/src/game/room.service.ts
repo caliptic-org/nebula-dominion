@@ -329,8 +329,17 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
     );
     if (valid.length === 0) return this.buildStartingUnits(race);
 
-    const power = (u: RosterUnitInput) =>
-      Math.max(0, Number(u.hp)) * Math.max(0, Number(u.attack));
+    // Cycle 20 BAL-DEPTH-1-POWER-METRIC — credit survivability so tanks (high
+    // def) and durable supports aren't benched in favour of pure glass cannons.
+    // The (1 + def/40) factor mirrors the def/(40+def) combat-mitigation model,
+    // so a def-38 unit's effective combat value is weighted ~1.95x its raw
+    // hp·attack instead of 1.0x.
+    const power = (u: RosterUnitInput) => {
+      const hp = Math.max(0, Number(u.hp));
+      const atk = Math.max(0, Number(u.attack));
+      const def = Math.max(0, Number(u.defense));
+      return hp * atk * (1 + def / 40);
+    };
     const top = [...valid].sort((a, b) => power(b) - power(a)).slice(0, BATTLE_FORMATION_SIZE);
 
     return top.map((u, i) => {

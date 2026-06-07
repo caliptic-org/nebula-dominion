@@ -70,7 +70,7 @@ const BASE_BONUSES: Record<string, CommanderBonus> = {
   threnix:  { trainSpeedMultiplier: -0.28 },                    // "Mutasyon hızı +28%"
   // cycle-19 BAL-DEPTH-3 — morgath repurposed as the zerg TANK pick: trades raw
   // damage for heavy defense + HP, the defensive counterpart to aggressive vex.
-  morgath:  { damageMultiplier: 0.10, defenseMultiplier: 0.22, hpMultiplier: 0.18 }, // tactical tank
+  morgath:  { damageMultiplier: 0.10, defenseMultiplier: 0.16, hpMultiplier: 0.18 }, // tactical tank (cycle-20: 0.22→0.16, was 2x the next-highest def)
   kthala:   { resourceProductionMultiplier: 0.25 },             // "Üretim Lordu" (locked T5)
 
   // ─── Otomat ─────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ export const COMMANDER_CATALOG: CommanderCatalogEntry[] = [
   // ── Zerg ──
   { id: 'vex',     name: "Ana Kraliçe Vex'thara", title: 'Kovan Bilinci',   race: 'zerg',  tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı, +10% HP', startsUnlocked: true,  portrait: '/assets/characters/zerg/vex_thara.png' },
   { id: 'threnix', name: 'Genom Üstadı Threnix',  title: 'Evrim Mühendisi', race: 'zerg',  tier: 'TIER 3',      skill: 'Mutasyon hızı +28%',          startsUnlocked: true,  portrait: '/assets/characters/zerg/threnix.png' },
-  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Taktik Savunma',  race: 'zerg',  tier: 'TIER 4',      skill: '+10% hasar, +22% savunma, +18% HP', startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
+  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Taktik Savunma',  race: 'zerg',  tier: 'TIER 4',      skill: '+10% hasar, +16% savunma, +18% HP', startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
   { id: 'kthala',  name: 'Brood-Anne Kthala',     title: 'Üretim Lordu',    race: 'zerg',  tier: 'TIER 5',      skill: 'Kaynak üretimi +25%',         startsUnlocked: false, portrait: '/assets/characters/zerg/kthala.png' },
   // ── Otomat ──
   { id: 'prime',    name: 'Demiurge Prime',         title: 'Merkez YZ',      race: 'otomat', tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%',            startsUnlocked: true,  portrait: '/assets/characters/otomat/demiurge_prime.png' },

@@ -34,7 +34,7 @@ const SKILL_COOLDOWNS: Record<number, number> = { 0: 2, 1: 3, 2: 4, 3: 5 };
 // slot 0, never stalls on a failed ability).
 const ABILITY_RADIUS = 2; // Manhattan radius for AoE damage / heal
 const ABILITY_AOE_FACTOR = 0.6; // per-target AoE damage = attack · dmgMul · this · defReduction
-const ABILITY_HEAL_PCT = 0.3; // heal = 30% of each ally's maxHp
+const ABILITY_HEAL_PCT = 0.2; // heal = 20% of each ally's maxHp (cycle 20 BAL-DEPTH-3: 0.30 sustain ≈ attacker DPS → tank-mirror stalemate; lowered so attacks out-pace heals)
 const ABILITY_SUPPORT_PATTERN = /heal|regen|repair|restor|transfus|shield|plating|rally|tactical/i;
 
 export interface GameCreatedEvent {
@@ -243,10 +243,13 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     // 0.75 reduction cap (which a 38-def unit never approaches). Worked
     // example: Marine atk10 vs Zergling def3 → 9 dmg; Zergling atk9 vs Marine
     // def7 → 8 dmg.
-    const baseDamage = Math.max(
-      1,
-      Math.round((attacker.attack * dmgMul * 40) / (40 + effectiveDefense)),
-    );
+    // Cycle 20 BAL-DEPTH-3 — the 0.75 mitigation cap promised in the comment
+    // above was never actually enforced. Floor the damage factor at 0.25 so at
+    // least 25% of every hit lands, bounding the high-def-commander + heal
+    // sustain loop that could otherwise stalemate (morgath L30 → ~59% mitig;
+    // the cap keeps any future stacking from exceeding 75%).
+    const dmgFactor = Math.max(0.25, 40 / (40 + effectiveDefense));
+    const baseDamage = Math.max(1, Math.round(attacker.attack * dmgMul * dmgFactor));
     const damage = isCrit ? Math.round(baseDamage * 1.75) : Math.round(baseDamage);
     target.hp -= damage;
     attacker.actionUsed = true;
@@ -319,6 +322,11 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
 
   private async handleAbility(userId: string, dto: GameActionDto, room: GameRoom): Promise<ActionResult> {
     if (room.currentPlayerId !== userId) return fail('Not your turn');
+    // Cycle 20 BAL-DEPTH-2-DEPLOY-AOE — abilities are ACTION-phase only, like
+    // handleAttack/handleMerge. Without this guard the first player could fire
+    // an AoE on turn 1 during DEPLOY (before the opponent ever acts), landing a
+    // free first-strike nuke on the still-stacked enemy column.
+    if (room.phase !== TurnPhase.ACTION) return fail('Not action phase');
 
     const { unitId, skillIndex = 0 } = dto.payload as any;
     if (skillIndex < 0 || skillIndex > 3) return fail('Invalid skill index');
@@ -374,10 +382,9 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     let totalDmg = 0;
     for (const e of enemies) {
       if (dist(e.position, unit.position) <= ABILITY_RADIUS) {
-        const dmg = Math.max(
-          1,
-          Math.round((unit.attack * dmgMul * ABILITY_AOE_FACTOR * 40) / (40 + Math.max(0, e.defense))),
-        );
+        // Same 0.75 mitigation cap as handleAttack (cycle 20 BAL-DEPTH-3).
+        const dmgFactor = Math.max(0.25, 40 / (40 + Math.max(0, e.defense)));
+        const dmg = Math.max(1, Math.round(unit.attack * dmgMul * ABILITY_AOE_FACTOR * dmgFactor));
         e.hp -= dmg;
         totalDmg += dmg;
       }

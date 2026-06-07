@@ -236,6 +236,32 @@ export class DailyRewardsService {
     quest.progress = Math.min(quest.progress + amount, quest.targetAmount);
     if (quest.progress >= quest.targetAmount) {
       quest.completed = true;
+      await this.questRepo.save(quest);
+
+      // Cycle-21 DQ-2 — ACTUALLY credit the quest reward to the wallet.
+      // Previously recordQuestProgress only emitted 'quest_completed' and the
+      // gateway discarded every reward field (no ResourcesService.grant), so a
+      // completed daily quest paid exactly zero — same display-only defect the
+      // cycle-19 streak fix addressed. Credit mineral/gas/energy here at the
+      // source of truth (atomic + cap-clamped in grant), best-effort so a
+      // wallet hiccup never un-completes the quest. (XP reward still flows via
+      // the event for now; a progression-XP credit is a follow-up that needs
+      // ProgressionService.) NOTE: quest PROGRESS itself is wired in a separate
+      // follow-up — gameplay services must call recordQuestProgress on
+      // win_battle / build_structure / train_units / produce_* events.
+      const mineral = Math.max(0, Math.floor(Number(quest.mineralReward) || 0));
+      const gas = Math.max(0, Math.floor(Number(quest.gasReward) || 0));
+      const energy = Math.max(0, Math.floor(Number(quest.energyReward) || 0));
+      if (mineral + gas + energy > 0) {
+        try {
+          await this.resources.grant(userId, { mineral, gas, energy });
+        } catch (err) {
+          this.logger.warn(
+            `daily-quest wallet credit failed user=${userId} type=${questType}: ${(err as Error)?.message ?? err}`,
+          );
+        }
+      }
+
       this.emitter.emit('daily_rewards.quest_completed', {
         userId,
         questType,
@@ -244,10 +270,11 @@ export class DailyRewardsService {
         gasReward: quest.gasReward,
         energyReward: quest.energyReward,
       });
-      this.logger.log(`Quest completed: userId=${userId} type=${questType}`);
+      this.logger.log(
+        `Quest completed: userId=${userId} type=${questType} +${mineral}M +${gas}G +${energy}E`,
+      );
 
       // Check if all quests are done → award loot box
-      await this.questRepo.save(quest);
       await this.maybeAwardDailyLootBox(userId, today);
     } else {
       await this.questRepo.save(quest);

@@ -56,15 +56,21 @@ export interface CommanderBonus {
 /** Base bonus at level 1. Level scaling applied at lookup time. */
 const BASE_BONUSES: Record<string, CommanderBonus> = {
   // ─── İnsan ──────────────────────────────────────────────────────────
-  voss:     { damageMultiplier: 0.12 },                         // "Tüm filo +12% hasar"
+  // cycle-19 BAL-DEPTH-3 — voss is the balanced frontline pick (dmg + survivability);
+  // kovacs is the glass-cannon assassin (high dmg, def penalty). Two distinct
+  // combat profiles so commander choice is a real damage-vs-tank decision, not
+  // "always pick the highest damageMultiplier".
+  voss:     { damageMultiplier: 0.12, hpMultiplier: 0.10, defenseMultiplier: 0.08 }, // balanced bruiser
   chen:     { scienceMultiplier: 0.22 },                        // "Bilim +22%"
   reyes:    { trainSpeedMultiplier: -0.18 },                    // "Eğitim hızı +18%" → -18% duration
-  kovacs:   { damageMultiplier: 0.15, defenseMultiplier: -0.10 }, // "İstihbarat" (locked T4 — placeholder)
+  kovacs:   { damageMultiplier: 0.15, defenseMultiplier: -0.10 }, // glass-cannon assassin (intentional def penalty)
 
   // ─── Zerg ───────────────────────────────────────────────────────────
-  vex:      { damageMultiplier: 0.14 },                         // "Tüm sürü +14% saldırı"
+  vex:      { damageMultiplier: 0.14, hpMultiplier: 0.10 },     // aggressive swarm bruiser
   threnix:  { trainSpeedMultiplier: -0.28 },                    // "Mutasyon hızı +28%"
-  morgath:  { damageMultiplier: 0.20 },                         // "AI saldırı puanı +20%"
+  // cycle-19 BAL-DEPTH-3 — morgath repurposed as the zerg TANK pick: trades raw
+  // damage for heavy defense + HP, the defensive counterpart to aggressive vex.
+  morgath:  { damageMultiplier: 0.10, defenseMultiplier: 0.22, hpMultiplier: 0.18 }, // tactical tank
   kthala:   { resourceProductionMultiplier: 0.25 },             // "Üretim Lordu" (locked T5)
 
   // ─── Otomat ─────────────────────────────────────────────────────────
@@ -77,7 +83,7 @@ const BASE_BONUSES: Record<string, CommanderBonus> = {
   khorvash: { damageMultiplier: 0.18 },                         // "Yakın dövüş +18%"
   ulrek:    { resourceProductionMultiplier: 0.24 },             // "Kan Özü +24%"
   ravenna:  { trainSpeedMultiplier: -0.30 },                    // "Av süresi -30%"
-  korova:   { damageMultiplier: 0.25, hpMultiplier: 0.20 },     // T5 lock
+  korova:   { damageMultiplier: 0.25, hpMultiplier: 0.20, defenseMultiplier: 0.15 }, // T5 lock — apex bruiser-tank
 
   // ─── Şeytan ─────────────────────────────────────────────────────────
   malphas:  { buildCostMultiplier: -0.15 },                     // "Pakt maliyeti -15%"
@@ -88,14 +94,14 @@ const BASE_BONUSES: Record<string, CommanderBonus> = {
 
 export const COMMANDER_CATALOG: CommanderCatalogEntry[] = [
   // ── İnsan ──
-  { id: 'voss',   name: 'Kmt. Aleksander Voss',  title: 'Genetik Savaşçı', race: 'insan', tier: 'BAŞ KOMUTAN', skill: 'Tüm filo +12% hasar',         startsUnlocked: true,  portrait: '/assets/characters/insan/voss.png' },
+  { id: 'voss',   name: 'Kmt. Aleksander Voss',  title: 'Genetik Savaşçı', race: 'insan', tier: 'BAŞ KOMUTAN', skill: '+12% hasar, +10% HP, +8% savunma', startsUnlocked: true,  portrait: '/assets/characters/insan/voss.png' },
   { id: 'chen',   name: 'Dr. Elara Chen',         title: 'Baş Bilim Adamı', race: 'insan', tier: 'TIER 2',      skill: 'Bilim +22%',                  startsUnlocked: true,  portrait: '/assets/characters/insan/chen.png' },
   { id: 'reyes',  name: 'General Marcus Reyes',   title: 'Askeri Komutan',  race: 'insan', tier: 'TIER 3',      skill: 'Eğitim hızı +18%',            startsUnlocked: true,  portrait: '/assets/characters/insan/reyes.png' },
   { id: 'kovacs', name: "Lily 'Phantom' Kovacs",  title: 'İstihbarat',      race: 'insan', tier: 'TIER 4',      skill: '+15% hasar, suikast +%',      startsUnlocked: false, portrait: '/assets/characters/insan/kovacs.png' },
   // ── Zerg ──
-  { id: 'vex',     name: "Ana Kraliçe Vex'thara", title: 'Kovan Bilinci',   race: 'zerg',  tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı',       startsUnlocked: true,  portrait: '/assets/characters/zerg/vex_thara.png' },
+  { id: 'vex',     name: "Ana Kraliçe Vex'thara", title: 'Kovan Bilinci',   race: 'zerg',  tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı, +10% HP', startsUnlocked: true,  portrait: '/assets/characters/zerg/vex_thara.png' },
   { id: 'threnix', name: 'Genom Üstadı Threnix',  title: 'Evrim Mühendisi', race: 'zerg',  tier: 'TIER 3',      skill: 'Mutasyon hızı +28%',          startsUnlocked: true,  portrait: '/assets/characters/zerg/threnix.png' },
-  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Strateji',        race: 'zerg',  tier: 'TIER 4',      skill: 'AI saldırı puanı +20%',       startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
+  { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Taktik Savunma',  race: 'zerg',  tier: 'TIER 4',      skill: '+10% hasar, +22% savunma, +18% HP', startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
   { id: 'kthala',  name: 'Brood-Anne Kthala',     title: 'Üretim Lordu',    race: 'zerg',  tier: 'TIER 5',      skill: 'Kaynak üretimi +25%',         startsUnlocked: false, portrait: '/assets/characters/zerg/kthala.png' },
   // ── Otomat ──
   { id: 'prime',    name: 'Demiurge Prime',         title: 'Merkez YZ',      race: 'otomat', tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%',            startsUnlocked: true,  portrait: '/assets/characters/otomat/demiurge_prime.png' },
@@ -106,7 +112,7 @@ export const COMMANDER_CATALOG: CommanderCatalogEntry[] = [
   { id: 'khorvash', name: 'Alpha Khorvash',          title: 'Sürü Lideri',   race: 'canavar', tier: 'BAŞ KOMUTAN', skill: 'Yakın dövüş +18%',          startsUnlocked: true,  portrait: '/assets/characters/canavar/khorvash.png' },
   { id: 'ulrek',    name: 'Şaman Ulrek',             title: 'Ata Çağrıcı',   race: 'canavar', tier: 'TIER 2',      skill: 'Kan Özü +24%',              startsUnlocked: true,  portrait: '/assets/characters/canavar/ulrek.png' },
   { id: 'ravenna',  name: 'Avcı Kraliçe Ravenna',    title: 'Av Lordu',      race: 'canavar', tier: 'TIER 3',      skill: 'Av süresi -30%',            startsUnlocked: true,  portrait: '/assets/characters/canavar/ravenna.png' },
-  { id: 'korova',   name: 'Korova, Beast-God Yavru', title: 'Primordial',    race: 'canavar', tier: 'TIER 5',      skill: '+25% hasar, +20% HP',       startsUnlocked: false, portrait: '/assets/characters/canavar/korova.png' },
+  { id: 'korova',   name: 'Korova, Beast-God Yavru', title: 'Primordial',    race: 'canavar', tier: 'TIER 5',      skill: '+25% hasar, +20% HP, +15% savunma', startsUnlocked: false, portrait: '/assets/characters/canavar/korova.png' },
   // ── Şeytan ──
   { id: 'malphas',  name: 'Karanlık Lord Malphas',   title: 'Sürgün Lord',   race: 'seytan',  tier: 'BAŞ KOMUTAN', skill: 'Pakt maliyeti -15%',        startsUnlocked: true,  portrait: '/assets/characters/seytan/malphas.png' },
   { id: 'lilithra', name: 'Cadı-Kraliçe Lilithra',   title: 'Ritüel Ustası', race: 'seytan',  tier: 'TIER 2',      skill: 'Çağırma süresi -25%',       startsUnlocked: true,  portrait: '/assets/characters/seytan/lilithra.png' },

@@ -98,7 +98,21 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   async loadFormation(userId: string, race: Race): Promise<UnitState[] | undefined> {
     try {
       const roster = await this.units.getUnits(userId);
-      return this.rooms.buildFormationUnits(roster, race);
+      const formation = this.rooms.buildFormationUnits(roster, race);
+      // Cycle-19 BAL-DEPTH-3 — apply the player's active-commander hpMultiplier
+      // at battle start. Combat already reads damageMultiplier + defenseMultiplier
+      // per hit (handleAttack), but hpMultiplier was DEAD (no code scaled unit
+      // HP), so HP/tank commanders had zero combat value. Scaling maxHp here
+      // (units enter at full health) makes a survivability commander a real pick.
+      const bonus = await this.commanders.getActiveBonus(userId);
+      const hpMul = 1 + (bonus.hpMultiplier ?? 0);
+      if (hpMul !== 1) {
+        for (const u of formation) {
+          u.maxHp = Math.max(1, Math.round(u.maxHp * hpMul));
+          u.hp = u.maxHp;
+        }
+      }
+      return formation;
     } catch (err) {
       this.logger.warn(
         `formation load failed user=${userId}: ${(err as Error)?.message ?? err}`,

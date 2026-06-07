@@ -209,20 +209,26 @@ const DEFENDER_POWER_FRACTION = 0.9;
 const DEFENDER_FLOOR = 4_000;
 
 /**
- * Cycle-18 FUNNEL-01 — rookie onboarding band.
+ * Cycle-18 FUNNEL-01 / cycle-19 FUNNEL-01-NEW — rookie onboarding band.
  *
  * A fresh roster must WIN its first PvE fight (the tutorial dopamine hit).
  * Seeded fleet power: HUMAN 3×marine = 3·(110hp·20atk) = 6600; ZERG
  * 3×zergling = 3·(63hp·17atk) = 3213. The flat `DEFENDER_FLOOR` (4000) sat
- * ABOVE the ZERG starter (3213) — a glass-cannon kit the UI framed as a
- * cosmetic race pick — so a fresh Zerg player LOST their first battle while
- * HUMAN won. While the attacker is still at/below `ROOKIE_FLEET_THRESHOLD`
- * (just above HUMAN's 6600 starter) we BYPASS the floor and scale the bot to
- * a guaranteed-beatable fraction so BOTH seeded rosters win, then hand off to
- * the normal `DEFENDER_POWER_FRACTION` band + floor once the player has
- * invested past the starter roster (one extra unit clears it).
+ * ABOVE the ZERG starter (3213), so a fresh Zerg player lost their first
+ * battle while HUMAN won.
+ *
+ * Cycle 18 first gated this on a FLEET-POWER band (fleet ≤ 7000 → guaranteed
+ * win). That was a regression (FUNNEL-01-NEW): because the win math is
+ * `0.85·atk ≥ 0.6·1.15·atk = 0.69·atk` → TRUE for any fleet, the band was a
+ * permanent 100%-win zone for the entire sub-7000 early game, with a hard
+ * lose-cliff at 7001 that actively punished growth. Now the band is
+ * LEVEL-gated: only genuinely-fresh accounts (current_level ≤ ROOKIE_MAX_LEVEL)
+ * get the guaranteed-beatable bot. It ends naturally as the player levels past
+ * the tutorial (tutorial alone grants 500 XP → Lv2; a win or two → Lv3), so
+ * there is no permanent farm band and no fleet cliff — a Lv3+ player always
+ * faces the real `DEFENDER_POWER_FRACTION` band regardless of fleet size.
  */
-const ROOKIE_FLEET_THRESHOLD = 7_000;
+const ROOKIE_MAX_LEVEL = 2;
 const ROOKIE_DEFENDER_FRACTION = 0.6;
 
 /**
@@ -459,17 +465,44 @@ export class BattlesStubController {
    * PvE module can swap this for zone/node difficulty without touching the
    * outcome math.
    */
-  private deriveDefenderPower(attackerPower: number): number {
-    // Cycle-18 FUNNEL-01 — rookie band: below the threshold, bypass the
-    // floor and scale the bot to a guaranteed-beatable fraction so a fresh
-    // HUMAN (6600) AND a fresh ZERG (3213) both win their tutorial fight even
-    // across the ±15% mulberry32 jitter (ZERG worst case: 2731 atk vs 2217
-    // def → still a win). Past the threshold the normal band + floor applies.
-    if (attackerPower <= ROOKIE_FLEET_THRESHOLD) {
+  private deriveDefenderPower(attackerPower: number, isRookie: boolean): number {
+    // Cycle-19 FUNNEL-01-NEW — rookie band is LEVEL-gated (genuinely-fresh
+    // accounts only), not a permanent fleet band. A rookie faces a
+    // guaranteed-beatable bot (0.6× fleet, no floor) so HUMAN (6600) AND ZERG
+    // (3213) both win their tutorial fight across the ±15% jitter. Once the
+    // player levels past the tutorial they get the normal band + floor — no
+    // permanent farm zone, no fleet win/lose cliff.
+    if (isRookie) {
       return Math.round(attackerPower * ROOKIE_DEFENDER_FRACTION);
     }
     const scaled = attackerPower * DEFENDER_POWER_FRACTION;
     return Math.max(DEFENDER_FLOOR, Math.round(scaled));
+  }
+
+  /**
+   * Cycle-19 FUNNEL-01-NEW — is the caller a genuinely-fresh account that
+   * should still get guaranteed-winnable tutorial fights? Probes
+   * `player_levels.current_level` (game-server's canonical level table; same
+   * read pattern as story.service.ts). A brand-new account whose player_levels
+   * row hasn't materialised yet, or any read hiccup, degrades to `true` so the
+   * very first battles stay beatable rather than throwing a fresh player into
+   * the real difficulty band.
+   */
+  private async isRookiePlayer(userId: string): Promise<boolean> {
+    try {
+      const rows = (await this.dataSource.query(
+        `SELECT current_level FROM player_levels WHERE user_id = $1 LIMIT 1`,
+        [userId],
+      )) as { current_level: number | string }[];
+      const raw = rows?.[0]?.current_level;
+      if (raw === undefined || raw === null) return true;
+      return Number(raw) <= ROOKIE_MAX_LEVEL;
+    } catch (err) {
+      this.logger.warn(
+        `isRookiePlayer probe failed user=${userId}: ${(err as Error)?.message ?? err}`,
+      );
+      return true;
+    }
   }
 
   @Post()
@@ -499,9 +532,10 @@ export class BattlesStubController {
     // upgrades / merges move the win odds. Empty/failed fleet read → 0,
     // which falls back to the race-neutral base (pure-jitter 50/50).
     const fleetPower = await this.computeAttackerPower(userId);
+    const isRookie = await this.isRookiePlayer(userId);
     const attackerPower = fleetPower > 0 ? fleetPower : RACE_NEUTRAL_BASE;
     const defenderPower =
-      fleetPower > 0 ? this.deriveDefenderPower(fleetPower) : RACE_NEUTRAL_BASE;
+      fleetPower > 0 ? this.deriveDefenderPower(fleetPower, isRookie) : RACE_NEUTRAL_BASE;
 
     const battle = newBattle(
       body?.attackerRace ?? 'insan',

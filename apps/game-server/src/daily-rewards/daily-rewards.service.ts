@@ -12,6 +12,7 @@ import {
 } from './constants/streak-rewards.constants';
 import { QUEST_POOL, DAILY_QUEST_COUNT } from './constants/quest-pool.constants';
 import { rollLootBox } from './constants/loot-box.constants';
+import { ResourcesService } from '../resources/resources.service';
 import {
   StreakStatusDto,
   ClaimStreakResultDto,
@@ -42,6 +43,7 @@ export class DailyRewardsService {
     @InjectRepository(LootBoxAward)
     private readonly lootBoxRepo: Repository<LootBoxAward>,
     private readonly emitter: EventEmitter2,
+    private readonly resources: ResourcesService,
   ) {}
 
   // ─── Login Streak ──────────────────────────────────────────────────────────
@@ -112,8 +114,31 @@ export class DailyRewardsService {
     await this.streakRepo.save(streak);
 
     const result = this.buildClaimResult(streak, true, usedRescueToken);
+
+    // Cycle-19 MON-8-NEW — ACTUALLY credit the wallet. Previously the streak
+    // reward (mineral/gas/energy on days 1/2/4/5/7) was only copied into the
+    // result DTO and emitted; nothing ever wrote player_resources, so every
+    // streak day delivered exactly zero. Grant the day's resource reward to
+    // the wallet here, on the fresh-claim path only (a same-day repeat claim
+    // returns early above and never reaches this credit). ResourcesService.grant
+    // is atomic + cap-clamped; a zero-sum reward (premium-item days 3/6) no-ops.
+    const mineral = Math.max(0, Math.floor(Number(result.mineral ?? 0)));
+    const gas = Math.max(0, Math.floor(Number(result.gas ?? 0)));
+    const energy = Math.max(0, Math.floor(Number(result.energy ?? 0)));
+    if (mineral + gas + energy > 0) {
+      try {
+        await this.resources.grant(userId, { mineral, gas, energy });
+      } catch (err) {
+        // Never fail the streak claim on a wallet hiccup — the streak state is
+        // already persisted; log and continue so the player keeps their streak.
+        this.logger.warn(
+          `streak wallet credit failed user=${userId}: ${(err as Error)?.message ?? err}`,
+        );
+      }
+    }
+
     this.emitter.emit('daily_rewards.streak_claimed', { userId, streak: streak.currentStreak, reward: result });
-    this.logger.log(`Streak claimed: userId=${userId} streak=${streak.currentStreak}`);
+    this.logger.log(`Streak claimed: userId=${userId} streak=${streak.currentStreak} +${mineral}M +${gas}G +${energy}E`);
 
     return result;
   }

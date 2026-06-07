@@ -19,6 +19,18 @@ export const TUTORIAL_REWARD_COSMETIC = 'guild_starter_emblem';
 export const GUILD_AID_STORAGE_CONTRIB_RATE = 0.02;
 
 /**
+ * Cycle-18 BAL-06 — auto-promotion threshold. contributionPts (bumped 1:1 by
+ * both resource donations and research science) previously only sorted the
+ * roster and gated the FIRST_DONATION tutorial step — it never converted to a
+ * rank or perk, so the "donation → contributionPts → rank" loop dead-ended.
+ * A MEMBER who accumulates this many contributionPts is auto-promoted to
+ * OFFICER (which unlocks the ability to start guild research), giving the
+ * contribution grind a real mechanical payoff. LEADER/existing OFFICER are
+ * never touched. Sized so it takes a sustained donor, not a single dump.
+ */
+export const GUILD_OFFICER_PROMOTION_THRESHOLD = 100_000;
+
+/**
  * Telemetry event names emitted on the EventEmitter bus.
  */
 export const TELEMETRY_GUILD_LIFECYCLE = 'guild_lifecycle';

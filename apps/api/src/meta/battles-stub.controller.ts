@@ -209,6 +209,23 @@ const DEFENDER_POWER_FRACTION = 0.9;
 const DEFENDER_FLOOR = 4_000;
 
 /**
+ * Cycle-18 FUNNEL-01 — rookie onboarding band.
+ *
+ * A fresh roster must WIN its first PvE fight (the tutorial dopamine hit).
+ * Seeded fleet power: HUMAN 3×marine = 3·(110hp·20atk) = 6600; ZERG
+ * 3×zergling = 3·(63hp·17atk) = 3213. The flat `DEFENDER_FLOOR` (4000) sat
+ * ABOVE the ZERG starter (3213) — a glass-cannon kit the UI framed as a
+ * cosmetic race pick — so a fresh Zerg player LOST their first battle while
+ * HUMAN won. While the attacker is still at/below `ROOKIE_FLEET_THRESHOLD`
+ * (just above HUMAN's 6600 starter) we BYPASS the floor and scale the bot to
+ * a guaranteed-beatable fraction so BOTH seeded rosters win, then hand off to
+ * the normal `DEFENDER_POWER_FRACTION` band + floor once the player has
+ * invested past the starter roster (one extra unit clears it).
+ */
+const ROOKIE_FLEET_THRESHOLD = 7_000;
+const ROOKIE_DEFENDER_FRACTION = 0.6;
+
+/**
  * Commander XP granted to the winner on this FE `/battle` path (BAL-3,
  * cycle 17). Mirrors the Socket.io PvP winner payout in
  * `game-server/src/game/game.service.ts` (+100/win) so both battle
@@ -443,6 +460,14 @@ export class BattlesStubController {
    * outcome math.
    */
   private deriveDefenderPower(attackerPower: number): number {
+    // Cycle-18 FUNNEL-01 — rookie band: below the threshold, bypass the
+    // floor and scale the bot to a guaranteed-beatable fraction so a fresh
+    // HUMAN (6600) AND a fresh ZERG (3213) both win their tutorial fight even
+    // across the ±15% mulberry32 jitter (ZERG worst case: 2731 atk vs 2217
+    // def → still a win). Past the threshold the normal band + floor applies.
+    if (attackerPower <= ROOKIE_FLEET_THRESHOLD) {
+      return Math.round(attackerPower * ROOKIE_DEFENDER_FRACTION);
+    }
     const scaled = attackerPower * DEFENDER_POWER_FRACTION;
     return Math.max(DEFENDER_FLOOR, Math.round(scaled));
   }

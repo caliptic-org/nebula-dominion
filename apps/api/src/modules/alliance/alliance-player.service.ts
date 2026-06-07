@@ -23,6 +23,7 @@ import { DonateDto } from './dto/donate.dto';
 import { DeclareWarByTagDto } from './dto/declare-war-by-tag.dto';
 import { ChatQueryDto } from './dto/chat-query.dto';
 import { DonationQueryDto } from './dto/donation-query.dto';
+import { applyAllianceXp } from './alliance-progression';
 
 @Injectable()
 export class AlliancePlayerService {
@@ -430,6 +431,19 @@ export class AlliancePlayerService {
       if (memberRecord) {
         memberRecord.contribution += mineral + gas + energy;
         await manager.save(AllianceMember, memberRecord);
+      }
+
+      // Cycle-18 BAL-01 — grant alliance-wide XP (1:1 with donated resources)
+      // so alliance.level, the public leaderboard (ordered by xp), and the
+      // member cap actually progress. Without this, donating only bumped the
+      // personal contribution counter and the alliance's own xp/level stayed
+      // pinned at 0/1 forever.
+      const alliance = await manager.findOne(Alliance, {
+        where: { id: member.allianceId },
+      });
+      if (alliance) {
+        applyAllianceXp(alliance, mineral + gas + energy);
+        await manager.save(Alliance, alliance);
       }
 
       const donation = manager.create(AllianceDonation, {

@@ -77,6 +77,18 @@ export const XP_DAILY_CAPS: Partial<Record<XpSource, number>> = {
   [XpSource.ACHIEVEMENT]:    5000,
 };
 
+// ── cycle 18 BAL17-NEW-3 — GLOBAL per-UTC-day XP ceiling ─────────────────
+// The per-source caps above stop any SINGLE faucet from dominating, but
+// their SUM is unbounded by design intent: age-3+ ceiling = construction
+// 5000 + pve 8000 + pvp 8000 + mission 3000 + achievement 5000 = 29,000
+// XP/day, which let a grinder who maxes every source reach Lv54 (950,000
+// total XP) in ~33 days — ~4.5× faster than the intended ~150-day band
+// (~6,333 XP/day). This GLOBAL cap across ALL sources is enforced in
+// ProgressionService.awardXp on top of the per-source caps: 950,000 / 7,000
+// ≈ 136 days, back inside the design band, while the per-source caps still
+// preserve faucet diversity. Sized at the audit's recommended ~7,000.
+export const GLOBAL_DAILY_XP_CAP = 7000;
+
 export const XP_BASE_AMOUNTS: Record<XpSource, number> = {
   [XpSource.DAILY_MISSION]:   200,
   [XpSource.PVE_WIN]:         150,

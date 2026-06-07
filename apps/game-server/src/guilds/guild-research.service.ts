@@ -19,7 +19,10 @@ import {
   GuildResearchStatus,
 } from './entities/guild-research-state.entity';
 import { GuildResearchContribution } from './entities/guild-research-contribution.entity';
-import { TELEMETRY_GUILD_ACTIVITY } from './guilds.constants';
+import {
+  TELEMETRY_GUILD_ACTIVITY,
+  GUILD_OFFICER_PROMOTION_THRESHOLD,
+} from './guilds.constants';
 import {
   RESEARCH_DURATION_DAYS,
   RESEARCH_WEEKLY_SLOTS,
@@ -436,6 +439,15 @@ export class GuildResearchService {
       // guild's overall contribution log.
       member.contributionPts += accepted;
       member.lastActiveAt = new Date();
+      // Cycle-18 BAL-06 — research science also counts toward the OFFICER
+      // auto-promotion threshold, so contributionPts converts to a real rank
+      // here too (mirrors recordDonation in GuildsService).
+      if (
+        member.role === GuildRole.MEMBER &&
+        member.contributionPts >= GUILD_OFFICER_PROMOTION_THRESHOLD
+      ) {
+        member.role = GuildRole.OFFICER;
+      }
       await manager.save(member);
 
       await manager.save(
@@ -499,22 +511,63 @@ export class GuildResearchService {
       },
     });
     for (const r of overdue) {
-      r.status = GuildResearchStatus.CANCELLED;
-      await this.researchRepo.save(r);
-      this.emitTelemetry({
-        userId: r.selectedBy,
-        guildId: r.guildId,
-        kind: 'research_cancelled',
-        payload: {
-          researchId: r.researchId,
-          level: r.level,
-          xpContributed: r.xpContributed,
-          xpRequired: r.xpRequired,
-          reason: 'deadline_expired',
-        },
+      // Cycle-18 BAL-08 — refund contributed science on deadline cancel.
+      // Previously the 7-day deadline wiped up to 500K contributed science
+      // with ZERO refund: an all-or-nothing penalty that punished exactly the
+      // small/casual guilds the retention hook is meant to capture. Science
+      // was debited 1:1 per contribution (contribute(): accepted science →
+      // GuildResearchContribution.xpContributed), so we credit each
+      // contributor's xpContributed back to their science wallet (capped at
+      // science_cap). The refund + CANCELLED flip run in ONE transaction
+      // under a pessimistic_write lock so a concurrent completion can't race
+      // us and a crash can't double-credit; the next sweep only re-selects
+      // RESEARCHING rows, so a refunded research is never refunded twice.
+      await this.dataSource.transaction(async (manager) => {
+        const fresh = await manager.findOne(GuildResearchState, {
+          where: { id: r.id, status: GuildResearchStatus.RESEARCHING },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!fresh) return; // completed/cancelled by another path — skip
+
+        const contributions = await manager.find(GuildResearchContribution, {
+          where: { researchStateId: fresh.id },
+        });
+        let refundedTotal = 0;
+        for (const c of contributions) {
+          const refund = Math.max(0, Math.floor(Number(c.xpContributed)));
+          if (refund <= 0) continue;
+          await manager.query(
+            `UPDATE player_resources
+                SET science = LEAST(science_cap, science + $2)
+              WHERE player_id = $1::uuid`,
+            [c.userId, refund],
+          );
+          refundedTotal += refund;
+        }
+
+        fresh.status = GuildResearchStatus.CANCELLED;
+        await manager.save(fresh);
+
+        this.emitTelemetry({
+          userId: fresh.selectedBy,
+          guildId: fresh.guildId,
+          kind: 'research_cancelled',
+          payload: {
+            researchId: fresh.researchId,
+            level: fresh.level,
+            xpContributed: fresh.xpContributed,
+            xpRequired: fresh.xpRequired,
+            reason: 'deadline_expired',
+            scienceRefunded: refundedTotal,
+          },
+        });
       });
     }
-    if (overdue.length) this.logger.log(`Cancelled ${overdue.length} overdue research(es).`);
+    if (overdue.length) {
+      this.logger.log(
+        `Cancelled ${overdue.length} overdue research(es) and refunded contributed science.`,
+      );
+    }
     return overdue.length;
   }
 

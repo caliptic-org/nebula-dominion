@@ -7,6 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Resource } from './entities/resource.entity';
 import { ResourceCost } from '../buildings/buildings.constants';
 import { EconomyService, TICK_INTERVAL_MS } from '../economy/economy.service';
+import { GUILD_RESEARCH_CATALOG, composeGuildBuffs } from '../guilds/research.config';
 
 export interface ResourceSnapshot {
   mineral: number;
@@ -48,6 +49,56 @@ export class ResourcesService {
     private readonly emitter: EventEmitter2,
     private readonly dataSource: DataSource,
   ) {}
+
+  // ─── Guild production buff (cycle-18 BAL-04) ──────────────────────────────
+  // The guild PRODUCTION research branch (production_boost L1/L2/L3 = +5/+10/
+  // +15%, SUMMED by composeGuildBuffs) was composed and surfaced via
+  // getGuildBuffs but NEVER applied to any resource generation — 650K science
+  // bought a displayed number with zero in-game effect. We now multiply
+  // mineral/gas/energy production by (1 + productionPct/100) in every tick
+  // path. population (housing) and science (lab trickle) are intentionally
+  // NOT buffed — productionPct is a *resource-production* buff.
+  //
+  // The level→pct mapping is derived from GUILD_RESEARCH_CATALOG so the SQL
+  // CASE used by the bulk tick and the TS factor used by the per-player paths
+  // can never drift from the config / composeGuildBuffs.
+  private static readonly PRODUCTION_RESEARCH_ID = 'production_boost';
+
+  /** SQL `CASE grs.level WHEN <lvl> THEN <pct> ... ELSE 0 END`, generated from
+   *  config so the bulk-tick SUM matches composeGuildBuffs exactly. Contains
+   *  only hardcoded config values — no user input, no injection surface. */
+  private readonly productionBuffCaseSql = (() => {
+    const def = GUILD_RESEARCH_CATALOG.find(
+      (r) => r.id === ResourcesService.PRODUCTION_RESEARCH_ID,
+    );
+    const whens = (def?.levels ?? [])
+      .filter((l) => l.effect.kind === 'production_pct')
+      .map((l) => `WHEN ${l.level} THEN ${(l.effect as { value: number }).value}`)
+      .join(' ');
+    return whens ? `CASE grs.level ${whens} ELSE 0 END` : '0';
+  })();
+
+  /**
+   * Production multiplier from the player's guild PRODUCTION research, used by
+   * the per-player tick paths (applyTick / applyOfflineAccumulation). Returns
+   * 1.0 for solo players or guilds with no production research. Derived via
+   * composeGuildBuffs so it is identical to what getGuildBuffs reports.
+   */
+  private async getGuildProductionFactor(playerId: string): Promise<number> {
+    const rows = (await this.dataSource.query(
+      `SELECT grs.research_id, grs.level
+         FROM guild_members gm
+         JOIN guild_research_states grs ON grs.guild_id = gm.guild_id
+        WHERE gm.user_id = $1
+          AND grs.status = 'completed'`,
+      [playerId],
+    )) as Array<{ research_id: string; level: number }>;
+    if (!rows.length) return 1;
+    const { productionPct } = composeGuildBuffs(
+      rows.map((r) => ({ researchId: r.research_id, level: Number(r.level) })),
+    );
+    return 1 + productionPct / 100;
+  }
 
   async getOrCreate(playerId: string): Promise<Resource> {
     let resource = await this.resourceRepo.findOne({ where: { playerId } });
@@ -121,16 +172,21 @@ export class ResourcesService {
         return;
       }
 
+      // Cycle-18 BAL-04 — apply the guild production buff to the offline
+      // catch-up so an offline guild member accrues the same boosted rate the
+      // online bulk tick would have credited.
+      const factor = await this.getGuildProductionFactor(playerId);
+
       resource.mineral = Math.min(
-        Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick) * missedTicks),
+        Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick) * missedTicks * factor),
         resource.mineralCap,
       );
       resource.gas = Math.min(
-        Math.floor(Number(resource.gas) + Number(resource.gasPerTick) * missedTicks),
+        Math.floor(Number(resource.gas) + Number(resource.gasPerTick) * missedTicks * factor),
         resource.gasCap,
       );
       resource.energy = Math.min(
-        Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * missedTicks),
+        Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * missedTicks * factor),
         resource.energyCap,
       );
       resource.population = Math.min(
@@ -446,17 +502,19 @@ export class ResourcesService {
   /** Still available for the cron worker to tick online players */
   async applyTick(playerId: string): Promise<ResourceSnapshot> {
     const resource = await this.getOrCreate(playerId);
+    // Cycle-18 BAL-04 — guild production buff on mineral/gas/energy.
+    const factor = await this.getGuildProductionFactor(playerId);
 
     resource.mineral = Math.min(
-      Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick)),
+      Math.floor(Number(resource.mineral) + Number(resource.mineralPerTick) * factor),
       resource.mineralCap,
     );
     resource.gas = Math.min(
-      Math.floor(Number(resource.gas) + Number(resource.gasPerTick)),
+      Math.floor(Number(resource.gas) + Number(resource.gasPerTick) * factor),
       resource.gasCap,
     );
     resource.energy = Math.min(
-      Math.floor(Number(resource.energy) + Number(resource.energyPerTick)),
+      Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * factor),
       resource.energyCap,
     );
     resource.population = Math.min(
@@ -503,22 +561,47 @@ export class ResourcesService {
     // mineral/gas/energy do — capped at science_cap via LEAST(...). The
     // WHERE filter now also lets a science-only producer (e.g. an academy
     // with no currency output) tick so the trickle actually accumulates.
+    // Cycle-18 BAL-04: each producing row is multiplied by its guild
+    // production factor (1 + Σproduction_pct/100) via a LEFT JOIN to
+    // guild_members → completed PRODUCTION research. Solo players (and guilds
+    // with no production research) fall through COALESCE to factor 1.0, so
+    // every producer still ticks. The CASE/SUM mapping is generated from
+    // GUILD_RESEARCH_CATALOG (productionBuffCaseSql) so it matches
+    // composeGuildBuffs exactly — no SQL/TS drift. population (housing) and
+    // science (lab trickle) are deliberately NOT buffed.
     const rows = await this.dataSource.query(`
-      UPDATE player_resources
-      SET mineral    = LEAST(mineral_cap,    FLOOR(mineral    + mineral_per_tick)),
-          gas        = LEAST(gas_cap,        FLOOR(gas        + gas_per_tick)),
-          energy     = LEAST(energy_cap,     FLOOR(energy     + energy_per_tick)),
-          population = LEAST(population_cap, FLOOR(population + population_per_tick)),
-          science    = LEAST(science_cap,    FLOOR(science    + science_per_tick)),
+      UPDATE player_resources pr
+      SET mineral    = LEAST(pr.mineral_cap,    FLOOR(pr.mineral    + pr.mineral_per_tick * src.factor)),
+          gas        = LEAST(pr.gas_cap,        FLOOR(pr.gas        + pr.gas_per_tick     * src.factor)),
+          energy     = LEAST(pr.energy_cap,     FLOOR(pr.energy     + pr.energy_per_tick  * src.factor)),
+          population = LEAST(pr.population_cap,  FLOOR(pr.population  + pr.population_per_tick)),
+          science    = LEAST(pr.science_cap,    FLOOR(pr.science     + pr.science_per_tick)),
           last_tick_at = NOW()
-      WHERE mineral_per_tick > 0
-         OR gas_per_tick > 0
-         OR energy_per_tick > 0
-         OR science_per_tick > 0
-      RETURNING player_id, mineral, gas, energy, population, science,
-                mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
-                mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
-                science_per_tick, last_tick_at
+      FROM (
+        SELECT p.player_id,
+               1 + COALESCE(gp.pct, 0) / 100.0 AS factor
+          FROM player_resources p
+          -- player_resources.player_id is uuid; guild_members.user_id is
+          -- varchar(255) holding the same id — compare as text to avoid a
+          -- uuid=varchar operator error.
+          LEFT JOIN guild_members gm ON gm.user_id = p.player_id::text
+          LEFT JOIN (
+            SELECT grs.guild_id, SUM(${this.productionBuffCaseSql}) AS pct
+              FROM guild_research_states grs
+             WHERE grs.status = 'completed'
+               AND grs.research_id = '${ResourcesService.PRODUCTION_RESEARCH_ID}'
+             GROUP BY grs.guild_id
+          ) gp ON gp.guild_id = gm.guild_id
+      ) src
+      WHERE pr.player_id = src.player_id
+        AND (pr.mineral_per_tick > 0
+         OR pr.gas_per_tick > 0
+         OR pr.energy_per_tick > 0
+         OR pr.science_per_tick > 0)
+      RETURNING pr.player_id, pr.mineral, pr.gas, pr.energy, pr.population, pr.science,
+                pr.mineral_cap, pr.gas_cap, pr.energy_cap, pr.population_cap, pr.science_cap,
+                pr.mineral_per_tick, pr.gas_per_tick, pr.energy_per_tick, pr.population_per_tick,
+                pr.science_per_tick, pr.last_tick_at
     `) as Array<{
       player_id: string;
       mineral: string | number;

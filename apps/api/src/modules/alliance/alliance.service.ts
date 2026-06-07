@@ -14,6 +14,7 @@ import { AllianceStorage } from './entities/alliance-storage.entity';
 import { CreateAllianceDto } from './dto/create-alliance.dto';
 import { DeclareWarDto } from './dto/declare-war.dto';
 import { DepositResourcesDto } from './dto/deposit-resources.dto';
+import { applyAllianceXp } from './alliance-progression';
 
 /**
  * Audit cycle 7 (REG-CYC6-ALLIANCE-FINDALL-MEMBER-LEAK + FINDONE-UNGUARDED):
@@ -456,6 +457,14 @@ export class AllianceService {
 
       member.contribution += mineralsAmt + energyAmt;
       await manager.save(member);
+
+      // Cycle-18 BAL-01 — grant alliance-wide XP (1:1 with deposited
+      // resources) so alliance.level / leaderboard / maxMembers progress.
+      const alliance = await manager.findOne(Alliance, { where: { id: allianceId } });
+      if (alliance) {
+        applyAllianceXp(alliance, mineralsAmt + energyAmt);
+        await manager.save(alliance);
+      }
 
       // Return the post-update snapshot for the caller.
       const fresh = await manager.findOne(AllianceStorage, { where: { allianceId } });

@@ -449,11 +449,23 @@ export class GuildRaidsService {
           .slice(0, RAID_TOP_CONTRIBUTOR_COUNT)
           .map((c) => c.userId),
       );
+      // Cycle-18 BAL-05 — damage-proportional base drop. Previously each
+      // contributor rolled rollInRange(min,max) INDEPENDENT of damage share,
+      // so a 1-chip-damage member had the same expected base as the carry —
+      // no effort-vs-reward gradient. Scale the base within [min,max] by the
+      // contributor's share of the TOP damage (contributions are sorted DESC,
+      // so [0] is the carry → share 1.0 → max; the rest scale down toward
+      // min). Deterministic, replacing the RNG the audit flagged. For flat
+      // tiers (NORMAL/HARD min==max) this is a no-op.
+      const maxDamage = Number(contributions[0]?.damageDealt ?? 0);
 
       const awards = new Map<string, DropAward>();
 
       for (const c of contributions) {
-        const baseAmount = this.rollInRange(baseRange.min, baseRange.max);
+        const shareOfMax = maxDamage > 0 ? Number(c.damageDealt) / maxDamage : 1;
+        const baseAmount = Math.round(
+          baseRange.min + (baseRange.max - baseRange.min) * shareOfMax,
+        );
         const bonus = top5Ids.has(c.userId) ? RAID_TOP_CONTRIBUTOR_BONUS : 0;
         const desired = baseAmount + bonus;
 

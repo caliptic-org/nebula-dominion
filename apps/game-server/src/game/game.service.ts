@@ -160,23 +160,31 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const defMul = 1 + (targetCmd.defenseMultiplier ?? 0);
     const effectiveDefense = Math.max(0, target.defense * defMul);
     const isCrit = Math.random() < 0.15;
-    // ── cycle 17 BAL-1 — defense-reduction damage model ──────────────
+    // ── cycle 17 BAL-1 / cycle 18 BAL17-NEW-1 — defense-reduction model ──
     // Damage model switched from SUBTRACTIVE (atk - def, which hard-floored
     // any low-attack unit to the max(1,…) minimum and let a single race
     // win every matchup by stacking defense) to DEFENSE-AS-REDUCTION:
     //
-    //   baseDamage = round(atk * dmgMul * 100 / (100 + effectiveDefense))
+    //   baseDamage = round(atk * dmgMul * 40 / (40 + effectiveDefense))
     //
-    // Defense now has diminishing returns — each point of armor shaves a
-    // shrinking percentage off incoming damage instead of a flat point — so
-    // no race auto-wins on stacked defense and attack multipliers (e.g.
-    // ZERG +15% atk) translate into real damage instead of being eaten by
-    // the opponent's flat defense bonus. Worked example (race-adjusted base
-    // stats): Marine atk10 vs Zergling def3 → 10 dmg; Zergling atk9 vs
-    // Marine def7 → 8 dmg, collapsing the old ~5x kill-time skew to ~1.75x.
+    // Defense has diminishing returns — each armor point shaves a shrinking
+    // percentage off incoming damage — so no race auto-wins on stacked
+    // defense and attack multipliers (e.g. ZERG +15% atk) translate into
+    // real damage instead of being eaten by a flat defense bonus.
+    //
+    // The DENOMINATOR CONSTANT is 40, NOT 100. Cycle 17 first shipped 100,
+    // but the constant must match the actual unit-defense range (3–38; max
+    // is Captain at 38, ~46 with race mult). At denominator 100 the highest
+    // unit reached only 38/138 = 27.5% mitigation — defense was near-useless
+    // and TANK builds (siege_tank/captain) had no payoff. At 40 the gradient
+    // is meaningful: Captain ~46/86 = 53%, Marine ~7/47 = 15%, Zergling
+    // 3/43 = 7% — a real tank vs glass-cannon trade-off, still bounded by the
+    // 0.75 reduction cap (which a 38-def unit never approaches). Worked
+    // example: Marine atk10 vs Zergling def3 → 9 dmg; Zergling atk9 vs Marine
+    // def7 → 8 dmg.
     const baseDamage = Math.max(
       1,
-      Math.round((attacker.attack * dmgMul * 100) / (100 + effectiveDefense)),
+      Math.round((attacker.attack * dmgMul * 40) / (40 + effectiveDefense)),
     );
     const damage = isCrit ? Math.round(baseDamage * 1.75) : Math.round(baseDamage);
     target.hp -= damage;

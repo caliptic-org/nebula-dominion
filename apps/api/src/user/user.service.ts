@@ -421,6 +421,16 @@ export class UserService {
             // unreachable until the player grinds a gas trade or wait.
             { type: 'gas_refinery',      x: 3, y: 4 },
             { type: 'solar_plant',       x: 5, y: 4 },
+            // Cycle-18 FUNNEL-04 — second solar_plant. The 6-building HUMAN
+            // seed over-provisions energy CONSUMERS: produced = solar 20 +
+            // command_center 10 = 30/tick; consumed = command_center 5 +
+            // gas_refinery 4 + barracks 8 + academy 10 + factory 12 = 39/tick
+            // → NET -9 energy/tick. A fresh player watched their energy bar
+            // count DOWN to 0 in ~28 ticks on first load — the opposite of the
+            // "kaynaklar büyümenin temelidir" growth message. A 2nd solar_plant
+            // (+20) flips the budget to +11/tick positive while keeping every
+            // day-1 capability (train / research / build) intact.
+            { type: 'solar_plant',       x: 5, y: 5 },
             { type: 'barracks',          x: 4, y: 5 },
             { type: 'academy',           x: 3, y: 3 },
             { type: 'factory',           x: 5, y: 3 },

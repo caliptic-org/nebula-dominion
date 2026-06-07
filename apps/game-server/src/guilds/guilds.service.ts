@@ -17,8 +17,13 @@ import {
   TUTORIAL_STEP_ORDER,
   TutorialStep,
 } from './entities/guild-tutorial-state.entity';
+import {
+  GuildResearchState,
+  GuildResearchStatus,
+} from './entities/guild-research-state.entity';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { ResourcesService } from '../resources/resources.service';
+import { composeGuildBuffs } from './research.config';
 import { DONATABLE_RESOURCES, type DonatableResource } from './dto/membership.dto';
 import {
   EVENT_GUILD_TUTORIAL_REQUIRED,
@@ -26,6 +31,7 @@ import {
   TELEMETRY_GUILD_PROGRESSION,
   TUTORIAL_REWARD_COSMETIC,
   TUTORIAL_REWARD_ENERGY,
+  GUILD_OFFICER_PROMOTION_THRESHOLD,
 } from './guilds.constants';
 
 interface TutorialRequiredEvent {
@@ -172,6 +178,30 @@ export class GuildsService {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      // Cycle-18 BAL-03 — enforce member capacity. The EXPANSION research
+      // branch (200K/350K/500K science → capacity 35/50/70) was 100% inert:
+      // joinGuild had NO upper bound, so guilds grew unbounded for free and
+      // the single most expensive research line (1.05M science) gated nothing.
+      // Gate the join on the composed memberCapacity (DEFAULT 25 + completed
+      // EXPANSION research), mirroring alliance.service.ts join() which
+      // already enforces maxMembers. Count + compose happen inside the tx to
+      // avoid a stale snapshot under concurrent joins.
+      const completedResearch = await manager.find(GuildResearchState, {
+        where: { guildId: guild.id, status: GuildResearchStatus.COMPLETED },
+      });
+      const { memberCapacity } = composeGuildBuffs(
+        completedResearch.map((c) => ({ researchId: c.researchId, level: c.level })),
+      );
+      const liveMemberCount = await manager.count(GuildMember, {
+        where: { guildId: guild.id },
+      });
+      if (liveMemberCount >= memberCapacity) {
+        throw new ConflictException(
+          `Guild ${guild.tag} is full (${liveMemberCount}/${memberCapacity}) — ` +
+            'the guild must fund EXPANSION research to raise its capacity',
+        );
+      }
+
       const member = manager.create(GuildMember, {
         guildId: guild.id,
         userId,
@@ -433,7 +463,26 @@ export class GuildsService {
       // ── 3. Credit contribution points + write the GuildEvent ───────────
       member.contributionPts += amount;
       member.lastActiveAt = new Date();
+      // Cycle-18 BAL-06 — auto-promote a sustained MEMBER donor to OFFICER so
+      // contributionPts converts to a real rank (officers can start research).
+      let promoted = false;
+      if (
+        member.role === GuildRole.MEMBER &&
+        member.contributionPts >= GUILD_OFFICER_PROMOTION_THRESHOLD
+      ) {
+        member.role = GuildRole.OFFICER;
+        promoted = true;
+      }
       await manager.save(member);
+
+      if (promoted) {
+        this.emitTelemetry(TELEMETRY_GUILD_PROGRESSION, {
+          userId,
+          guildId,
+          kind: 'auto_promoted',
+          payload: { role: GuildRole.OFFICER, contributionPts: member.contributionPts },
+        });
+      }
 
       const event = await manager.save(
         manager.create(GuildEvent, {

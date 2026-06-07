@@ -1,15 +1,28 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThanOrEqual, EntityManager } from 'typeorm';
 import { Alliance } from './entities/alliance.entity';
 import { AllianceMember, AllianceRole } from './entities/alliance-member.entity';
 import { AllianceWar, WarStatus } from './entities/alliance-war.entity';
+
+/**
+ * Cycle-18 BAL-02 — war resolution window. A declared war has a 24h prep
+ * (startsAt = declaredAt + 24h, entity default) then a 48h combat window;
+ * once startsAt + WAR_COMBAT_MS has passed the war auto-resolves. The api has
+ * no @nestjs/schedule, so resolution is LAZY — triggered whenever anyone reads
+ * the war list for either side (mirrors the resource offline-accumulation
+ * pattern). This fixes BOTH halves of the original no-op: warWins/warLosses
+ * now actually move (a reward + ranking), and the pairing unlocks for a
+ * re-declaration instead of being locked in DECLARED forever.
+ */
+const WAR_COMBAT_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Dedicated war service for the Alliance War MVP.
@@ -27,6 +40,8 @@ import { AllianceWar, WarStatus } from './entities/alliance-war.entity';
  */
 @Injectable()
 export class AllianceWarService {
+  private readonly logger = new Logger(AllianceWarService.name);
+
   constructor(
     @InjectRepository(Alliance)
     private readonly allianceRepo: Repository<Alliance>,
@@ -104,6 +119,7 @@ export class AllianceWarService {
    */
   async listWars(requesterId: string, allianceId: string): Promise<AllianceWar[]> {
     await this.assertMembership(requesterId, allianceId);
+    await this.resolveDueWars(allianceId);
     return this.warRepo.find({
       where: [{ attackerId: allianceId }, { defenderId: allianceId }],
       relations: ['attacker', 'defender'],
@@ -126,6 +142,7 @@ export class AllianceWarService {
 
   /** Active = DECLARED or ACTIVE. Ended/truce are excluded. */
   async getActive(allianceId: string): Promise<AllianceWar[]> {
+    await this.resolveDueWars(allianceId);
     return this.warRepo.find({
       where: [
         { attackerId: allianceId, status: WarStatus.DECLARED },
@@ -136,5 +153,77 @@ export class AllianceWarService {
       relations: ['attacker', 'defender'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Cycle-18 BAL-02 — lazily resolve any of this alliance's wars whose combat
+   * window (startsAt + WAR_COMBAT_MS) has elapsed. Deterministic outcome: the
+   * side with the higher summed member contribution wins (ties → attacker, by
+   * initiative). Sets winner/scores/status=ENDED + endsAt and increments
+   * warWins/warLosses on both alliances. Each war resolves exactly once (the
+   * pessimistic_write re-check inside the tx + the DECLARED/ACTIVE guard make
+   * it idempotent under concurrent reads). Best-effort: a failure here never
+   * blocks the war-list read.
+   */
+  private async resolveDueWars(allianceId: string): Promise<void> {
+    const cutoff = new Date(Date.now() - WAR_COMBAT_MS);
+    const due = await this.warRepo.find({
+      where: [
+        { attackerId: allianceId, status: WarStatus.DECLARED, startsAt: LessThanOrEqual(cutoff) },
+        { attackerId: allianceId, status: WarStatus.ACTIVE, startsAt: LessThanOrEqual(cutoff) },
+        { defenderId: allianceId, status: WarStatus.DECLARED, startsAt: LessThanOrEqual(cutoff) },
+        { defenderId: allianceId, status: WarStatus.ACTIVE, startsAt: LessThanOrEqual(cutoff) },
+      ],
+    });
+    for (const war of due) {
+      try {
+        await this.warRepo.manager.transaction(async (manager) => {
+          const fresh = await manager.findOne(AllianceWar, {
+            where: { id: war.id },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (
+            !fresh ||
+            (fresh.status !== WarStatus.DECLARED && fresh.status !== WarStatus.ACTIVE)
+          ) {
+            return; // already resolved by a concurrent read
+          }
+
+          const [attackerPower, defenderPower] = await Promise.all([
+            this.sumContribution(manager, fresh.attackerId),
+            this.sumContribution(manager, fresh.defenderId),
+          ]);
+          const attackerWon = attackerPower >= defenderPower; // ties → attacker
+          fresh.attackerScore = attackerPower;
+          fresh.defenderScore = defenderPower;
+          fresh.winnerId = attackerWon ? fresh.attackerId : fresh.defenderId;
+          fresh.status = WarStatus.ENDED;
+          fresh.endsAt = new Date();
+          await manager.save(fresh);
+
+          const winnerId = attackerWon ? fresh.attackerId : fresh.defenderId;
+          const loserId = attackerWon ? fresh.defenderId : fresh.attackerId;
+          await manager.increment(Alliance, { id: winnerId }, 'warWins', 1);
+          await manager.increment(Alliance, { id: loserId }, 'warLosses', 1);
+        });
+      } catch (err) {
+        this.logger.warn(
+          `War resolution failed for ${war.id}: ${(err as Error)?.message ?? err}`,
+        );
+      }
+    }
+  }
+
+  /** Sum of member contribution for an alliance — the war strength proxy. */
+  private async sumContribution(
+    manager: EntityManager,
+    allianceId: string,
+  ): Promise<number> {
+    const row = await manager
+      .createQueryBuilder(AllianceMember, 'm')
+      .select('COALESCE(SUM(m.contribution), 0)', 'total')
+      .where('m.allianceId = :allianceId', { allianceId })
+      .getRawOne<{ total: string | number }>();
+    return Number(row?.total ?? 0);
   }
 }

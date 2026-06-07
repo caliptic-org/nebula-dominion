@@ -11,6 +11,7 @@ import {
   XP_SOURCE_WEIGHTS,
   XP_SOURCE_MIN_AGE,
   XP_DAILY_CAPS,
+  GLOBAL_DAILY_XP_CAP,
   getLevelDef,
   getMaxLevel,
   getFirstLevelForAge,
@@ -164,6 +165,31 @@ export class ProgressionService {
       if (earnedToday + finalAmount > dailyCap) {
         this.logger.warn(
           `XP daily cap hit: user=${dto.userId} source=${dto.source} earned=${earnedToday} attempt=${finalAmount} cap=${dailyCap}`,
+        );
+        return { progress: this.toDto(record), leveledUp: false };
+      }
+    }
+
+    // ── Global per-UTC-day XP cap (cycle 18 BAL17-NEW-3) ────────────────
+    // The per-source caps above stop single-faucet dominance, but their
+    // SUM (29,000/day) still let a grinder who maxes every faucet reach
+    // Lv54 ~4.5× too fast. This GLOBAL ceiling sums ALL sources' post-
+    // multiplier XP since UTC midnight and is a benign no-op success once
+    // hit, mirroring the per-source cap above. Together they keep both
+    // faucet diversity (per-source) AND the ~150-day pacing (global).
+    if (finalAmount > 0) {
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const totalRow = await this.xpTxRepo
+        .createQueryBuilder('tx')
+        .select('COALESCE(SUM(tx.final_amount), 0)', 'sum')
+        .where('tx.user_id = :userId', { userId: dto.userId })
+        .andWhere('tx.created_at >= :dayStart', { dayStart })
+        .getRawOne<{ sum: string | number }>();
+      const totalToday = Number(totalRow?.sum ?? 0);
+      if (totalToday + finalAmount > GLOBAL_DAILY_XP_CAP) {
+        this.logger.warn(
+          `Global XP daily cap hit: user=${dto.userId} total=${totalToday} attempt=${finalAmount} cap=${GLOBAL_DAILY_XP_CAP}`,
         );
         return { progress: this.toDto(record), leveledUp: false };
       }

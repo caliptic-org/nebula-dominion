@@ -18,6 +18,13 @@ export class BattleEngineService {
   private readonly CRIT_CHANCE = 0.15;
   private readonly CRIT_MULTIPLIER = 1.75;
   private readonly DEFENSE_REDUCTION_CAP = 0.75;
+  // Cycle-18 BAL17-NEW-1: the defense-reduction denominator must match the
+  // real unit-defense range (3–38; max Captain 38, ~46 with race mult). At
+  // the original 100 the strongest unit reached only 38/138 = 27.5%
+  // mitigation, making defense near-useless. At 40 the gradient is meaningful
+  // (Captain ~53%, Marine ~15%, Zergling ~7%) while the 0.75 cap still bounds
+  // it. Mirrors the live socket engine in game-server game.service.ts.
+  private readonly DEFENSE_REDUCTION_SCALE = 40;
   private readonly ENGINE_VERSION = '1.0.0';
 
   getEngineVersion(): string {
@@ -27,11 +34,13 @@ export class BattleEngineService {
   /**
    * Server-side damage calculation — clients never control this.
    * Formula: base = attacker.attack * (1 - defense_reduction)
-   * defense_reduction = min(defender.defense / (defender.defense + 100), 0.75)
+   * defense_reduction = min(defender.defense / (defender.defense + 40), 0.75)
+   * (denominator 40 calibrated to the 3–38 unit-defense range — see
+   * DEFENSE_REDUCTION_SCALE; cycle-18 BAL17-NEW-1.)
    */
   calculateDamage(attacker: UnitSnapshot, defender: UnitSnapshot): DamageResult {
     const defenseReduction = Math.min(
-      defender.defense / (defender.defense + 100),
+      defender.defense / (defender.defense + this.DEFENSE_REDUCTION_SCALE),
       this.DEFENSE_REDUCTION_CAP,
     );
     const baseDamage = Math.max(1, Math.round(attacker.attack * (1 - defenseReduction)));

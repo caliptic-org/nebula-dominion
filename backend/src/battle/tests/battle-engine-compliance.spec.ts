@@ -3,7 +3,7 @@
  * against the documented design spec (CAL-107).
  *
  * Damage formula (server-side, anti-cheat):
- *   defenseReduction = min(defense / (defense + 100), 0.75)
+ *   defenseReduction = min(defense / (defense + 40), 0.75)   // scale=40, cycle-18 BAL17-NEW-1
  *   baseDamage = max(1, round(attack * (1 - defenseReduction)))
  *   finalDamage = round(baseDamage * critMultiplier)   [critMultiplier = 1.75 on crit, 1.0 otherwise]
  *   critChance = 0.15 (15%), defenseReductionCap = 0.75 (75%)
@@ -44,7 +44,10 @@ describe('[Compliance] BattleEngine — Damage Formula & Initiative (CAL-107)', 
     });
   });
 
-  // ── Defense reduction formula: min(d/(d+100), 0.75) ──────────────────────
+  // ── Defense reduction formula: min(d/(d+40), 0.75) ───────────────────────
+  // Scale constant is 40 (cycle-18 BAL17-NEW-1), calibrated to the 3–38
+  // unit-defense range so in-range defense is meaningful (Captain def38 →
+  // ~49% mitigation) instead of the near-useless 27.5% the old scale=100 gave.
 
   describe('defense reduction formula', () => {
     it('defense=0 → no reduction, damage equals attack', () => {
@@ -53,16 +56,24 @@ describe('[Compliance] BattleEngine — Damage Formula & Initiative (CAL-107)', 
       expect(baseDamage).toBe(100);
     });
 
-    it('defense=100 → 50% reduction, damage = round(attack × 0.5)', () => {
+    it('defense=40 (= scale) → 50% reduction, damage = round(attack × 0.5)', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 100 }));
+      // 40 / (40 + 40) = 0.5 exactly
+      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 40 }));
       expect(baseDamage).toBe(50);
     });
 
-    it('defense=300 → hits 75% cap, damage = round(attack × 0.25)', () => {
+    it('defense=20 → 33.3% reduction, damage = round(attack × 0.667)', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // 300 / (300 + 100) = 0.75 exactly — cap
-      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 300 }));
+      // 20 / 60 ≈ 0.3333, baseDamage = round(100 * 0.6667) = round(66.67) = 67
+      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 20 }));
+      expect(baseDamage).toBe(67);
+    });
+
+    it('defense=120 → hits 75% cap exactly, damage = round(attack × 0.25)', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      // 120 / (120 + 40) = 0.75 exactly — cap
+      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 120 }));
       expect(baseDamage).toBe(25);
     });
 
@@ -76,13 +87,6 @@ describe('[Compliance] BattleEngine — Damage Formula & Initiative (CAL-107)', 
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
       const { finalDamage } = engine.calculateDamage(unit({ attack: 1 }), unit({ defense: 9999 }));
       expect(finalDamage).toBeGreaterThanOrEqual(1);
-    });
-
-    it('defense=200 → 66.67% reduction, damage = round(attack × 0.333)', () => {
-      jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // 200 / 300 ≈ 0.6667, baseDamage = round(100 * 0.3333) = round(33.33) = 33
-      const { baseDamage } = engine.calculateDamage(unit({ attack: 100 }), unit({ defense: 200 }));
-      expect(baseDamage).toBe(33);
     });
   });
 
@@ -121,41 +125,43 @@ describe('[Compliance] BattleEngine — Damage Formula & Initiative (CAL-107)', 
   // ── Real Age 1 unit matchups from design doc ─────────────────────────────
 
   describe('Age 1 design-doc matchups', () => {
-    // defenseReduction = min(d/(d+100), 0.75); baseDamage = round(atk*(1-dr))
+    // defenseReduction = min(d/(d+40), 0.75); baseDamage = round(atk*(1-dr))
 
-    it('Human Soldier (atk=20) vs Zerg Guardian (def=24) → baseDamage=16', () => {
+    it('Human Soldier (atk=20) vs Zerg Guardian (def=24) → baseDamage=13', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // dr = 24/124 ≈ 0.19355; baseDamage = round(20 * 0.80645) = round(16.129) = 16
+      // dr = 24/64 = 0.375; baseDamage = round(20 * 0.625) = round(12.5) = 13
       const { baseDamage } = engine.calculateDamage(
         unit({ attack: 20, name: 'Soldier' }),
         unit({ defense: 24, name: 'Guardian' }),
       );
-      expect(baseDamage).toBe(16);
+      expect(baseDamage).toBe(13);
     });
 
-    it('Zerg Hive Lord (atk=42) vs Human Commander (def=38) → baseDamage=30', () => {
+    it('Zerg Hive Lord (atk=42) vs Human Commander (def=38) → baseDamage=22', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // dr = 38/138 ≈ 0.27536; baseDamage = round(42 * 0.72464) = round(30.435) = 30
+      // dr = 38/78 ≈ 0.48718; baseDamage = round(42 * 0.51282) = round(21.538) = 22
+      // (def=38 is the highest unit defense in the game → ~49% mitigation,
+      //  the meaningful tank ceiling the scale=40 retune restores.)
       const { baseDamage } = engine.calculateDamage(
         unit({ attack: 42, name: 'Hive Lord' }),
         unit({ defense: 38, name: 'Commander' }),
       );
-      expect(baseDamage).toBe(30);
+      expect(baseDamage).toBe(22);
     });
 
-    it('Human Sniper (atk=48) vs Zerg Larva (def=3) → baseDamage=47', () => {
+    it('Human Sniper (atk=48) vs Zerg Larva (def=3) → baseDamage=45', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // dr = 3/103 ≈ 0.02913; baseDamage = round(48 * 0.97087) = round(46.602) = 47
+      // dr = 3/43 ≈ 0.06977; baseDamage = round(48 * 0.93023) = round(44.651) = 45
       const { baseDamage } = engine.calculateDamage(
         unit({ attack: 48, name: 'Sniper' }),
         unit({ defense: 3, name: 'Larva' }),
       );
-      expect(baseDamage).toBe(47);
+      expect(baseDamage).toBe(45);
     });
 
     it('Human Recruit (atk=12) vs Zerg Zergling (def=5) → baseDamage=11', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // dr = 5/105 ≈ 0.04762; baseDamage = round(12 * 0.95238) = round(11.428) = 11
+      // dr = 5/45 ≈ 0.11111; baseDamage = round(12 * 0.88889) = round(10.667) = 11
       const { baseDamage } = engine.calculateDamage(
         unit({ attack: 12, name: 'Recruit' }),
         unit({ defense: 5, name: 'Zergling' }),
@@ -163,20 +169,20 @@ describe('[Compliance] BattleEngine — Damage Formula & Initiative (CAL-107)', 
       expect(baseDamage).toBe(11);
     });
 
-    it('Zerg Bone Guard (atk=28) vs Human Heavy Trooper (def=32) → baseDamage=21', () => {
+    it('Zerg Bone Guard (atk=28) vs Human Heavy Trooper (def=32) → baseDamage=16', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);
-      // dr = 32/132 ≈ 0.24242; baseDamage = round(28 * 0.75758) = round(21.212) = 21
+      // dr = 32/72 ≈ 0.44444; baseDamage = round(28 * 0.55556) = round(15.556) = 16
       const { baseDamage } = engine.calculateDamage(
         unit({ attack: 28, name: 'Bone Guard' }),
         unit({ defense: 32, name: 'Heavy Trooper' }),
       );
-      expect(baseDamage).toBe(21);
+      expect(baseDamage).toBe(16);
     });
 
-    it('Human Marksman crit (atk=32) vs Zerg Creeper (def=10): crit=55', () => {
+    it('Human Marksman crit (atk=32) vs Zerg Creeper (def=10): crit=46', () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.01);
-      // dr = 10/110 ≈ 0.09091; base = round(32 * 0.90909) = round(29.09) = 29
-      // crit = round(29 * 1.75) = round(50.75) = 51
+      // dr = 10/50 = 0.2; base = round(32 * 0.8) = round(25.6) = 26
+      // crit = round(26 * 1.75) = round(45.5) = 46
       const result = engine.calculateDamage(
         unit({ attack: 32, name: 'Marksman' }),
         unit({ defense: 10, name: 'Creeper' }),

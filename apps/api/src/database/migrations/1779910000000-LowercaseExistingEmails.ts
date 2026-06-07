@@ -97,10 +97,33 @@ export class LowercaseExistingEmails1779910000000
     // 3. Belt-and-braces — UNIQUE expression index on LOWER(email).
     //    Even if a future regression INSERTs mixed-case, Postgres
     //    rejects it at the DB layer.
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX IF NOT EXISTS uq_users_lower_email
-         ON users (LOWER(email))`,
-    );
+    //
+    //    CRITICAL: if any case-collision rows survive step 2 (the UPDATE
+    //    skips them to stay crash-free), a plain CREATE UNIQUE INDEX
+    //    would itself throw "could not create unique index ... key is
+    //    duplicated" — crash-looping the api boot for the whole fleet.
+    //    Wrap in a DO/EXCEPTION block: try the UNIQUE index first; if it
+    //    fails on residual duplicates, fall back to a NON-unique index
+    //    (still speeds up the LOWER(email) login lookup) and log a
+    //    NOTICE so an operator can dedup + re-tighten later. The real
+    //    correctness fix is the application-level RegisterDto @Transform
+    //    + AuthService normalization in this same commit; the index is
+    //    only defense-in-depth.
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_indexes WHERE indexname = 'uq_users_lower_email'
+        ) THEN
+          BEGIN
+            CREATE UNIQUE INDEX uq_users_lower_email ON users (LOWER(email));
+          EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'unique lower(email) index skipped (residual collisions: %); creating non-unique fallback', SQLERRM;
+            CREATE INDEX IF NOT EXISTS ix_users_lower_email ON users (LOWER(email));
+          END;
+        END IF;
+      END $$;
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

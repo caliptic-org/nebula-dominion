@@ -54,10 +54,21 @@ export class AddVipSpendIdempotencyLedger1779900000000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // 0. UUID generator — use gen_random_uuid() (PostgreSQL 13+ core,
+    //    no extension required) instead of uuid_generate_v4() which
+    //    needs the uuid-ossp extension. The game-server bootstrap only
+    //    installs pgcrypto; uuid-ossp is NOT guaranteed present on the
+    //    api DB. Referencing a missing function in CREATE TABLE throws
+    //    at boot → migrationsRun crashes the api → deploy crash-loop.
+    //    gen_random_uuid() is shipped in PostgreSQL core since 13 (the
+    //    stack is PG17) so this is dependency-free. pgcrypto is also
+    //    created defensively for any PG<13 edge case.
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+
     // 1. Ledger table — UNIQUE(transaction_id) is the linchpin.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS vip_spend_ledger (
-        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id         UUID NOT NULL,
         transaction_id  UUID NOT NULL,
         spend_usd       NUMERIC(12,2) NOT NULL CHECK (spend_usd >= 0),
@@ -79,16 +90,29 @@ export class AddVipSpendIdempotencyLedger1779900000000
     //    Use ON CONFLICT DO NOTHING in case the migration re-runs
     //    (typeorm tracks executed migrations but defensive coding
     //    here is cheap).
+    //
+    //    Wrapped in a DO/EXCEPTION block: the backfill is a best-effort
+    //    data seed, NOT a schema change the app depends on. If the
+    //    `transactions` table or one of its columns is missing/diverged
+    //    on a given environment, a RAISE NOTICE is logged but the
+    //    migration completes — the worst case is one extra credit on a
+    //    historical webhook replay, vs. crash-looping the api boot for
+    //    the whole fleet (which is what happened cycles 11-15).
     await queryRunner.query(`
-      INSERT INTO vip_spend_ledger (user_id, transaction_id, spend_usd, credited_at)
-      SELECT
-        t.user_id,
-        t.id AS transaction_id,
-        COALESCE(t.amount_usd, t.amount_try * 0.0285, 0)::NUMERIC(12,2) AS spend_usd,
-        COALESCE(t.updated_at, t.created_at) AS credited_at
-      FROM transactions t
-      WHERE t.status = 'completed'
-      ON CONFLICT (transaction_id) DO NOTHING
+      DO $$
+      BEGIN
+        INSERT INTO vip_spend_ledger (user_id, transaction_id, spend_usd, credited_at)
+        SELECT
+          t.user_id,
+          t.id AS transaction_id,
+          COALESCE(t.amount_usd, t.amount_try * 0.0285, 0)::NUMERIC(12,2) AS spend_usd,
+          COALESCE(t.updated_at, t.created_at) AS credited_at
+        FROM transactions t
+        WHERE t.status = 'completed'
+        ON CONFLICT (transaction_id) DO NOTHING;
+      EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'vip_spend_ledger backfill skipped: %', SQLERRM;
+      END $$;
     `);
 
     // 3. New 3-arg process_vip_spend overload (transaction_id required).

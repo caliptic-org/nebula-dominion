@@ -12,6 +12,7 @@ import { AntiCheatService } from '../anti-cheat/anti-cheat.service';
 import { ActionType, GameActionDto } from './dto/game-action.dto';
 import { Race, GameMode } from '../matchmaking/dto/join-queue.dto';
 import { MatchResult } from '../matchmaking/matchmaking.service';
+import { RewardsService } from '../battle/rewards.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,6 +84,8 @@ function buildService(): {
   emitter: EventEmitter2;
   savedRooms: GameRoom[];
   removedFromActive: string[];
+  resources: { grant: jest.Mock };
+  commanders: { awardXp: jest.Mock };
 } {
   const savedRooms: GameRoom[] = [];
   const removedFromActive: string[] = [];
@@ -154,6 +157,16 @@ function buildService(): {
     getAvailableMutationsForUnit: jest.fn().mockReturnValue([]),
   };
 
+  const commandersMock = {
+    awardXp: jest.fn().mockResolvedValue(undefined),
+    // Neutral bonus (no multipliers) so damage-formula expectations hold.
+    getActiveBonus: jest.fn().mockResolvedValue({}),
+  };
+  const unitsMock = { getUnits: jest.fn().mockResolvedValue([]) };
+  // Real RewardsService (pure, dependency-free) so finishGame computes the
+  // genuine reward table; resources.grant is mocked so we can assert credits.
+  const resourcesMock = { grant: jest.fn().mockResolvedValue(undefined) };
+
   const svc = new GameService(
     roomsMock as RoomService,
     sessionsMock as SessionService,
@@ -164,6 +177,10 @@ function buildService(): {
     progressionMock as any,
     mergeServiceMock as any,
     { notify: jest.fn() } as any,
+    commandersMock as any,
+    unitsMock as any,
+    new RewardsService(),
+    resourcesMock as any,
   );
 
   // Provide a way to set the current room for a test
@@ -172,15 +189,22 @@ function buildService(): {
     (roomsMock.get as jest.Mock).mockImplementation(async () => ({ ...currentRoom }));
   };
 
-  return { svc, emitter, savedRooms, removedFromActive };
+  return { svc, emitter, savedRooms, removedFromActive, resources: resourcesMock, commanders: commandersMock };
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
+// Exact-damage assertions pin the 15% crit RNG (Math.random < 0.15) to a
+// no-crit value; restore after each test so the spy never leaks.
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe('GameService — battle event ordering', () => {
   it('ATTACK emits unit_attacked event with correct damage', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // no crit (>= 0.15)
     const { svc } = buildService();
     const room = makeRoom();
     (svc as any).__setRoom(room);
@@ -195,9 +219,9 @@ describe('GameService — battle event ordering', () => {
     expect(attackedEvent).toBeDefined();
     expect(attackedEvent!.data.attackerUnitId).toBe('u1');
     expect(attackedEvent!.data.targetUnitId).toBe('u2');
-    // cycle 17 BAL-1 defense-reduction model: damage = round(atk*100/(100+def)).
-    // soldier attack=8, defense=5 → round(8*100/105)=round(7.62)=8.
-    expect(attackedEvent!.data.damage).toBe(8);
+    // cycle 17/18/20 defense-reduction model: damage = round(atk * 40/(40+def)).
+    // soldier attack=8, defense=5 → round(8*40/45)=round(7.11)=7 (no crit).
+    expect(attackedEvent!.data.damage).toBe(7);
   });
 
   it('ATTACK fires unit_died after unit_attacked when target HP drops to 0', async () => {
@@ -423,6 +447,79 @@ describe('GameService — battle event ordering', () => {
   });
 });
 
+describe('GameService — COMBAT-REWARDS-1 battle resource rewards', () => {
+  function makeWinRoom(overrides: Partial<GameRoom> = {}): GameRoom {
+    return makeRoom({
+      players: {
+        'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+        'user-2': makePlayer('user-2', { units: [makeUnit({ id: 'u2', hp: 1, defense: 0 })] }),
+      },
+      ...overrides,
+    });
+  }
+
+  const winAttack = makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'u2' } });
+
+  it('credits BOTH the winner and the loser via ResourcesService.grant', async () => {
+    const { svc, resources } = buildService();
+    (svc as any).__setRoom(makeWinRoom());
+
+    await svc.processAction('user-1', winAttack);
+
+    expect(resources.grant).toHaveBeenCalledTimes(2);
+    const byUser = Object.fromEntries(resources.grant.mock.calls.map((c) => [c[0], c[1]]));
+    expect(byUser['user-1']).toBeDefined();
+    expect(byUser['user-2']).toBeDefined();
+  });
+
+  it('uses the real RewardsService table — winner gets the win reward, loser the (smaller) loss reward', async () => {
+    const { svc, resources } = buildService();
+    (svc as any).__setRoom(makeWinRoom());
+
+    await svc.processAction('user-1', winAttack);
+
+    const byUser = Object.fromEntries(resources.grant.mock.calls.map((c) => [c[0], c[1]]));
+    // Winner: BASE_MINERALS_WIN (150) scaled by the quick-victory bonus
+    // (totalTurns=1 ≤ 10) → ≥ 150. Loser: flat BASE_*_LOSE, no multipliers.
+    expect(byUser['user-1'].mineral).toBeGreaterThanOrEqual(150);
+    expect(byUser['user-1'].gas).toBeGreaterThan(0);
+    expect(byUser['user-2']).toEqual({ mineral: 40, gas: 20 });
+    // Winner strictly out-earns the loser — combat investment pays off.
+    expect(byUser['user-1'].mineral).toBeGreaterThan(byUser['user-2'].mineral);
+  });
+
+  it('skips bots (no resource row) — only the human is credited in a PvE win', async () => {
+    const { svc, resources } = buildService();
+    const botId = 'bot:pve-1';
+    (svc as any).__setRoom(
+      makeRoom({
+        currentPlayerId: 'user-1',
+        players: {
+          'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+          [botId]: makePlayer(botId, { units: [makeUnit({ id: 'b1', hp: 1, defense: 0 })] }),
+        },
+      }),
+    );
+
+    await svc.processAction('user-1', makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'b1' } }));
+
+    expect(resources.grant).toHaveBeenCalledTimes(1);
+    expect(resources.grant.mock.calls[0][0]).toBe('user-1');
+    expect(resources.grant).not.toHaveBeenCalledWith(botId, expect.anything());
+  });
+
+  it('is idempotent per room — a re-grant for the same room credits only once', async () => {
+    const { svc, resources } = buildService();
+    const reward = { minerals: 100, gas: 50, xp: 0, eloDelta: 0, bonuses: [] };
+
+    await (svc as any).grantBattleResources('room-dup', [{ userId: 'user-1', rewards: reward }]);
+    await (svc as any).grantBattleResources('room-dup', [{ userId: 'user-1', rewards: reward }]);
+
+    expect(resources.grant).toHaveBeenCalledTimes(1);
+    expect(resources.grant).toHaveBeenCalledWith('user-1', { mineral: 100, gas: 50 });
+  });
+});
+
 describe('GameService — game creation flow', () => {
   it('onMatchFound emits game.created event with room and tokens', async () => {
     const { svc, emitter } = buildService();
@@ -486,7 +583,8 @@ describe('GameService — damage formula verification', () => {
     expect(attackedEvent!.data.damage).toBeGreaterThanOrEqual(1);
   });
 
-  it('damage = max(1, round(attack * 100 / (100 + defense)))', async () => {
+  it('damage = max(1, round(attack * 40 / (40 + defense)))', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // no crit (>= 0.15)
     const { svc } = buildService();
     const room = makeRoom({
       players: {
@@ -502,8 +600,8 @@ describe('GameService — damage formula verification', () => {
     }));
 
     const attackedEvent = result.events.find(e => e.type === 'unit_attacked');
-    // cycle 17 BAL-1 defense-reduction model: round(15*100/108)=round(13.89)=14.
-    expect(attackedEvent!.data.damage).toBe(14);
+    // cycle 17/18/20 defense-reduction model: round(15*40/48)=round(12.5)=13.
+    expect(attackedEvent!.data.damage).toBe(13);
   });
 });
 
@@ -531,6 +629,10 @@ describe('GameService — PvE bot anti-cheat bypass', () => {
       { awardXp: jest.fn().mockResolvedValue(undefined), getProgress: jest.fn().mockResolvedValue({ age: 1 }) } as any,
       { findRecipe: jest.fn().mockReturnValue(null), merge: jest.fn(), mutate: jest.fn().mockReturnValue(null), getAvailableMutationsForUnit: jest.fn().mockReturnValue([]) } as any,
       { notify: jest.fn() } as any,
+      { awardXp: jest.fn().mockResolvedValue(undefined), getActiveBonus: jest.fn().mockResolvedValue({}) } as any,
+      { getUnits: jest.fn().mockResolvedValue([]) } as any,
+      new RewardsService(),
+      { grant: jest.fn().mockResolvedValue(undefined) } as any,
     );
 
     const botId = 'bot:test-bot-id';

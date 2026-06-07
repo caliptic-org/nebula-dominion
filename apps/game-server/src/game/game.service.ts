@@ -13,6 +13,9 @@ import { MergeService } from './merge/merge.service';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { CommandersService } from '../commanders/commanders.service';
 import { UnitsService } from '../units/units.service';
+import { RewardsService } from '../battle/rewards.service';
+import { BattleRewards } from '../battle/battle-log.service';
+import { ResourcesService } from '../resources/resources.service';
 import { Race } from '../matchmaking/dto/join-queue.dto';
 
 const BOT_USER_ID_PREFIX = 'bot:';
@@ -36,6 +39,21 @@ const ABILITY_RADIUS = 2; // Manhattan radius for AoE damage / heal
 const ABILITY_AOE_FACTOR = 0.6; // per-target AoE damage = attack · dmgMul · this · defReduction
 const ABILITY_HEAL_PCT = 0.2; // heal = 20% of each ally's maxHp (cycle 20 BAL-DEPTH-3: 0.30 sustain ≈ attacker DPS → tank-mirror stalemate; lowered so attacks out-pace heals)
 const ABILITY_SUPPORT_PATTERN = /heal|regen|repair|restor|transfus|shield|plating|rally|tactical/i;
+
+// ── COMBAT-REWARDS-1 (cycle 22) — real battle resource rewards ───────────
+// The real-time Socket.io battle (this service's finishGame) used to credit
+// only XP: an inline mock stood in for the real RewardsService, computing a
+// flat XP number for the game_end cinematic and granting NOTHING spendable.
+// Resource income existed ONLY on the FE quick-battle surface
+// (api BattlesStubController → /buildings/resources/battle-reward), so a
+// player who fought real-time tactical battles earned XP but zero
+// minerals/gas. This wires the real RewardsService and credits the computed
+// minerals/gas to each human's persistent wallet via ResourcesService.grant
+// — the exact call the canonical battle-reward endpoint already makes —
+// bringing the two battle surfaces to parity. Bounded per-instance dedupe
+// keyed by room id makes a finishGame retry (reconnect) idempotent; the cap
+// keeps a long-lived process from growing the Set without bound.
+const REWARDED_ROOMS_MAX = 50_000;
 
 export interface GameCreatedEvent {
   match: MatchResult;
@@ -65,13 +83,13 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GameService.name);
   private readonly maxRoundMs: number;
   private timeoutTimer: NodeJS.Timeout;
-  private readonly rewards = {
-    calculate: (isWin: boolean, totalTurns: number, eloDelta: number, isPvE: boolean) => ({
-      xp: isWin ? 100 : 25,
-      bonus: isPvE ? 0 : Math.round(Math.abs(eloDelta) * 0.5),
-      turns: totalTurns,
-    }),
-  };
+
+  // COMBAT-REWARDS-1 — bounded FIFO dedupe of rooms whose battle resource
+  // reward has already been granted. Instance-scoped (GameService is a
+  // singleton) so a finishGame retry can't double-credit, while each test
+  // gets a fresh set.
+  private readonly rewardedRooms = new Set<string>();
+  private readonly rewardedRoomOrder: string[] = [];
 
   constructor(
     private readonly rooms: RoomService,
@@ -85,6 +103,8 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     private readonly questProgress: QuestProgressNotifier,
     private readonly commanders: CommandersService,
     private readonly units: UnitsService,
+    private readonly rewards: RewardsService,
+    private readonly resources: ResourcesService,
   ) {
     this.maxRoundMs = config.get<number>('game.maxRoundDurationMs', 30000);
   }
@@ -626,6 +646,16 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const winnerRewards = this.rewards.calculate(true, totalTurns, winResult.delta, isPvE);
     const loserRewards = this.rewards.calculate(false, totalTurns, loseResult.delta, isPvE);
 
+    // COMBAT-REWARDS-1 — actually credit the battle's resource rewards to
+    // each human's wallet (the mock granted nothing spendable). Awaited so
+    // the snapshot the client re-fetches after game_end reflects the credit.
+    // Bots are skipped (no resource row); errors are swallowed so a wallet
+    // hiccup never blocks the game-end response — the battle still resolves.
+    await this.grantBattleResources(room.id, [
+      { userId: winnerId, rewards: winnerRewards },
+      { userId: loserId, rewards: loserRewards },
+    ]);
+
     events.push({
       type: 'game_end',
       data: {
@@ -739,6 +769,63 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
         `Failed to award battle XP: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * COMBAT-REWARDS-1 — credit each human's battle resource reward (minerals
+   * + gas from RewardsService) to their persistent wallet via
+   * ResourcesService.grant — the same call the canonical
+   * `/buildings/resources/battle-reward` endpoint makes, so the Socket.io
+   * battle surface reaches parity with the FE quick-battle surface.
+   *
+   * - Bots (`bot:*` ids) have no resource row and are skipped.
+   * - Idempotent per room: a finishGame retry (reconnect) can't double-credit.
+   *   The flag is set BEFORE granting so a concurrent retry can't slip
+   *   through — under-granting on a rare wallet failure (logged) is safer
+   *   than double-granting.
+   * - Never throws: a wallet hiccup is logged but must not block the
+   *   game-end response — the battle still resolves.
+   */
+  private async grantBattleResources(
+    roomId: string,
+    grants: Array<{ userId: string; rewards: BattleRewards }>,
+  ): Promise<void> {
+    if (!this.markRoomRewarded(roomId)) return;
+
+    await Promise.all(
+      grants
+        .filter((g) => !g.userId.startsWith(BOT_USER_ID_PREFIX))
+        .map(async ({ userId, rewards }) => {
+          const mineral = Math.max(0, Math.floor(rewards.minerals));
+          const gas = Math.max(0, Math.floor(rewards.gas));
+          if (mineral === 0 && gas === 0) return;
+          try {
+            await this.resources.grant(userId, { mineral, gas });
+            this.logger.log(
+              `Battle resources granted: user=${userId} room=${roomId} +${mineral} mineral +${gas} gas`,
+            );
+          } catch (err) {
+            this.logger.error(
+              `Battle resource grant failed for ${userId} (room=${roomId}): ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }),
+    );
+  }
+
+  /** Record a room as rewarded; returns false if it already was (bounded
+   *  FIFO so a long-lived process can't grow the dedupe set without limit). */
+  private markRoomRewarded(roomId: string): boolean {
+    if (this.rewardedRooms.has(roomId)) return false;
+    this.rewardedRooms.add(roomId);
+    this.rewardedRoomOrder.push(roomId);
+    if (this.rewardedRoomOrder.length > REWARDED_ROOMS_MAX) {
+      const oldest = this.rewardedRoomOrder.shift();
+      if (oldest) this.rewardedRooms.delete(oldest);
+    }
+    return true;
   }
 
   private findUnit(room: GameRoom, userId: string, unitId: string): UnitState | undefined {

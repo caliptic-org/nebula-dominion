@@ -82,6 +82,14 @@ export class Resource {
   @Column({ name: 'population_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
   populationPerTick: number;
 
+  /** Science produced per tick (30 s) — cycle 17 BAL-02. Derived from
+   *  active research labs (academy / cyber_core / hatchery sciencePerTick)
+   *  in recalculateProductionRates. Decouples mid-game base upgrades from
+   *  PvP-only science sourcing. Companion migration:
+   *  1779940000000-AddBuildingScienceProduction. */
+  @Column({ name: 'science_per_tick', type: 'numeric', precision: 20, scale: 4, default: 0 })
+  sciencePerTick: number;
+
   /** Updated by resource ticks and offline accumulation — used to compute missed production on login */
   @Column({ name: 'last_tick_at', type: 'timestamptz', nullable: true })
   lastTickAt: Date | null;

@@ -115,11 +115,18 @@ describe('BuildingsService', () => {
 
       await service.recalculateProductionRates('p1');
 
-      expect(resources.updateRates).toHaveBeenCalledWith('p1', {
-        mineralPerTick: 5 + 15 + 0, // command_center + extractor + solar
-        gasPerTick: 0,
-        energyPerTick: (10 - 5) + (0 - 3) + (20 - 0), // net per building
-      });
+      // objectContaining so the assertion is robust to additional rate
+      // fields the call now carries (populationPerTick + cycle 17 BAL-02
+      // sciencePerTick — 0 here since none of these 3 buildings is a lab).
+      expect(resources.updateRates).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          mineralPerTick: 5 + 15 + 0, // command_center + extractor + solar
+          gasPerTick: 0,
+          energyPerTick: (10 - 5) + (0 - 3) + (20 - 0), // net per building
+          sciencePerTick: 0,
+        }),
+      );
     });
   });
 });

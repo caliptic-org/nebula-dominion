@@ -10,7 +10,7 @@ import {
   TIER_LEVELS_BY_LEVEL,
   resolveAge,
   resolveTierName,
-  xpRequiredForLevel,
+  xpToNextForLevel,
 } from './tier-table';
 
 export interface TierProgressView {
@@ -80,7 +80,11 @@ export class TierService {
       nextLevel,
       isMaxLevel: false,
       required: {
-        xp: xpRequiredForLevel(nextLevel).toString(),
+        // cycle 17 BAL-3 — single XP curve, game-server canonical. XP needed to
+        // reach the next level = the CURRENT level's per-level `xpToNext` delta
+        // (game-server `getLevelDef(currentLevel).xpToNext`), NOT a 100·L² formula
+        // keyed on the next level. Keyed on currentLevel to match game-server.
+        xp: xpToNextForLevel(progress.currentLevel).toString(),
       },
       nextTier: nextDef
         ? {
@@ -148,7 +152,11 @@ export class TierService {
         currentAge: 1,
         currentTierName: 'Tohum',
         xp: '0',
-        xpToNextLevel: xpRequiredForLevel(2).toString(),
+        // cycle 17 BAL-3 — single XP curve, game-server canonical. Seed the Lv1
+        // player's xpToNext from the game-server mirror (getLevelDef(1).xpToNext
+        // = 359), NOT the old 100·L² value (400). tier_progression is the
+        // read-through mirror (cycle 2 A9) — it must never seed a divergent number.
+        xpToNextLevel: xpToNextForLevel(1).toString(),
         achievements: null,
       });
       progress = await this.progressRepo.save(progress);
@@ -181,10 +189,11 @@ export class TierService {
         progress.currentAge = live.current_age;
         progress.xp = String(live.current_xp);
         progress.currentTierName = resolveTierName(live.current_level, null);
-        progress.xpToNextLevel =
-          live.current_level >= MAX_TIER_LEVEL
-            ? '0'
-            : xpRequiredForLevel(live.current_level + 1).toString();
+        // cycle 17 BAL-3 — single XP curve, game-server canonical. Mirror the
+        // game-server per-level delta for the live CURRENT level
+        // (getLevelDef(current_level).xpToNext), NOT 100·L² keyed on next level.
+        // xpToNextForLevel already returns 0 at max level / age-cap levels.
+        progress.xpToNextLevel = xpToNextForLevel(live.current_level).toString();
         await this.progressRepo.save(progress);
       }
     } catch (err) {
@@ -202,13 +211,14 @@ export class TierService {
     // Compute xpToNextLevel from the current level rather than trusting the
     // stored column. The lazy sync only writes when state moves forward, so
     // any time the player's level moved back (admin reset, prestige, etc.)
-    // the column lingers with a stale threshold from the higher level. The
-    // function is the source of truth — `xpRequiredForLevel(L) = 100*L²` —
-    // and it's cheap to evaluate. Cap at MAX_TIER_LEVEL with '0'.
-    const xpToNext =
-      progress.currentLevel >= MAX_TIER_LEVEL
-        ? '0'
-        : xpRequiredForLevel(progress.currentLevel + 1).toString();
+    // the column lingers with a stale threshold from the higher level.
+    //
+    // cycle 17 BAL-3 — single XP curve, game-server canonical, api mirrors not
+    // invents. The value mirrors game-server's per-level `xpToNext` delta for
+    // the CURRENT level (getLevelDef(currentLevel).xpToNext) — NOT the old
+    // 100·L² formula keyed on the next level, which never lined up with real
+    // level-ups. xpToNextForLevel returns 0 at max / age-cap levels.
+    const xpToNext = xpToNextForLevel(progress.currentLevel).toString();
     return {
       userId: progress.userId,
       currentLevel: progress.currentLevel,

@@ -96,8 +96,48 @@ export function resolveAge(level: number): number {
   return TIER_LEVELS_BY_LEVEL[clamped]?.age ?? 1;
 }
 
-export function xpRequiredForLevel(level: number): bigint {
-  if (level <= MIN_TIER_LEVEL) return 0n;
-  // Mild quadratic curve: 100 * level^2 — broad enough to span the 6-age span.
-  return BigInt(100 * level * level);
+/**
+ * cycle 17 BAL-3 — SINGLE XP CURVE, game-server canonical, api MIRRORS not invents.
+ *
+ * This table is a verbatim copy of game-server's per-level `xpToNext` deltas
+ * (apps/game-server/src/progression/config/level-config.ts). game-server is the
+ * sole XP source of truth (cycle 2 A9). The api tier view must NOT invent its
+ * own curve — the previous `xpRequiredForLevel(L) = 100·L²` formula disagreed
+ * with this table at EVERY level (Lv2: 400 vs 359; Lv30: 90000 vs 8449) and made
+ * the HUD XP-to-next bar never line up with real level-ups.
+ *
+ * SEMANTICS — keyed by CURRENT level (NOT next level), matching game-server's
+ * `toDto()`:  xpToNextLevel = getLevelDef(currentLevel).xpToNext.
+ *   - The value is the XP delta needed to advance FROM `level` to `level + 1`.
+ *   - `null` on game-server means "last level of its age" (advance-age gated) or
+ *     max level; here we surface it as 0 (no in-age level-up remaining), which
+ *     the FE renders as a full / capped bar.
+ *
+ * If this table and game-server's level-config.ts ever drift, game-server wins —
+ * fix this copy, never re-introduce a formula. Ideally both apps would import a
+ * shared package; until that refactor lands this mirror keeps them in lockstep.
+ */
+export const XP_TO_NEXT_BY_LEVEL: Record<number, number | null> = {
+  1: 359, 2: 423, 3: 500, 4: 590, 5: 696, 6: 821, 7: 969, 8: 1143, 9: null,
+  10: 816, 11: 962, 12: 1136, 13: 1340, 14: 1581, 15: 1866, 16: 2202, 17: 2597, 18: null,
+  19: 2219, 20: 2618, 21: 3088, 22: 3645, 23: 4302, 24: 5076, 25: 5990, 26: 7067, 27: null,
+  28: 6068, 29: 7160, 30: 8449, 31: 9970, 32: 11764, 33: 13881, 34: 16380, 35: 19328, 36: null,
+  37: 15334, 38: 18094, 39: 21351, 40: 25194, 41: 29729, 42: 35079, 43: 41396, 44: 48847, 45: null,
+  46: 37189, 47: 43883, 48: 51779, 49: 61083, 50: 72097, 51: 85074, 52: 100387, 53: 118487, 54: null,
+};
+
+/**
+ * cycle 17 BAL-3 — XP needed to advance FROM `currentLevel` to `currentLevel + 1`,
+ * mirroring game-server's canonical per-level curve. Replaces the old
+ * `xpRequiredForLevel(L) = 100·L²` formula.
+ *
+ * Returns 0n when the level is the last of its age (game-server `xpToNext: null`,
+ * advance-age gated) or at/above max level — the FE shows a full/capped bar.
+ *
+ * @param currentLevel the player's CURRENT level (not the next level)
+ */
+export function xpToNextForLevel(currentLevel: number): bigint {
+  const clamped = Math.max(MIN_TIER_LEVEL, Math.min(MAX_TIER_LEVEL, currentLevel));
+  const xpToNext = XP_TO_NEXT_BY_LEVEL[clamped];
+  return xpToNext == null ? 0n : BigInt(xpToNext);
 }

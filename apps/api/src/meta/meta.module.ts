@@ -11,6 +11,9 @@ import { ChatStubController } from './chat-stub.controller';
 import { BuffsStubController } from './buffs-stub.controller';
 import { ResearchStubController } from './research-stub.controller';
 import { QuestProgressModule } from '../modules/quest-progress/quest-progress.module';
+// cycle 17 BAL-03: MissionsStubController delegates daily-quest claims to
+// DailyEngagementService for DB-backed idempotency + wallet/XP credit.
+import { DailyEngagementModule } from '../modules/daily-engagement/daily-engagement.module';
 
 /* MetaModule
  *
@@ -44,7 +47,7 @@ import { QuestProgressModule } from '../modules/quest-progress/quest-progress.mo
  * production-active status. */
 
 @Module({
-  imports: [QuestProgressModule],
+  imports: [QuestProgressModule, DailyEngagementModule],
   controllers: [
     LeaderboardStubController,
     MissionsStubController,

@@ -65,15 +65,20 @@ interface Mission {
 // hydration via useMissionClaims still flips the badge to "ÖDÜL ALINDI"
 // once the BE has recorded a successful claim.
 const MISSIONS: Mission[] = [
-  { id: 'story-1', title: "Nebula'nın Uyanışı", description: 'İlk üssünü kur ve komutanını seç.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 5000 }, { label: 'XP', amount: 1200 }], category: 'story', difficulty: 'kolay', chapter: 1 },
-  { id: 'story-2', title: 'İlk Kan', description: 'Yakındaki düşman üssüne saldır ve ilk savaş zaferini kazan.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 8000 }, { label: 'XP', amount: 2500 }], category: 'story', difficulty: 'orta', chapter: 1 },
-  { id: 'story-3', title: 'İttifak ya da Kan', description: 'Başka bir ırkla diplomatik ilişki kur veya savaş ilan et.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Enerji', amount: 10000 }, { label: 'XP', amount: 5000 }], category: 'story', difficulty: 'zor', chapter: 2 },
-  { id: 'story-4', title: 'Nebula Hâkimi', description: 'Tüm galaksiye hükmeden tek ırk ol.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Rozet', amount: 1 }, { label: 'XP', amount: 50000 }], category: 'story', difficulty: 'efsane', chapter: 3 },
+  // cycle 17 BAL-01: XP amounts below mirror the honest server catalog
+  // (apps/api/.../missions.catalog.ts) — story-* credit 300 XP (event base),
+  // NOT the phantom 1.2k/2.5k/5k/50k that never landed. gold/gems are real.
+  { id: 'story-1', title: "Nebula'nın Uyanışı", description: 'İlk üssünü kur ve komutanını seç.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 5000 }, { label: 'XP', amount: 300 }], category: 'story', difficulty: 'kolay', chapter: 1 },
+  { id: 'story-2', title: 'İlk Kan', description: 'Yakındaki düşman üssüne saldır ve ilk savaş zaferini kazan.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Kaynak', amount: 8000 }, { label: 'XP', amount: 300 }], category: 'story', difficulty: 'orta', chapter: 1 },
+  { id: 'story-3', title: 'İttifak ya da Kan', description: 'Başka bir ırkla diplomatik ilişki kur veya savaş ilan et.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Enerji', amount: 10000 }, { label: 'XP', amount: 300 }], category: 'story', difficulty: 'zor', chapter: 2 },
+  { id: 'story-4', title: 'Nebula Hâkimi', description: 'Tüm galaksiye hükmeden tek ırk ol.', state: 'active', progress: 0, progressLabel: '0/1', rewards: [{ label: 'Rozet', amount: 1 }, { label: 'XP', amount: 300 }], category: 'story', difficulty: 'efsane', chapter: 3 },
   { id: 'daily-1', title: 'Kaynak Toplayıcı', description: '3 madeni tamamen topla.', state: 'completed', progress: 100, progressLabel: '3/3', timeLeft: '—', rewards: [{ label: 'Kaynak', amount: 2000 }], category: 'daily', difficulty: 'kolay' },
   { id: 'daily-2', title: 'Savaşçı Ruhu', description: 'En az 2 PvP savaşı kazan.', state: 'active', progress: 50, progressLabel: '1/2', timeLeft: '14s 23d', rewards: [{ label: 'XP', amount: 800 }], category: 'daily', difficulty: 'orta' },
   { id: 'daily-3', title: 'Araştırmacı Zihni', description: '1 teknoloji araştırması tamamla.', state: 'active', progress: 0, progressLabel: '0/1', timeLeft: '14s 23d', rewards: [{ label: 'Enerji', amount: 1000 }], category: 'daily', difficulty: 'kolay' },
-  { id: 'weekly-1', title: 'Savaş Makinesi', description: 'Bu hafta 15 düşman birimi yok et.', state: 'active', progress: 47, progressLabel: '7/15', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 15000 }, { label: 'XP', amount: 10000 }], category: 'weekly', difficulty: 'zor' },
-  { id: 'weekly-2', title: 'İmparatorluk İnşacısı', description: 'Bu hafta 5 yeni yapı inşa et.', state: 'active', progress: 80, progressLabel: '4/5', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 10000 }, { label: 'XP', amount: 6000 }], category: 'weekly', difficulty: 'orta' },
+  // cycle 17 BAL-01: weekly-* credit 200 XP (daily_mission base), not the
+  // phantom 10k/6k. gold is real.
+  { id: 'weekly-1', title: 'Savaş Makinesi', description: 'Bu hafta 15 düşman birimi yok et.', state: 'active', progress: 47, progressLabel: '7/15', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 15000 }, { label: 'XP', amount: 200 }], category: 'weekly', difficulty: 'zor' },
+  { id: 'weekly-2', title: 'İmparatorluk İnşacısı', description: 'Bu hafta 5 yeni yapı inşa et.', state: 'active', progress: 80, progressLabel: '4/5', timeLeft: '4g 18s', rewards: [{ label: 'Kaynak', amount: 10000 }, { label: 'XP', amount: 200 }], category: 'weekly', difficulty: 'orta' },
 ];
 
 const DIFFICULTY_COLOR: Record<Difficulty, string> = {

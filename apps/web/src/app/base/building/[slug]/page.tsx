@@ -62,6 +62,15 @@ import {
 } from '@/lib/upgrade-requirements';
 import { scaledDurationSec } from '@/lib/game-speed';
 
+// Building upgrade cost exponent — FE mirror of
+// BuildingsService.BUILDING_UPGRADE_COST_EXP (game-server). cost estimate
+// shown here = baseCost × EXP^level. cycle 17 BAL-01: lowered 1.5 → 1.22
+// so the displayed "next level" price matches what the server actually
+// charges AND tracks the 1.18 yield curve (upgrades stay self-funding past
+// Lv30). Keep this in lock-step with the backend constant — a mismatch
+// makes the UI overstate or understate the upgrade price.
+const BUILDING_UPGRADE_COST_EXP = 1.22;
+
 // Reuses the slug→backendType mapping that /base/build defines. Duplicated
 // here for now because /base/build is a client component — extract to a
 // shared lib once a third consumer appears.
@@ -303,8 +312,9 @@ function Inner({ slug }: { slug: string }) {
     if (upgradingId === owned.id) return;
     setUpgradingId(owned.id);
     try {
-      // POST /api/buildings/:id/upgrade — game-server scales cost 1.5× per
-      // existing level and bumps the row. Production rates are recalculated
+      // POST /api/buildings/:id/upgrade — game-server scales cost
+      // BUILDING_UPGRADE_COST_EXP× (1.22, cycle 17 BAL-01) per existing
+      // level and bumps the row. Production rates are recalculated
       // server-side so the wallet trickle picks up the new tier within one
       // tick. Wallet refresh fires immediately so the HUD pill doesn't lag
       // the visible level bump. Buildings refresh pulls the new row with
@@ -565,7 +575,7 @@ function Inner({ slug }: { slug: string }) {
               <Eyebrow color={race.primary}>YÜKSELTME</Eyebrow>
               <Caption style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55 }}>
                 {owned
-                  ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceA.name} + ${Math.round(costB * Math.pow(1.5, owned.level)).toLocaleString()} ${race.resourceB.name} ile yükseltebilirsin.`
+                  ? `Mevcut seviye: ${owned.level}. Sıradaki seviyeyi ${Math.round(costA * Math.pow(BUILDING_UPGRADE_COST_EXP, owned.level)).toLocaleString()} ${race.resourceA.name} + ${Math.round(costB * Math.pow(BUILDING_UPGRADE_COST_EXP, owned.level)).toLocaleString()} ${race.resourceB.name} ile yükseltebilirsin.`
                   : 'Bu slot henüz inşa edilmemiş. Önce yapımı başlat, sonra seviyeleri buradan görürsün.'}
               </Caption>
 

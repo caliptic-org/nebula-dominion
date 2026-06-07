@@ -8,15 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository,
   QueryFailedError,
-  MoreThanOrEqual,
   DataSource,
 } from 'typeorm';
 import { MissionClaim, MissionType } from './entities/mission-claim.entity';
 import { CanonicalReward } from './dto/claim-mission.dto';
-import {
-  resolveMissionReward,
-  PER_USER_DAILY_XP_CAP,
-} from './missions.catalog';
+import { resolveMissionReward } from './missions.catalog';
 
 interface ClaimInput {
   userId: string;
@@ -434,30 +430,21 @@ export class DailyEngagementService {
       }
     }
 
-    // Per-user daily XP ceiling — defensive against ID enumeration or
-    // catalog drift. The previous claim handler had no cap at all; a
-    // live playtest farmed lv1→14 in 31 calls before the structural
-    // fix (catalog lookup) landed. Now there's both a structural cap
-    // (the catalog can only mint defined values) AND a behavioural cap
-    // (a single user can't claim past PER_USER_DAILY_XP_CAP in a day).
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const todaysClaims = await this.claimRepo.find({
-      where: { userId, claimedAt: MoreThanOrEqual(dayStart) },
-    });
-    const todaysXp = todaysClaims.reduce(
-      (sum, c) => sum + (c.rewardJson?.xp ?? 0),
-      0,
-    );
-    let cappedReward: CanonicalReward = { ...reward };
-    if ((cappedReward.xp ?? 0) > 0 && todaysXp + (cappedReward.xp ?? 0) > PER_USER_DAILY_XP_CAP) {
-      const remaining = Math.max(0, PER_USER_DAILY_XP_CAP - todaysXp);
-      this.logger.warn(
-        `Mission claim XP capped user=${userId} mission=${missionId} ` +
-          `attempted=${cappedReward.xp} todaysXp=${todaysXp} remaining=${remaining}`,
-      );
-      cappedReward = { ...cappedReward, xp: remaining };
-    }
+    // ── cycle 17 BAL-4 / BAL-02: dead client-side XP cap removed ──────
+    // This used to clamp `reward.xp` against a 150 000/day PER_USER_DAILY_XP_CAP
+    // computed by summing rewardJson.xp across today's claim rows. That cap
+    // was DEAD CODE: rewardJson.xp is decorative (it feeds the FE display
+    // and creditWallet's `xp` resource field) — it is NOT the progression
+    // XP that advances Lv/Çağ. The real progression grant flows through
+    // creditXp() below, which sends only { source, referenceId } and lets
+    // game-server mint XP from its own XP_BASE_AMOUNTS table, completely
+    // ignoring this number. So clamping it here never bounded any minted
+    // progression XP. The authoritative per-source daily ceiling now lives
+    // in game-server level-config.ts XP_DAILY_CAPS (DAILY_MISSION 3000,
+    // ACHIEVEMENT 5000, …), enforced where the XP is actually minted.
+    // `cappedReward` retains its name for downstream readability but is now
+    // just the catalog reward as-is.
+    const cappedReward: CanonicalReward = { ...reward };
 
     const record = this.claimRepo.create({
       userId,

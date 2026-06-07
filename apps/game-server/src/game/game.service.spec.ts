@@ -195,8 +195,9 @@ describe('GameService — battle event ordering', () => {
     expect(attackedEvent).toBeDefined();
     expect(attackedEvent!.data.attackerUnitId).toBe('u1');
     expect(attackedEvent!.data.targetUnitId).toBe('u2');
-    // soldier: attack=8, defense=5 → damage=3
-    expect(attackedEvent!.data.damage).toBe(3);
+    // cycle 17 BAL-1 defense-reduction model: damage = round(atk*100/(100+def)).
+    // soldier attack=8, defense=5 → round(8*100/105)=round(7.62)=8.
+    expect(attackedEvent!.data.damage).toBe(8);
   });
 
   it('ATTACK fires unit_died after unit_attacked when target HP drops to 0', async () => {
@@ -485,7 +486,7 @@ describe('GameService — damage formula verification', () => {
     expect(attackedEvent!.data.damage).toBeGreaterThanOrEqual(1);
   });
 
-  it('damage = max(1, attack - defense)', async () => {
+  it('damage = max(1, round(attack * 100 / (100 + defense)))', async () => {
     const { svc } = buildService();
     const room = makeRoom({
       players: {
@@ -501,7 +502,8 @@ describe('GameService — damage formula verification', () => {
     }));
 
     const attackedEvent = result.events.find(e => e.type === 'unit_attacked');
-    expect(attackedEvent!.data.damage).toBe(7); // 15 - 8 = 7
+    // cycle 17 BAL-1 defense-reduction model: round(15*100/108)=round(13.89)=14.
+    expect(attackedEvent!.data.damage).toBe(14);
   });
 });
 

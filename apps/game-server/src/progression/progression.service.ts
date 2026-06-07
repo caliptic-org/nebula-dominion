@@ -133,7 +133,7 @@ export class ProgressionService {
     // Lv 54 reachable in ~12 trains. Fix: XP is fixed per source.
     const finalAmount = Math.round(baseAmount * multiplier);
 
-    // ── Per-source daily cap (HIGH F6-econ) ──────────────────────────
+    // ── Per-source daily cap (HIGH F6-econ; cycle 17 BAL-4/BAL-02) ───
     // Second wall after units.service's queue cap. Sum the player's XP
     // from this source since UTC midnight; if already at/over cap, no-op
     // success (don't 4xx — clients shouldn't have to special-case capped
@@ -141,6 +141,14 @@ export class ProgressionService {
     // benign skips). Caps are coarse-grained per UTC day; finer windows
     // (rolling hour, per-hour buckets) are deferred until telemetry shows
     // they matter.
+    //
+    // This block is SOURCE-AGNOSTIC: it enforces whatever appears in
+    // XP_DAILY_CAPS keyed by dto.source. cycle 17 added PVE_WIN/PVP_WIN
+    // (8000 each), DAILY_MISSION (3000) and ACHIEVEMENT (5000) to that
+    // map — closing the previously-uncapped battle-XP faucet — and they
+    // are enforced here automatically with no per-source branching. The
+    // summed final_amount is POST-multiplier, so the cap is a true XP/day
+    // ceiling independent of the player's age xpMultiplier.
     const dailyCap = XP_DAILY_CAPS[dto.source];
     if (dailyCap !== undefined && finalAmount > 0) {
       const todayStart = new Date();

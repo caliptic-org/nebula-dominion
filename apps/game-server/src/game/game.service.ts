@@ -160,7 +160,24 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const defMul = 1 + (targetCmd.defenseMultiplier ?? 0);
     const effectiveDefense = Math.max(0, target.defense * defMul);
     const isCrit = Math.random() < 0.15;
-    const baseDamage = Math.max(1, attacker.attack * dmgMul - effectiveDefense);
+    // ── cycle 17 BAL-1 — defense-reduction damage model ──────────────
+    // Damage model switched from SUBTRACTIVE (atk - def, which hard-floored
+    // any low-attack unit to the max(1,…) minimum and let a single race
+    // win every matchup by stacking defense) to DEFENSE-AS-REDUCTION:
+    //
+    //   baseDamage = round(atk * dmgMul * 100 / (100 + effectiveDefense))
+    //
+    // Defense now has diminishing returns — each point of armor shaves a
+    // shrinking percentage off incoming damage instead of a flat point — so
+    // no race auto-wins on stacked defense and attack multipliers (e.g.
+    // ZERG +15% atk) translate into real damage instead of being eaten by
+    // the opponent's flat defense bonus. Worked example (race-adjusted base
+    // stats): Marine atk10 vs Zergling def3 → 10 dmg; Zergling atk9 vs
+    // Marine def7 → 8 dmg, collapsing the old ~5x kill-time skew to ~1.75x.
+    const baseDamage = Math.max(
+      1,
+      Math.round((attacker.attack * dmgMul * 100) / (100 + effectiveDefense)),
+    );
     const damage = isCrit ? Math.round(baseDamage * 1.75) : Math.round(baseDamage);
     target.hp -= damage;
     attacker.actionUsed = true;

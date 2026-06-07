@@ -24,6 +24,8 @@ export interface ResourceSnapshot {
   gasPerTick: number;
   energyPerTick: number;
   populationPerTick: number;
+  /** Science produced per tick — cycle 17 BAL-02 lab trickle */
+  sciencePerTick: number;
   lastTickAt: Date | null;
 }
 
@@ -135,6 +137,12 @@ export class ResourcesService {
         Math.floor(Number(resource.population) + Number(resource.populationPerTick) * missedTicks),
         resource.populationCap,
       );
+      // Cycle 17 BAL-02: offline players also accrue lab science over the
+      // missed ticks so the trickle keeps pace whether online or offline.
+      resource.science = Math.min(
+        Math.floor(Number(resource.science ?? 0) + Number(resource.sciencePerTick ?? 0) * missedTicks),
+        Number(resource.scienceCap ?? Number.MAX_SAFE_INTEGER),
+      );
 
       // Advance lastTickAt by exact ticks applied so fractional remainder carries forward
       resource.lastTickAt = new Date(new Date(resource.lastTickAt).getTime() + missedTicks * TICK_INTERVAL_MS);
@@ -204,7 +212,7 @@ export class ResourcesService {
       RETURNING id, player_id, mineral, gas, energy, population, science,
                 mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
                 mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
-                last_tick_at
+                science_per_tick, last_tick_at
       `,
       [playerId, mineralGrant, gasGrant, energyGrant, scienceGrant],
     )) as Array<{
@@ -224,6 +232,7 @@ export class ResourcesService {
       gas_per_tick: string | number;
       energy_per_tick: string | number;
       population_per_tick: string | number;
+      science_per_tick: string | number;
       last_tick_at: Date | null;
     }>;
 
@@ -250,6 +259,7 @@ export class ResourcesService {
       gasPerTick:        Number(r.gas_per_tick),
       energyPerTick:     Number(r.energy_per_tick),
       populationPerTick: Number(r.population_per_tick),
+      sciencePerTick:    Number(r.science_per_tick ?? 0),
       lastTickAt:        r.last_tick_at,
     };
 
@@ -321,7 +331,7 @@ export class ResourcesService {
       RETURNING id, player_id, mineral, gas, energy, population, science,
                 mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
                 mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
-                last_tick_at
+                science_per_tick, last_tick_at
       `,
       [playerId, mineralCost, gasCost, energyCost, scienceCost],
     )) as Array<{
@@ -341,6 +351,7 @@ export class ResourcesService {
       gas_per_tick: string | number;
       energy_per_tick: string | number;
       population_per_tick: string | number;
+      science_per_tick: string | number;
       last_tick_at: Date | null;
     }>;
 
@@ -368,6 +379,7 @@ export class ResourcesService {
       gasPerTick:        Number(r.gas_per_tick),
       energyPerTick:     Number(r.energy_per_tick),
       populationPerTick: Number(r.population_per_tick),
+      sciencePerTick:    Number(r.science_per_tick ?? 0),
       lastTickAt:        r.last_tick_at,
     };
 
@@ -386,6 +398,10 @@ export class ResourcesService {
       gasPerTick: number;
       energyPerTick: number;
       populationPerTick?: number;
+      /** Cycle 17 BAL-02 — research-lab science trickle. Optional so
+       *  older callers (and tests) that don't pass it leave the column
+       *  untouched. */
+      sciencePerTick?: number;
     },
   ): Promise<void> {
     const resource = await this.getOrCreate(playerId);
@@ -395,10 +411,15 @@ export class ResourcesService {
     if (rates.populationPerTick !== undefined) {
       resource.populationPerTick = rates.populationPerTick;
     }
+    if (rates.sciencePerTick !== undefined) {
+      resource.sciencePerTick = rates.sciencePerTick;
+    }
     await this.resourceRepo.save(resource);
     await this.invalidateCache(playerId);
     this.logger.debug(
-      `Updated production rates for ${playerId}: +${rates.mineralPerTick}M/tick +${rates.gasPerTick}G/tick +${rates.energyPerTick}E/tick`,
+      `Updated production rates for ${playerId}: +${rates.mineralPerTick}M/tick ` +
+        `+${rates.gasPerTick}G/tick +${rates.energyPerTick}E/tick ` +
+        `+${rates.sciencePerTick ?? 0}◈/tick`,
     );
   }
 
@@ -442,6 +463,14 @@ export class ResourcesService {
       Math.floor(Number(resource.population) + Number(resource.populationPerTick)),
       resource.populationCap,
     );
+    // Cycle 17 BAL-02: science trickle accrues alongside the other
+    // currencies in the single-player tick path too. Cap falls back to a
+    // safe ceiling if the column is somehow null (defensive — the schema
+    // defaults it to 10T).
+    resource.science = Math.min(
+      Math.floor(Number(resource.science ?? 0) + Number(resource.sciencePerTick ?? 0)),
+      Number(resource.scienceCap ?? Number.MAX_SAFE_INTEGER),
+    );
     resource.lastTickAt = new Date();
 
     await this.resourceRepo.save(resource);
@@ -463,26 +492,33 @@ export class ResourcesService {
    * over-credit a wallet, and RETURNING gives us the post-update values
    * for the Redis cache priming + storage-warning fan-out below.
    *
-   * Population is intentionally NOT in the WHERE filter — only the three
-   * "currency" rates gate activeness (matches getActivePlayerIds in the
-   * worker). Population_per_tick > 0 alone wouldn't trigger a tick row
-   * pre-fix, so we keep that behaviour identical post-fix.
+   * Population is intentionally NOT in the WHERE filter. The three
+   * "currency" rates plus science (cycle 17 BAL-02 lab trickle) gate
+   * activeness — a science-only producer (e.g. an academy with no mineral/
+   * gas/energy output) must still tick so its research trickle accrues.
+   * Population_per_tick > 0 alone still wouldn't trigger a tick row.
    */
   async applyTickBulk(): Promise<number> {
+    // Cycle 17 BAL-02: science accrues from the lab trickle the same way
+    // mineral/gas/energy do — capped at science_cap via LEAST(...). The
+    // WHERE filter now also lets a science-only producer (e.g. an academy
+    // with no currency output) tick so the trickle actually accumulates.
     const rows = await this.dataSource.query(`
       UPDATE player_resources
       SET mineral    = LEAST(mineral_cap,    FLOOR(mineral    + mineral_per_tick)),
           gas        = LEAST(gas_cap,        FLOOR(gas        + gas_per_tick)),
           energy     = LEAST(energy_cap,     FLOOR(energy     + energy_per_tick)),
           population = LEAST(population_cap, FLOOR(population + population_per_tick)),
+          science    = LEAST(science_cap,    FLOOR(science    + science_per_tick)),
           last_tick_at = NOW()
       WHERE mineral_per_tick > 0
          OR gas_per_tick > 0
          OR energy_per_tick > 0
+         OR science_per_tick > 0
       RETURNING player_id, mineral, gas, energy, population, science,
                 mineral_cap, gas_cap, energy_cap, population_cap, science_cap,
                 mineral_per_tick, gas_per_tick, energy_per_tick, population_per_tick,
-                last_tick_at
+                science_per_tick, last_tick_at
     `) as Array<{
       player_id: string;
       mineral: string | number;
@@ -499,6 +535,7 @@ export class ResourcesService {
       gas_per_tick: string | number;
       energy_per_tick: string | number;
       population_per_tick: string | number;
+      science_per_tick: string | number;
       last_tick_at: Date;
     }>;
 
@@ -524,6 +561,7 @@ export class ResourcesService {
         gasPerTick:        Number(r.gas_per_tick),
         energyPerTick:     Number(r.energy_per_tick),
         populationPerTick: Number(r.population_per_tick),
+        sciencePerTick:    Number(r.science_per_tick ?? 0),
         lastTickAt:        r.last_tick_at,
       };
 
@@ -590,6 +628,7 @@ export class ResourcesService {
       gasPerTick:       Number(resource.gasPerTick),
       energyPerTick:    Number(resource.energyPerTick),
       populationPerTick:Number(resource.populationPerTick),
+      sciencePerTick:   Number(resource.sciencePerTick ?? 0),
       lastTickAt:       resource.lastTickAt,
     };
   }

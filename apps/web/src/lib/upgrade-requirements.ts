@@ -12,6 +12,15 @@
 
 export type BuildingType = string;
 
+/**
+ * Science charged per target-level on Lv5+ upgrades. Cycle 17 BAL-02:
+ * dropped 10× (50 → 5) to decouple base progression from PvP-only science
+ * sourcing. MUST match SCIENCE_COST_PER_LEVEL / SCIENCE_GATE_MIN_LEVEL in
+ * apps/game-server/src/buildings/upgrade-requirements.ts.
+ */
+export const SCIENCE_COST_PER_LEVEL = 5;
+export const SCIENCE_GATE_MIN_LEVEL = 5;
+
 export interface UpgradeRequirement {
   kind: 'building_min_level' | 'hq_min_level' | 'science_min';
   buildingType?: BuildingType;
@@ -103,8 +112,8 @@ export function computeUpgradeRequirements(args: {
     });
   }
 
-  if (targetLevel >= 5) {
-    const scienceCost = targetLevel * 50;
+  if (targetLevel >= SCIENCE_GATE_MIN_LEVEL) {
+    const scienceCost = targetLevel * SCIENCE_COST_PER_LEVEL;
     out.push({
       kind: 'science_min',
       minScience: scienceCost,

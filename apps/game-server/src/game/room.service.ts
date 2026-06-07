@@ -155,7 +155,23 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
     }
 
     const playerIds = Object.keys(players);
-    const firstPlayer = playerIds[Math.floor(Math.random() * 2)];
+    // cycle 17 BAL-1 — speed initiative / first-strike.
+    // The turn engine is strictly alternating (one player acts, then the
+    // other), so a unit's `speed` had no combat value beyond move range —
+    // ZERG's +30% speed bonus was dead weight. Wire it in here: the player
+    // whose roster has the higher total speed acts FIRST, turning the speed
+    // stat into a meaningful first-strike advantage. Ties (e.g. mirror
+    // matches) fall back to the original coin flip so the opening turn isn't
+    // deterministic when initiative is equal.
+    const initiative = (pid: string): number =>
+      players[pid].units.reduce((sum, u) => sum + (u.speed ?? 0), 0);
+    const [a, b] = playerIds;
+    const firstPlayer =
+      initiative(a) === initiative(b)
+        ? playerIds[Math.floor(Math.random() * 2)]
+        : initiative(a) > initiative(b)
+          ? a
+          : b;
 
     const room: GameRoom = {
       id: roomId,

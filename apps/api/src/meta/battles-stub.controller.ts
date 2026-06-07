@@ -10,6 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QuestProgressService } from '../modules/quest-progress/quest-progress.service';
 
@@ -167,18 +169,53 @@ function rand(seed: number): number {
 }
 
 /**
- * Per-race power proxy used by the synchronous outcome resolver. Real
- * BattleModule will compute power from the player's actual fleet/units;
- * for now these are flat balance-targeted values that keep the matchup
- * close enough that the mulberry32 jitter still swings results either way.
+ * ## Cycle-17 BAL-2 — fleet-driven outcome (BAL-2-STUB-OUTCOME-IGNORES-INVESTMENT)
+ *
+ * The previous resolver looked attacker/defender power up in a FLAT
+ * per-race table (`RACE_POWER[race]`). That had two balance defects:
+ *
+ *   1. The player's fleet was never read, so a heavy investor and a
+ *      brand-new account had **identical** win odds. Training, upgrades
+ *      and merges did nothing to the battle.
+ *   2. The flat values were not symmetric (otomat 5400 vs zerg 5120), so
+ *      the favourite won ~57-58% even though the only intended swing was
+ *      the true-50/50 mulberry32 jitter.
+ *
+ * The fix reads the caller's **real** fleet power from `player_units`
+ * (see `BattlesStubController.computeAttackerPower`) and derives the PvE
+ * defender from that investment (see `deriveDefenderPower`) rather than a
+ * flat race constant. So training/upgrading/merging now visibly moves the
+ * win odds, and the race a player picked no longer biases the coin flip.
+ *
+ * `RACE_NEUTRAL_BASE` is the **race-flat** fallback used only when the
+ * fleet query is empty or fails (fresh account with zero units, or the
+ * `player_units` table is unreachable). It replaces the old per-race
+ * table: every race shares the same base so the residual outcome is the
+ * pure jitter (true 50/50), removing the otomat-favoured / zerg-disfavoured
+ * bias that issue BAL-2 called out as the interim requirement.
  */
-const RACE_POWER: Record<RaceKey, number> = {
-  insan:    5_280,
-  zerg:     5_120,
-  otomat:   5_400,
-  canavar:  5_360,
-  seytan:   5_200,
-};
+const RACE_NEUTRAL_BASE = 5_300;
+
+/**
+ * PvE defender difficulty band, expressed as a fraction of the attacker's
+ * real fleet power. The defender is scaled to the player's own investment
+ * so the fight stays meaningful at every progression tier instead of being
+ * pinned to a flat constant: a fresh fleet faces a floor-level bot it can
+ * lose to, while a well-invested fleet outscales the same fractional bot
+ * and wins more often. `DEFENDER_FLOOR` keeps the very first battles
+ * (near-zero fleet power) from facing a literally-zero defender.
+ */
+const DEFENDER_POWER_FRACTION = 0.9;
+const DEFENDER_FLOOR = 4_000;
+
+/**
+ * Commander XP granted to the winner on this FE `/battle` path (BAL-3,
+ * cycle 17). Mirrors the Socket.io PvP winner payout in
+ * `game-server/src/game/game.service.ts` (+100/win) so both battle
+ * surfaces level commanders identically. Fanned out to game-server's
+ * InternalServiceGuard-gated `POST /api/commanders/internal/award-xp`.
+ */
+const COMMANDER_XP_PER_WIN = 100;
 
 /**
  * Hash the battle id into a stable seed for mulberry32. We can't use the
@@ -210,9 +247,21 @@ function seedFromId(id: string): number {
  * `turnsElapsed >= maxTurns`. We surface `turnsElapsed = maxTurns` so the
  * `winProb` chip in the UI matches the resolved outcome.
  *
- * ## Cycle-5 / ECON-C8-01 hardening (this revision)
+ * ## Cycle-17 BAL-2 — fleet-driven power (this revision)
  *
- * `newBattle` is now invoked **only from POST /battles**. The previous
+ * `attackerPower` / `defenderPower` are no longer looked up in a flat
+ * per-race table. The caller resolves the attacker's **real** fleet power
+ * from `player_units` (`computeAttackerPower`) and derives the PvE
+ * defender from that investment (`deriveDefenderPower`) before calling
+ * `newBattle`. So the battle outcome now reflects the player's fleet
+ * investment (training / upgrades / merges) instead of a flat race
+ * constant. `newBattle` itself stays a pure function of (race labels,
+ * resolved powers) so it is still deterministic given a battle id, which
+ * keeps reproducible bug triage intact.
+ *
+ * ## Cycle-5 / ECON-C8-01 hardening (preserved)
+ *
+ * `newBattle` is still invoked **only from POST /battles**. The previous
  * lazy-create branch in GET /:id is gone — see the controller's GET
  * handler for the vulnerability writeup. Because the only caller is the
  * POST path, and the POST path is the single place that wires
@@ -224,12 +273,14 @@ function seedFromId(id: string): number {
  * probability by retrying with hand-picked ids. The new id is the only
  * value subsequently bound to the per-user store key.
  */
-function newBattle(attacker: RaceKey, defender: RaceKey): BattleState {
+function newBattle(
+  attacker: RaceKey,
+  defender: RaceKey,
+  attackerPower: number,
+  defenderPower: number,
+): BattleState {
   const id = `b_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
   const seed = seedFromId(id);
-
-  const attackerPower = RACE_POWER[attacker] ?? 5_000;
-  const defenderPower = RACE_POWER[defender] ?? 5_000;
 
   // ±15% jitter on each side, sourced from mulberry32 so the outcome is
   // deterministic given the battle id (helps reproducible bug triage).
@@ -328,11 +379,77 @@ function advance(state: BattleState): BattleState {
 export class BattlesStubController {
   private readonly logger = new Logger(BattlesStubController.name);
 
-  constructor(private readonly questProgress: QuestProgressService) {}
+  constructor(
+    private readonly questProgress: QuestProgressService,
+    // player_units is game-server-owned; api reads it via raw SQL on the
+    // shared DataSource — same pattern boss.service.ts / formations.service.ts
+    // use (CLAUDE.md §1: api + game-server share one Postgres DB).
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+  ) {}
+
+  /**
+   * Cycle-17 BAL-2 — the caller's REAL fleet power.
+   *
+   * Sums `hp * attack` over the caller's alive `player_units` rows. Those
+   * columns already bake in every investment the player made: training
+   * adds rows, `/units/:id/upgrade` persists the +10%/level stat boost
+   * straight onto hp/attack/defense/speed, and merges replace low-tier
+   * rows with higher-stat ones. So this single sum makes training /
+   * upgrades / merges all move the battle odds, which is exactly what the
+   * flat `RACE_POWER` table failed to do.
+   *
+   * Owner-scoped: `player_id = $1` — a caller only ever sees their own
+   * fleet, never another user's. Returns 0 when the player has no units;
+   * the caller then falls back to the race-neutral base so a fresh account
+   * still gets a fightable (jitter-decided) battle.
+   *
+   * Never throws: a missing/unreachable `player_units` table degrades to
+   * 0 (→ neutral-base fallback) with a warn, mirroring
+   * formations.service.ts. A battle must never 500 on a fleet-read hiccup.
+   */
+  private async computeAttackerPower(userId: string): Promise<number> {
+    try {
+      const rows = await this.dataSource.query<Array<{ power: string | number | null }>>(
+        `SELECT COALESCE(SUM(hp::numeric * attack::numeric), 0) AS power
+           FROM player_units
+          WHERE player_id = $1
+            AND is_alive = true`,
+        [userId],
+      );
+      const raw = rows?.[0]?.power;
+      const power = Number(raw) || 0;
+      return power > 0 && Number.isFinite(power) ? power : 0;
+    } catch (err) {
+      this.logger.warn(
+        `attacker fleet power query failed for player=${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        } — falling back to race-neutral base`,
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * Cycle-17 BAL-2 — derive the PvE defender power from the attacker's
+   * real fleet investment rather than a flat race constant.
+   *
+   * The bot is scaled to `DEFENDER_POWER_FRACTION` of the attacker's fleet
+   * power (floored at `DEFENDER_FLOOR`), so a well-invested fleet outscales
+   * its opponent and wins more often while a fresh/weak fleet faces a
+   * floor-level bot it can still lose to. The ±15% mulberry32 jitter in
+   * `newBattle` keeps any individual battle uncertain. A future real
+   * PvE module can swap this for zone/node difficulty without touching the
+   * outcome math.
+   */
+  private deriveDefenderPower(attackerPower: number): number {
+    const scaled = attackerPower * DEFENDER_POWER_FRACTION;
+    return Math.max(DEFENDER_FLOOR, Math.round(scaled));
+  }
 
   @Post()
   @ApiOperation({ summary: 'Start a new battle (stub)' })
-  start(
+  async start(
     @Request() req: any,
     @Body()
     body: {
@@ -340,9 +457,9 @@ export class BattlesStubController {
       defenderRace?: RaceKey;
       /**
        * @deprecated Ignored by the server. Outcome is now server-computed
-       *  (attacker power vs defender power + mulberry32 jitter) and the
-       *  battle resolves synchronously inside POST /battles. A real PvE/PvP
-       *  battle module will replace this stub.
+       *  (attacker FLEET power vs derived defender power + mulberry32
+       *  jitter) and the battle resolves synchronously inside POST
+       *  /battles. A real PvE/PvP battle module will replace this stub.
        */
       outcome?: unknown;
     },
@@ -353,7 +470,20 @@ export class BattlesStubController {
     // ignored. A real PvE/PvP battle module will replace this stub.
     void body?.outcome;
 
-    const battle = newBattle(body?.attackerRace ?? 'insan', body?.defenderRace ?? 'zerg');
+    // Cycle-17 BAL-2: read the caller's REAL fleet power so training /
+    // upgrades / merges move the win odds. Empty/failed fleet read → 0,
+    // which falls back to the race-neutral base (pure-jitter 50/50).
+    const fleetPower = await this.computeAttackerPower(userId);
+    const attackerPower = fleetPower > 0 ? fleetPower : RACE_NEUTRAL_BASE;
+    const defenderPower =
+      fleetPower > 0 ? this.deriveDefenderPower(fleetPower) : RACE_NEUTRAL_BASE;
+
+    const battle = newBattle(
+      body?.attackerRace ?? 'insan',
+      body?.defenderRace ?? 'zerg',
+      attackerPower,
+      defenderPower,
+    );
     BATTLES.set(storeKey(userId, battle.id), battle);
 
     // QUEST PROGRESS HOOK — battle.won (HIGH F3 fix)
@@ -404,6 +534,24 @@ export class BattlesStubController {
           `quest-progress hook threw synchronously userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+
+      // COMMANDER XP FAN-OUT — battle.won (BAL-3, cycle 17)
+      //
+      // The Socket.io PvP path (game.service) grants +100 commander XP to
+      // the winner; this FE `/battle` path never did, so the /battle
+      // screen progressed commanders by 0 (the curve flatten in
+      // commanders.constants.ts would never be felt by real players). Fan
+      // a matching +100 out to game-server's InternalServiceGuard-gated
+      // `POST /api/commanders/internal/award-xp`. Fire-and-forget: a
+      // commander-XP hiccup must not roll back the battle response (the FE
+      // already shows the win), and a missed +100 is cosmetic — it
+      // self-heals on the next won battle. `creditCommanderXp` never
+      // throws; the void+catch guards against a future signature change.
+      void this.creditCommanderXp(userId, COMMANDER_XP_PER_WIN).catch((err) => {
+        this.logger.warn(
+          `commander-xp hook failed userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     }
 
     return battle;
@@ -582,6 +730,61 @@ export class BattlesStubController {
       walletCredited: credited,
       rewards: state.rewards,
     };
+  }
+
+  /**
+   * Sign and fan out a commander-XP grant to game-server (BAL-3, cycle
+   * 17). Mirrors the `creditWallet` fan-out below + the cycle-5
+   * `recalculateProductionRatesViaGameServer` internal-call pattern in
+   * `user.service.ts`: POSTs to game-server's InternalServiceGuard-gated
+   * `POST /api/commanders/internal/award-xp` with the
+   * `X-Internal-Service: Bearer <secret>` header.
+   *
+   * Best-effort / never throws: a commander-XP hiccup must not roll back
+   * the battle response or its wallet credit. Unlike `creditWallet` there
+   * is no per-battle idempotency flag — a missed +100 is cosmetic, not an
+   * economy leak, and self-heals on the next won battle.
+   */
+  private async creditCommanderXp(userId: string, amount: number): Promise<void> {
+    const baseUrl = (
+      process.env.GAME_SERVER_URL || 'http://localhost:5000'
+    ).replace(/\/+$/, '');
+    const url = `${baseUrl}/api/commanders/internal/award-xp`;
+
+    const serviceSecret =
+      process.env.INTERNAL_SERVICE_SECRET || process.env.JWT_SECRET;
+    if (!serviceSecret) {
+      this.logger.warn(
+        'battle commander-xp skipped fan-out — INTERNAL_SERVICE_SECRET / JWT_SECRET unset',
+      );
+      return;
+    }
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 3000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Service': `Bearer ${serviceSecret}`,
+        },
+        body: JSON.stringify({ userId, amount }),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(
+          `commander-xp fan-out non-2xx ${res.status} body=${text.slice(0, 200)}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `commander-xp fan-out failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Sign and fan out the wallet grant to game-server. Mirrors

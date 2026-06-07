@@ -16,6 +16,8 @@ import {
   computeUpgradeRequirements,
   canUpgrade,
   describeBlockers,
+  SCIENCE_COST_PER_LEVEL,
+  SCIENCE_GATE_MIN_LEVEL,
 } from './upgrade-requirements';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { ProgressionService } from '../progression/progression.service';
@@ -145,22 +147,53 @@ export class BuildingsService {
   }
 
   /**
-   * Upgrade an existing building by 1 level. Cost scales 1.5× per level on
-   * top of the base cost (matches the estimate the /base/building/[slug]
-   * detail page already shows). Recalculates production rates so the bump
-   * shows up in the wallet pill within one tick.
+   * Upgrade an existing building by 1 level. Cost scales
+   * BUILDING_UPGRADE_COST_EXP× (1.22 as of cycle 17 BAL-01) per level on
+   * top of the base cost — tuned to track the 1.18 yield curve so a
+   * building's output keeps pace with its own next-upgrade price (payback
+   * under ~3 days at Lv50; old 1.5 exponent stalled the loop past ~Lv30).
+   * Recalculates production rates so the bump shows up in the wallet pill
+   * within one tick.
+   *
+   * cycle 17 BAL-2: the command_center (HQ) now carries a non-zero base
+   * cost ({ 200, 50, 100 }, see buildings.constants.ts) so this same
+   * baseCfg.cost × EXP^level formula gives HQ leveling a real, back-loaded
+   * price. Previously HQ base was { 0, 0, 0 } and 0 × EXP^level stayed 0,
+   * so the HQ — which drives every age gate — could be leveled to the cap
+   * for free, gated only by support-building prereqs. Age advancement is
+   * now gated by economy too.
    *
    * Throws:
    *   - NotFound when no building / not the player's
    *   - BadRequest when the building isn't ACTIVE (must be built first)
    *   - BadRequest on insufficient resources
    */
-  /** Level cap — past this, the 1.5^level cost overflows IEEE-754 around
-   *  Lv 75 and the per-tier prereq table runs out anyway.  54 matches
-   *  the story-doc max progression (Age 6 max-level HQ).  Mirror this
-   *  on the frontend `upgrade-requirements.ts` so the button greys out
+  /** Level cap — the per-tier prereq table runs out at this point anyway.
+   *  54 matches the story-doc max progression (Age 6 max-level HQ).  Mirror
+   *  this on the frontend `upgrade-requirements.ts` so the button greys out
    *  before the player hits a backend rejection. */
   private static readonly MAX_BUILDING_LEVEL = 54;
+
+  /**
+   * Per-level upgrade COST exponent: cost = baseCost × EXP^level.
+   *
+   * cycle 17 BAL-01 — lowered 1.5 → 1.22 to track the 1.18 yield curve
+   * applied in recalculateProductionRates (`1.18^(level-1)`). Old 1.5
+   * exponent outpaced yield by 1.5/1.18 = 1.271×/level, so past ~Lv30 a
+   * single building could never out-earn its own next upgrade — a
+   * perpetual-deficit wall (Lv40→41 payback was ~112 days). At 1.22 the
+   * cost/yield ratio is 1.22/1.18 = 1.034×/level, keeping payback under
+   * ~3 days at Lv50 and the upgrade loop self-funding all the way to the
+   * Lv54 cap.
+   *
+   * NOTE: first-pass retune. The final value should be confirmed against
+   * playtest / telemetry (median upgrade cadence, wallet net-flow) before
+   * being treated as locked.
+   *
+   * Tunable in ONE place — both the live cost calc (L~250) and any future
+   * cost-estimate helper should read this constant, not a literal.
+   */
+  private static readonly BUILDING_UPGRADE_COST_EXP = 1.22;
 
   async upgradeBuilding(playerId: string, buildingId: string): Promise<Building> {
     const building = await this.buildingRepo.findOne({ where: { id: buildingId, playerId } });
@@ -228,11 +261,20 @@ export class BuildingsService {
     }
 
     const baseCfg = BUILDING_CONFIGS[building.type];
-    const scale = Math.pow(1.5, building.level); // cost at level L → L+1
+    // cost at level L → L+1. cycle 17 BAL-01: exponent lowered 1.5 → 1.22
+    // (BUILDING_UPGRADE_COST_EXP) so cost tracks the 1.18 yield curve and
+    // upgrades stay self-funding past Lv30. See constant JSDoc.
+    const scale = Math.pow(BuildingsService.BUILDING_UPGRADE_COST_EXP, building.level);
     // Lv 5+ upgrade'lerinde bilim de düşülür — computeUpgradeRequirements
-    // ile aynı formül: targetLevel × 50. Cost objesinin science alanını
-    // ResourcesService.deduct artık honour ediyor.
-    const scienceCost = targetLevel >= 5 ? targetLevel * 50 : 0;
+    // ile AYNI formül olmalı: targetLevel × SCIENCE_COST_PER_LEVEL.
+    // Cycle 17 BAL-02: shared constant (was inline targetLevel × 50, now
+    // ×5 — 10× ucuz) so the requirement check and the deduction can never
+    // drift, and base upgrades stop being coupled to PvP-only science.
+    // Cost objesinin science alanını ResourcesService.deduct honour ediyor.
+    const scienceCost =
+      targetLevel >= SCIENCE_GATE_MIN_LEVEL
+        ? targetLevel * SCIENCE_COST_PER_LEVEL
+        : 0;
     // Commander buildCostMultiplier applies to upgrades too. Without this
     // an active Malphas / Aurelius / Lokhode discount would only help
     // first-time construction; players would feel the bonus disappear
@@ -403,9 +445,26 @@ export class BuildingsService {
     let gasPerTick = 0;
     let energyPerTick = 0;
     let populationPerTick = 0;
+    // Cycle 17 BAL-02: science trickle from research-flavoured labs
+    // (academy / cyber_core / hatchery sciencePerTick). The DB-driven
+    // economy_building_configs path (computeBuildingRates) has no science
+    // column, so science is ALWAYS sourced from the static BUILDING_CONFIGS
+    // here, applying the same 1.18^(level-1) level scaling the legacy
+    // mineral/gas/energy fallback uses. Accumulated outside the
+    // econRates branch so it works whether or not the DB config is seeded.
+    let sciencePerTick = 0;
 
     for (const building of activeBuildings) {
       const econRates = await this.economyService.computeBuildingRates(building.type, building.level);
+
+      // Science is config-only (no DB equivalent) — scale it with the
+      // same per-level curve as the legacy fallback regardless of which
+      // production branch the currencies take below.
+      const scienceBase = BUILDING_CONFIGS[building.type].production.sciencePerTick ?? 0;
+      if (scienceBase > 0) {
+        const sciLevelScale = Math.pow(1.18, Math.max(0, building.level - 1));
+        sciencePerTick += Math.round(scienceBase * sciLevelScale);
+      }
 
       if (econRates.mineralPerTick !== 0 || econRates.gasPerTick !== 0 ||
           econRates.netEnergyPerTick !== 0 || econRates.populationPerTick !== 0) {
@@ -422,7 +481,8 @@ export class BuildingsService {
         // from Lv 1 to Lv 10 only ever made it MORE EXPENSIVE without
         // changing what it produced. Players reported "üs gelişim
         // hesaplarında hata olabilirmi" because it's a real bug:
-        // upgrade cost scaled 1.5^level, yield did not scale at all.
+        // the upgrade cost scaled exponentially (then 1.5^level, now
+        // 1.22^level per cycle 17 BAL-01), yield did not scale at all.
         //
         // Apply the same 1.18^(level-1) scaling the DB-driven path
         // uses, so until economy_building_configs is properly seeded
@@ -457,6 +517,9 @@ export class BuildingsService {
       mineralPerTick = Math.round(mineralPerTick * prodMul);
       gasPerTick     = Math.round(gasPerTick * prodMul);
       energyPerTick  = Math.round(energyPerTick * prodMul);
+      // Science (research output) benefits from the same production
+      // commander bonus — cycle 17 BAL-02.
+      sciencePerTick = Math.round(sciencePerTick * prodMul);
     }
 
     await this.resources.updateRates(playerId, {
@@ -464,6 +527,7 @@ export class BuildingsService {
       gasPerTick,
       energyPerTick,
       populationPerTick,
+      sciencePerTick,
     });
   }
 }

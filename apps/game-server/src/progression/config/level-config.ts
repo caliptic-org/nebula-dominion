@@ -46,12 +46,35 @@ export const XP_SOURCE_WEIGHTS: Record<XpSource, number> = {
 // for sources whose intended cadence is already gated by external cron / PvP
 // matchmaking / quest assignment).
 //
+// Caps are POST-multiplier (cycle 4): awardXp sums final_amount (base ×
+// age xpMultiplier) and compares against the cap, so the cap holds the
+// real daily XP ceiling regardless of how large the age multiplier grows
+// at higher ages — a Çağ 6 player at 5.0× multiplier taps out at the same
+// XP ceiling as a Çağ 1 player, just from fewer actions.
+//
 // CONSTRUCTION: 5000 XP/day is comfortably above an average player's
 // building + training session (≈ 30–60 events × 80 XP = 2400–4800 XP)
 // while making the previous 800 000 XP exploit impossible — a determined
 // botter taps out at 5000 from this source per UTC day.
+//
+// ── cycle 17 BAL-4 / BAL-02 ─────────────────────────────────────────────
+// Before cycle 17, PVE_WIN (150 base) and PVP_WIN (200 base) were the ONLY
+// uncapped XP faucets. With every other faucet bounded, battle-spam was the
+// only viable fast path: a grinder could compress the 150-day age curve to
+// ~13 days (≈3× faster than the design band) purely by farming wins. We add
+// 8000/day caps on each battle-win source (sized ≈50% of a mid-age daily XP
+// budget per the audit) so all faucets now share a ceiling shape and no
+// single source dominates the curve. DAILY_MISSION (3000) and ACHIEVEMENT
+// (5000) are likewise capped here — this is now the single authoritative
+// place battle/mission/achievement XP is bounded (the old client-side 150k
+// cap in apps/api daily-engagement was dead code capping a decorative
+// rewardJson.xp that was never credited as progression; removed in cycle 17).
 export const XP_DAILY_CAPS: Partial<Record<XpSource, number>> = {
-  [XpSource.CONSTRUCTION]: 5000,
+  [XpSource.CONSTRUCTION]:   5000,
+  [XpSource.PVE_WIN]:        8000,
+  [XpSource.PVP_WIN]:        8000,
+  [XpSource.DAILY_MISSION]:  3000,
+  [XpSource.ACHIEVEMENT]:    5000,
 };
 
 export const XP_BASE_AMOUNTS: Record<XpSource, number> = {

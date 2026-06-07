@@ -130,16 +130,31 @@ export function getCommandersByRace(race: CommanderRace | null): CommanderCatalo
 }
 
 /** ── Level scaling ──────────────────────────────────────────────────────
- *  XP required to advance from level N to N+1. Geometric: 100 × 1.4^(N-1).
- *  L1→L2: 100, L2→L3: 140, L3→L4: 196, ..., L10→L11: ~2065, L29→L30: ~94k.
+ *  XP required to advance from level N to N+1. Geometric: 100 × 1.18^(N-1).
+ *  L1→L2: 100, L2→L3: 118, L3→L4: 139, ..., L9→L10: ~376, L19→L20: ~1967,
+ *  L29→L30: ~10.3k.
  *
- *  Cumulative L1→L30: ~245k XP — at 80 XP/battle (default) that's ~3000
- *  battles to max a commander. Drops to ~150 battles with bonus XP from
- *  win streaks / boss kills, which is the intended grind length. */
+ *  ## cycle 17 — BAL-3 curve flatten (1.4 → 1.18)
+ *
+ *  The old base of 1.4 produced a grotesque grind: cumulative L1→L30 was
+ *  ~4.32M XP. At the real PvP payout of +100 XP/win that is ~43,000 wins
+ *  to max a single commander — the prior JSDoc's "~150 battles" claim was
+ *  wrong by ~280×. Flattening the base to 1.18 brings the curve in line
+ *  with the intended grind:
+ *
+ *    - Cumulative L1→L10: ~1,909 XP  ≈   19 wins  (+100/win)
+ *    - Cumulative L1→L20: ~12,342 XP ≈  123 wins  (matches the intended
+ *                                                  ~150-with-bonus target)
+ *    - Cumulative L1→L30: ~66,945 XP ≈  669 wins  (full max is a long-tail
+ *                                                  prestige chase, not the
+ *                                                  baseline progression)
+ *
+ *  These are the REAL numbers (computed from the formula below), not an
+ *  aspirational estimate — keep this block in sync if the base changes. */
 export const COMMANDER_MAX_LEVEL = 30;
 export function xpForNextLevel(level: number): number {
   if (level >= COMMANDER_MAX_LEVEL) return 0;
-  return Math.round(100 * Math.pow(1.4, level - 1));
+  return Math.round(100 * Math.pow(1.18, level - 1));
 }
 
 /** Level scaling factor applied to base bonus.

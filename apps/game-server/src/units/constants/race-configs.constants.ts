@@ -56,7 +56,19 @@ export interface RaceBonus {
   trainingTimeMult: number;
 }
 
+/**
+ * cycle 17 BAL-1 — race combat multiplier table.
+ *
+ * Tuned to pair with the defense-as-reduction damage model in
+ * game.service.ts (baseDamage = atk * 100 / (100 + def)). Under that model
+ * defense has diminishing returns, so an attack bonus is no longer cancelled
+ * out by an opponent's flat defense bonus and no race auto-wins by stacking
+ * armour. The prior subtractive formula made HUMAN/AUTOMATON auto-win and
+ * ZERG/BEAST/DEMON auto-lose (~5–19x combat-power skew); these values keep
+ * each race a sidegrade.
+ */
 export const RACE_BONUSES: Record<Race, RaceBonus> = {
+  // Durable line-holder: best defense + extra HP, no offensive edge.
   [Race.HUMAN]: {
     attackMult: 1.0,
     defenseMult: 1.15,
@@ -64,13 +76,21 @@ export const RACE_BONUSES: Record<Race, RaceBonus> = {
     speedMult: 1.0,
     trainingTimeMult: 1.0,
   },
+  // Swarm aggressor: highest attack + speed, cheapest to mass, but thin
+  // armour and no longer a glass cannon. hpMult 0.90→1.0 and defenseMult
+  // 0.85→0.95 (cycle 17 BAL-1) so ZERG is a sidegrade rather than paper —
+  // the +15% attack now lands real damage through the reduction formula,
+  // and the +30% speed feeds the room-creation initiative hook (first
+  // strike) instead of being dead weight in a one-action-per-unit turn.
   [Race.ZERG]: {
     attackMult: 1.15,
-    defenseMult: 0.85,
-    hpMult: 0.90,
+    defenseMult: 0.95,
+    hpMult: 1.0,
     speedMult: 1.30,
     trainingTimeMult: 0.75,
   },
+  // Armoured artillery: top defense + solid attack, but slow and slow to
+  // build. Diminishing-returns defense keeps it from being unkillable.
   [Race.AUTOMATON]: {
     attackMult: 1.10,
     defenseMult: 1.20,
@@ -78,23 +98,30 @@ export const RACE_BONUSES: Record<Race, RaceBonus> = {
     speedMult: 0.90,
     trainingTimeMult: 1.10,
   },
-  // BEAST + DEMON ship with HUMAN-mirror defaults — they're playable
-  // race choices via api's race.enum but don't have their own combat
-  // multipliers tuned yet. Picking neutral values keeps PvP queueable
-  // until the balance pass for these races lands.
+  // cycle 17 BAL-1 — BEAST/DEMON moved off the neutral 1.0/1.0/1.0/1.0
+  // placeholder (which read as "worst race", a strict subset of everyone
+  // else) to distinct-but-balanced identities. They remain whitelist-
+  // blocked from PvP queueing (cycle 2 A5) until their full unit kits ship,
+  // so these are forward-looking profiles, not yet live-tuned against the
+  // 3 shipped races — treat as DEFERRED for fine balance.
+  //
+  // BEAST — fast, hard-hitting brawler with low armour (a melee bruiser,
+  // ZERG-adjacent but trading swarm economy for raw HP bulk).
   [Race.BEAST]: {
-    attackMult: 1.0,
-    defenseMult: 1.0,
-    hpMult: 1.0,
-    speedMult: 1.0,
+    attackMult: 1.20,
+    defenseMult: 0.90,
+    hpMult: 1.15,
+    speedMult: 1.10,
     trainingTimeMult: 1.0,
   },
+  // DEMON — high-attack caster/skirmisher: glassy (low HP/def) but hits
+  // hardest and trains fast, leaning on burst rather than attrition.
   [Race.DEMON]: {
-    attackMult: 1.0,
-    defenseMult: 1.0,
-    hpMult: 1.0,
-    speedMult: 1.0,
-    trainingTimeMult: 1.0,
+    attackMult: 1.25,
+    defenseMult: 0.85,
+    hpMult: 0.90,
+    speedMult: 1.05,
+    trainingTimeMult: 0.90,
   },
 };
 
@@ -193,7 +220,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     type: UnitType.MECHA_WALKER,
     race: Race.HUMAN,
     hp: 154,
-    attack: 45,
+    // cycle 17 BAL-4: atk 45 -> 52. Restores a monotone merge curve —
+    // 3× Sniper (pw 8064) → 1× Mecha (154×52 = 8008) is now ~x0.99 power
+    // (was x0.86, a 15% downgrade). See MERGE_RECIPES JSDoc for the ladder.
+    attack: 52,
     defense: 12,
     speed: 2,
     cost: { mineral: 0, gas: 0, energy: 0 },
@@ -207,7 +237,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     type: UnitType.GENETIC_WARRIOR,
     race: Race.HUMAN,
     hp: 246,
-    attack: 72,
+    // cycle 17 BAL-4: atk 72 -> 98. 3× Mecha (pw 24024) → 1× Genetic
+    // (246×98 = 24108) is now ~x1.00 power (was x0.85). Keeps the merge
+    // ladder monotone non-decreasing in per-merge value.
+    attack: 98,
     defense: 24,
     speed: 3,
     cost: { mineral: 0, gas: 0, energy: 0 },
@@ -221,7 +254,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     type: UnitType.CAPTAIN,
     race: Race.HUMAN,
     hp: 394,
-    attack: 115,
+    // cycle 17 BAL-4: atk 115 -> 184. 3× Genetic (pw 72324) → 1× Captain
+    // (394×184 = 72496) is now ~x1.00 power (was x0.85). Captain remains
+    // the human merge terminus (no MERGE_RECIPES key → "tepesinde").
+    attack: 184,
     defense: 38,
     speed: 3,
     cost: { mineral: 0, gas: 0, energy: 0 },
@@ -328,6 +364,27 @@ export function applyRaceBonuses(cfg: UnitConfig): UnitConfig & { effectiveStats
  * Currently insan-only. Other races' merge chains land in follow-up
  * commits once their lex unit types are added to UnitType + UNIT_CONFIGS
  * (and the player_units_type_enum migration extends to cover them).
+ *
+ * cycle 17 BAL-4 — merge ladder retuned to a monotone power curve
+ * (power := hp × attack). Pre-fix the upper merges were a 15% power LOSS
+ * per step (3× source pw > result pw). Result-unit attack was bumped
+ * (Mecha 45→52, Genetic 72→98, Captain 115→184) so every "3-in-1" step
+ * is now ~x1.00 power (within the x0.95–1.05 band), monotone
+ * non-decreasing — never a downgrade. Human ladder per-merge value:
+ *   Marine→Sniper  x1.99  (intentional big first jump)
+ *   Sniper→Mecha   x0.99
+ *   Mecha→Genetic  x1.00
+ *   Genetic→Captain x1.00  (Captain = human merge terminus)
+ *
+ * cycle 17 BAL-4 — Ultralisk→Queen trap REMOVED. Queen (175hp/12atk,
+ * pw 2100) is a SUPPORT caster, not a tier-up of the Ultralisk tank line
+ * (400hp/40atk, pw 16000); merging 3× Ultralisk into 1 Queen was a ~x0.04
+ * (~96%) power annihilation. Ultralisk is now the Zerg merge TERMINUS:
+ * absent from this table, mergeRoster throws "…tepesinde" (top of chain),
+ * the same graceful cap as Captain on the human side. A proper Zerg T4
+ * tank (e.g. Brood-Lord ~520hp/55atk) can be added later — it needs a new
+ * UnitType enum value + UNIT_CONFIGS entry + player_units_type_enum
+ * migration, so it's deferred rather than shipped in this surgical retune.
  */
 export const MERGE_RECIPES: Partial<Record<UnitType, UnitType>> = {
   // İnsan promosyon ladder: Marine → Sniper → Mecha Walker → Genetic
@@ -340,12 +397,13 @@ export const MERGE_RECIPES: Partial<Record<UnitType, UnitType>> = {
   [UnitType.MECHA_WALKER]:     UnitType.GENETIC_WARRIOR,
   [UnitType.GENETIC_WARRIOR]:  UnitType.CAPTAIN,
   // Zerg evrim zinciri — UnitType enum'da hâlihazırda bulunan değerleri
-  // kullanır.  Zergling (T1) → Hydralisk (T2) → Ultralisk (T3) → Queen
-  // (T4). Lex'te Beyin Kurt T5 var ama backend UnitType'ında yok; o
-  // tier'a çıkıldığında migration + UNIT_CONFIGS gerekli (defer).
+  // kullanır.  Zergling (T1) → Hydralisk (T2) → Ultralisk (T3, terminus).
+  // Ultralisk→Queen KALDIRILDI (cycle 17 BAL-4): Queen bir destek birimi,
+  // Ultralisk tank hattının üst tier'ı değil — merge ~x0.04 güç imhasıydı.
+  // Ultralisk artık Zerg merge zincirinin tepesinde (Captain gibi). Gerçek
+  // bir Zerg T4 tank (örn. Brood-Lord) eklenince buraya bir satır gelir.
   [UnitType.ZERGLING]:         UnitType.HYDRALISK,
   [UnitType.HYDRALISK]:        UnitType.ULTRALISK,
-  [UnitType.ULTRALISK]:        UnitType.QUEEN,
 };
 
 /**
@@ -378,11 +436,14 @@ export const MERGE_SOURCE_TIERS: Partial<Record<UnitType, number>> = {
   [UnitType.MECHA_WALKER]:     3,
   // Human T4 → result T5 (charge 4× base = 400M / 800G + 1 science).
   [UnitType.GENETIC_WARRIOR]:  4,
-  // Zerg ladder mirrors the same tiering — Zergling T1, Hydralisk T2,
-  // Ultralisk T3. The Queen merge consumes 3× Ultralisks at T3 → result T4.
+  // Zerg ladder mirrors the same tiering — Zergling T1 → Hydralisk T2 →
+  // Ultralisk T3 (merge terminus). cycle 17 BAL-4: Ultralisk dropped from
+  // this table in lockstep with MERGE_RECIPES (Ultralisk→Queen trap
+  // removed). Ultralisk is no longer a merge SOURCE, so it needs no cost
+  // tier — mergeRoster rejects it at the recipe lookup before
+  // computeMergeCost ever runs.
   [UnitType.ZERGLING]:         1,
   [UnitType.HYDRALISK]:        2,
-  [UnitType.ULTRALISK]:        3,
 };
 
 /**

@@ -21,6 +21,26 @@
 
 import { BuildingType, BuildingStatus } from './entities/building.entity';
 
+/**
+ * Science charged per target-level on Lv5+ building upgrades.
+ *
+ * Cycle 17 BAL-02: was 50/level, which made a 6-building HUMAN base
+ * to Lv54 cost ~442 500 science — and the ONLY science sources were
+ * PvP battle rewards + garrisoned galaxy nodes, silently coupling all
+ * mid-game BASE progression to the map/PvP subsystem (~19 capital-node-
+ * days of pure uptime). Dropped 10× to 5/level so science is a soft
+ * pacing lever, not a hard wall. Paired with a lab science trickle
+ * (academy/cyber_core/hatchery sciencePerTick) + a ~500 science starter
+ * grant so day-1 Lv5 upgrades are reachable without first winning a PvP
+ * battle. MUST stay in sync with the same constant mirrored on the FE
+ * (apps/web/src/lib/upgrade-requirements.ts) and the deduction in
+ * BuildingsService.upgradeBuilding.
+ */
+export const SCIENCE_COST_PER_LEVEL = 5;
+
+/** First building level at which science is charged on upgrade. */
+export const SCIENCE_GATE_MIN_LEVEL = 5;
+
 export interface UpgradeRequirement {
   /** Internal rule type — frontend uses this to pick an icon. */
   kind: 'building_min_level' | 'hq_min_level' | 'science_min';
@@ -148,10 +168,11 @@ export function computeUpgradeRequirements(args: {
     });
   }
 
-  // Bilim maliyeti — Lv 5 ve üstü her upgrade için targetLevel × 50.
+  // Bilim maliyeti — Lv 5 ve üstü her upgrade için targetLevel × 5
+  // (cycle 17 BAL-02: 10× ucuzlatıldı, PvP-only bağımlılığı kırıldı).
   // Lv 1-4 bilim gerektirmez (oyuncu daha akademi açmamış olabilir).
-  if (targetLevel >= 5) {
-    const scienceCost = targetLevel * 50;
+  if (targetLevel >= SCIENCE_GATE_MIN_LEVEL) {
+    const scienceCost = targetLevel * SCIENCE_COST_PER_LEVEL;
     out.push({
       kind: 'science_min',
       minScience: scienceCost,

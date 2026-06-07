@@ -221,6 +221,7 @@ export class UserService {
     // queueing the seed buildings through a fake construction cooldown.
     await this.seedStarterBuildings(id, race);
     await this.seedStarterUnits(id, race);
+    await this.seedStarterScience(id);
 
     // Production-rate recompute hook — F2 fix (audit 2026-06-06).
     //
@@ -317,6 +318,45 @@ export class UserService {
       );
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Grant a small science starter so day-1 Lv5 building upgrades are
+   * reachable — cycle 17 BAL-02.
+   *
+   * Background: science was previously sourced ONLY from PvP battle
+   * rewards + garrisoned galaxy nodes, yet every Lv5+ building upgrade
+   * charges science. A pure base-builder who never touched the PvP/map
+   * subsystem could NOT reach mid-game base progression — the science
+   * wallet stayed at 0 (the entity default). Paired with the lab science
+   * trickle (academy/cyber_core/hatchery sciencePerTick) and the 10×
+   * cheaper upgrade gate (SCIENCE_COST_PER_LEVEL 50 → 5), a 500-science
+   * starter covers the first handful of Lv5 upgrades (cost = level × 5)
+   * without first winning a battle.
+   *
+   * Raw SQL — same Postgres DB as game-server, no entity import needed
+   * (mirrors seedStarterBuildings). The player_resources row may not
+   * exist yet (game-server creates it lazily via getOrCreate on first
+   * snapshot), so we INSERT-or-bump: create the row with the starter
+   * science if absent, otherwise GREATEST-raise an existing row so we
+   * never lower a wallet that already earned science. Idempotent: safe to
+   * replay. Non-fatal — a failed grant just leaves science at 0 and the
+   * player can still earn it via battles/nodes, so we swallow + log.
+   */
+  private async seedStarterScience(userId: string): Promise<void> {
+    const STARTER_SCIENCE = 500;
+    try {
+      await this.dataSource.query(
+        `INSERT INTO player_resources (player_id, science)
+           VALUES ($1::uuid, $2)
+         ON CONFLICT (player_id)
+           DO UPDATE SET science = GREATEST(player_resources.science, EXCLUDED.science)`,
+        [userId, STARTER_SCIENCE],
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`seedStarterScience failed for ${userId}: ${msg}`);
     }
   }
 

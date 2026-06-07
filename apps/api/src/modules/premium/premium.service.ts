@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, MoreThan } from 'typeorm';
+import { DataSource, EntityManager, Repository, MoreThan } from 'typeorm';
 import { PremiumPass } from './entities/premium-pass.entity';
 import { UserPremiumPass } from './entities/user-premium-pass.entity';
 
@@ -88,6 +94,63 @@ function recordDailyXp(userId: string, awarded: number): void {
   existing.total += awarded;
 }
 
+// --- MON-3: battle-pass free vs premium track split ----------------------
+//
+// The season pass shipped a flat `tier_rewards` array with NO track field,
+// so every reward — including the cosmetics and the tier-40 unit unlock the
+// 800-gem `battle_pass_premium` SKU is meant to gate — was claimable by
+// anyone who reached the tier. The premium SKU bought nothing.
+//
+// Rather than re-seed the JSONB via a migration (a bad migration would
+// crash-loop the api — boot runs `migrationsRun`), the track is derived in
+// TypeScript from the reward `type` discriminator the seed already uses:
+//
+//   • premium track → `cosmetic` (skins/frames/trails/titles) and
+//     `unit_unlock`. The prestige / power rewards that justify the
+//     800-gem ($9.99) premium pass.
+//   • free track    → everything else: `void_crystals`, `currency`,
+//     `resource_pack`, `xp_booster`. Modest, functional, claimable by all
+//     who reach the tier.
+//
+// `claimTierReward` gates premium-track tiers on the player actually owning
+// the premium pass; `getAvailablePasses`/`getPassByCode` annotate each tier
+// with its `track` so clients can render the two-column path and lock the
+// premium rows for non-owners.
+const PREMIUM_REWARD_TYPES = new Set(['cosmetic', 'unit_unlock']);
+
+/** SKU whose purchase unlocks the premium battle-pass track. */
+const PREMIUM_TRACK_SKU = 'battle_pass_premium';
+
+type BattlePassTrack = 'free' | 'premium';
+
+/** Classify a tier reward into its track from the reward `type`. */
+function rewardTrack(reward: unknown): BattlePassTrack {
+  const type =
+    reward && typeof reward === 'object' && typeof (reward as { type?: unknown }).type === 'string'
+      ? (reward as { type: string }).type
+      : '';
+  return PREMIUM_REWARD_TYPES.has(type) ? 'premium' : 'free';
+}
+
+/**
+ * Annotate each `tier_rewards` entry with its `track` so API consumers can
+ * render the free/premium reward path. Non-battle passes (no `tierRewards`
+ * array) pass through untouched. The track is derived, not stored — no
+ * migration needed.
+ */
+function annotateTierTracks<T extends { tierRewards?: unknown }>(pass: T): T {
+  const tiers = (pass as { tierRewards?: unknown }).tierRewards;
+  if (!Array.isArray(tiers)) return pass;
+  return {
+    ...pass,
+    tierRewards: tiers.map((t) =>
+      t && typeof t === 'object'
+        ? { ...(t as Record<string, unknown>), track: rewardTrack((t as { reward?: unknown }).reward) }
+        : t,
+    ),
+  } as T;
+}
+
 @Injectable()
 export class PremiumService {
   private readonly logger = new Logger(PremiumService.name);
@@ -102,16 +165,17 @@ export class PremiumService {
   ) {}
 
   async getAvailablePasses() {
-    return this.passRepository.find({
+    const passes = await this.passRepository.find({
       where: { isActive: true },
       order: { priceUsd: 'ASC' },
     });
+    return passes.map((p) => annotateTierTracks(p));
   }
 
   async getPassByCode(code: string) {
     const pass = await this.passRepository.findOne({ where: { code } });
     if (!pass) throw new NotFoundException(`Premium pass '${code}' bulunamadı`);
-    return pass;
+    return annotateTierTracks(pass);
   }
 
   async getUserActivePasses(userId: string) {
@@ -272,6 +336,27 @@ export class PremiumService {
     return Object.assign(saved, { xpGranted: toGrant, alreadyApplied: false });
   }
 
+  /**
+   * MON-3 — does the user own the premium battle-pass track? Ownership is a
+   * `user_inventory` row for the `battle_pass_premium` SKU that hasn't
+   * expired; the shop's `purchaseWithInGameCurrency` upserts this row when
+   * the 800-gem SKU is bought. Runs through the passed `manager` so it joins
+   * the surrounding claim transaction and sees a same-tx purchase.
+   */
+  private async ownsPremiumTrack(manager: EntityManager, userId: string): Promise<boolean> {
+    const rows = await manager.query(
+      `SELECT 1
+         FROM user_inventory ui
+         JOIN shop_items si ON si.id = ui.shop_item_id
+        WHERE ui.user_id = $1::uuid
+          AND si.sku = $2
+          AND (ui.expires_at IS NULL OR ui.expires_at > NOW())
+        LIMIT 1`,
+      [userId, PREMIUM_TRACK_SKU],
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
   async claimTierReward(userId: string, userPassId: string, tier: number): Promise<Record<string, unknown>> {
     // HIGH F4-econ — race-condition hardening.
     //
@@ -322,19 +407,51 @@ export class PremiumService {
         throw new NotFoundException(`Tier ${tier} için ödül tanımlanmamış`);
       }
 
-      // Credit the reward into the player's wallet BEFORE marking it as
-      // claimed — better to retry on a wallet-update failure than to mark
-      // claimed and lose the reward entirely. The reward shape supports
-      // nebulaCoins / voidCrystals / premiumGems / xp keys (battle-pass
-      // tier rewards in the existing pass definitions follow this). Anything
-      // outside that set is silently skipped so the tier still completes
-      // and the FE toast doesn't lie.
-      const reward = tierData.reward as Partial<{
-        nebulaCoins: number; voidCrystals: number; premiumGems: number; xp: number;
-      }>;
-      const coins = Math.max(0, Math.floor(Number(reward.nebulaCoins ?? 0)));
-      const crystals = Math.max(0, Math.floor(Number(reward.voidCrystals ?? 0)));
-      const gems = Math.max(0, Math.floor(Number(reward.premiumGems ?? 0)));
+      // MON-3 — premium-track gate. Cosmetics and unit unlocks live on the
+      // premium track and are claimable ONLY by players who bought the
+      // `battle_pass_premium` SKU. Free-track rewards (currency / resources /
+      // boosters) stay claimable by everyone who reached the tier. Without
+      // this, the 800-gem premium pass bought nothing and every reward was
+      // free. The ownership check runs in-tx so a purchase committed in the
+      // same transaction is visible.
+      if (rewardTrack(tierData.reward) === 'premium') {
+        const owns = await this.ownsPremiumTrack(manager, userId);
+        if (!owns) {
+          throw new ForbiddenException(
+            `Tier ${tier} ödülü premium savaş geçişine özel. Önce Premium Geçiş satın al.`,
+          );
+        }
+      }
+
+      // Credit currency rewards into the player's wallet BEFORE marking the
+      // tier claimed — better to retry on a wallet failure than to mark
+      // claimed and lose the reward. The seeded tier rewards are
+      // discriminated by `type`:
+      //   • {type:'void_crystals', amount}              → wallet void_crystals
+      //   • {type:'currency', nebula_coins, premium_gems, void_crystals}
+      //                                                  → wallet currencies
+      // Non-wallet rewards (cosmetic / unit_unlock / resource_pack /
+      // xp_booster) are recorded as claimed here so the tier completes and
+      // the FE toast doesn't lie; granting the actual cosmetic, unit unlock,
+      // in-game resources, or XP buff is wired through the cosmetic /
+      // inventory systems and is out of scope for this wallet credit.
+      //
+      // NOTE: the previous code read camelCase keys (nebulaCoins /
+      // voidCrystals / premiumGems) that exist on NO seeded reward, so it
+      // credited zero for every tier. This now matches the real `type`-
+      // discriminated snake_case shape.
+      const reward = tierData.reward as Record<string, unknown>;
+      const num = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+      let coins = 0;
+      let crystals = 0;
+      let gems = 0;
+      if (reward.type === 'void_crystals') {
+        crystals = num(reward.amount);
+      } else if (reward.type === 'currency') {
+        coins = num(reward.nebula_coins);
+        crystals = num(reward.void_crystals);
+        gems = num(reward.premium_gems);
+      }
       if (coins + crystals + gems > 0) {
         // Lazy-init the wallet row (mirrors the shop service pattern) so
         // a player who's never touched the shop still gets their first

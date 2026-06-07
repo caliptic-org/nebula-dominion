@@ -16,8 +16,8 @@ import {
   computeUpgradeRequirements,
   canUpgrade,
   describeBlockers,
-  SCIENCE_COST_PER_LEVEL,
   SCIENCE_GATE_MIN_LEVEL,
+  scienceCostForLevel,
 } from './upgrade-requirements';
 import { QuestProgressNotifier } from '../quest-progress/quest-progress-notifier.service';
 import { ProgressionService } from '../progression/progression.service';
@@ -279,15 +279,12 @@ export class BuildingsService {
     // upgrades stay self-funding past Lv30. See constant JSDoc.
     const scale = Math.pow(BuildingsService.BUILDING_UPGRADE_COST_EXP, building.level);
     // Lv 5+ upgrade'lerinde bilim de düşülür — computeUpgradeRequirements
-    // ile AYNI formül olmalı: targetLevel × SCIENCE_COST_PER_LEVEL.
-    // Cycle 17 BAL-02: shared constant (was inline targetLevel × 50, now
-    // ×5 — 10× ucuz) so the requirement check and the deduction can never
-    // drift, and base upgrades stop being coupled to PvP-only science.
-    // Cost objesinin science alanını ResourcesService.deduct honour ediyor.
-    const scienceCost =
-      targetLevel >= SCIENCE_GATE_MIN_LEVEL
-        ? targetLevel * SCIENCE_COST_PER_LEVEL
-        : 0;
+    // ile AYNI formülü (scienceCostForLevel) paylaşır, böylece istek kontrolü
+    // ve düşüm asla drift edemez. Cycle 17 BAL-02: 50→5 ucuzlatıldı + PvP
+    // bağımlılığı kırıldı; cycle 20 ECON-BAL-05: 1.15^lvl ölçeklemesi eklendi
+    // (geç oyunda gerçek yumuşak kapı). scienceCostForLevel gate'i kendi
+    // içinde uygular (SCIENCE_GATE_MIN_LEVEL altında 0 döner).
+    const scienceCost = scienceCostForLevel(targetLevel);
     // Commander buildCostMultiplier applies to upgrades too. Without this
     // an active Malphas / Aurelius / Lokhode discount would only help
     // first-time construction; players would feel the bonus disappear

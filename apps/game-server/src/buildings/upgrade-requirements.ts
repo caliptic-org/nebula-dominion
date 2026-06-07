@@ -41,6 +41,27 @@ export const SCIENCE_COST_PER_LEVEL = 5;
 /** First building level at which science is charged on upgrade. */
 export const SCIENCE_GATE_MIN_LEVEL = 5;
 
+/**
+ * Cycle-20 ECON-BAL-05 — per-level science-cost growth exponent.
+ *
+ * The flat `targetLevel × 5` charge (max 270 at Lv54) gated NOTHING once a
+ * single lab trickle produced tens of thousands of science/day — science was
+ * a soft lever in name only. Scaling the cost by 1.15^(level-1) restores it as
+ * a real mid/late pacing gate WITHOUT the old PvP coupling: Lv5 ≈ 25, Lv30 ≈
+ * 9.9k, Lv54 ≈ 446k — roughly a third of a day of one Lv54 lab's output
+ * (post cycle-20 yield rebalance), so it slows late upgrades without walling
+ * them. MUST stay in sync with the FE mirror (apps/web/.../upgrade-requirements).
+ */
+export const SCIENCE_COST_EXP = 1.15;
+
+/** Science charged to upgrade a building to `targetLevel` (0 below the gate). */
+export function scienceCostForLevel(targetLevel: number): number {
+  if (targetLevel < SCIENCE_GATE_MIN_LEVEL) return 0;
+  return Math.round(
+    targetLevel * SCIENCE_COST_PER_LEVEL * Math.pow(SCIENCE_COST_EXP, targetLevel - 1),
+  );
+}
+
 export interface UpgradeRequirement {
   /** Internal rule type — frontend uses this to pick an icon. */
   kind: 'building_min_level' | 'hq_min_level' | 'science_min';
@@ -168,11 +189,12 @@ export function computeUpgradeRequirements(args: {
     });
   }
 
-  // Bilim maliyeti — Lv 5 ve üstü her upgrade için targetLevel × 5
-  // (cycle 17 BAL-02: 10× ucuzlatıldı, PvP-only bağımlılığı kırıldı).
+  // Bilim maliyeti — Lv 5 ve üstü her upgrade için scienceCostForLevel
+  // (cycle 17 BAL-02: 10× ucuzlatıldı; cycle 20 ECON-BAL-05: 1.15^lvl ile
+  // ölçeklendi ki geç oyunda gerçek bir yumuşak kapı olsun).
   // Lv 1-4 bilim gerektirmez (oyuncu daha akademi açmamış olabilir).
   if (targetLevel >= SCIENCE_GATE_MIN_LEVEL) {
-    const scienceCost = targetLevel * SCIENCE_COST_PER_LEVEL;
+    const scienceCost = scienceCostForLevel(targetLevel);
     out.push({
       kind: 'science_min',
       minScience: scienceCost,

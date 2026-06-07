@@ -14,12 +14,22 @@ export type BuildingType = string;
 
 /**
  * Science charged per target-level on Lv5+ upgrades. Cycle 17 BAL-02:
- * dropped 10× (50 → 5) to decouple base progression from PvP-only science
- * sourcing. MUST match SCIENCE_COST_PER_LEVEL / SCIENCE_GATE_MIN_LEVEL in
- * apps/game-server/src/buildings/upgrade-requirements.ts.
+ * dropped 10× (50 → 5); cycle 20 ECON-BAL-05: scaled by 1.15^(level-1) so
+ * science is a real late-game soft gate again (it was trivial vs lab income).
+ * MUST match SCIENCE_COST_PER_LEVEL / SCIENCE_GATE_MIN_LEVEL / SCIENCE_COST_EXP
+ * and scienceCostForLevel in apps/game-server/src/buildings/upgrade-requirements.ts.
  */
 export const SCIENCE_COST_PER_LEVEL = 5;
 export const SCIENCE_GATE_MIN_LEVEL = 5;
+export const SCIENCE_COST_EXP = 1.15;
+
+/** Science charged to upgrade a building to `targetLevel` (0 below the gate). */
+export function scienceCostForLevel(targetLevel: number): number {
+  if (targetLevel < SCIENCE_GATE_MIN_LEVEL) return 0;
+  return Math.round(
+    targetLevel * SCIENCE_COST_PER_LEVEL * Math.pow(SCIENCE_COST_EXP, targetLevel - 1),
+  );
+}
 
 export interface UpgradeRequirement {
   kind: 'building_min_level' | 'hq_min_level' | 'science_min';
@@ -113,7 +123,7 @@ export function computeUpgradeRequirements(args: {
   }
 
   if (targetLevel >= SCIENCE_GATE_MIN_LEVEL) {
-    const scienceCost = targetLevel * SCIENCE_COST_PER_LEVEL;
+    const scienceCost = scienceCostForLevel(targetLevel);
     out.push({
       kind: 'science_min',
       minScience: scienceCost,

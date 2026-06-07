@@ -503,16 +503,20 @@ export class BuildingsService {
         const legacyScale = Math.pow(BuildingsService.BUILDING_YIELD_EXP, Math.max(0, building.level - 1));
         mineralPerTick += Math.round(legacyCfg.production.mineralPerTick * legacyScale);
         gasPerTick     += Math.round(legacyCfg.production.gasPerTick * legacyScale);
-        // cycle 20 ECON-BAL-03 — energy CONSUMPTION now scales with level too
-        // (at the same yield exponent), so a leveled factory / defense_matrix
-        // actually pressures the grid instead of draining a flat amount
-        // forever (energy used to flip to surplus-forever by ~Age 2). Scaling
-        // the NET (production − consumption) by the same factor preserves the
-        // SIGN of a net-positive base at every level — it can never flip the
-        // cycle-19 HUMAN starter's +energy budget negative — while making
-        // high-level consumers a real draw.
+        // Energy: PRODUCTION scales with level; CONSUMPTION stays FLAT.
+        // Cycle 20 (ECON-BAL-03) briefly scaled consumption too, but cycle 21
+        // proved that scaling each building's NET by its own level can brown
+        // out an unevenly-leveled base — e.g. solar L1 + factory L10 →
+        // −12·1.10^9 ≈ −28 ⇒ a net-negative base — a UX regression the prior
+        // flat-consumption model never had ("sign preserved" was provably
+        // false). Reverted: a base with any producer stays energy-positive.
+        // The cycle-20 yield nerf (1.18→1.10) already slows the energy surplus
+        // so it is no longer trivially surplus-forever; a real energy-as-hard-
+        // constraint (deficit penalty rather than scaled drain) is deferred to
+        // a dedicated design.
         energyPerTick  += Math.round(
-          (legacyCfg.production.energyPerTick - legacyCfg.energyConsumptionPerTick) * legacyScale,
+          legacyCfg.production.energyPerTick * legacyScale -
+            legacyCfg.energyConsumptionPerTick,
         );
       }
     }

@@ -73,13 +73,27 @@ servis eklersen aynısını yap.
 
 ### 3. Database migration trigger
 
-Migration'lar `game-server` container'ı boot olurken çalışır
-(`DB_RUN_MIGRATIONS=true` env'i + TypeORM `migrationsRun: true`
-config'i). `api` migration koşturmaz. Order'a dikkat:
+**HER İKİ servis de kendi migration'larını boot'ta koşar** (paylaşımlı
+DB'ye, bağımsızca):
+- **game-server**: `apps/game-server/src/database/typeorm-migrations/*`
+  globu, `DB_RUN_MIGRATIONS=true` env'i + `app.module.ts` `migrationsRun`.
+- **api**: `apps/api/src/config/database.config.ts` içinde `migrationsRun: true`
+  (hardcoded — env'e bağlı değil), glob = `apps/api/src/database/migrations/*`
+  **VE** root `database/migrations/*` (yani api-owned tablolar: `shop_items`,
+  `user_currency`, `transactions`, premium_pass seed'leri api boot'ta gelir).
+
+Yani: api-owned bir tablo/seed eklemek için yeni TypeORM migration'ı
+`apps/api/src/database/migrations/`'a koy (api boot'ta koşar); game-server
+tablosu için `apps/game-server/src/database/typeorm-migrations/`'a koy. Bozuk
+migration ilgili servisi crash-loop'lar → additive + `IF NOT EXISTS` + dedup-önce.
+
+Order'a dikkat:
 - `redis` healthy →
-- `game-server` start → migration koş → listen →
-- `api` start → DB tabloları zaten hazır →
+- `game-server` start → kendi migration'larını koş → listen →
+- `api` start → kendi migration'larını koş (+ root SQL seed'leri) →
 - `web` start → API'ye bağlan.
+
+(Eski not "api migration koşturmaz" YANLIŞTI — düzeltildi.)
 
 ### 4. MinIO local — LXC volume'da
 
@@ -119,13 +133,26 @@ eski URL'leri çağırmaya devam eder. Production'da subdomain değişirse:
 
 ### Kod değişikliğini production'a almak
 
-DEPLOYMENT.md §10.1 adımları. Özet:
-1. Lokalde build + test
-2. tar + scp LXC'ye (`.env`'i exclude'la — production secret'ları korur)
-3. LXC'de `docker compose ... build api game-server web && up -d`
+**Otomatik CI/CD var** (`.github/workflows/deploy-prod.yml`): kodu
+`main`'e **push** et → LXC 204'teki **self-hosted GitHub Actions runner**
+(`nebula-prod-runner`) tetiklenir → runner workspace'inde
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml
+--env-file /opt/nebula-dominion/.env build + up -d` → healthcheck
+("containers healthy") → internal (LXC 10.10.10.40) + public (Cloudflare
+Tunnel) smoke test. `concurrency: deploy-prod` ile aynı anda tek deploy.
+Bozuk migration/build → "Wait for containers healthy" adımı kırmızı,
+production'a UYGULANMAZ (build "Apply stack"tan önce fail eder).
 
-CI yok — manuel. Gelecekte Gitea+Drone veya GitHub Actions self-hosted
-runner LXC'ye install edilebilir.
+- İzleme: `gh run watch <id> --exit-status`.
+- **`paths-ignore`**: `**.md`, `docs/**`, `infrastructure/terraform|runner/**`
+  push'ları deploy TETİKLEMEZ (doc-only commit'ler rebuild yapmaz).
+- Sadece-config/env değişikliği: `workflow_dispatch` + `skip_build:true`
+  (image build atla, sadece `up -d`).
+- `.env` repo'da DEĞİL → LXC'deki `/opt/nebula-dominion/.env`'den okunur
+  (secret'lar runner'da değil host'ta).
+
+Legacy manuel yol (runner down ise): DEPLOYMENT.md §10.1 — tar + scp LXC'ye
+(`.env` exclude) + LXC'de `docker compose ... build && up -d`.
 
 ### Yeni migration
 
@@ -208,8 +235,10 @@ Aynı şekilde `NEXT_PUBLIC_GAME_SERVER_URL`.
    Nebula container loglarını da indeksleyebilsin.
 2. **Uptime Kuma** monitor'leri — 3 public URL + 1 DB connect probe.
 3. **cAdvisor** LXC'de — per-container CPU/RAM panel'leri Grafana'da.
-4. **CI/CD** — şu an manuel deploy; Gitea/Drone veya GitHub Actions
-   runner LXC'ye install edip auto-build/deploy.
+4. ~~**CI/CD**~~ ✅ TAMAMLANDI — GitHub Actions self-hosted runner LXC 204'te
+   kurulu, `main`'e push → otomatik build+deploy+smoke-test
+   (`.github/workflows/deploy-prod.yml`). Bkz. §"Kod değişikliğini
+   production'a almak".
 5. **TLS SAN extension** — `certbot --expand` ile nebula subdomain'leri
    bastion cert'e ekle (Cloudflare Tunnel `noTLSVerify` zaten bypass
    ediyor, low-priority).

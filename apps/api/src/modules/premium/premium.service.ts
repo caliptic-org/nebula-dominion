@@ -235,17 +235,13 @@ export class PremiumService {
    */
   async ensureBattlePassEnrollment(userId: string): Promise<UserPremiumPass | null> {
     const now = new Date();
-    const existing = await this.userPassRepository.findOne({
-      where: {
-        userId,
-        status: 'active',
-        expiresAt: MoreThan(now),
-        premiumPass: { passType: 'battle_pass' },
-      },
-      relations: ['premiumPass'],
-    });
-    if (existing) return existing;
 
+    // The current active season is the source of truth — resolve it FIRST.
+    // Previously the existing-enrollment check was NOT season-scoped (it matched
+    // any non-expired battle_pass pass), so a late enrollee whose old-season
+    // pass hadn't lapsed kept banking XP into a CLOSED season after a new one
+    // started. Scoping to the active season makes XP always land on the current
+    // pass and lets stale enrollees roll over (cycle-27 BP-NO-SEASON-RESET).
     const season = await this.passRepository.findOne({
       where: { passType: 'battle_pass', isActive: true },
       order: { createdAt: 'DESC' },
@@ -255,19 +251,41 @@ export class PremiumService {
       return null;
     }
 
-    // Guard against a concurrent enrollment for this exact season.
-    const dup = await this.userPassRepository.findOne({
-      where: { userId, premiumPassId: season.id, status: 'active' },
-    });
-    if (dup) return dup;
+    const freshExpiry = (): Date => {
+      const e = new Date();
+      e.setDate(e.getDate() + season.durationDays);
+      return e;
+    };
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + season.durationDays);
+    // Existing enrollment for THIS season (any expiry — also serves as the
+    // concurrent-enroll dup guard).
+    const enrollment = await this.userPassRepository.findOne({
+      where: { userId, premiumPassId: season.id, status: 'active' },
+      relations: ['premiumPass'],
+    });
+    if (enrollment) {
+      // expiresAt = enrollTime + durationDays can lapse before the season is
+      // rotated out (there is no rotation cron yet), which used to strand the
+      // player on an expired pass they could neither earn into nor (after the
+      // BP-EXPIRE claim guard) claim from. While the season is still active,
+      // refresh the window IN PLACE — same season, so tier progress survives.
+      if (!enrollment.expiresAt || enrollment.expiresAt.getTime() <= now.getTime()) {
+        enrollment.expiresAt = freshExpiry();
+        const refreshed = await this.userPassRepository.save(enrollment);
+        this.logger.log(
+          `Battle pass re-activated (active season): user=${userId} season=${season.code}`,
+        );
+        return refreshed;
+      }
+      return enrollment;
+    }
+
+    // No enrollment for the current season → create a FREE one.
     const userPass = this.userPassRepository.create({
       userId,
       premiumPassId: season.id,
       status: 'active',
-      expiresAt,
+      expiresAt: freshExpiry(),
       currentTier: 0,
       tierXp: 0,
       paymentProvider: 'free',

@@ -229,23 +229,46 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
   describe('FLOW-001 — free-season enrollment', () => {
     const season = { id: 'season-1', code: 'battle_pass_season5', passType: 'battle_pass', durationDays: 90 };
 
-    it('returns the existing active battle-pass enrollment without creating one', async () => {
+    const future = new Date(Date.now() + 30 * 86_400_000);
+
+    it('returns the existing non-expired enrollment for the active season without creating one', async () => {
       manager = {};
       await makeService();
-      const existing = { id: 'up-1', premiumPass: { passType: 'battle_pass' } };
+      passRepo.findOne.mockResolvedValue(season);
+      const existing = { id: 'up-1', premiumPassId: 'season-1', expiresAt: future, premiumPass: { passType: 'battle_pass' } };
       userPassRepo.findOne.mockResolvedValueOnce(existing);
 
       const result = await service.ensureBattlePassEnrollment('user-1');
 
       expect(result).toBe(existing);
       expect(userPassRepo.create).not.toHaveBeenCalled();
+      expect(userPassRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('reactivates an EXPIRED same-season enrollment in place, preserving tier progress (BP-NO-SEASON-RESET)', async () => {
+      manager = {};
+      await makeService();
+      passRepo.findOne.mockResolvedValue(season);
+      const expired = {
+        id: 'up-old', premiumPassId: 'season-1', currentTier: 17, tierXp: 240,
+        expiresAt: new Date(Date.now() - 86_400_000), premiumPass: { passType: 'battle_pass' },
+      };
+      userPassRepo.findOne.mockResolvedValueOnce(expired);
+      userPassRepo.save.mockImplementation((v: any) => Promise.resolve(v));
+
+      const result: any = await service.ensureBattlePassEnrollment('user-1');
+
+      // refreshed in place — no new row, tier progress untouched
+      expect(userPassRepo.create).not.toHaveBeenCalled();
+      expect(result.currentTier).toBe(17);
+      expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
     });
 
     it('creates a FREE enrollment (currentTier 0, paymentProvider free) in the active season', async () => {
       manager = {};
       await makeService();
-      userPassRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null); // existing, dup
       passRepo.findOne.mockResolvedValue(season);
+      userPassRepo.findOne.mockResolvedValueOnce(null); // no enrollment for this season
       userPassRepo.create.mockImplementation((v: any) => v);
       userPassRepo.save.mockImplementation((v: any) => Promise.resolve({ id: 'up-new', ...v }));
 
@@ -267,10 +290,8 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
     it('on a concurrent-enroll unique violation (23505), re-fetches the winner pass', async () => {
       manager = {};
       await makeService();
-      userPassRepo.findOne
-        .mockResolvedValueOnce(null)  // existing battle-pass check
-        .mockResolvedValueOnce(null); // dup check
       passRepo.findOne.mockResolvedValue(season);
+      userPassRepo.findOne.mockResolvedValueOnce(null); // no enrollment for this season
       userPassRepo.create.mockImplementation((v: any) => v);
       const uniqueErr = new QueryFailedError('q', [], Object.assign(new Error('dup'), { code: '23505' }) as any);
       userPassRepo.save.mockRejectedValueOnce(uniqueErr);
@@ -284,7 +305,6 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
     it('returns null when there is no active battle_pass season', async () => {
       manager = {};
       await makeService();
-      userPassRepo.findOne.mockResolvedValueOnce(null);
       passRepo.findOne.mockResolvedValue(null);
 
       const result = await service.ensureBattlePassEnrollment('user-1');

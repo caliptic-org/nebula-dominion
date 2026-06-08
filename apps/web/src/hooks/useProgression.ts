@@ -128,10 +128,21 @@ export function useProgression({ userId, onLevelUp, onXpGained, onAgeTransition 
       onAgeTransition?.(payload);
     });
 
+    // FLOW-004 — a maxed account banked a prestige level. The full DTO
+    // (prestigeLevel / prestigeXp) plus the recalculated production bonus
+    // need a refetch; the socket payload only carries the new level so we
+    // patch it optimistically and refetch the rest.
+    socket.on('prestige_up', (payload: { prestigeLevel: number }) => {
+      setProgress((prev) =>
+        prev ? { ...prev, prestigeLevel: payload.prestigeLevel } : prev,
+      );
+      void fetchProgress();
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [userId, onLevelUp, onXpGained, onAgeTransition]);
+  }, [userId, onLevelUp, onXpGained, onAgeTransition, fetchProgress]);
 
   const advanceAge = useCallback(async () => {
     if (!userId || advancing) return;

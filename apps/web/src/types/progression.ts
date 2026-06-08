@@ -45,6 +45,13 @@ export interface PlayerProgress {
    *  /api/progression/:id/advance-age. The endpoint enforces the HQ
    *  level gate (command_center.level >= ageMax) on its own. */
   canAdvanceAge: boolean;
+  /** FLOW-004 endgame prestige. 0 until the account reaches MAX_LEVEL and
+   *  begins accruing post-max XP. Each prestige level is a permanent +2%
+   *  production bonus (capped +100%). prestigeXp counts toward
+   *  prestigeXpPerLevel for the in-progress bar. */
+  prestigeLevel: number;
+  prestigeXp: number;
+  prestigeXpPerLevel: number;
 }
 
 export interface LevelUpPayload {

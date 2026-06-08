@@ -51,6 +51,18 @@ export class ProgressionGateway {
     });
   }
 
+  @OnEvent('progression.prestige_up')
+  handlePrestigeUp(event: { userId: string; prestigeLevel: number }): void {
+    // FLOW-004 — the client refetches the progress DTO on this signal so the
+    // prestige bar + permanent production bonus reflect immediately.
+    this.server.to(`user:${event.userId}`).emit('prestige_up', {
+      prestigeLevel: event.prestigeLevel,
+    });
+    this.logger.log(
+      `Emitted prestige_up to user=${event.userId} prestige_level=${event.prestigeLevel}`,
+    );
+  }
+
   @OnEvent('era.transition')
   handleEraTransition(event: EraTransitionEvent): void {
     this.server.to(`user:${event.userId}`).emit('era_transition', {

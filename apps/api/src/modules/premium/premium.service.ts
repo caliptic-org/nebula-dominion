@@ -220,6 +220,64 @@ export class PremiumService {
   }
 
   /**
+   * FLOW-001 (battle pass) — ensure the player has a free-track enrollment in
+   * the current battle-pass season so XP can accumulate.
+   *
+   * The battle pass has a FREE track for every player, but nothing ever
+   * created a UserPremiumPass: buying the `battle_pass_premium` SKU only writes
+   * a user_inventory row (the MON-3 ownership signal), and there was no free
+   * enrollment path at all. So addBattlePassXp always no-op'd and the pass
+   * never progressed for ANYONE — MON-3's tier gating was academic. This
+   * lazily creates a free UserPremiumPass on first battle. Idempotent: returns
+   * the existing active battle-pass enrollment when present. Premium-track
+   * access is still decided separately by ownsPremiumTrack (the SKU), so free
+   * enrollment here doesn't grant premium rewards.
+   */
+  async ensureBattlePassEnrollment(userId: string): Promise<UserPremiumPass | null> {
+    const now = new Date();
+    const existing = await this.userPassRepository.findOne({
+      where: {
+        userId,
+        status: 'active',
+        expiresAt: MoreThan(now),
+        premiumPass: { passType: 'battle_pass' },
+      },
+      relations: ['premiumPass'],
+    });
+    if (existing) return existing;
+
+    const season = await this.passRepository.findOne({
+      where: { passType: 'battle_pass', isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    if (!season) {
+      this.logger.warn('ensureBattlePassEnrollment: no active battle_pass season found');
+      return null;
+    }
+
+    // Guard against a concurrent enrollment for this exact season.
+    const dup = await this.userPassRepository.findOne({
+      where: { userId, premiumPassId: season.id, status: 'active' },
+    });
+    if (dup) return dup;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + season.durationDays);
+    const userPass = this.userPassRepository.create({
+      userId,
+      premiumPassId: season.id,
+      status: 'active',
+      expiresAt,
+      currentTier: 0,
+      tierXp: 0,
+      paymentProvider: 'free',
+    });
+    const saved = await this.userPassRepository.save(userPass);
+    this.logger.log(`Battle pass free enrollment: user=${userId} season=${season.code}`);
+    return saved;
+  }
+
+  /**
    * Grant battle-pass XP from an internal (game-server) event.
    *
    * BLOCKER F1 hardening — see the module-level guard rails block above
@@ -273,21 +331,29 @@ export class PremiumService {
     }
 
     const now = new Date();
-    const battlePass = await this.userPassRepository.findOne({
+    let battlePass = await this.userPassRepository.findOne({
       where: {
         userId,
         status: 'active',
         expiresAt: MoreThan(now),
+        premiumPass: { passType: 'battle_pass' },
       },
       relations: ['premiumPass'],
     });
 
-    // (c) No active battle pass — null no-op, do not bank the reference.
-    if (!battlePass || battlePass.premiumPass.passType !== 'battle_pass') {
-      this.logger.debug(
-        `addBattlePassXp no-op (no active battle pass): user=${userId} source=${source} ref=${referenceId}`,
-      );
-      return null;
+    // (c) No active battle pass — FLOW-001: auto-enroll in the free season so
+    // the pass actually progresses (previously this no-op'd and nobody ever
+    // had a UserPremiumPass). If there's no battle_pass season configured at
+    // all, stay a no-op and do NOT bank the reference (so the event can credit
+    // once a season exists).
+    if (!battlePass) {
+      battlePass = await this.ensureBattlePassEnrollment(userId);
+      if (!battlePass) {
+        this.logger.debug(
+          `addBattlePassXp no-op (no battle_pass season): user=${userId} source=${source} ref=${referenceId}`,
+        );
+        return null;
+      }
     }
 
     // (d) Daily cap — credit only what's left in today's bucket.

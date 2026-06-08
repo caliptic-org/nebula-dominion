@@ -209,4 +209,70 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
       expect(passes[1].tierRewards).toBeUndefined();
     });
   });
+
+  describe('FLOW-001 — free-season enrollment', () => {
+    const season = { id: 'season-1', code: 'battle_pass_season5', passType: 'battle_pass', durationDays: 90 };
+
+    it('returns the existing active battle-pass enrollment without creating one', async () => {
+      manager = {};
+      await makeService();
+      const existing = { id: 'up-1', premiumPass: { passType: 'battle_pass' } };
+      userPassRepo.findOne.mockResolvedValueOnce(existing);
+
+      const result = await service.ensureBattlePassEnrollment('user-1');
+
+      expect(result).toBe(existing);
+      expect(userPassRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a FREE enrollment (currentTier 0, paymentProvider free) in the active season', async () => {
+      manager = {};
+      await makeService();
+      userPassRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null); // existing, dup
+      passRepo.findOne.mockResolvedValue(season);
+      userPassRepo.create.mockImplementation((v: any) => v);
+      userPassRepo.save.mockImplementation((v: any) => Promise.resolve({ id: 'up-new', ...v }));
+
+      const result: any = await service.ensureBattlePassEnrollment('user-1');
+
+      expect(userPassRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          premiumPassId: 'season-1',
+          status: 'active',
+          currentTier: 0,
+          tierXp: 0,
+          paymentProvider: 'free',
+        }),
+      );
+      expect(result.premiumPassId).toBe('season-1');
+    });
+
+    it('returns null when there is no active battle_pass season', async () => {
+      manager = {};
+      await makeService();
+      userPassRepo.findOne.mockResolvedValueOnce(null);
+      passRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.ensureBattlePassEnrollment('user-1');
+
+      expect(result).toBeNull();
+      expect(userPassRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('addBattlePassXp auto-enrolls a passless player, then credits the XP', async () => {
+      manager = {};
+      await makeService();
+      // battlePass query + ensureEnrollment existing/dup checks all miss.
+      userPassRepo.findOne.mockResolvedValue(null);
+      passRepo.findOne.mockResolvedValue(season);
+      userPassRepo.create.mockImplementation((v: any) => ({ ...v }));
+      userPassRepo.save.mockImplementation((v: any) => Promise.resolve({ id: 'up-new', ...v }));
+
+      const res: any = await service.addBattlePassXp('user-bpx-1', 100, 'pve_battle', 'battle:bpx-1');
+
+      expect(userPassRepo.create).toHaveBeenCalled(); // enrolled
+      expect(res?.xpGranted).toBe(100);
+    });
+  });
 });

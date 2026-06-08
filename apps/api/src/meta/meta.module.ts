@@ -14,6 +14,10 @@ import { QuestProgressModule } from '../modules/quest-progress/quest-progress.mo
 // cycle 17 BAL-03: MissionsStubController delegates daily-quest claims to
 // DailyEngagementService for DB-backed idempotency + wallet/XP credit.
 import { DailyEngagementModule } from '../modules/daily-engagement/daily-engagement.module';
+// FLOW-001 (battle pass): BattlesStubController grants battle-pass XP on a won
+// quick-battle (in-process; PremiumModule already boots in AppModule, so this
+// import is a singleton re-use, not a new instantiation).
+import { PremiumModule } from '../modules/premium/premium.module';
 
 /* MetaModule
  *
@@ -47,7 +51,7 @@ import { DailyEngagementModule } from '../modules/daily-engagement/daily-engagem
  * production-active status. */
 
 @Module({
-  imports: [QuestProgressModule, DailyEngagementModule],
+  imports: [QuestProgressModule, DailyEngagementModule, PremiumModule],
   controllers: [
     LeaderboardStubController,
     MissionsStubController,

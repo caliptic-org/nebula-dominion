@@ -14,6 +14,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QuestProgressService } from '../modules/quest-progress/quest-progress.service';
+import { PremiumService } from '../modules/premium/premium.service';
 
 /**
  * Battle + battle-prep controller (production-active, name kept for history).
@@ -241,6 +242,14 @@ const ROOKIE_DEFENDER_FRACTION = 0.6;
 const COMMANDER_XP_PER_WIN = 100;
 
 /**
+ * FLOW-001 — battle-pass XP granted to the winner of a quick-battle. Mirrors
+ * the per-call clamp (1000) / daily cap (2000) in premium.service.addBattlePassXp:
+ * at 200/win a player needs ~5 wins for a tier (XP_PER_TIER=1000) and the
+ * daily cap admits ~10 wins/day (≈2 tiers), a sane season pace.
+ */
+const BATTLE_PASS_XP_PER_WIN = 200;
+
+/**
  * Hash the battle id into a stable seed for mulberry32. We can't use the
  * raw string with our numeric rand(), so fold the char codes. The result
  * differs per battle id so two POSTs in the same second still roll
@@ -404,6 +413,9 @@ export class BattlesStubController {
 
   constructor(
     private readonly questProgress: QuestProgressService,
+    // FLOW-001 (battle pass): in-process battle-pass XP grant on a won
+    // quick-battle (PremiumService is in this same api service).
+    private readonly premium: PremiumService,
     // player_units is game-server-owned; api reads it via raw SQL on the
     // shared DataSource — same pattern boss.service.ts / formations.service.ts
     // use (CLAUDE.md §1: api + game-server share one Postgres DB).
@@ -625,6 +637,22 @@ export class BattlesStubController {
           `commander-xp hook failed userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
         );
       });
+
+      // BATTLE-PASS XP — FLOW-001 (battle pass)
+      //
+      // Nothing previously fed the mounted /premium/battle-pass/xp endpoint,
+      // so the pass never progressed for anyone. addBattlePassXp auto-enrolls
+      // the player in the free season, is idempotent on (userId, referenceId)
+      // and daily-capped, so a retry/replay can't double-credit. In-process
+      // (PremiumService is in this api). Fire-and-forget: a pass-XP hiccup must
+      // not roll back the battle response — the FE has already shown the win.
+      void this.premium
+        .addBattlePassXp(userId, BATTLE_PASS_XP_PER_WIN, 'pve_battle', `battle:${battle.id}`)
+        .catch((err) => {
+          this.logger.warn(
+            `battle-pass-xp hook failed userId=${userId} battleId=${battle.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
     }
 
     return battle;

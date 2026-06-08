@@ -8,6 +8,8 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAlliances } from '@/hooks/useAlliances';
 import { useAllianceWars, type AllianceWarDto } from '@/hooks/useAllianceWars';
+import { useAllianceMembers } from '@/hooks/useAllianceMembers';
+import { toFrontendRace, type BackendRace } from '@/lib/race-api';
 import {
   RACES,
   ND,
@@ -42,7 +44,6 @@ interface AllianceMember {
   race: NDRaceKey;
   power: number;
   contribution: number;
-  online: boolean;
 }
 
 interface WarEntry {
@@ -67,15 +68,16 @@ interface Objective {
   reward: string;
 }
 
-const MEMBERS: AllianceMember[] = [
-  { id: 'm1', name: 'A. Voss',         role: 'Lider',  race: 'insan',   power: 142_800, contribution: 18_420, online: true  },
-  { id: 'm2', name: 'Chen',            role: 'Subay',  race: 'insan',   power: 118_400, contribution: 14_120, online: true  },
-  { id: 'm3', name: 'Reyes',           role: 'Subay',  race: 'insan',   power: 102_800, contribution: 11_400, online: false },
-  { id: 'm4', name: 'Phantom',         role: 'Üye',    race: 'insan',   power:  88_100, contribution:  9_220, online: true  },
-  { id: 'm5', name: 'Wolfe',           role: 'Üye',    race: 'otomat',  power:  74_500, contribution:  7_100, online: false },
-  { id: 'm6', name: 'Stride',          role: 'Üye',    race: 'canavar', power:  68_900, contribution:  6_840, online: true  },
-  { id: 'm7', name: 'Lyra',            role: 'Üye',    race: 'zerg',    power:  55_200, contribution:  4_980, online: false },
-];
+// AllianceMember roster comes from the live GET /alliance/members endpoint
+// (useAllianceMembers) — see the mapping inside the component. The old
+// hardcoded 7-member demo array was removed (cycle-27 ALLIANCE-MEMBERS-STUB).
+
+// Maps the backend AllianceRole enum to the FE's 3-tier label.
+function roleLabel(role: string): AllianceMember['role'] {
+  if (role === 'leader') return 'Lider';
+  if (role === 'officer') return 'Subay';
+  return 'Üye';
+}
 
 // Race fallback used when projecting backend wars into the WarCard shape.
 // The /alliance-wars/:id endpoint only knows the opponent's id+tag+name —
@@ -226,6 +228,22 @@ export default function AlliancePage() {
     return own?.id ?? null;
   }, [profile?.allianceId, profile?.allianceTag, discoverableAlliances]);
 
+  // Real roster (cycle-27 ALLIANCE-MEMBERS-STUB). The member-scoped endpoint
+  // derives the alliance from the JWT, so we only need to gate on membership.
+  const { members: liveMembers } = useAllianceMembers(hasAlliance);
+  const members: AllianceMember[] = useMemo(
+    () =>
+      liveMembers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        role: roleLabel(m.role),
+        race: m.race ? (toFrontendRace(m.race as BackendRace) ?? 'insan') : 'insan',
+        power: m.power,
+        contribution: m.contribution,
+      })),
+    [liveMembers],
+  );
+
   // Real wars list for the player's alliance. Falls back to [] for guests
   // and guildless players; the empty-state banner already handles those.
   const { wars: backendWars, loading: warsLoading, refresh: refreshWars } = useAllianceWars(myAllianceId);
@@ -298,7 +316,7 @@ export default function AlliancePage() {
     tag: profile?.allianceTag ?? '—',
     tier: hasAlliance ? 'BÜYÜK İTTİFAK' : '—',
     tierScore: hasAlliance ? 24_120 : 0,
-    memberCount: hasAlliance ? MEMBERS.length : 0,
+    memberCount: hasAlliance ? members.length : 0,
     capacity: 50,
     weeklyRank: hasAlliance ? 5 : 0,
     weeklyDonations: hasAlliance ? 184_000 : 0,
@@ -634,12 +652,16 @@ export default function AlliancePage() {
           <Panel race={race}>
             <div style={panelHeader()}>
               <Eyebrow color={race.primary}>ÜYELER</Eyebrow>
-              <Code>{MEMBERS.length}</Code>
+              <Code>{members.length}</Code>
             </div>
             <div>
-              {MEMBERS.map(m => (
-                <MemberRow key={m.id} member={m} />
-              ))}
+              {members.length === 0 ? (
+                <Caption style={{ display: 'block', padding: '14px 12px', textAlign: 'center' }}>
+                  Üye listesi yükleniyor…
+                </Caption>
+              ) : (
+                members.map(m => <MemberRow key={m.id} member={m} />)
+              )}
             </div>
           </Panel>
         )}
@@ -861,21 +883,9 @@ function MemberRow({ member }: { member: AllianceMember }) {
         alignItems: 'center',
       }}
     >
-      <div style={{ position: 'relative' }}>
-        <Sigil race={r} size={28} />
-        <div
-          style={{
-            position: 'absolute',
-            right: -2,
-            bottom: -2,
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: member.online ? ND.ok : ND.textMute,
-            border: `1px solid ${ND.bg}`,
-          }}
-        />
-      </div>
+      {/* No presence dot — the game has no online/presence tracking, so a
+          green/grey status would be fabricated (cycle-27 ALLIANCE-MEMBERS-STUB). */}
+      <Sigil race={r} size={28} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontFamily: ND.display, fontSize: 12, color: ND.text }}>{member.name}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, color: ND.textDim }}>

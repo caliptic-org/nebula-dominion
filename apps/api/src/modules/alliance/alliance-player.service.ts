@@ -25,6 +25,25 @@ import { ChatQueryDto } from './dto/chat-query.dto';
 import { DonationQueryDto } from './dto/donation-query.dto';
 import { applyAllianceXp } from './alliance-progression';
 
+/**
+ * Enriched roster row (cycle-27 audit ALLIANCE-MEMBERS-STUB). The
+ * alliance_members table only carries {userId, role, contribution}, which is
+ * not enough to render a real roster — the FE was falling back to a hardcoded
+ * 7-member demo list. We join `users` for the display name + race and
+ * `player_levels` for a "might" proxy (total_xp) so the page shows the actual
+ * alliance. `online` is deliberately omitted: there's no presence system, and
+ * faking a green dot is exactly the dishonesty this fix removes.
+ */
+export interface AllianceMemberView {
+  id: string;
+  userId: string;
+  name: string;
+  race: string | null; // English BE enum (human/automaton/…); FE maps to Turkish
+  role: AllianceRole;
+  contribution: number;
+  power: number;
+}
+
 @Injectable()
 export class AlliancePlayerService {
   constructor(
@@ -99,19 +118,59 @@ export class AlliancePlayerService {
 
   // ─── Members ──────────────────────────────────────────────────────────────
 
-  async getMembers(userId: string, search?: string): Promise<AllianceMember[]> {
+  async getMembers(userId: string, search?: string): Promise<AllianceMemberView[]> {
     const member = await this.requireMembership(userId);
-    const qb = this.memberRepo
-      .createQueryBuilder('m')
-      .where('m.allianceId = :id', { id: member.allianceId })
-      .orderBy('m.role', 'ASC')
-      .addOrderBy('m.joinedAt', 'ASC');
-
+    // Raw SQL because we cross into users + player_levels (the latter is
+    // game-server-owned on the shared DB — same join idiom as
+    // leaderboard-stub.controller). users.id is uuid = alliance_members.user_id
+    // (uuid); player_levels.user_id is varchar so it needs the ::text cast.
+    const params: unknown[] = [member.allianceId];
+    let searchClause = '';
     if (search) {
-      qb.andWhere('m.userId::text ILIKE :search', { search: `%${search}%` });
+      params.push(`%${search}%`);
+      searchClause = ` AND u.username ILIKE $${params.length}`;
     }
-
-    return qb.getMany();
+    const rows = (await this.dataSource.query(
+      `SELECT
+          am.id::text              AS id,
+          am.user_id::text         AS "userId",
+          u.username               AS name,
+          u.race                   AS race,
+          am.role                  AS role,
+          am.contribution          AS contribution,
+          COALESCE(pl.total_xp, 0) AS power
+         FROM alliance_members am
+         JOIN users u ON u.id::text = am.user_id::text
+         LEFT JOIN player_levels pl ON pl.user_id = am.user_id::text
+        WHERE am.alliance_id = $1${searchClause}
+        ORDER BY
+          CASE am.role
+            WHEN 'leader'  THEN 0
+            WHEN 'officer' THEN 1
+            WHEN 'veteran' THEN 2
+            WHEN 'member'  THEN 3
+            ELSE 4
+          END,
+          am.contribution DESC`,
+      params,
+    )) as Array<{
+      id: string;
+      userId: string;
+      name: string;
+      race: string | null;
+      role: AllianceRole;
+      contribution: string | number;
+      power: string | number;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      name: r.name,
+      race: r.race,
+      role: r.role,
+      contribution: Number(r.contribution),
+      power: Number(r.power),
+    }));
   }
 
   async inviteMember(userId: string, dto: InviteMemberDto): Promise<AllianceApplication> {

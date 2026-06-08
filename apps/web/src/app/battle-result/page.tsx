@@ -6,6 +6,13 @@ import { BattleResultScreen, type BattleResultData, type BattleOutcome } from '@
 import { useRaceTheme } from '@/hooks/useRaceTheme';
 import { Race, RACE_DESCRIPTIONS } from '@/types/units';
 import { RACES, type NDRaceKey } from '@/components/handoff';
+import { getCurrentUserId } from '@/lib/currentUser';
+
+interface LiveProgression {
+  level: number;
+  currentXp: number;
+  xpToNextLevel: number | null;
+}
 
 const ND_RACE_KEYS: readonly NDRaceKey[] = ['insan', 'zerg', 'otomat', 'canavar', 'seytan'];
 
@@ -125,6 +132,43 @@ function Inner() {
     setStashLoaded(true);
   }, []);
 
+  // Real progression for the XP bar. The bar used to be pure mock
+  // (makeMockData's xpBefore=12400/xpMax=20000/level=14), so after a real
+  // battle it showed a fabricated level + position. Now that battle XP is
+  // actually granted (cycle-28 BATTLE_REWARD_XP), fetch the player's live
+  // level/XP so the bar reflects truth. A short delay lets the fire-and-forget
+  // grant land; the global progression toaster still owns the level-up moment.
+  const [liveProg, setLiveProg] = useState<LiveProgression | null>(null);
+  useEffect(() => {
+    if (!stashLoaded || !stash) return; // only for a real battle result
+    const userId = getCurrentUserId();
+    if (!userId) return;
+    const base = (process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? '').replace(/\/+$/, '');
+    const token =
+      typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      fetch(`${base}/api/progression/${userId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (!cancelled && p && typeof p.level === 'number') {
+            setLiveProg({
+              level: p.level,
+              currentXp: Number(p.currentXp ?? 0),
+              xpToNextLevel: p.xpToNextLevel ?? null,
+            });
+          }
+        })
+        .catch(() => {});
+    }, 1200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [stashLoaded, stash]);
+
   // Source of truth for the headline + reward tier: the backend-rolled
   // status carried by `stash.status` (set by BattleScreen.onContinue from
   // POST /battles response). The BE owns the outcome since cycle 4; the
@@ -180,6 +224,24 @@ function Inner() {
     // Use real simulation stats when present; fall back to mock numbers
     // for direct deep-links (no /battle round-trip).  MVP same pattern —
     // when the sim ran we know exactly who carried the team.
+    const gain = stash.rewards.xp;
+    // Real XP bar when live progression has loaded; otherwise keep the
+    // mock-derived bar for the brief pre-fetch window + deep-link previews.
+    const xpFields = liveProg
+      ? {
+          level: liveProg.level,
+          xpAfter: liveProg.currentXp,
+          xpBefore: Math.max(0, liveProg.currentXp - gain),
+          xpMax: liveProg.xpToNextLevel ?? Math.max(liveProg.currentXp, 1),
+          // Real level-ups are surfaced by the global progression toaster;
+          // the result screen no longer fabricates one from an xp threshold.
+          levelUp: false,
+          newLevel: liveProg.level,
+        }
+      : {
+          xpAfter: mock.rewards.xpBefore + gain,
+          levelUp: outcome === 'victory' && gain > 200,
+        };
     return {
       ...mock,
       stats: stash.stats ?? mock.stats,
@@ -196,13 +258,11 @@ function Inner() {
         crystal: 0,
         // science → research wallet currency (◈), shown beside the resource pills
         science: stash.rewards.science ?? 0,
-        xpGained: stash.rewards.xp,
-        xpAfter: mock.rewards.xpBefore + stash.rewards.xp,
-        // levelUp logic: same as mock, since the stub doesn't track level.
-        levelUp: outcome === 'victory' && stash.rewards.xp > 200,
+        xpGained: gain,
+        ...xpFields,
       },
     };
-  }, [stash, outcome, effectiveRace]);
+  }, [stash, outcome, effectiveRace, liveProg]);
 
   return <BattleResultScreen data={data} forcedRace={forced} />;
 }

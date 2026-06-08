@@ -63,6 +63,9 @@ services:
         # rebuild only the web bundle, exercise the flow, then flip back to
         # 1 and rebuild again before opening to real players.
         NEXT_PUBLIC_GAME_SPEED_MULTIPLIER: ${NEXT_PUBLIC_GAME_SPEED_MULTIPLIER:-1}
+        # Guild backend is live — bake the FE flag true so the real /guilds API
+        # is used instead of stub guilds (cycle-27 GUILD-BACKEND-FEATURE-FLAG).
+        NEXT_PUBLIC_GUILD_BACKEND_READY: ${NEXT_PUBLIC_GUILD_BACKEND_READY:-true}
     ports: !override
       - '10.10.10.40:3000:3000'
     environment:

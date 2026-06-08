@@ -29,6 +29,11 @@ ARG NEXT_PUBLIC_SENTRY_RELEASE
 # because Next.js standalone bakes NEXT_PUBLIC_* at build time — restarting
 # the container won't pick it up; only a rebuild does.
 ARG NEXT_PUBLIC_GAME_SPEED_MULTIPLIER=1
+# Guild backend is live (game-server /api/guilds/*, GuildsModule mounted). The
+# FE guildApi gates on this flag; without it baked true the prod bundle served
+# hardcoded stub guilds (cycle-27 audit GUILD-BACKEND-FEATURE-FLAG-DISABLED).
+# Default true so the real backend is used unless a build explicitly opts out.
+ARG NEXT_PUBLIC_GUILD_BACKEND_READY=true
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GAME_SERVER_URL=$NEXT_PUBLIC_GAME_SERVER_URL
 ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
@@ -37,6 +42,7 @@ ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_SENTRY_ENV=$NEXT_PUBLIC_SENTRY_ENV
 ENV NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE
 ENV NEXT_PUBLIC_GAME_SPEED_MULTIPLIER=$NEXT_PUBLIC_GAME_SPEED_MULTIPLIER
+ENV NEXT_PUBLIC_GUILD_BACKEND_READY=$NEXT_PUBLIC_GUILD_BACKEND_READY
 
 RUN pnpm --filter @nebula-dominion/web run build
 

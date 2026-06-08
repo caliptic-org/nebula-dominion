@@ -231,6 +231,12 @@ const DEFENDER_FLOOR = 4_000;
  */
 const ROOKIE_MAX_LEVEL = 2;
 const ROOKIE_DEFENDER_FRACTION = 0.6;
+// cycle-27 audit ROOKIE_BAND_BYPASSED — Lv 3..(VETERAN_MIN_LEVEL-1) is a
+// TRANSITION band that linearly ramps the defender fraction (0.6→0.9) and the
+// floor (0→DEFENDER_FLOOR) so the guaranteed-winnable tutorial doesn't slam
+// into the full difficulty band the instant the player hits Lv3 (~1-2h in).
+// Veteran band (full 0.9× + floor) begins at this level.
+const VETERAN_MIN_LEVEL = 6;
 
 /**
  * Commander XP granted to the winner on this FE `/battle` path (BAL-3,
@@ -477,43 +483,54 @@ export class BattlesStubController {
    * PvE module can swap this for zone/node difficulty without touching the
    * outcome math.
    */
-  private deriveDefenderPower(attackerPower: number, isRookie: boolean): number {
+  private deriveDefenderPower(attackerPower: number, level: number): number {
     // Cycle-19 FUNNEL-01-NEW — rookie band is LEVEL-gated (genuinely-fresh
     // accounts only), not a permanent fleet band. A rookie faces a
     // guaranteed-beatable bot (0.6× fleet, no floor) so HUMAN (6600) AND ZERG
-    // (3213) both win their tutorial fight across the ±15% jitter. Once the
-    // player levels past the tutorial they get the normal band + floor — no
-    // permanent farm zone, no fleet win/lose cliff.
-    if (isRookie) {
+    // (3213) both win their tutorial fight across the ±15% jitter.
+    if (level <= ROOKIE_MAX_LEVEL) {
       return Math.round(attackerPower * ROOKIE_DEFENDER_FRACTION);
     }
-    const scaled = attackerPower * DEFENDER_POWER_FRACTION;
-    return Math.max(DEFENDER_FLOOR, Math.round(scaled));
+    // Veteran band: full 0.9× fleet + floor.
+    if (level >= VETERAN_MIN_LEVEL) {
+      return Math.max(DEFENDER_FLOOR, Math.round(attackerPower * DEFENDER_POWER_FRACTION));
+    }
+    // Transition band (Lv 3..5) — cycle-27 audit ROOKIE_BAND_BYPASSED. Before
+    // this, the bot jumped from 0.6× (no floor) straight to 0.9× + 4000 floor
+    // at Lv3 (a ~122% spike the moment the tutorial ended → retention hazard).
+    // Linearly ramp BOTH levers over the transition so growth never feels
+    // punished. t = 0.25 / 0.5 / 0.75 at Lv 3 / 4 / 5.
+    const t = (level - ROOKIE_MAX_LEVEL) / (VETERAN_MIN_LEVEL - ROOKIE_MAX_LEVEL);
+    const fraction =
+      ROOKIE_DEFENDER_FRACTION + (DEFENDER_POWER_FRACTION - ROOKIE_DEFENDER_FRACTION) * t;
+    const floor = Math.round(DEFENDER_FLOOR * t);
+    return Math.max(floor, Math.round(attackerPower * fraction));
   }
 
   /**
-   * Cycle-19 FUNNEL-01-NEW — is the caller a genuinely-fresh account that
-   * should still get guaranteed-winnable tutorial fights? Probes
-   * `player_levels.current_level` (game-server's canonical level table; same
-   * read pattern as story.service.ts). A brand-new account whose player_levels
-   * row hasn't materialised yet, or any read hiccup, degrades to `true` so the
-   * very first battles stay beatable rather than throwing a fresh player into
-   * the real difficulty band.
+   * Cycle-19 FUNNEL-01-NEW / cycle-27 ROOKIE_BAND — the caller's canonical
+   * level, which drives the rookie → transition → veteran difficulty band in
+   * `deriveDefenderPower`. Probes `player_levels.current_level` (game-server's
+   * canonical level table; same read pattern as story.service.ts). A brand-new
+   * account whose player_levels row hasn't materialised yet, or any read
+   * hiccup, degrades to level 1 (rookie / easiest) so the very first battles
+   * stay beatable rather than throwing a fresh player into the real band.
    */
-  private async isRookiePlayer(userId: string): Promise<boolean> {
+  private async getPlayerLevel(userId: string): Promise<number> {
     try {
       const rows = (await this.dataSource.query(
         `SELECT current_level FROM player_levels WHERE user_id = $1 LIMIT 1`,
         [userId],
       )) as { current_level: number | string }[];
       const raw = rows?.[0]?.current_level;
-      if (raw === undefined || raw === null) return true;
-      return Number(raw) <= ROOKIE_MAX_LEVEL;
+      if (raw === undefined || raw === null) return 1;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 1 ? n : 1;
     } catch (err) {
       this.logger.warn(
-        `isRookiePlayer probe failed user=${userId}: ${(err as Error)?.message ?? err}`,
+        `getPlayerLevel probe failed user=${userId}: ${(err as Error)?.message ?? err}`,
       );
-      return true;
+      return 1;
     }
   }
 
@@ -553,15 +570,15 @@ export class BattlesStubController {
     // commander progression actually pay off in the primary battle. The three
     // reads are independent → fetch in parallel to keep the synchronous battle
     // create path snappy. commanderMult degrades to 1.0 on any read failure.
-    const [fleetPower, isRookie, commanderMult] = await Promise.all([
+    const [fleetPower, playerLevel, commanderMult] = await Promise.all([
       this.computeAttackerPower(userId),
-      this.isRookiePlayer(userId),
+      this.getPlayerLevel(userId),
       this.getCommanderPowerMultiplier(userId),
     ]);
     const rawAttacker = fleetPower > 0 ? fleetPower : RACE_NEUTRAL_BASE;
     const attackerPower = Math.round(rawAttacker * commanderMult);
     const defenderPower =
-      fleetPower > 0 ? this.deriveDefenderPower(fleetPower, isRookie) : RACE_NEUTRAL_BASE;
+      fleetPower > 0 ? this.deriveDefenderPower(fleetPower, playerLevel) : RACE_NEUTRAL_BASE;
 
     const battle = newBattle(
       body?.attackerRace ?? 'insan',

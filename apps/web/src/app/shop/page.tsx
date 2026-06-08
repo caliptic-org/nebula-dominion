@@ -33,7 +33,7 @@ import { useGates, gateAllows } from '@/lib/gates';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 type Tab = 'genel' | 'vip' | 'lonca' | 'etkinlik' | 'gecis';
-type Currency = 'gem' | 'gold';
+type Currency = 'gem' | 'gold' | 'void';
 type Tag = 'new' | 'best' | 'limited' | 'hot';
 
 interface ShopProduct {
@@ -43,6 +43,9 @@ interface ShopProduct {
   category: Tab;
   gemPrice?: number;
   goldPrice?: number;
+  /** ECON #4 — void_crystals sink. Items priced in void are void-ONLY (no
+   *  gem/gold price) so they surface only under the 🕳 Boşluk currency toggle. */
+  voidPrice?: number;
   originalGemPrice?: number;
   originalGoldPrice?: number;
   discount?: number;
@@ -80,6 +83,11 @@ const PRODUCTS: ShopProduct[] = [
   { id: 'speed-boost', name: 'Hız Katalizörü',  description: 'Tüm üretimler 1 saat anında',  category: 'genel', gemPrice: 50,  goldPrice: 400,                                            bundleContents: ['1 Saat Anında Üretim'] },
   // Race exclusive
   { id: 'race-bundle', name: 'Irk Paketi',      description: 'Aktif ırka özel güç paketi',    category: 'genel', gemPrice: 500, originalGemPrice: 750, discount: 33, tag: 'limited', stock: 50, raceTinted: true, bundleContents: ['Özel komutan çerçevesi', '5× Hızlandırıcı', '2× Kalkan', '500 Mineral', '300 Gas'] },
+  // ── Boşluk Kristali sinks (ECON #4) — void_crystals from battle-pass +
+  //    subspace finally has somewhere to go. Cosmetic / soft-convenience only. ──
+  { id: 'void-skin-singularity', name: 'Tekillik Skini',    description: 'Efsanevi komutan görünümü',     category: 'genel', voidPrice: 1200, tag: 'best',    bundleContents: ['Tekillik Komutan Skini'] },
+  { id: 'void-frame-eclipse',    name: 'Tutulma Çerçevesi', description: 'Boşluk temalı profil çerçevesi', category: 'genel', voidPrice: 500,                  bundleContents: ['Tutulma Çerçevesi', 'Yarık Efekti'] },
+  { id: 'void-xp-surge',         name: 'Boşluk XP Dalgası', description: '2× XP kazanımı 24 saat',         category: 'genel', voidPrice: 600,  tag: 'hot',     bundleContents: ['2× XP × 24 saat'] },
   // VIP plans (rendered via VIP section)
   // Lonca
   { id: 'lonca-kaynak',     name: 'Lonca Kaynağı',         description: 'Lonca ambarı için kaynak',            category: 'lonca', gemPrice: 300, goldPrice: 2400, bundleContents: ['5.000 Lonca Minerali', '2.500 Lonca Gazı'] },
@@ -147,7 +155,7 @@ const TAG_COLOR: Record<Tag, string> = {
  * VIP comes from useVipStatus inside the component. The shop renders
  * 0-stats during the brief flash before hooks resolve so the player
  * never sees a fake 1250-gem wallet they don't actually own. */
-const GUEST_CURRENCY = { gem: 0, gold: 0 };
+const GUEST_CURRENCY = { gem: 0, gold: 0, void: 0 };
 const GUEST_VIP_LEVEL = 0;
 const GUEST_VIP_XP = 0;
 
@@ -212,7 +220,7 @@ function ShopPageInner() {
   // legacy mock values.
   const { data: liveWallet } = useUserWallet();
   const playerCurrency = liveWallet
-    ? { gem: liveWallet.premium_gems, gold: liveWallet.nebula_coins }
+    ? { gem: liveWallet.premium_gems, gold: liveWallet.nebula_coins, void: liveWallet.void_crystals }
     : GUEST_CURRENCY;
   // Live VIP — uses real GET /api/vip/status. Falls back to "VIP 0 / 0 XP"
   // when the player isn't a VIP yet so the section honestly shows "not
@@ -241,8 +249,14 @@ function ShopPageInner() {
   const visible = useMemo(() => {
     if (tab === 'vip') return [] as ShopProduct[];
     if (tab === 'gecis') return [] as ShopProduct[];
-    return PRODUCTS.filter(p => p.category === tab);
-  }, [tab]);
+    // void_crystals items are void-only; partition them from the gem/gold
+    // catalogue so neither view shows a card with no price in the active
+    // currency (which would render "—").
+    return PRODUCTS.filter(p =>
+      p.category === tab &&
+      (currency === 'void' ? p.voidPrice !== undefined : p.voidPrice === undefined),
+    );
+  }, [tab, currency]);
 
   if (!ready) return null;
 
@@ -267,6 +281,7 @@ function ShopPageInner() {
         <div style={{ display: 'flex', gap: 6 }}>
           <ResPill kind="crystal" value={playerCurrency.gem.toLocaleString()} accent={race.primary} />
           <ResPill kind="cred" value={playerCurrency.gold.toLocaleString()} accent={ND.warn} />
+          <ResPill kind="dark" value={playerCurrency.void.toLocaleString()} accent="#c04aff" />
         </div>
       </header>
 
@@ -320,7 +335,7 @@ function ShopPageInner() {
       {/* Currency switch — only meaningful for non-VIP tabs */}
       {tab !== 'vip' && tab !== 'gecis' && (
         <div style={{ display: 'flex', gap: 6, padding: '12px 16px 0' }}>
-          {(['gem', 'gold'] as Currency[]).map(c => (
+          {(['gem', 'gold', 'void'] as Currency[]).map(c => (
             <button
               key={c}
               type="button"
@@ -328,7 +343,7 @@ function ShopPageInner() {
               style={pillStyle(currency === c, race)}
               aria-pressed={currency === c}
             >
-              {c === 'gem' ? '💎 Kristal' : '🪙 Altın'}
+              {c === 'gem' ? '💎 Kristal' : c === 'gold' ? '🪙 Altın' : '🕳 Boşluk'}
             </button>
           ))}
         </div>
@@ -417,10 +432,14 @@ function pillStyle(on: boolean, race: NDRace): React.CSSProperties {
 
 function ProductCard({ product, race, currency }: { product: ShopProduct; race: NDRace; currency: Currency }) {
   const tCommon = useTranslations('common');
+  const useVoid = currency === 'void' && product.voidPrice !== undefined;
   const useGem = currency === 'gem' && product.gemPrice !== undefined;
-  const price = useGem ? product.gemPrice : product.goldPrice;
-  const originalPrice = useGem ? product.originalGemPrice : product.originalGoldPrice;
-  const unitIcon = useGem ? '💎' : '🪙';
+  // currencyType the POST /shop/purchase contract expects. Void items are
+  // void-only, so when this card is void-priced we always debit void_crystals.
+  const currencyType = useVoid ? 'void_crystals' : useGem ? 'premium_gems' : 'nebula_coins';
+  const price = useVoid ? product.voidPrice : useGem ? product.gemPrice : product.goldPrice;
+  const originalPrice = useVoid ? undefined : useGem ? product.originalGemPrice : product.originalGoldPrice;
+  const unitIcon = useVoid ? '🕳' : useGem ? '💎' : '🪙';
   return (
     <Panel
       race={race}
@@ -473,6 +492,10 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
               toast.error(tCommon('loginRequired'));
               return;
             }
+            if (price === undefined) {
+              toast.error('Bu ürün bu para birimiyle alınamaz');
+              return;
+            }
             try {
               // POST /api/v1/shop/purchase exists; we send the product id
               // and the chosen currency. Backend validates balance + fires
@@ -492,7 +515,7 @@ function ProductCard({ product, race, currency }: { product: ShopProduct; race: 
               // matches the controller contract.
               await api.post('/shop/purchase', {
                 sku: product.id,
-                currencyType: useGem ? 'premium_gems' : 'nebula_coins',
+                currencyType,
               });
               toast.success(`${product.name} alındı`);
               // Wallet just changed — pop both HUDs without waiting for poll.

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -69,6 +70,19 @@ export class UnitsController {
   @Get('configs/:race')
   getConfigsForRace(@Param('race') race: Race) {
     return this.units.getRaceUnitConfigs(race);
+  }
+
+  /**
+   * DELETE /api/units/:id — disband (permanently dismiss) one unit.
+   * The supply-release valve for the population cap (ECON #6): frees the
+   * unit's supply so a roster full of un-mergeable units can't lock a player
+   * out of training. Idempotency note: a second call 404s (unit already gone).
+   */
+  @Delete(':id')
+  @UseGuards(HttpJwtGuard)
+  @HttpCode(HttpStatus.OK)
+  async disbandUnit(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.units.disbandUnit(userId, id);
   }
 
   /**

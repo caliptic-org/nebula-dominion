@@ -16,6 +16,7 @@ import {
   computeMergeCost,
   getUnitConfigsByRace,
   applyRaceBonuses,
+  unitSupplyCost,
 } from './constants/race-configs.constants';
 import { Race } from '../matchmaking/dto/join-queue.dto';
 import { BuildingType, BuildingStatus } from '../buildings/entities/building.entity';
@@ -200,6 +201,30 @@ export class UnitsService {
       );
     }
 
+    // ── Population (supply) cap guard (ECON #6) ─────────────────────
+    // population was a dead readout: trainUnit deducted M/G/E but never a
+    // supply cost, so army size was unbounded and the "Nüfus" bar meant
+    // nothing. Each unit now costs supply = unitSupplyCost(config); the
+    // standing roster + in-flight queue + this batch must fit under
+    // populationCap. Computed FRESH from the roster every call (combat
+    // deaths aren't persisted, so the alive roster IS the standing army) —
+    // never a stored counter, so it can't drift into a false lockout.
+    // Done BEFORE resource deduction so a capped order doesn't burn
+    // minerals. Fail-open if cap is unset/0 (never brick training on a
+    // misconfigured cap).
+    const capSnap = await this.resources.getSnapshot(playerId);
+    const popCap = Number(capSnap.populationCap ?? 0);
+    if (popCap > 0) {
+      const popUsed = await this.computePopulationUsed(playerId);
+      const batchSupply = unitSupplyCost(config) * count;
+      if (popUsed + batchSupply > popCap) {
+        throw new BadRequestException(
+          `Nüfus kapasitesi yetersiz: ${popUsed} + ${batchSupply} > ${popCap}. ` +
+            `Birimleri birleştirerek (Promosyon Töreni) yer açın.`,
+        );
+      }
+    }
+
     // ── Commander bonus ─────────────────────────────────────────────
     // trainCostMultiplier: negative = discount (Azurath: -0.20 → -20%).
     // trainSpeedMultiplier: negative = faster (Reyes: -0.18 → -18% time).
@@ -257,11 +282,96 @@ export class UnitsService {
     });
 
     await this.queueRepo.save(entry);
+    // Reserve the supply immediately so the HUD "Nüfus" bar reflects the
+    // in-flight order (display only — enforcement recomputed fresh above).
+    await this.syncPopulation(playerId);
     this.logger.log(
       `Player ${playerId} queued training of ${dto.unitType} in building ${dto.buildingId}. Completes at: ${completesAt.toISOString()}`,
     );
 
     return entry;
+  }
+
+  /**
+   * Derived population (supply) used — ECON #6. Sums unitSupplyCost across the
+   * player's standing roster (alive units) plus in-flight training-queue
+   * orders. This is the single source of truth for both the trainUnit cap
+   * check and the displayed value; nothing is cached in a running counter, so
+   * it cannot drift (combat deaths aren't persisted, merges hard-delete rows —
+   * the roster always reflects reality).
+   */
+  private async computePopulationUsed(playerId: string): Promise<number> {
+    const aliveRows = (await this.unitRepo
+      .createQueryBuilder('u')
+      .select('u.type', 'type')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('u.playerId = :playerId', { playerId })
+      .andWhere('u.isAlive = true')
+      .groupBy('u.type')
+      .getRawMany()) as Array<{ type: UnitType; cnt: string }>;
+
+    const queuedRows = (await this.queueRepo
+      .createQueryBuilder('q')
+      .select('q.unitType', 'type')
+      .addSelect('SUM(q.count)', 'cnt')
+      .where('q.playerId = :playerId', { playerId })
+      .andWhere('q.isComplete = false')
+      .groupBy('q.unitType')
+      .getRawMany()) as Array<{ type: UnitType; cnt: string }>;
+
+    let used = 0;
+    for (const row of [...aliveRows, ...queuedRows]) {
+      const cfg = UNIT_CONFIGS[row.type];
+      if (!cfg) continue;
+      used += unitSupplyCost(cfg) * Number(row.cnt ?? 0);
+    }
+    return used;
+  }
+
+  /**
+   * Recompute derived supply and persist it to player_resources.population so
+   * the HUD reads an honest value. Best-effort: a failure here must never
+   * break training/merge (the cap check doesn't rely on the stored column).
+   */
+  private async syncPopulation(playerId: string): Promise<void> {
+    try {
+      const used = await this.computePopulationUsed(playerId);
+      await this.resources.setPopulation(playerId, used);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`population sync skipped for ${playerId}: ${msg}`);
+    }
+  }
+
+  /**
+   * Disband (permanently dismiss) one unit — ECON #6 supply-release valve.
+   *
+   * REQUIRED for the population cap to be safe: combat deaths aren't persisted
+   * and several TRAINABLE units (siege_tank, ghost, medic, queen, ultralisk)
+   * have no merge recipe, so without this a roster full of them at the cap
+   * would be a permanent training lockout. Disband hard-deletes the row (same
+   * convention as mergeRoster) and re-syncs population so the freed supply is
+   * immediately available + reflected on the HUD. Guarantees every unit type
+   * has an escape hatch.
+   */
+  async disbandUnit(
+    playerId: string,
+    unitId: string,
+  ): Promise<{ disbanded: string; freedSupply: number }> {
+    const unit = await this.unitRepo.findOne({
+      where: { id: unitId, playerId, isAlive: true },
+    });
+    if (!unit) {
+      throw new NotFoundException('Birim bulunamadı veya size ait değil');
+    }
+    const cfg = UNIT_CONFIGS[unit.type];
+    const freedSupply = cfg ? unitSupplyCost(cfg) : 0;
+    await this.unitRepo.remove(unit);
+    await this.syncPopulation(playerId);
+    this.logger.log(
+      `Player ${playerId} disbanded unit ${unitId} (${unit.type}) — freed ${freedSupply} supply`,
+    );
+    return { disbanded: unitId, freedSupply };
   }
 
   /** List pending (non-completed) training queue entries for a player */
@@ -369,6 +479,14 @@ export class UnitsService {
           const msg = err instanceof Error ? err.message : String(err);
           this.logger.warn(`awardXp(training) skipped for ${entry.playerId}: ${msg}`);
         });
+    }
+
+    // Minting moved units from in-flight queue → alive roster (net supply
+    // unchanged), but recompute each affected player's population so the HUD
+    // stays exact regardless of which path produced the rows.
+    const affected = [...new Set(overdue.map((e) => e.playerId))];
+    for (const pid of affected) {
+      await this.syncPopulation(pid);
     }
 
     return overdue.length;
@@ -705,6 +823,10 @@ export class UnitsService {
       );
       return result;
     });
+
+    // Merge hard-deleted 3 source rows and inserted 1 → supply freed.
+    // Recompute so the freed population shows up immediately.
+    await this.syncPopulation(playerId);
 
     // XP grant — merging is a meaningful progression action.  Reuse
     // XpSource.CONSTRUCTION (80 base XP) so the player sees the same

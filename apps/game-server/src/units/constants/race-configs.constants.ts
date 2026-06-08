@@ -323,6 +323,20 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
   },
 };
 
+/**
+ * Supply (population) cost of one unit — ECON #6 population cap.
+ *
+ * Derived from build cost (mineral + gas) rather than a hand-tuned per-unit
+ * field so it can't drift out of sync with rebalances: a 50-mineral Marine
+ * costs 1 supply, a 250-cost Siege Tank costs 5. max(1, …) so even a free/
+ * cheap swarm unit occupies at least one population slot. UnitsService sums
+ * this across the standing roster + in-flight queue to enforce populationCap.
+ */
+export function unitSupplyCost(cfg: UnitConfig): number {
+  const buildCost = (cfg.cost.mineral ?? 0) + (cfg.cost.gas ?? 0);
+  return Math.max(1, Math.ceil(buildCost / 50));
+}
+
 /** Returns UNIT_CONFIGS for a given race only */
 export function getUnitConfigsByRace(race: Race): UnitConfig[] {
   // Exclude merge-only units (trainable=false) so /base/production doesn't

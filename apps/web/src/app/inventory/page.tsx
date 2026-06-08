@@ -312,6 +312,7 @@ export default function RosterPage() {
         {/* Unit detail drawer */}
         {selectedUnit && (
           <UnitDetailDrawer
+            key={selectedUnit.id}
             race={race}
             unit={selectedUnit}
             liveUnits={liveUnits}
@@ -498,6 +499,10 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
   const tInventory = useTranslations('inventory');
   const cost = upgradeCost(unit);
   const [upgrading, setUpgrading] = useState(false);
+  const [disbanding, setDisbanding] = useState(false);
+  // Two-tap confirm — disband permanently removes the unit, so the first tap
+  // arms the action and the second commits it.
+  const [confirmDisband, setConfirmDisband] = useState(false);
 
   const stateColor =
     unit.state === 'ready'   ? race.primary :
@@ -525,6 +530,28 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
       toast.error(err instanceof FetchError ? err.message : 'Yükseltme başarısız');
     } finally {
       setUpgrading(false);
+    }
+  }
+
+  // Disband one unit of this type — frees its population (supply) slot so a
+  // roster full of un-mergeable units can't lock the player out of training
+  // (ECON #6 cap valve). Acts on one live row, like Yükselt.
+  async function handleDisband() {
+    if (disbanding) return;
+    if (!liveTarget) { toast.error(tInventory('trainFirst')); return; }
+    if (!confirmDisband) { setConfirmDisband(true); return; }
+    setDisbanding(true);
+    try {
+      const res = await gameServerApi.delete<{ freedSupply?: number }>(`/units/${liveTarget.id}`);
+      const freed = res?.freedSupply ?? 0;
+      toast.success(`${unit.name} dağıtıldı — ${freed} nüfus boşaldı`);
+      onUpgraded();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof FetchError ? err.message : 'Dağıtma başarısız');
+    } finally {
+      setDisbanding(false);
+      setConfirmDisband(false);
     }
   }
 
@@ -637,6 +664,35 @@ function UnitDetailDrawer({ race, unit, liveUnits, onUpgraded, onClose }: UnitDe
           </Link>
         )}
       </div>
+      {/* Disband — frees a population slot (ECON #6 cap valve). Only for a
+          real roster unit; two-tap confirm because it's permanent. */}
+      {liveTarget && (
+        <button
+          type="button"
+          onClick={handleDisband}
+          disabled={disbanding}
+          style={{
+            all: 'unset',
+            cursor: disbanding ? 'default' : 'pointer',
+            textAlign: 'center',
+            fontFamily: ND.mono,
+            fontSize: 10,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: confirmDisband ? ND.warn : ND.textDim,
+            border: `1px solid ${confirmDisband ? ND.warn : ND.border}`,
+            borderRadius: 3,
+            padding: '6px 0',
+            opacity: disbanding ? 0.6 : 1,
+          }}
+        >
+          {disbanding
+            ? 'Dağıtılıyor…'
+            : confirmDisband
+              ? 'Onayla — kalıcı olarak dağıt'
+              : 'Birimi Dağıt (nüfus boşalt)'}
+        </button>
+      )}
       {!liveTarget && (
         <div style={{
           fontSize: 10,

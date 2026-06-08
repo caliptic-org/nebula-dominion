@@ -695,6 +695,26 @@ export class ResourcesService {
     await this.redis.del(RESOURCE_CACHE_KEY(playerId));
   }
 
+  /**
+   * Overwrite the stored `population` (supply-used) value for display.
+   *
+   * ECON #6 population cap: population is "slot-based, not time-accumulated"
+   * (see the offline/tick handling above) — it represents supply consumed by
+   * the standing army, NOT a produced resource. UnitsService owns the roster,
+   * so it computes the derived used-supply and calls this to keep the column
+   * (which the HUD "Nüfus" bar reads) honest. The enforcement check in
+   * trainUnit recomputes fresh from the roster, so this column is display-only
+   * and a stale write can never cause a false training lockout.
+   */
+  async setPopulation(playerId: string, value: number): Promise<void> {
+    const safe = Math.max(0, Math.floor(Number(value) || 0));
+    await this.dataSource.query(
+      `UPDATE player_resources SET population = $2 WHERE player_id = $1`,
+      [playerId, safe],
+    );
+    await this.invalidateCache(playerId);
+  }
+
   private toSnapshot(resource: Resource): ResourceSnapshot {
     return {
       mineral:          Math.floor(Number(resource.mineral)),

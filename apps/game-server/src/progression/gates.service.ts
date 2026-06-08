@@ -179,11 +179,12 @@ export class GatesService {
          GROUP BY type`,
         [userId],
       ),
-      this.ds.query<{ mineral: number; gas: number; energy: number }[]>(
+      this.ds.query<{ mineral: number; gas: number; energy: number; science: number }[]>(
         // Schema realities: player_resources keys off `player_id` (not user_id)
-        // and stores `mineral` singular, no science column. Science currency
-        // lives in a separate flow that gates here don't read yet.
-        `SELECT mineral, gas, energy
+        // and stores `mineral` singular. `science` IS a real column (cycle-27
+        // audit SCIENCE-NOT-LOADED-GATES — it was previously hardcoded to 0
+        // here, so any science-typed gate evaluated as permanently unsatisfied).
+        `SELECT mineral, gas, energy, science
          FROM player_resources
          WHERE player_id = $1
          LIMIT 1`,
@@ -194,7 +195,7 @@ export class GatesService {
     const lvl = levelRows[0];
     const buildings = new Map<string, number>();
     for (const r of buildingRows) buildings.set(r.type, r.level);
-    const res = resRows[0] ?? { mineral: 0, gas: 0, energy: 0 };
+    const res = resRows[0] ?? { mineral: 0, gas: 0, energy: 0, science: 0 };
 
     return {
       level: lvl?.current_level ?? 1,
@@ -205,7 +206,7 @@ export class GatesService {
         minerals: Number(res.mineral),     // gates.config.ts uses plural; schema uses singular
         gas:      Number(res.gas),
         energy:   Number(res.energy),
-        science:  0,                       // not yet sourced — TODO when a gate actually checks it
+        science:  Number(res.science),     // cycle-27: now sourced so science gates resolve
       },
       units: new Map(),   // not yet sourced; covered later when unit-gated buttons matter
     };

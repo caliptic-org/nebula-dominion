@@ -531,9 +531,23 @@ export class BattlesStubController {
     // Cycle-17 BAL-2: read the caller's REAL fleet power so training /
     // upgrades / merges move the win odds. Empty/failed fleet read → 0,
     // which falls back to the race-neutral base (pure-jitter 50/50).
-    const fleetPower = await this.computeAttackerPower(userId);
-    const isRookie = await this.isRookiePlayer(userId);
-    const attackerPower = fleetPower > 0 ? fleetPower : RACE_NEUTRAL_BASE;
+    //
+    // cycle-26 COMBAT-QUICKBATTLE-POWER-FIX: ALSO read the active commander's
+    // combat power multiplier and apply it to the ATTACKER only. The defender
+    // stays derived from RAW fleet power, so a better/higher-level commander
+    // genuinely raises win odds (it doesn't if both sides scale together).
+    // This brings the FE /battle surface to parity with the Socket.io path
+    // (which already applies commander bonuses) and makes the age-gated
+    // commander progression actually pay off in the primary battle. The three
+    // reads are independent → fetch in parallel to keep the synchronous battle
+    // create path snappy. commanderMult degrades to 1.0 on any read failure.
+    const [fleetPower, isRookie, commanderMult] = await Promise.all([
+      this.computeAttackerPower(userId),
+      this.isRookiePlayer(userId),
+      this.getCommanderPowerMultiplier(userId),
+    ]);
+    const rawAttacker = fleetPower > 0 ? fleetPower : RACE_NEUTRAL_BASE;
+    const attackerPower = Math.round(rawAttacker * commanderMult);
     const defenderPower =
       fleetPower > 0 ? this.deriveDefenderPower(fleetPower, isRookie) : RACE_NEUTRAL_BASE;
 
@@ -804,6 +818,47 @@ export class BattlesStubController {
    * is no per-battle idempotency flag — a missed +100 is cosmetic, not an
    * economy leak, and self-heals on the next won battle.
    */
+  /**
+   * cycle-26 COMBAT-QUICKBATTLE-POWER-FIX — read the player's active commander
+   * combat power multiplier from game-server (single source of truth:
+   * CommandersService.getActivePowerMultiplier). Mirrors the creditCommanderXp
+   * fan-out (same base URL + X-Internal-Service secret). Best-effort: any
+   * failure (no secret / timeout / non-2xx / bad body) returns 1.0 so the
+   * battle still resolves on raw fleet power. Read-only GET — no side effects.
+   */
+  private async getCommanderPowerMultiplier(userId: string): Promise<number> {
+    const baseUrl = (
+      process.env.GAME_SERVER_URL || 'http://localhost:5000'
+    ).replace(/\/+$/, '');
+    const serviceSecret =
+      process.env.INTERNAL_SERVICE_SECRET || process.env.JWT_SECRET;
+    if (!serviceSecret) return 1;
+
+    const url = `${baseUrl}/api/commanders/internal/active-power-multiplier?userId=${encodeURIComponent(userId)}`;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 3000);
+    try {
+      const res = await fetch(url, {
+        headers: { 'X-Internal-Service': `Bearer ${serviceSecret}` },
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        this.logger.warn(`commander-power-multiplier non-2xx ${res.status} — using 1.0`);
+        return 1;
+      }
+      const body = (await res.json().catch(() => null)) as { multiplier?: number } | null;
+      const m = Number(body?.multiplier);
+      return Number.isFinite(m) && m > 0 ? m : 1;
+    } catch (err) {
+      this.logger.warn(
+        `commander-power-multiplier fetch failed: ${err instanceof Error ? err.message : String(err)} — using 1.0`,
+      );
+      return 1;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   private async creditCommanderXp(userId: string, amount: number): Promise<void> {
     const baseUrl = (
       process.env.GAME_SERVER_URL || 'http://localhost:5000'

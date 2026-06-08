@@ -203,6 +203,27 @@ export class CommandersService {
   }
 
   /**
+   * cycle 26 COMBAT-QUICKBATTLE-POWER-FIX — the active commander's combat
+   * POWER multiplier, for the api quick-battle (battles-stub) to scale the
+   * attacker's effective fleet power. The Socket.io battle already applies
+   * commander damage/hp/defense; the FE quick-battle ignored the commander
+   * entirely, so commander choice/level did nothing on the primary battle
+   * surface. Sum of the LEVEL-SCALED combat bonuses (damage + hp + defense)
+   * → a power multiplier; 1.0 when no commander is active. Floored at 0.5 so
+   * a freak net-negative (glass-cannon def penalty) can't zero out a fleet.
+   * Single source of truth (reuses getActiveBonus) — the api reads this via
+   * the InternalServiceGuard-gated endpoint rather than duplicating the table.
+   */
+  async getActivePowerMultiplier(userId: string): Promise<number> {
+    const bonus = await this.getActiveBonus(userId);
+    const combat =
+      (bonus.damageMultiplier ?? 0) +
+      (bonus.hpMultiplier ?? 0) +
+      (bonus.defenseMultiplier ?? 0);
+    return Math.max(0.5, 1 + combat);
+  }
+
+  /**
    * Award XP to the active commander and bump level if the threshold is
    * crossed. Loops through level-ups so a single big grant (boss kill,
    * mission reward) can pop multiple levels in one call.

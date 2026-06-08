@@ -76,3 +76,35 @@ describe('CommandersService — age-gated unlock', () => {
     });
   });
 });
+
+describe('CommandersService — getActivePowerMultiplier (COMBAT-QUICKBATTLE-POWER-FIX)', () => {
+  function buildWithActive(active: { commanderId: string; level: number } | null) {
+    const playerCommanderRepo = { findOne: jest.fn().mockResolvedValue(active) };
+    return new CommandersService(playerCommanderRepo as any, { query: jest.fn() } as any);
+  }
+
+  it('returns 1.0 when no commander is active', async () => {
+    expect(await buildWithActive(null).getActivePowerMultiplier('u1')).toBe(1);
+  });
+
+  it('sums level-scaled combat bonuses (voss L1: +12 dmg +10 hp +8 def → 1.30)', async () => {
+    const m = await buildWithActive({ commanderId: 'voss', level: 1 }).getActivePowerMultiplier('u1');
+    expect(m).toBeCloseTo(1.3, 5);
+  });
+
+  it('a net-positive glass cannon still boosts (kovacs L1: +15 dmg -10 def → 1.05)', async () => {
+    const m = await buildWithActive({ commanderId: 'kovacs', level: 1 }).getActivePowerMultiplier('u1');
+    expect(m).toBeCloseTo(1.05, 5);
+  });
+
+  it('scales up with commander level (voss L10 > voss L1)', async () => {
+    const l1 = await buildWithActive({ commanderId: 'voss', level: 1 }).getActivePowerMultiplier('u1');
+    const l10 = await buildWithActive({ commanderId: 'voss', level: 10 }).getActivePowerMultiplier('u1');
+    expect(l10).toBeGreaterThan(l1);
+  });
+
+  it('a pure-economy commander (no combat bonus) is neutral 1.0 (chen)', async () => {
+    const m = await buildWithActive({ commanderId: 'chen', level: 5 }).getActivePowerMultiplier('u1');
+    expect(m).toBe(1);
+  });
+});

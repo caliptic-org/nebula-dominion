@@ -182,4 +182,27 @@ export class CommandersController {
       xp: result.xp,
     };
   }
+
+  /**
+   * GET /api/commanders/internal/active-power-multiplier?userId=...
+   *
+   * cycle 26 COMBAT-QUICKBATTLE-POWER-FIX — server-to-server read for the
+   * api quick-battle (battles-stub) to scale attacker fleet power by the
+   * player's active commander combat bonus, so commander choice/level
+   * affects PvE win odds on the FE `/battle` surface (the Socket.io path
+   * already applies the bonus). InternalServiceGuard-gated; never reachable
+   * by a player JWT. Returns 1.0 when the player has no active commander.
+   */
+  @Get('internal/active-power-multiplier')
+  @UseGuards(InternalServiceGuard)
+  async activePowerMultiplierInternal(
+    @Query('userId') userId?: string,
+  ): Promise<{ userId: string; multiplier: number }> {
+    const id = typeof userId === 'string' ? userId.trim() : '';
+    if (!id) {
+      throw new BadRequestException('userId required');
+    }
+    const multiplier = await this.service.getActivePowerMultiplier(id);
+    return { userId: id, multiplier };
+  }
 }

@@ -337,16 +337,21 @@ function newBattle(
   // Re-seed the roll so it doesn't perfectly correlate with the outcome.
   const roll = rand(seed ^ 0xdeadbeef);
 
+  // xp matches the canonical grant (XpSource.PVE_WIN=150 / PVE_LOSS=30 in the
+  // game-server level-config) so the result screen's "+XP" reflects what
+  // grant-battle-reward actually awards rather than overstating it ~2x
+  // (cycle-28 follow-up). gold/gems are display-legacy fields that are NOT
+  // credited (PvE must not mint premium gems); the FE no longer shows them.
   const rewards = won
     ? {
         gold:    1500 + Math.floor(roll * 1000),
         gems:    50,
-        xp:      320,
+        xp:      150,
         mineral: 400 + Math.floor(roll * 600),
         gas:     120 + Math.floor(roll * 200),
         science: 15  + Math.floor(roll * 20),
       }
-    : { gold: 250, gems: 0, xp: 80, mineral: 60, gas: 20, science: 3 };
+    : { gold: 250, gems: 0, xp: 30, mineral: 60, gas: 20, science: 3 };
 
   const log = [
     { turn: 0, text: 'Filolar konuşlandı. İlk dalga geliyor.' },
@@ -382,7 +387,7 @@ function advance(state: BattleState): BattleState {
       state.rewards = {
         gold: 1500 + Math.floor(roll * 1000),
         gems: 50,
-        xp: 320,
+        xp: 150, // canonical PVE_WIN base (see newBattle note)
         mineral: 400 + Math.floor(roll * 600),
         gas: 120 + Math.floor(roll * 200),
         science: 15 + Math.floor(roll * 20),
@@ -390,7 +395,7 @@ function advance(state: BattleState): BattleState {
       state.log.push({ turn: state.turnsElapsed, text: 'Düşman filosu yok edildi. Zafer.' });
     } else {
       state.status = 'lost';
-      state.rewards = { gold: 250, gems: 0, xp: 80, mineral: 60, gas: 20, science: 3 };
+      state.rewards = { gold: 250, gems: 0, xp: 30, mineral: 60, gas: 20, science: 3 };
       state.log.push({ turn: state.turnsElapsed, text: 'Filomuz geri çekildi. Yenilgi kabul edildi.' });
     }
   } else {

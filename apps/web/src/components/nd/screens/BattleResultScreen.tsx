@@ -272,7 +272,12 @@ export function BattleResultScreen({ data, forcedRace }: Props) {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <ResPill kind={race.resourceA.icon} value={`+${fmt(data.rewards.resourceA)}`} accent={race.primary} />
             <ResPill kind={race.resourceB.icon} value={`+${fmt(data.rewards.resourceB)}`} accent={race.primary} />
-            <ResPill kind="crystal" value={`+${data.rewards.crystal}`} accent="oklch(0.82 0.16 80)" />
+            {/* Crystal pill only when actually awarded — real PvE battles grant
+                no gems/crystals, so the value is 0 and this stays hidden (it used
+                to display phantom gems that were never credited). */}
+            {data.rewards.crystal > 0 && (
+              <ResPill kind="crystal" value={`+${data.rewards.crystal}`} accent="oklch(0.82 0.16 80)" />
+            )}
             {data.rewards.science != null && data.rewards.science > 0 && (
               /* Science pill — uses the inline ◈ glyph since ResPill doesn't ship a
                * science icon kind.  Rendered identical to the others so the row

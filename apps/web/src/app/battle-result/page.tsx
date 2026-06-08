@@ -190,7 +190,10 @@ function Inner() {
         resourceA: stash.rewards.mineral ?? stash.rewards.gold,
         // gas → resourceB
         resourceB: stash.rewards.gas ?? mock.rewards.resourceB,
-        crystal: stash.rewards.gems,
+        // PvE grants no gems/crystals (premium currency — granting it from
+        // battles would be inflationary), so don't show a phantom crystal
+        // reward. The pill hides itself when 0 (cycle-28 follow-up).
+        crystal: 0,
         // science → research wallet currency (◈), shown beside the resource pills
         science: stash.rewards.science ?? 0,
         xpGained: stash.rewards.xp,

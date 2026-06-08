@@ -342,3 +342,23 @@ describe('RoomService — state hash consistency', () => {
     expect(h1).not.toBe(h2);
   });
 });
+
+describe('RoomService — buildBotMirror difficulty scaling (SOCKET_BOT_DEFENSE_UNSCALED)', () => {
+  it('scales defense by the SAME difficulty factor as hp and attack', () => {
+    const { svc } = buildRoomService();
+    const unit = makeUnit('u1'); // hp 30, attack 8, defense 5
+    const [bot] = svc.buildBotMirror([unit], Race.ZERG, 0.5);
+    expect(bot.maxHp).toBe(15); // round(30 * 0.5)
+    expect(bot.attack).toBe(4); // round(8 * 0.5)
+    // Previously copied 1:1 (5); now scaled like the rest → round(2.5) = 3.
+    expect(bot.defense).toBe(3);
+  });
+
+  it('mirrors defense at full strength only at difficulty 1.0', () => {
+    const { svc } = buildRoomService();
+    const [bot] = svc.buildBotMirror([makeUnit('u1')], Race.ZERG, 1.0);
+    expect(bot.defense).toBe(5);
+    expect(bot.maxHp).toBe(30);
+    expect(bot.attack).toBe(8);
+  });
+});

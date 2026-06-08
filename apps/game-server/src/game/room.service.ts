@@ -382,7 +382,12 @@ export class RoomService implements OnModuleDestroy, OnModuleInit {
         hp: full,
         maxHp: full,
         attack: Math.max(1, Math.round(Number(u.attack) * f)),
-        defense: Math.max(0, Math.round(Number(u.defense))),
+        // BAL — defense must scale by the same difficulty `f` as hp/attack so
+        // the bot is a UNIFORM 0.9× mirror. Leaving it at 1.0× let a player's
+        // own commander defense bonus mirror onto the bot un-discounted,
+        // skewing PvE outcomes for high-defense commanders (cycle-27 audit
+        // SOCKET_BOT_DEFENSE_UNSCALED).
+        defense: Math.max(0, Math.round(Number(u.defense) * f)),
         speed: Math.max(0, Math.round(Number(u.speed))),
         position: { x: 0, y: i },
         actionUsed: false,

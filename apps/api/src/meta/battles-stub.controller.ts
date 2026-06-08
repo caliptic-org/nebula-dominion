@@ -972,7 +972,11 @@ export class BattlesStubController {
       gas:     state.rewards.gas     ?? 0,
       science: state.rewards.science ?? 0,
       xp:      state.rewards.xp      ?? 0,
-      source:  `battle:${state.id}`,
+      // Encode the outcome in the source so grant-battle-reward can map it to a
+      // real XpSource and actually award level XP (cycle-28 BATTLE_REWARD_XP —
+      // the xp field was previously dropped on the receiving end). The full tag
+      // doubles as the awardXp idempotency referenceId (unique per battle).
+      source:  `${state.status === 'won' ? 'pve_win' : 'pve_loss'}:${state.id}`,
     };
 
     const ac = new AbortController();

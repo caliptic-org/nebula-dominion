@@ -20,6 +20,8 @@ import { InternalServiceGuard } from '../auth/internal-service.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { BUILDING_CONFIGS } from './buildings.constants';
 import { BuildingType } from './entities/building.entity';
+import { ProgressionService } from '../progression/progression.service';
+import { XpSource } from '../progression/config/level-config';
 
 @Controller('buildings')
 export class BuildingsController {
@@ -50,6 +52,7 @@ export class BuildingsController {
   constructor(
     private readonly buildings: BuildingsService,
     private readonly resources: ResourcesService,
+    private readonly progression: ProgressionService,
   ) {}
 
   /** GET /api/buildings — list owned buildings for the authenticated player */
@@ -192,6 +195,35 @@ export class BuildingsController {
       throw new BadRequestException(
         'reward amount exceeds per-call ceiling — internal callers must split larger grants',
       );
+    }
+
+    // ── Level XP (cycle-28 BATTLE_REWARD_XP) ────────────────────────────
+    // The `xp` field used to be cap-checked then SILENTLY DROPPED, so the
+    // primary quick-battle (PvE) surface granted zero character progression.
+    // Award it through the canonical progression path: the source tag encodes
+    // the outcome (pve_win:/pve_loss:) → a real XpSource (amount + level
+    // scaling + daily caps live there), and the full tag is the awardXp
+    // referenceId so a battles-stub retry is idempotent (UNIQUE(user,source,
+    // ref) → 23505 no-ops). Best-effort + fire-and-forget like the commander-XP
+    // fan-out: a progression hiccup must not fail the resource grant, and the
+    // FE picks up the gain via the xp_gained / level_up socket events awardXp
+    // emits.
+    const src = typeof body.source === 'string' ? body.source : '';
+    const xpSource = src.startsWith('pve_win')
+      ? XpSource.PVE_WIN
+      : src.startsWith('pve_loss')
+        ? XpSource.PVE_LOSS
+        : null;
+    if (xpSource && typeof body.xp === 'number' && body.xp > 0) {
+      void this.progression
+        .awardXp({ userId, source: xpSource, referenceId: src })
+        .catch((err: unknown) =>
+          this.logger.warn(
+            `battle-reward awardXp skipped user=${userId} source=${src}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          ),
+        );
     }
 
     const grant: { mineral?: number; gas?: number; science?: number } = {};

@@ -299,7 +299,12 @@ export class CommandersService {
    * race=canavar".
    */
   async unlockAgeGatedCommanders(userId: string, newAge: number): Promise<void> {
-    if (newAge < 4) return; // tier 4 is the earliest age-gated tier
+    // cycle 25 PROG-TIER2-3-EARLY-UNLOCK — TIER 2/3 are now age-gated too
+    // (they used to ship startsUnlocked, letting a fresh L1 player run
+    // +22-30% bonuses and subvert age pacing). TIER 2 gates at age 2, so age
+    // 2 is now the earliest age-gated transition. Iterating the catalog means
+    // a catch-up jump unlocks every tier the player has earned.
+    if (newAge < 2) return; // tier 2 is the earliest age-gated tier
 
     const rows = await this.dataSource.query<Array<{ race: string | null }>>(
       `SELECT u.race FROM users u WHERE u.id = $1 LIMIT 1`,
@@ -333,6 +338,8 @@ export class CommandersService {
     }
 
     const candidates = getCommandersByRace(canonicalRace).filter((c) => {
+      if (c.tier === 'TIER 2' && newAge >= 2) return true;
+      if (c.tier === 'TIER 3' && newAge >= 3) return true;
       if (c.tier === 'TIER 4' && newAge >= 4) return true;
       if (c.tier === 'TIER 5' && newAge >= 5) return true;
       return false;

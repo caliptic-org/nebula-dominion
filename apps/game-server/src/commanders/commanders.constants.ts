@@ -95,28 +95,28 @@ const BASE_BONUSES: Record<string, CommanderBonus> = {
 export const COMMANDER_CATALOG: CommanderCatalogEntry[] = [
   // ── İnsan ──
   { id: 'voss',   name: 'Kmt. Aleksander Voss',  title: 'Genetik Savaşçı', race: 'insan', tier: 'BAŞ KOMUTAN', skill: '+12% hasar, +10% HP, +8% savunma', startsUnlocked: true,  portrait: '/assets/characters/insan/voss.png' },
-  { id: 'chen',   name: 'Dr. Elara Chen',         title: 'Baş Bilim Adamı', race: 'insan', tier: 'TIER 2',      skill: 'Bilim +22%',                  startsUnlocked: true,  portrait: '/assets/characters/insan/chen.png' },
-  { id: 'reyes',  name: 'General Marcus Reyes',   title: 'Askeri Komutan',  race: 'insan', tier: 'TIER 3',      skill: 'Eğitim hızı +18%',            startsUnlocked: true,  portrait: '/assets/characters/insan/reyes.png' },
+  { id: 'chen',   name: 'Dr. Elara Chen',         title: 'Baş Bilim Adamı', race: 'insan', tier: 'TIER 2',      skill: 'Bilim +22%',                  startsUnlocked: false, portrait: '/assets/characters/insan/chen.png' },
+  { id: 'reyes',  name: 'General Marcus Reyes',   title: 'Askeri Komutan',  race: 'insan', tier: 'TIER 3',      skill: 'Eğitim hızı +18%',            startsUnlocked: false, portrait: '/assets/characters/insan/reyes.png' },
   { id: 'kovacs', name: "Lily 'Phantom' Kovacs",  title: 'İstihbarat',      race: 'insan', tier: 'TIER 4',      skill: '+15% hasar, suikast +%',      startsUnlocked: false, portrait: '/assets/characters/insan/kovacs.png' },
   // ── Zerg ──
   { id: 'vex',     name: "Ana Kraliçe Vex'thara", title: 'Kovan Bilinci',   race: 'zerg',  tier: 'BAŞ KOMUTAN', skill: 'Tüm sürü +14% saldırı, +10% HP', startsUnlocked: true,  portrait: '/assets/characters/zerg/vex_thara.png' },
-  { id: 'threnix', name: 'Genom Üstadı Threnix',  title: 'Evrim Mühendisi', race: 'zerg',  tier: 'TIER 3',      skill: 'Mutasyon hızı +28%',          startsUnlocked: true,  portrait: '/assets/characters/zerg/threnix.png' },
+  { id: 'threnix', name: 'Genom Üstadı Threnix',  title: 'Evrim Mühendisi', race: 'zerg',  tier: 'TIER 3',      skill: 'Mutasyon hızı +28%',          startsUnlocked: false, portrait: '/assets/characters/zerg/threnix.png' },
   { id: 'morgath', name: "Beyin Kurt Mor'gath",   title: 'Taktik Savunma',  race: 'zerg',  tier: 'TIER 4',      skill: '+10% hasar, +16% savunma, +18% HP', startsUnlocked: false, portrait: '/assets/characters/zerg/morgath.png' },
   { id: 'kthala',  name: 'Brood-Anne Kthala',     title: 'Üretim Lordu',    race: 'zerg',  tier: 'TIER 5',      skill: 'Kaynak üretimi +25%',         startsUnlocked: false, portrait: '/assets/characters/zerg/kthala.png' },
   // ── Otomat ──
   { id: 'prime',    name: 'Demiurge Prime',         title: 'Merkez YZ',      race: 'otomat', tier: 'BAŞ KOMUTAN', skill: 'Tüm üretim +10%',            startsUnlocked: true,  portrait: '/assets/characters/otomat/demiurge_prime.png' },
-  { id: 'aurelius', name: 'Mimar Aurelius',         title: 'Yapı Lordu',     race: 'otomat', tier: 'TIER 2',      skill: 'İnşaa süresi -22%',          startsUnlocked: true,  portrait: '/assets/characters/otomat/aurelius.png' },
-  { id: 'crucible', name: 'Alg. Şövalye Crucible',  title: 'Savaş Komutanı', race: 'otomat', tier: 'TIER 3',      skill: 'Birim hasarı +16%',          startsUnlocked: true,  portrait: '/assets/characters/otomat/crucible.png' },
+  { id: 'aurelius', name: 'Mimar Aurelius',         title: 'Yapı Lordu',     race: 'otomat', tier: 'TIER 2',      skill: 'İnşaa süresi -22%',          startsUnlocked: false, portrait: '/assets/characters/otomat/aurelius.png' },
+  { id: 'crucible', name: 'Alg. Şövalye Crucible',  title: 'Savaş Komutanı', race: 'otomat', tier: 'TIER 3',      skill: 'Birim hasarı +16%',          startsUnlocked: false, portrait: '/assets/characters/otomat/crucible.png' },
   { id: 'lokhode',  name: 'Lo-Khode Veri-Mühendis', title: 'Sistem Yönetici', race: 'otomat', tier: 'TIER 4',     skill: '+30% bilim, -10% maliyet',   startsUnlocked: false, portrait: '/assets/characters/otomat/lo_khode.png' },
   // ── Canavar ──
   { id: 'khorvash', name: 'Alpha Khorvash',          title: 'Sürü Lideri',   race: 'canavar', tier: 'BAŞ KOMUTAN', skill: 'Yakın dövüş +18%',          startsUnlocked: true,  portrait: '/assets/characters/canavar/khorvash.png' },
-  { id: 'ulrek',    name: 'Şaman Ulrek',             title: 'Ata Çağrıcı',   race: 'canavar', tier: 'TIER 2',      skill: 'Kan Özü +24%',              startsUnlocked: true,  portrait: '/assets/characters/canavar/ulrek.png' },
-  { id: 'ravenna',  name: 'Avcı Kraliçe Ravenna',    title: 'Av Lordu',      race: 'canavar', tier: 'TIER 3',      skill: 'Av süresi -30%',            startsUnlocked: true,  portrait: '/assets/characters/canavar/ravenna.png' },
+  { id: 'ulrek',    name: 'Şaman Ulrek',             title: 'Ata Çağrıcı',   race: 'canavar', tier: 'TIER 2',      skill: 'Kan Özü +24%',              startsUnlocked: false, portrait: '/assets/characters/canavar/ulrek.png' },
+  { id: 'ravenna',  name: 'Avcı Kraliçe Ravenna',    title: 'Av Lordu',      race: 'canavar', tier: 'TIER 3',      skill: 'Av süresi -30%',            startsUnlocked: false, portrait: '/assets/characters/canavar/ravenna.png' },
   { id: 'korova',   name: 'Korova, Beast-God Yavru', title: 'Primordial',    race: 'canavar', tier: 'TIER 5',      skill: '+25% hasar, +20% HP, +15% savunma', startsUnlocked: false, portrait: '/assets/characters/canavar/korova.png' },
   // ── Şeytan ──
   { id: 'malphas',  name: 'Karanlık Lord Malphas',   title: 'Sürgün Lord',   race: 'seytan',  tier: 'BAŞ KOMUTAN', skill: 'Pakt maliyeti -15%',        startsUnlocked: true,  portrait: '/assets/characters/seytan/malphas.png' },
-  { id: 'lilithra', name: 'Cadı-Kraliçe Lilithra',   title: 'Ritüel Ustası', race: 'seytan',  tier: 'TIER 2',      skill: 'Çağırma süresi -25%',       startsUnlocked: true,  portrait: '/assets/characters/seytan/lilithra.png' },
-  { id: 'vorhaal',  name: 'Suikastçı Vorhaal',       title: 'Gölge Bıçak',   race: 'seytan',  tier: 'TIER 3',      skill: 'Suikast hasarı +20%',       startsUnlocked: true,  portrait: '/assets/characters/seytan/vorhaal.png' },
+  { id: 'lilithra', name: 'Cadı-Kraliçe Lilithra',   title: 'Ritüel Ustası', race: 'seytan',  tier: 'TIER 2',      skill: 'Çağırma süresi -25%',       startsUnlocked: false, portrait: '/assets/characters/seytan/lilithra.png' },
+  { id: 'vorhaal',  name: 'Suikastçı Vorhaal',       title: 'Gölge Bıçak',   race: 'seytan',  tier: 'TIER 3',      skill: 'Suikast hasarı +20%',       startsUnlocked: false, portrait: '/assets/characters/seytan/vorhaal.png' },
   { id: 'azurath',  name: 'Borç Tahsilcisi Azurath', title: 'Borç Lordu',    race: 'seytan',  tier: 'TIER 4',      skill: 'Maliyet -%20 / -%10',       startsUnlocked: false, portrait: '/assets/characters/seytan/azurath.png' },
 ];
 

@@ -71,115 +71,13 @@ const EMOJIS = ['⚔️','🔥','💎','🛡️','⚡','🌌','👑','💀','✨
 
 /* ── Demo Data ─────────────────────────────────────────────────────────── */
 
-const GLOBAL_MESSAGES: ChatMessage[] = [
-  {
-    id: 'sys-1',
-    type: 'battle',
-    content: '⚔️ Komutan Voss (İnsan) sektör 7-Alpha\'yı ele geçirdi!',
-    timestamp: '14:22',
-  },
-  {
-    id: 'msg-1',
-    type: 'player',
-    author: 'Morgath_X',
-    race: 'zerg',
-    level: 47,
-    content: 'Sektör 7 kimin kontrolünde? İttifak teklifim var.',
-    timestamp: '14:23',
-  },
-  {
-    id: 'msg-2',
-    type: 'player',
-    author: 'DemUrgePrime',
-    race: 'otomat',
-    level: 62,
-    content: 'Holografik ağımız bölgeyi taradı. Koordinatlar: X:447 Y:892. Dikkatli olun.',
-    timestamp: '14:24',
-  },
-  {
-    id: 'sys-2',
-    type: 'system',
-    content: '🌌 Yeni çağ etkinliği başladı: Nebula Kalkanı — 2 saat kaldı',
-    timestamp: '14:24',
-  },
-  {
-    id: 'msg-3',
-    type: 'player',
-    author: 'Khorvash',
-    race: 'canavar',
-    level: 38,
-    content: 'GG! Herkes hazır mı? Büyük saldırıyı başlatıyoruz.',
-    timestamp: '14:25',
-  },
-  {
-    id: 'msg-4',
-    type: 'player',
-    author: 'Sen',
-    race: 'insan',
-    level: 55,
-    content: 'Koordinatları aldım. Saldırıya katılıyorum!',
-    timestamp: '14:25',
-    isOwn: true,
-  },
-  {
-    id: 'msg-5',
-    type: 'player',
-    author: 'Malphas',
-    race: 'seytan',
-    level: 71,
-    content: 'Karanlık güçler bu savaşa dahil. İttifaklara inanmıyorum ama... bu sefer.',
-    timestamp: '14:26',
-  },
-  {
-    id: 'sys-3',
-    type: 'battle',
-    content: '💀 Lonca "Iron Veil" sektör 12\'yi kaybetti!',
-    timestamp: '14:27',
-  },
-];
-
-const GUILD_MESSAGES: ChatMessage[] = [
-  {
-    id: 'g-sys-1',
-    type: 'guild',
-    content: '🤝 Yeni üye katıldı: Reyes_Alpha [İnsan Lvl.24]',
-    timestamp: '13:45',
-  },
-  {
-    id: 'g-1',
-    type: 'player',
-    author: 'GuildMaster_Voss',
-    race: 'insan',
-    level: 88,
-    content: 'Lonca toplantısı bu gece 20:00\'da. Tüm üyeler katılsın.',
-    timestamp: '13:48',
-  },
-  {
-    id: 'g-2',
-    type: 'player',
-    author: 'Aurelius',
-    race: 'otomat',
-    level: 55,
-    content: 'Kaynak transferi hazır. Kim almak istiyor?',
-    timestamp: '13:52',
-  },
-  {
-    id: 'g-3',
-    type: 'player',
-    author: 'Sen',
-    race: 'insan',
-    level: 55,
-    content: 'Kaynak transferini alıyorum, teşekkürler!',
-    timestamp: '13:54',
-    isOwn: true,
-  },
-  {
-    id: 'g-sys-2',
-    type: 'guild',
-    content: '🏆 Lonca "Nebula Knights" haftalık sıralamada 3. sıraya yükseldi!',
-    timestamp: '14:00',
-  },
-];
+// CHAT-MIXED-STUB-REAL (cycle-27 audit): the hardcoded GLOBAL_MESSAGES /
+// GUILD_MESSAGES demo feeds were removed. They were prepended to the live
+// useChatChannel feed, so every player saw the same phantom combat/sector
+// events ("Komutan Voss sektör 7-Alpha'yı ele geçirdi!") that never happened —
+// making a silent server look active and eroding trust. Global/guild now render
+// ONLY the live server feed (empty-state handles a quiet channel). DM is still
+// demo (DM_CONVERSATIONS below) — tracked separately as DM-CONVERSATIONS-STUB.
 
 const DM_CONVERSATIONS: DMConversation[] = [
   {
@@ -658,7 +556,6 @@ export default function ChatPage() {
     } as ChatMessage;
   });
 
-  const baseMessages = activeTab === 'global' ? GLOBAL_MESSAGES : GUILD_MESSAGES;
   const tabDrafts = draftsByTab[activeTab] ?? [];
   // De-dup: drop a local draft once the server has echoed back a message
   // with the same content — without this the optimistic line lingers next
@@ -667,19 +564,25 @@ export default function ChatPage() {
   const dedupedDrafts = tabDrafts.filter(
     (d) => !serverMessages.some((s) => s.content === d.content),
   );
-  const messages: ChatMessage[] = [...baseMessages, ...serverMessages, ...dedupedDrafts];
+  // Live server feed + the player's own optimistic drafts only — no demo
+  // seed (CHAT-MIXED-STUB-REAL). The empty-state below covers a quiet channel.
+  const messages: ChatMessage[] = [...serverMessages, ...dedupedDrafts];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeTab, activeDM]);
 
+  // New-message alert fires when the live feed actually grows — not on a fixed
+  // timer. The old 4s setTimeout popped a phantom "yeni mesaj" prompt on a
+  // silent channel (part of CHAT-MIXED-STUB-REAL). Track the server message
+  // count and only alert when a fresh message lands while scrolled up.
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    if (activeTab !== 'global') return;
-    const timer = setTimeout(() => {
+    if (activeTab === 'global' && serverMessages.length > prevMsgCountRef.current) {
       setNewMessageAlert(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [activeTab]);
+    }
+    prevMsgCountRef.current = serverMessages.length;
+  }, [serverMessages.length, activeTab]);
 
   // If the player is on the guild tab but has no alliance (e.g. they
   // were in a guild, opened this page, then left the guild via /alliance),

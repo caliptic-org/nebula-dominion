@@ -86,6 +86,7 @@ function buildService(): {
   removedFromActive: string[];
   resources: { grant: jest.Mock };
   commanders: { awardXp: jest.Mock };
+  progression: { recordMatchResult: jest.Mock };
 } {
   const savedRooms: GameRoom[] = [];
   const removedFromActive: string[] = [];
@@ -129,6 +130,8 @@ function buildService(): {
 
   const progressionMock = {
     awardXp: jest.fn().mockResolvedValue(undefined),
+    // ELO-NOT-PERSISTED (cycle 23) — finishGame persists ranked ratings.
+    recordMatchResult: jest.fn().mockResolvedValue(undefined),
     // getProgress is read by awardBattleXp() in the PvP path to pick
     // PVP_* vs PVE_* XP sources based on the player's age. Default to
     // Çağ 1 so the test exercises the PVE_* fallback unless explicitly
@@ -189,7 +192,10 @@ function buildService(): {
     (roomsMock.get as jest.Mock).mockImplementation(async () => ({ ...currentRoom }));
   };
 
-  return { svc, emitter, savedRooms, removedFromActive, resources: resourcesMock, commanders: commandersMock };
+  return {
+    svc, emitter, savedRooms, removedFromActive,
+    resources: resourcesMock, commanders: commandersMock, progression: progressionMock,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -520,6 +526,61 @@ describe('GameService — COMBAT-REWARDS-1 battle resource rewards', () => {
   });
 });
 
+describe('GameService — ELO-NOT-PERSISTED ranked rating', () => {
+  const winAttack = makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'u2' } });
+
+  function pvpWinRoom(): GameRoom {
+    return makeRoom({
+      players: {
+        'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+        'user-2': makePlayer('user-2', { units: [makeUnit({ id: 'u2', hp: 1, defense: 0 })] }),
+      },
+    });
+  }
+
+  it('persists BOTH players ratings on a ranked PvP result, matching the emitted newElo', async () => {
+    const { svc, progression } = buildService();
+    (svc as any).__setRoom(pvpWinRoom());
+
+    const result = await svc.processAction('user-1', winAttack);
+    const endEvent = result.events.find((e) => e.type === 'game_end');
+    const newElo = endEvent!.data.newElo as Record<string, number>;
+
+    expect(progression.recordMatchResult).toHaveBeenCalledTimes(2);
+    expect(progression.recordMatchResult).toHaveBeenCalledWith('user-1', newElo['user-1']);
+    expect(progression.recordMatchResult).toHaveBeenCalledWith('user-2', newElo['user-2']);
+  });
+
+  it('does NOT persist ratings for a CASUAL PvP match — casual play stays off the ladder', async () => {
+    const { svc, progression } = buildService();
+    const casualRoom = pvpWinRoom();
+    casualRoom.mode = 'casual';
+    (svc as any).__setRoom(casualRoom);
+
+    await svc.processAction('user-1', winAttack);
+
+    expect(progression.recordMatchResult).not.toHaveBeenCalled();
+  });
+
+  it('does NOT persist ratings for a PvE (bot) match — no farming ELO off bots', async () => {
+    const { svc, progression } = buildService();
+    const botId = 'bot:pve-1';
+    (svc as any).__setRoom(
+      makeRoom({
+        currentPlayerId: 'user-1',
+        players: {
+          'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+          [botId]: makePlayer(botId, { units: [makeUnit({ id: 'b1', hp: 1, defense: 0 })] }),
+        },
+      }),
+    );
+
+    await svc.processAction('user-1', makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'b1' } }));
+
+    expect(progression.recordMatchResult).not.toHaveBeenCalled();
+  });
+});
+
 describe('GameService — game creation flow', () => {
   it('onMatchFound emits game.created event with room and tokens', async () => {
     const { svc, emitter } = buildService();
@@ -626,7 +687,7 @@ describe('GameService — PvE bot anti-cheat bypass', () => {
       { validate: antiCheatValidate } as any,
       new EventEmitter2(),
       { get: jest.fn().mockImplementation((_k: string, def: any) => def) } as any,
-      { awardXp: jest.fn().mockResolvedValue(undefined), getProgress: jest.fn().mockResolvedValue({ age: 1 }) } as any,
+      { awardXp: jest.fn().mockResolvedValue(undefined), getProgress: jest.fn().mockResolvedValue({ age: 1 }), recordMatchResult: jest.fn().mockResolvedValue(undefined) } as any,
       { findRecipe: jest.fn().mockReturnValue(null), merge: jest.fn(), mutate: jest.fn().mockReturnValue(null), getAvailableMutationsForUnit: jest.fn().mockReturnValue([]) } as any,
       { notify: jest.fn() } as any,
       { awardXp: jest.fn().mockResolvedValue(undefined), getActiveBonus: jest.fn().mockResolvedValue({}) } as any,

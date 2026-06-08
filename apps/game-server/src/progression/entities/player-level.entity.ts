@@ -34,6 +34,16 @@ export class PlayerLevel {
   @Column({ name: 'total_xp', type: 'int', default: 0 })
   totalXp: number;
 
+  // ELO-NOT-PERSISTED (cycle 23) — durable ranked rating + games-played
+  // counter. Seeded into matchmaking at queue-join and rewritten by
+  // GameService.finishGame after each ranked (PvP) match. `ranked_games`
+  // feeds the ELO K-factor so ratings stabilise as a player accumulates games.
+  @Column({ name: 'elo', type: 'int', default: 1000 })
+  elo: number;
+
+  @Column({ name: 'ranked_games', type: 'int', default: 0 })
+  rankedGames: number;
+
   @Column({
     name: 'unlocked_content',
     type: 'text',

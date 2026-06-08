@@ -16,7 +16,7 @@ import { UnitsService } from '../units/units.service';
 import { RewardsService } from '../battle/rewards.service';
 import { BattleRewards } from '../battle/battle-log.service';
 import { ResourcesService } from '../resources/resources.service';
-import { Race } from '../matchmaking/dto/join-queue.dto';
+import { Race, GameMode } from '../matchmaking/dto/join-queue.dto';
 
 const BOT_USER_ID_PREFIX = 'bot:';
 const GRID_WIDTH = 8;
@@ -656,6 +656,19 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
       { userId: loserId, rewards: loserRewards },
     ]);
 
+    // ELO-NOT-PERSISTED (cycle 23) — persist the post-match ratings so the
+    // ladder actually accumulates (previously newElo was emitted but dropped,
+    // so every player stayed at 1000 forever). Ranked PvP only: when isPvE one
+    // side is a bot and crediting rating would let players farm ELO off bots.
+    // `!isPvE` guarantees both ids are human, so no per-id bot filter is
+    // needed. RANKED only — casual skirmishes (GameMode.CASUAL) are friendlies
+    // that must not move the ladder, else casual play (incl. casual-surrender
+    // collusion) would inflate ranked rating. Fire-and-forget — a rating write
+    // must not block the game-end response (mirrors the awardBattleXp contract).
+    if (!isPvE && room.mode === GameMode.RANKED) {
+      void this.persistMatchRatings(winnerId, winResult.newElo, loserId, loseResult.newElo);
+    }
+
     events.push({
       type: 'game_end',
       data: {
@@ -813,6 +826,32 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
           }
         }),
     );
+  }
+
+  /**
+   * ELO-NOT-PERSISTED (cycle 23) — persist both players' post-match ratings.
+   * Caller gates this to ranked PvP (`!isPvE`), so both ids are guaranteed
+   * human (no bot rating rows). Best-effort: a write failure is logged but
+   * never bubbles, so a rating-store hiccup can't break the game-end response.
+   */
+  private async persistMatchRatings(
+    winnerId: string,
+    winnerElo: number,
+    loserId: string,
+    loserElo: number,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        this.progression.recordMatchResult(winnerId, winnerElo),
+        this.progression.recordMatchResult(loserId, loserElo),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `Failed to persist match ratings (winner=${winnerId} loser=${loserId}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   /** Record a room as rewarded; returns false if it already was (bounded

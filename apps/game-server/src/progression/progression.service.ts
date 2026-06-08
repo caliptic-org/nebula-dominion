@@ -68,6 +68,43 @@ export class ProgressionService {
   }
 
   /**
+   * ELO-NOT-PERSISTED (cycle 23) — read a player's durable ranked rating for
+   * matchmaking seeding. `?? ` guards cover a row created before this column
+   * existed (in-memory create() returns the entity before DB defaults apply).
+   */
+  async getRanking(userId: string): Promise<{ elo: number; gamesPlayed: number }> {
+    const record = await this.getOrCreateProgress(userId);
+    return { elo: record.elo ?? 1000, gamesPlayed: record.rankedGames ?? 0 };
+  }
+
+  /**
+   * ELO-NOT-PERSISTED (cycle 23) — persist the post-match rating and bump the
+   * ranked-games counter (used by the ELO K-factor). Caller restricts this to
+   * ranked PvP results so bot (PvE) farming can't inflate the ladder.
+   *
+   * Atomic single-statement UPDATE (mirrors the awardXp
+   * ECON-PROG-AWARDXP-LOST-UPDATE fix): `ranked_games = ranked_games + 1`
+   * serialises at the row lock so a concurrent finish can't drop an increment.
+   * `elo` is an absolute SET — the caller already computed the post-match
+   * rating, and a given user can only be in one match at a time. getOrCreate
+   * first guarantees the row exists (a brand-new player's first ranked match).
+   */
+  async recordMatchResult(userId: string, newElo: number): Promise<void> {
+    await this.getOrCreateProgress(userId);
+    const elo = Math.max(0, Math.round(Number(newElo) || 0));
+    await this.dataSource.query(
+      `
+      UPDATE player_levels
+         SET elo = $1,
+             ranked_games = ranked_games + 1,
+             updated_at = NOW()
+       WHERE user_id = $2
+      `,
+      [elo, userId],
+    );
+  }
+
+  /**
    * Grants XP to a player, advancing level/age boundaries as appropriate.
    *
    * ── CONCURRENCY CONTRACT (HIGH ECON-PROG-AWARDXP-LOST-UPDATE fix) ──

@@ -14,6 +14,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { MatchmakingService, QueueEntry, MatchResult } from './matchmaking.service';
 import { JoinQueueDto, GameMode } from './dto/join-queue.dto';
+import { ProgressionService } from '../progression/progression.service';
 import type { GameCreatedEvent } from '../game/game.service';
 
 @WebSocketGateway({ namespace: '/matchmaking' })
@@ -21,7 +22,12 @@ export class MatchmakingGateway implements OnGatewayConnection, OnGatewayDisconn
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(MatchmakingGateway.name);
 
-  constructor(private readonly matchmaking: MatchmakingService) {}
+  constructor(
+    private readonly matchmaking: MatchmakingService,
+    // ELO-NOT-PERSISTED (cycle 23) — seed the queue from the player's persisted
+    // rating, not the JWT (which carries no elo/gamesPlayed).
+    private readonly progression: ProgressionService,
+  ) {}
 
   handleConnection(client: Socket): void {
     this.logger.debug(`Connected: ${client.id}`);
@@ -47,11 +53,20 @@ export class MatchmakingGateway implements OnGatewayConnection, OnGatewayDisconn
       throw new WsException('Already in queue for this mode');
     }
 
+    // ELO-NOT-PERSISTED (cycle 23) — seed from the player's durable rating
+    // (player_levels) instead of the JWT defaults, so matchmaking actually
+    // brackets by skill and the K-factor decays as ranked_games accrues.
+    // Best-effort: a read hiccup falls back to the 1000/0 baseline rather than
+    // blocking the player from queueing.
+    const ranking = await this.progression
+      .getRanking(user.sub)
+      .catch(() => ({ elo: 1000, gamesPlayed: 0 }));
+
     const entry: QueueEntry = {
       userId: user.sub,
       socketId: client.id,
-      elo: user.elo ?? 1000,
-      gamesPlayed: user.gamesPlayed ?? 0,
+      elo: ranking.elo,
+      gamesPlayed: ranking.gamesPlayed,
       race: dto.race,
       mode: dto.mode,
       queuedAt: Date.now(),

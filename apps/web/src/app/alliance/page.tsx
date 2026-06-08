@@ -55,7 +55,6 @@ interface WarEntry {
   theirs: number;
   endsIn: string;
   status: 'preparing' | 'active' | 'won' | 'lost';
-  slots: { filled: number; total: number };
 }
 
 interface Objective {
@@ -250,8 +249,9 @@ export default function AlliancePage() {
   // Project backend AllianceWarDto rows into the WarEntry shape WarCard
   // expects. Status mapping: declared→preparing, active→active,
   // ended+winner-mine→won, ended+winner-other→lost. Scores come straight
-  // from the DB columns; the "endsIn" + slot info is placeholder until
-  // matchmaking lands (post-MVP).
+  // from the DB columns. Per-war participation slots were removed (cycle-27
+  // ALLIANCE-WARS-SLOT) — alliance_wars has no participant tracking, so the
+  // old hardcoded 0/24 bar + the fake "Katıl" join were phantom UI.
   const projectedWars: WarEntry[] = useMemo(() => {
     return backendWars.map((w) => {
       const iAmAttacker = w.attackerId === myAllianceId;
@@ -272,7 +272,6 @@ export default function AlliancePage() {
         theirs,
         endsIn: w.endsAt ? '—' : (w.status === 'declared' ? 'Hazırlık' : '—'),
         status,
-        slots: { filled: 0, total: 24 },
       };
     });
   }, [backendWars, myAllianceId]);
@@ -844,16 +843,15 @@ function WarCard({ war, myRace }: { war: WarEntry; myRace: NDRace }) {
           </div>
           <Sigil race={opp} size={28} />
         </div>
-        <Caption>
-          Slot: <strong style={{ color: myRace.primary }}>{war.slots.filled}/{war.slots.total}</strong>
-          {war.status === 'preparing' && ' · Henüz başlamadı'}
-        </Caption>
+        {war.status === 'preparing' && (
+          <Caption>Henüz başlamadı</Caption>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <NDButton
             race={myRace}
             variant="primary"
             full
-            onClick={() => toast.success(`${war.opponentTag} savaşına katıldın — slot ${war.slots.filled + 1}/${war.slots.total}`)}
+            onClick={() => toast.info('Savaşa katılma yakında geliyor')}
           >
             Katıl
           </NDButton>

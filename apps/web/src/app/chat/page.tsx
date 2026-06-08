@@ -79,48 +79,14 @@ const EMOJIS = ['⚔️','🔥','💎','🛡️','⚡','🌌','👑','💀','✨
 // ONLY the live server feed (empty-state handles a quiet channel). DM is still
 // demo (DM_CONVERSATIONS below) — tracked separately as DM-CONVERSATIONS-STUB.
 
-const DM_CONVERSATIONS: DMConversation[] = [
-  {
-    id: 'dm-1',
-    author: 'Threnix',
-    race: 'zerg',
-    level: 43,
-    lastMessage: 'Yarın savaşa hazır mısın?',
-    timestamp: '14:20',
-    unread: 2,
-    online: true,
-  },
-  {
-    id: 'dm-2',
-    author: 'Aurelius',
-    race: 'otomat',
-    level: 55,
-    lastMessage: 'Kaynak transferini tamamladım.',
-    timestamp: '13:54',
-    unread: 0,
-    online: true,
-  },
-  {
-    id: 'dm-3',
-    author: 'Lilithra',
-    race: 'seytan',
-    level: 66,
-    lastMessage: 'Paktı düşün... güçlü olacak.',
-    timestamp: '12:30',
-    unread: 1,
-    online: false,
-  },
-  {
-    id: 'dm-4',
-    author: 'Kovacs',
-    race: 'insan',
-    level: 31,
-    lastMessage: 'GG önceki maçta!',
-    timestamp: '11:15',
-    unread: 0,
-    online: false,
-  },
-];
+// DM-CONVERSATIONS-STUB (cycle-27 audit): the 4 hardcoded demo conversations
+// (Threnix, Aurelius, Lilithra, Kovacs) were removed. They rendered as real
+// chats a player could "open" but nothing persisted — phantom data that broke
+// trust the moment they reloaded. Real DMs are a backend feature build: the api
+// chat stub has no per-recipient routing (only a per-user self-buffer) and the
+// game-server's persistent DM gateway isn't FE-wired yet. Until that lands the
+// DM tab shows an honest "coming soon" empty state instead of fake threads.
+const DM_CONVERSATIONS: DMConversation[] = [];
 
 /* ── Sub-components ────────────────────────────────────────────────────── */
 
@@ -769,13 +735,34 @@ export default function ChatPage() {
                 <Eyebrow color={race.primary}>Özel Mesajlar</Eyebrow>
                 <Code>{DM_CONVERSATIONS.length}</Code>
               </div>
-              {DM_CONVERSATIONS.map((conv) => (
-                <DMListItem
-                  key={conv.id}
-                  conv={conv}
-                  onClick={() => setActiveDM(conv)}
-                />
-              ))}
+              {DM_CONVERSATIONS.length === 0 ? (
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '48px 24px',
+                    color: ND.textMute,
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 32, opacity: 0.4 }} aria-hidden>📨</div>
+                  <div style={{ fontFamily: ND.body, fontSize: 12 }}>
+                    Özel mesajlaşma yakında geliyor.
+                  </div>
+                </div>
+              ) : (
+                DM_CONVERSATIONS.map((conv) => (
+                  <DMListItem
+                    key={conv.id}
+                    conv={conv}
+                    onClick={() => setActiveDM(conv)}
+                  />
+                ))
+              )}
             </div>
           )}
 

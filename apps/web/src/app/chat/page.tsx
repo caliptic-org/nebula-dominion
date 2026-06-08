@@ -540,14 +540,23 @@ export default function ChatPage() {
 
   // New-message alert fires when the live feed actually grows — not on a fixed
   // timer. The old 4s setTimeout popped a phantom "yeni mesaj" prompt on a
-  // silent channel (part of CHAT-MIXED-STUB-REAL). Track the server message
-  // count and only alert when a fresh message lands while scrolled up.
-  const prevMsgCountRef = useRef(0);
+  // silent channel (part of CHAT-MIXED-STUB-REAL).
+  //
+  // cycle-28 CHAT-NEWMSG-TABSWITCH fix: track the count seen specifically on
+  // the GLOBAL tab (not a single ref shared across tabs — that false-fired when
+  // switching global→guild→global because the smaller guild count made the
+  // unchanged global feed look "grown"). Only a genuine INCREASE on global
+  // alerts; decreases (mid-refetch dips) and the first populate (baseline 0)
+  // are ignored. Returning to global after new messages landed correctly
+  // alerts — those really are unseen.
+  const seenGlobalCountRef = useRef(0);
   useEffect(() => {
-    if (activeTab === 'global' && serverMessages.length > prevMsgCountRef.current) {
-      setNewMessageAlert(true);
+    if (activeTab !== 'global') return;
+    const count = serverMessages.length;
+    if (count > seenGlobalCountRef.current) {
+      if (seenGlobalCountRef.current > 0) setNewMessageAlert(true);
+      seenGlobalCountRef.current = count;
     }
-    prevMsgCountRef.current = serverMessages.length;
   }, [serverMessages.length, activeTab]);
 
   // If the player is on the guild tab but has no alliance (e.g. they

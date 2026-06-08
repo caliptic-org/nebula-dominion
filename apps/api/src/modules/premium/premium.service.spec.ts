@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PremiumService } from './premium.service';
 import { PremiumPass } from './entities/premium-pass.entity';
@@ -246,6 +246,23 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
         }),
       );
       expect(result.premiumPassId).toBe('season-1');
+    });
+
+    it('on a concurrent-enroll unique violation (23505), re-fetches the winner pass', async () => {
+      manager = {};
+      await makeService();
+      userPassRepo.findOne
+        .mockResolvedValueOnce(null)  // existing battle-pass check
+        .mockResolvedValueOnce(null); // dup check
+      passRepo.findOne.mockResolvedValue(season);
+      userPassRepo.create.mockImplementation((v: any) => v);
+      const uniqueErr = new QueryFailedError('q', [], Object.assign(new Error('dup'), { code: '23505' }) as any);
+      userPassRepo.save.mockRejectedValueOnce(uniqueErr);
+      const winner = { id: 'up-winner', premiumPassId: 'season-1' };
+      userPassRepo.findOne.mockResolvedValueOnce(winner); // re-fetch after violation
+
+      const result: any = await service.ensureBattlePassEnrollment('user-1');
+      expect(result).toBe(winner);
     });
 
     it('returns null when there is no active battle_pass season', async () => {

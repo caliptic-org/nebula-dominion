@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository, MoreThan } from 'typeorm';
+import { DataSource, EntityManager, QueryFailedError, Repository, MoreThan } from 'typeorm';
 import { PremiumPass } from './entities/premium-pass.entity';
 import { UserPremiumPass } from './entities/user-premium-pass.entity';
 
@@ -272,9 +272,29 @@ export class PremiumService {
       tierXp: 0,
       paymentProvider: 'free',
     });
-    const saved = await this.userPassRepository.save(userPass);
-    this.logger.log(`Battle pass free enrollment: user=${userId} season=${season.code}`);
-    return saved;
+    try {
+      const saved = await this.userPassRepository.save(userPass);
+      this.logger.log(`Battle pass free enrollment: user=${userId} season=${season.code}`);
+      return saved;
+    } catch (err) {
+      // A concurrent enrollment won the partial UNIQUE(user_id, premium_pass_id)
+      // WHERE status='active' index (migration 1779960000000). Treat the
+      // 23505 unique-violation as success-by-someone-else: re-fetch theirs so
+      // the caller (and the battle-XP grant riding on it) proceeds normally.
+      const pgCode =
+        err instanceof QueryFailedError
+          ? ((err as unknown as { code?: string }).code ??
+            (err as unknown as { driverError?: { code?: string } }).driverError?.code)
+          : undefined;
+      if (pgCode === '23505') {
+        const winner = await this.userPassRepository.findOne({
+          where: { userId, premiumPassId: season.id, status: 'active' },
+          relations: ['premiumPass'],
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
   /**

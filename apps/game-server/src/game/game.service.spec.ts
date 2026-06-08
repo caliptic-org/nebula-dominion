@@ -87,6 +87,7 @@ function buildService(): {
   resources: { grant: jest.Mock };
   commanders: { awardXp: jest.Mock };
   progression: { recordMatchResult: jest.Mock };
+  questProgress: { notifyBattlePassXp: jest.Mock };
 } {
   const savedRooms: GameRoom[] = [];
   const removedFromActive: string[] = [];
@@ -169,6 +170,7 @@ function buildService(): {
   // Real RewardsService (pure, dependency-free) so finishGame computes the
   // genuine reward table; resources.grant is mocked so we can assert credits.
   const resourcesMock = { grant: jest.fn().mockResolvedValue(undefined) };
+  const questProgressMock = { notify: jest.fn(), notifyBattlePassXp: jest.fn() };
 
   const svc = new GameService(
     roomsMock as RoomService,
@@ -179,7 +181,7 @@ function buildService(): {
     configMock as ConfigService,
     progressionMock as any,
     mergeServiceMock as any,
-    { notify: jest.fn() } as any,
+    questProgressMock as any,
     commandersMock as any,
     unitsMock as any,
     new RewardsService(),
@@ -195,6 +197,7 @@ function buildService(): {
   return {
     svc, emitter, savedRooms, removedFromActive,
     resources: resourcesMock, commanders: commandersMock, progression: progressionMock,
+    questProgress: questProgressMock,
   };
 }
 
@@ -581,6 +584,48 @@ describe('GameService — ELO-NOT-PERSISTED ranked rating', () => {
   });
 });
 
+describe('GameService — FLOW-001 battle-pass XP', () => {
+  const winAttack = makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'u2' } });
+
+  it('grants battle-pass XP to the socket winner (200, room-scoped), not the loser', async () => {
+    const { svc, questProgress } = buildService();
+    (svc as any).__setRoom(
+      makeRoom({
+        players: {
+          'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+          'user-2': makePlayer('user-2', { units: [makeUnit({ id: 'u2', hp: 1, defense: 0 })] }),
+        },
+      }),
+    );
+
+    await svc.processAction('user-1', winAttack);
+    await new Promise((r) => setImmediate(r)); // awardBattleXp is fire-and-forget
+
+    expect(questProgress.notifyBattlePassXp).toHaveBeenCalledWith('user-1', 200, 'pvp_battle', 'room:room-1');
+    expect(questProgress.notifyBattlePassXp).not.toHaveBeenCalledWith('user-2', expect.anything(), expect.anything(), expect.anything());
+  });
+
+  it('grants only the human winner in a PvE (bot) match', async () => {
+    const { svc, questProgress } = buildService();
+    const botId = 'bot:bp-1';
+    (svc as any).__setRoom(
+      makeRoom({
+        currentPlayerId: 'user-1',
+        players: {
+          'user-1': makePlayer('user-1', { units: [makeUnit({ id: 'u1', attack: 50 })] }),
+          [botId]: makePlayer(botId, { units: [makeUnit({ id: 'b1', hp: 1, defense: 0 })] }),
+        },
+      }),
+    );
+
+    await svc.processAction('user-1', makeDto({ type: ActionType.ATTACK, payload: { attackerUnitId: 'u1', targetUnitId: 'b1' } }));
+    await new Promise((r) => setImmediate(r));
+
+    expect(questProgress.notifyBattlePassXp).toHaveBeenCalledWith('user-1', 200, 'pve_battle', 'room:room-1');
+    expect(questProgress.notifyBattlePassXp).not.toHaveBeenCalledWith(botId, expect.anything(), expect.anything(), expect.anything());
+  });
+});
+
 describe('GameService — game creation flow', () => {
   it('onMatchFound emits game.created event with room and tokens', async () => {
     const { svc, emitter } = buildService();
@@ -689,7 +734,7 @@ describe('GameService — PvE bot anti-cheat bypass', () => {
       { get: jest.fn().mockImplementation((_k: string, def: any) => def) } as any,
       { awardXp: jest.fn().mockResolvedValue(undefined), getProgress: jest.fn().mockResolvedValue({ age: 1 }), recordMatchResult: jest.fn().mockResolvedValue(undefined) } as any,
       { findRecipe: jest.fn().mockReturnValue(null), merge: jest.fn(), mutate: jest.fn().mockReturnValue(null), getAvailableMutationsForUnit: jest.fn().mockReturnValue([]) } as any,
-      { notify: jest.fn() } as any,
+      { notify: jest.fn(), notifyBattlePassXp: jest.fn() } as any,
       { awardXp: jest.fn().mockResolvedValue(undefined), getActiveBonus: jest.fn().mockResolvedValue({}) } as any,
       { getUnits: jest.fn().mockResolvedValue([]) } as any,
       new RewardsService(),

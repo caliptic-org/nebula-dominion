@@ -55,6 +55,10 @@ const ABILITY_SUPPORT_PATTERN = /heal|regen|repair|restor|transfus|shield|platin
 // keeps a long-lived process from growing the Set without bound.
 const REWARDED_ROOMS_MAX = 50_000;
 
+// FLOW-001 pt.3 — battle-pass XP for a Socket.io battle win, matching the FE
+// quick-battle (200/win). Win-only; the api side auto-enrolls + daily-caps.
+const BATTLE_PASS_XP_PER_WIN = 200;
+
 export interface GameCreatedEvent {
   match: MatchResult;
   room: GameRoom;
@@ -775,6 +779,20 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
                 `Commander XP award skipped for ${userId}: ${err instanceof Error ? err.message : String(err)}`,
               );
             });
+          // ── Battle-pass XP (FLOW-001 pt.3) ──────────────────────
+          // Socket battles feed the pass too (the FE quick-battle already
+          // does, in-process). Win-only, matching the quick-battle 200/win.
+          // Fire-and-forget; skips bots; the api auto-enrolls + dedupes on
+          // (userId, referenceId) + daily-caps. room-scoped referenceId is a
+          // distinct namespace from the quick-battle 'battle:<id>'.
+          if (isWinner) {
+            this.questProgress.notifyBattlePassXp(
+              userId,
+              BATTLE_PASS_XP_PER_WIN,
+              isPvE ? 'pve_battle' : 'pvp_battle',
+              `room:${roomId}`,
+            );
+          }
         }),
       );
     } catch (err) {

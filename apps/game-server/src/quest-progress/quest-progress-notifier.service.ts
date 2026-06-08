@@ -83,4 +83,43 @@ export class QuestProgressNotifier {
       }
     })();
   }
+
+  /**
+   * FLOW-001 pt.3 — fire-and-forget battle-pass XP grant to the api so the
+   * real-time Socket.io battle feeds the pass too (the FE quick-battle already
+   * does, in-process). Same cross-service contract as notify(): same base URL,
+   * X-Internal-Service secret, errors swallowed, bots skipped. The api's
+   * addBattlePassXp auto-enrolls the player in the free season, is idempotent
+   * on (userId, referenceId), and is daily-capped — so a finishGame retry
+   * can't double-credit.
+   */
+  notifyBattlePassXp(userId: string, xpAmount: number, source: string, referenceId: string): void {
+    if (!userId || userId.startsWith('bot:')) return;
+    if (!(xpAmount > 0)) return;
+
+    const url = `${this.apiBaseUrl}/api/v1/premium/battle-pass/xp`;
+    const body = { userId, xpAmount, source, referenceId };
+
+    (async () => {
+      try {
+        const serviceSecret =
+          process.env.INTERNAL_SERVICE_SECRET || process.env.JWT_SECRET || '';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(serviceSecret ? { 'X-Internal-Service': `Bearer ${serviceSecret}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          this.logger.warn(`battle-pass xp HTTP ${res.status} userId=${userId} ref=${referenceId}`);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `battle-pass xp failed userId=${userId} ref=${referenceId}: ${(err as Error).message}`,
+        );
+      }
+    })();
+  }
 }

@@ -48,7 +48,7 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
   const makeService = async () => {
     passRepo = { find: jest.fn(), findOne: jest.fn() };
     userPassRepo = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() };
-    dataSource = { transaction: jest.fn((fn: any) => fn(manager)) };
+    dataSource = { transaction: jest.fn((fn: any) => fn(manager)), query: jest.fn().mockResolvedValue([]) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -273,6 +273,35 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
 
       expect(userPassRepo.create).toHaveBeenCalled(); // enrolled
       expect(res?.xpGranted).toBe(100);
+    });
+  });
+
+  describe('FLOW-001 pt.2 — premium-track ownership for the FE', () => {
+    it('ownsPremiumBattlePass is true when the battle_pass_premium SKU row exists', async () => {
+      manager = {};
+      await makeService();
+      dataSource.query.mockResolvedValue([{ '?column?': 1 }]);
+      expect(await service.ownsPremiumBattlePass('user-1')).toBe(true);
+      // queries user_inventory joined to shop_items for the SKU
+      expect(dataSource.query.mock.calls[0][0]).toContain('user_inventory');
+      expect(dataSource.query.mock.calls[0][1]).toEqual(['user-1', 'battle_pass_premium']);
+    });
+
+    it('ownsPremiumBattlePass is false when no SKU row exists', async () => {
+      manager = {};
+      await makeService();
+      dataSource.query.mockResolvedValue([]);
+      expect(await service.ownsPremiumBattlePass('user-1')).toBe(false);
+    });
+
+    it('checkPremiumStatus exposes ownsPremiumBattlePass', async () => {
+      manager = {};
+      await makeService();
+      userPassRepo.find.mockResolvedValue([]); // getUserActivePasses
+      dataSource.query.mockResolvedValue([{ '?column?': 1 }]); // owns premium SKU
+      const status: any = await service.checkPremiumStatus('user-1');
+      expect(status.ownsPremiumBattlePass).toBe(true);
+      expect(status.hasPremium).toBe(false);
     });
   });
 });

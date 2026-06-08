@@ -423,6 +423,26 @@ export class PremiumService {
     return Array.isArray(rows) && rows.length > 0;
   }
 
+  /**
+   * Public, non-transaction variant of ownsPremiumTrack for read-only status
+   * (the FE battle-pass UI shows premium-track rewards as claimable vs locked
+   * by this flag; the claim itself is still gated server-side). Same
+   * user_inventory + battle_pass_premium SKU check.
+   */
+  async ownsPremiumBattlePass(userId: string): Promise<boolean> {
+    const rows = await this.dataSource.query(
+      `SELECT 1
+         FROM user_inventory ui
+         JOIN shop_items si ON si.id = ui.shop_item_id
+        WHERE ui.user_id = $1::uuid
+          AND si.sku = $2
+          AND (ui.expires_at IS NULL OR ui.expires_at > NOW())
+        LIMIT 1`,
+      [userId, PREMIUM_TRACK_SKU],
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
   async claimTierReward(userId: string, userPassId: string, tier: number): Promise<Record<string, unknown>> {
     // HIGH F4-econ — race-condition hardening.
     //
@@ -567,6 +587,10 @@ export class PremiumService {
     const activePasses = await this.getUserActivePasses(userId);
     const hasPremium = activePasses.length > 0;
     const hasBattlePass = activePasses.some((p) => p.premiumPass.passType === 'battle_pass');
+    // ownsPremiumBattlePass = bought the battle_pass_premium SKU (the premium
+    // TRACK), distinct from hasBattlePass (now true for everyone via free
+    // enrollment). The FE uses it to lock/unlock premium-track rewards.
+    const ownsPremiumBattlePassFlag = await this.ownsPremiumBattlePass(userId);
 
     const multipliers = activePasses.reduce(
       (acc, pass) => {
@@ -584,6 +608,7 @@ export class PremiumService {
     return {
       hasPremium,
       hasBattlePass,
+      ownsPremiumBattlePass: ownsPremiumBattlePassFlag,
       activePasses: activePasses.map((p) => ({
         id: p.id,
         passName: p.premiumPass.name,

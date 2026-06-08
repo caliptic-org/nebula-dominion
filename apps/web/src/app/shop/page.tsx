@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -693,56 +693,192 @@ function VipSection({
   );
 }
 
+// ── Battle pass (FLOW-001 pt.2) — real tier/progress/claim, replacing the
+// former hardcoded mock. Data comes from the api premium endpoints:
+//   /premium/my-passes  → the player's free-season UserPremiumPass (currentTier,
+//                          tierXp, claimedRewards) — auto-enrolled on first battle.
+//   /premium/passes/<code> → tier_rewards annotated with `track` (free|premium).
+//   /premium/status      → ownsPremiumBattlePass (bought the 800-gem SKU).
+const BP_XP_PER_TIER = 1000;
+const BP_MAX_TIER = 50;
+const BP_SEASON_CODE = 'battle_pass_season5';
+
+interface BpTier { tier: number; reward: Record<string, unknown>; track: 'free' | 'premium' }
+interface BpData {
+  userPassId: string | null;
+  currentTier: number;
+  tierXp: number;
+  claimed: Set<number>;
+  tiers: BpTier[];
+  ownsPremium: boolean;
+}
+
+/** Human label for a tier reward (the seed shapes are `type`-discriminated). */
+function bpRewardLabel(reward: Record<string, unknown>): string {
+  const r = reward as Record<string, any>;
+  switch (r?.type) {
+    case 'void_crystals': return `+${Number(r.amount ?? 0).toLocaleString()} Kristal`;
+    case 'currency': return `+${Number(r.nebula_coins ?? 0).toLocaleString()} Altın`;
+    case 'resource_pack': return `+${Number(r.minerals ?? 0).toLocaleString()} Mineral`;
+    case 'xp_booster': return `${Number(r.hours ?? 0)}sa XP Hızlandırma`;
+    case 'cosmetic': return r.title ? String(r.title) : 'Özel Kozmetik';
+    case 'unit_unlock': return 'Birim Kilidi';
+    default: return 'Ödül';
+  }
+}
+
 function BattlePassSection({ race }: { race: NDRace }) {
   const tCommon = useTranslations('common');
   const tShop = useTranslations('shop');
-  const playerLevel = 12;
-  const totalLevels = 30;
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<BpData | null>(null);
+  const [busy, setBusy] = useState<number | 'buy' | null>(null);
+
+  const load = useCallback(async () => {
+    if (!hasSession()) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const [passes, pass, status] = await Promise.all([
+        api.get<any[]>('/premium/my-passes'),
+        api.get<any>(`/premium/passes/${BP_SEASON_CODE}`),
+        api.get<any>('/premium/status'),
+      ]);
+      const bp = (passes ?? []).find((p: any) => p?.premiumPass?.passType === 'battle_pass');
+      const claimed = new Set<number>(
+        ((bp?.claimedRewards ?? []) as any[])
+          .map((c) => Number(c?.tier))
+          .filter((n) => !Number.isNaN(n)),
+      );
+      const tiers: BpTier[] = ((pass?.tierRewards ?? []) as any[])
+        .filter((t) => t && typeof t.tier === 'number')
+        .map((t): BpTier => ({ tier: t.tier, reward: t.reward ?? {}, track: t.track === 'premium' ? 'premium' : 'free' }))
+        .sort((a, b) => a.tier - b.tier);
+      setData({
+        userPassId: bp?.id ?? null,
+        currentTier: Number(bp?.currentTier ?? 0),
+        tierXp: Number(bp?.tierXp ?? 0),
+        claimed,
+        tiers,
+        ownsPremium: Boolean(status?.ownsPremiumBattlePass),
+      });
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const claim = async (tier: number) => {
+    if (!data?.userPassId || busy != null) return;
+    setBusy(tier);
+    try {
+      await api.post(`/premium/passes/${data.userPassId}/claim-tier/${tier}`, {});
+      toast.success('Ödül alındı');
+      refreshUserWallet();
+      await load();
+    } catch (err) {
+      toast.error(err instanceof FetchError ? err.message : 'Ödül alınamadı');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const buyPremium = async () => {
+    if (!hasSession()) { toast.error(tCommon('loginRequired')); return; }
+    if (busy != null) return;
+    setBusy('buy');
+    try {
+      await api.post('/shop/purchase', { sku: 'battle_pass_premium', currencyType: 'premium_gems' });
+      toast.success(tShop('premiumActivated'));
+      refreshUserWallet();
+      await load();
+    } catch (err) {
+      toast.error(err instanceof FetchError ? err.message : tShop('premiumFailed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (!hasSession()) {
+    return (
+      <Panel race={race}>
+        <div style={{ padding: 16, textAlign: 'center', color: ND.textDim }}>{tCommon('loginRequired')}</div>
+      </Panel>
+    );
+  }
+  if (loading && !data) {
+    return (
+      <Panel race={race}>
+        <div style={{ padding: 16, textAlign: 'center', color: ND.textDim }}>Yükleniyor…</div>
+      </Panel>
+    );
+  }
+  if (!data) {
+    return (
+      <Panel race={race}>
+        <div style={{ padding: 16, textAlign: 'center', color: ND.textDim }}>Sezon geçişi şu an yüklenemedi.</div>
+      </Panel>
+    );
+  }
+
+  const progressPct = data.currentTier >= BP_MAX_TIER ? 100 : Math.min(100, (data.tierXp / BP_XP_PER_TIER) * 100);
+
   return (
     <>
       <NotchPanel race={race}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <div>
             <Eyebrow color={race.primary}>SEZON GEÇİŞİ</Eyebrow>
-            <H3 style={{ marginTop: 2, color: ND.text }}>
-              Seviye {playerLevel} / {totalLevels}
-            </H3>
+            <H3 style={{ marginTop: 2, color: ND.text }}>Tier {data.currentTier} / {BP_MAX_TIER}</H3>
           </div>
-          <Code style={{ color: ND.warn }}>⏱ 18g 4s</Code>
+          <Code style={{ color: data.ownsPremium ? race.primary : ND.warn }}>
+            {data.ownsPremium ? '💎 PREMIUM' : 'ÜCRETSİZ'}
+          </Code>
         </div>
         <div style={{ marginTop: 8 }}>
-          <Bar value={(playerLevel / totalLevels) * 100} color={race.primary} />
+          <Bar value={progressPct} color={race.primary} />
+          <Caption style={{ fontSize: 10, marginTop: 4 }}>
+            {data.currentTier >= BP_MAX_TIER ? 'Tüm tier’lar tamamlandı' : `${data.tierXp} / ${BP_XP_PER_TIER} XP — sonraki tier`}
+          </Caption>
         </div>
       </NotchPanel>
 
       <Panel race={race}>
         <div style={panelHeader()}>
-          <Eyebrow color={race.primary}>SONRAKİ ÖDÜLLER</Eyebrow>
+          <Eyebrow color={race.primary}>ÖDÜL YOLU</Eyebrow>
         </div>
         <div>
-          {Array.from({ length: 5 }, (_, i) => {
-            const lv = playerLevel + i;
-            const milestone = lv % 5 === 0;
+          {data.tiers.length === 0 && (
+            <div style={{ padding: 12, color: ND.textDim, fontSize: 12 }}>Ödül tanımlı değil.</div>
+          )}
+          {data.tiers.map((t) => {
+            const reached = data.currentTier >= t.tier;
+            const isClaimed = data.claimed.has(t.tier);
+            const premiumLocked = t.track === 'premium' && !data.ownsPremium;
+            const claimable = reached && !isClaimed && !premiumLocked;
             return (
               <div
-                key={lv}
+                key={t.tier}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '40px 1fr 1fr',
+                  gridTemplateColumns: '34px 1fr auto',
                   gap: 10,
                   padding: '10px 12px',
                   borderBottom: `1px solid ${ND.border}`,
                   alignItems: 'center',
+                  opacity: reached ? 1 : 0.55,
                 }}
               >
                 <div
                   style={{
-                    width: 32,
-                    height: 32,
+                    width: 30,
+                    height: 30,
                     borderRadius: 4,
-                    background: milestone ? race.primary : 'rgba(255,255,255,0.04)',
-                    color: milestone ? 'var(--color-bg-elevated)' : ND.text,
-                    border: milestone ? 'none' : `1px solid ${ND.border}`,
+                    background: reached ? race.primary : 'rgba(255,255,255,0.04)',
+                    color: reached ? 'var(--color-bg-elevated)' : ND.text,
+                    border: reached ? 'none' : `1px solid ${ND.border}`,
                     fontFamily: ND.display,
                     fontSize: 12,
                     fontWeight: 800,
@@ -751,17 +887,28 @@ function BattlePassSection({ race }: { race: NDRace }) {
                     justifyContent: 'center',
                   }}
                 >
-                  {lv}
+                  {t.tier}
                 </div>
-                <div>
-                  <Caption style={{ fontSize: 10 }}>ÜCRETSİZ</Caption>
-                  <div style={{ fontFamily: ND.display, fontSize: 11, color: ND.text }}>+500 Mineral</div>
-                </div>
-                <div>
-                  <Caption style={{ fontSize: 10, color: race.primary }}>PREMIUM</Caption>
-                  <div style={{ fontFamily: ND.display, fontSize: 11, color: race.primary }}>
-                    {milestone ? 'Komutan Skin' : `+${20 * (i + 1)} Kristal`}
+                <div style={{ minWidth: 0 }}>
+                  <Caption style={{ fontSize: 10, color: t.track === 'premium' ? race.primary : ND.textDim }}>
+                    {t.track === 'premium' ? '💎 PREMIUM' : 'ÜCRETSİZ'}
+                  </Caption>
+                  <div style={{ fontFamily: ND.display, fontSize: 11, color: t.track === 'premium' ? race.primary : ND.text }}>
+                    {bpRewardLabel(t.reward)}
                   </div>
+                </div>
+                <div style={{ minWidth: 60, display: 'flex', justifyContent: 'flex-end' }}>
+                  {isClaimed ? (
+                    <Caption style={{ fontSize: 10, color: ND.ok }}>✓ Alındı</Caption>
+                  ) : claimable ? (
+                    <NDButton race={race} size="sm" disabled={busy === t.tier} onClick={() => claim(t.tier)}>
+                      {busy === t.tier ? '…' : 'Al'}
+                    </NDButton>
+                  ) : premiumLocked && reached ? (
+                    <Caption style={{ fontSize: 10, color: ND.warn }}>🔒 Premium</Caption>
+                  ) : (
+                    <Caption style={{ fontSize: 10, color: ND.textMute }}>Kilitli</Caption>
+                  )}
                 </div>
               </div>
             );
@@ -769,27 +916,11 @@ function BattlePassSection({ race }: { race: NDRace }) {
         </div>
       </Panel>
 
-      <NDButton
-        race={race}
-        full
-        onClick={async () => {
-          if (!hasSession()) {
-            toast.error(tCommon('loginRequired'));
-            return;
-          }
-          try {
-            await api.post('/shop/purchase', { sku: 'battle_pass_premium', currencyType: 'premium_gems' });
-            toast.success(tShop('premiumActivated'));
-            // Refresh the gem pill — battle pass debit is premium_gems.
-            refreshUserWallet();
-          } catch (err) {
-            const msg = err instanceof FetchError ? err.message : tShop('premiumFailed');
-            toast.error(msg);
-          }
-        }}
-      >
-        Premium Geçiş Satın Al · 💎 800
-      </NDButton>
+      {!data.ownsPremium && (
+        <NDButton race={race} full disabled={busy === 'buy'} onClick={buyPremium}>
+          {busy === 'buy' ? '…' : 'Premium Geçiş Satın Al · 💎 800'}
+        </NDButton>
+      )}
     </>
   );
 }

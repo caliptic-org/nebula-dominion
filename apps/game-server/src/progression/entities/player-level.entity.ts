@@ -44,6 +44,16 @@ export class PlayerLevel {
   @Column({ name: 'ranked_games', type: 'int', default: 0 })
   rankedGames: number;
 
+  // FLOW-004 (endgame prestige) — post-max XP accrues here. Each
+  // PRESTIGE_XP_PER_LEVEL of prestige_xp grants a prestige_level, worth a
+  // permanent production bonus. Not reset on level-up (level is coupled to
+  // age/content); purely additive endgame progression.
+  @Column({ name: 'prestige_level', type: 'int', default: 0 })
+  prestigeLevel: number;
+
+  @Column({ name: 'prestige_xp', type: 'int', default: 0 })
+  prestigeXp: number;
+
   @Column({
     name: 'unlocked_content',
     type: 'text',

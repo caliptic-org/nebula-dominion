@@ -529,7 +529,11 @@ export class BuildingsService {
     // mineral building). Population is unaffected by commander
     // bonuses today; it tracks active worker assignments.
     const cmd = await this.commanders.getActiveBonus(playerId);
-    const prodMul = 1 + (cmd.resourceProductionMultiplier ?? 0);
+    // FLOW-004 — a maxed player's permanent prestige bonus stacks on top of
+    // the commander production multiplier. 0 for everyone below max prestige,
+    // so this is a no-op for normal play.
+    const prestigeBonus = await this.progression.getPrestigeProductionBonus(playerId);
+    const prodMul = 1 + (cmd.resourceProductionMultiplier ?? 0) + prestigeBonus;
     if (prodMul !== 1) {
       mineralPerTick = Math.round(mineralPerTick * prodMul);
       gasPerTick     = Math.round(gasPerTick * prodMul);

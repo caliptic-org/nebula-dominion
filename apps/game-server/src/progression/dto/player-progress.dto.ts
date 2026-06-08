@@ -75,4 +75,9 @@ export class PlayerProgressDto {
   tierBonusMultiplier: number;
   isMaxLevel: boolean;
   canAdvanceAge: boolean;
+  // FLOW-004 (endgame prestige) — 0 until the account reaches max level and
+  // starts accruing post-max XP. prestigeXp counts toward prestigeXpPerLevel.
+  prestigeLevel: number;
+  prestigeXp: number;
+  prestigeXpPerLevel: number;
 }

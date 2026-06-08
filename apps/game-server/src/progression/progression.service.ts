@@ -19,6 +19,9 @@ import {
   MAX_AGE,
   MAX_LEVEL,
   ERA_CATCH_UP_PRODUCTION_MULTIPLIER,
+  PRESTIGE_XP_PER_LEVEL,
+  PRESTIGE_PROD_PER_LEVEL,
+  PRESTIGE_PROD_CAP,
 } from './config/level-config';
 import { ProgressionConfigService } from './config/progression-config.service';
 import { AwardXpDto } from './dto/award-xp.dto';
@@ -65,6 +68,95 @@ export class ProgressionService {
   async getProgress(userId: string): Promise<PlayerProgressDto> {
     const record = await this.getOrCreateProgress(userId);
     return this.toDto(record);
+  }
+
+  /**
+   * FLOW-004 (endgame prestige) — accrue post-max XP into the prestige track.
+   * Called by awardXp ONLY when the account is at MAX_LEVEL (where XP used to
+   * be discarded). Self-contained so the hardened normal-leveling path stays
+   * untouched. Idempotency reuses xp_transactions UNIQUE(user,source,ref); the
+   * prestige_xp bump is a single atomic UPDATE. No daily cap — post-max XP is
+   * a slow endless grind with nothing to "rush", and any accrual is strictly
+   * better than the previous discard.
+   */
+  private async applyPrestigeXp(
+    record: PlayerLevel,
+    dto: AwardXpDto,
+  ): Promise<{ progress: PlayerProgressDto; leveledUp: boolean }> {
+    const baseAmount = XP_BASE_AMOUNTS[dto.source] ?? 0;
+    const multiplier = getLevelDef(record.currentLevel)?.xpMultiplier ?? 1.0;
+    const amount = Math.round(baseAmount * multiplier);
+    if (amount <= 0) return { progress: this.toDto(record), leveledUp: false };
+
+    // Idempotency — a duplicate (user, source, referenceId) means this XP was
+    // already turned into prestige; return the current state without re-adding.
+    try {
+      await this.xpTxRepo.save(
+        this.xpTxRepo.create({
+          userId: dto.userId,
+          source: dto.source,
+          baseAmount,
+          multiplier,
+          finalAmount: amount,
+          levelBefore: record.currentLevel,
+          levelAfter: record.currentLevel,
+          referenceId: dto.referenceId,
+        }),
+      );
+    } catch (err) {
+      const pgCode =
+        err instanceof QueryFailedError
+          ? ((err as QueryFailedError & { code?: string }).code ??
+            (err as QueryFailedError & { driverError?: { code?: string } }).driverError?.code)
+          : undefined;
+      if (pgCode === '23505') {
+        const fresh = await this.getOrCreateProgress(dto.userId);
+        return { progress: this.toDto(fresh), leveledUp: false };
+      }
+      throw err;
+    }
+
+    // Accrue + cascade in ONE atomic statement so concurrent grants for the
+    // same maxed user serialise at the row lock — no lost level-ups (the
+    // lost-update class the awardXp atomic UPDATE already guards against).
+    // Integer division banks whole prestige levels; modulo keeps the remainder.
+    const levelBefore = record.prestigeLevel ?? 0;
+    const rows = (await this.dataSource.query(
+      `
+      UPDATE player_levels
+         SET prestige_level = prestige_level + ((prestige_xp + $1::int) / $2::int),
+             prestige_xp     = (prestige_xp + $1::int) % $2::int,
+             updated_at      = NOW()
+       WHERE user_id = $3
+      RETURNING prestige_level, prestige_xp
+      `,
+      [amount, PRESTIGE_XP_PER_LEVEL, dto.userId],
+    )) as Array<{ prestige_level: number | string; prestige_xp: number | string }>;
+    if (rows.length === 0) return { progress: this.toDto(record), leveledUp: false };
+
+    const newLevel = Number(rows[0].prestige_level);
+    const newXp = Number(rows[0].prestige_xp);
+    const leveledUp = newLevel > levelBefore;
+    if (leveledUp) {
+      this.logger.log(`Prestige up: user=${dto.userId} prestige_level=${newLevel}`);
+      // Best-effort emit: listeners (e.g. a production recalc) can react; the
+      // bonus also bakes in on the next natural recalc (build/upgrade).
+      this.emitter.emit('progression.prestige_up', { userId: dto.userId, prestigeLevel: newLevel });
+    }
+    record.prestigeLevel = newLevel;
+    record.prestigeXp = newXp;
+    return { progress: this.toDto(record), leveledUp };
+  }
+
+  /**
+   * FLOW-004 — the player's permanent prestige production bonus (added to the
+   * commander multiplier in BuildingsService.recalculateProductionRates). 0 for
+   * everyone below max level / prestige 0, so it's a no-op for normal play.
+   */
+  async getPrestigeProductionBonus(userId: string): Promise<number> {
+    const record = await this.getOrCreateProgress(userId);
+    const bonus = (record.prestigeLevel ?? 0) * PRESTIGE_PROD_PER_LEVEL;
+    return Math.min(PRESTIGE_PROD_CAP, Math.max(0, bonus));
   }
 
   /**
@@ -143,9 +235,12 @@ export class ProgressionService {
   async awardXp(dto: AwardXpDto): Promise<{ progress: PlayerProgressDto; leveledUp: boolean }> {
     const record = await this.getOrCreateProgress(dto.userId);
 
-    // Absolute max level — no more XP
+    // Absolute max level — XP can no longer level the account, so (FLOW-004)
+    // redirect it into the PRESTIGE track instead of discarding it. The normal
+    // leveling path below (clamp / daily caps / idempotency / atomic UPDATE /
+    // processLevelUps) is untouched; applyPrestigeXp is self-contained.
     if (record.currentLevel >= MAX_LEVEL && getLevelDef(record.currentLevel)?.xpToNext === null) {
-      return { progress: this.toDto(record), leveledUp: false };
+      return this.applyPrestigeXp(record, dto);
     }
 
     // Enforce age gate for restricted sources (e.g. PvP requires Age 3+)
@@ -629,6 +724,10 @@ export class ProgressionService {
     dto.tierBonusMultiplier = levelDef?.xpMultiplier ?? 1.0;
     dto.isMaxLevel = isMaxLevel;
     dto.canAdvanceAge = record.currentLevel >= getMaxLevel(record.currentAge) && record.currentAge < MAX_AGE;
+    // FLOW-004 — prestige track (only meaningful at max level, 0 otherwise).
+    dto.prestigeLevel = record.prestigeLevel ?? 0;
+    dto.prestigeXp = record.prestigeXp ?? 0;
+    dto.prestigeXpPerLevel = PRESTIGE_XP_PER_LEVEL;
     return dto;
   }
 }

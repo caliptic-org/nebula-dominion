@@ -132,6 +132,17 @@ export const MAX_AGE = 6;
 export const LEVELS_PER_AGE = 9;
 export const MAX_LEVEL = MAX_AGE * LEVELS_PER_AGE; // 54
 
+// ── Endgame prestige (FLOW-004) ──────────────────────────────────────────
+// At MAX_LEVEL the player can no longer level (xpToNext === null), so all XP
+// was silently discarded — a dead endgame. It now feeds a PRESTIGE track:
+// every PRESTIGE_XP_PER_LEVEL of post-max XP grants one prestige level, each
+// worth a small PERMANENT production bonus (capped). A slow, endless
+// progression goal that keeps a maxed character growing. Age/level/unlocks are
+// NOT reset (level is coupled to age/content), so prestige is purely additive.
+export const PRESTIGE_XP_PER_LEVEL = 50_000;
+export const PRESTIGE_PROD_PER_LEVEL = 0.02; // +2% production per prestige level
+export const PRESTIGE_PROD_CAP = 1.0; // bonus capped at +100% from prestige
+
 // ─── Tier badge categories ────────────────────────────────────────────────────
 export enum AgeTierBadge {
   ACEMI     = 'acemi',      // Novice:     Ages 1–2

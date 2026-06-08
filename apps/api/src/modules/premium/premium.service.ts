@@ -494,6 +494,15 @@ export class PremiumService {
       });
 
       if (!userPass) throw new NotFoundException('Pass bulunamadı');
+      // Season-expiry gate (cycle-27 audit BP-EXPIRE-NO-GATE). getUserActivePasses
+      // and ensureBattlePassEnrollment both filter expiresAt > now, but claim did
+      // not — so an old/expired userPassId could still drain its tier rewards
+      // after the season closed, breaking the seasonal-reset contract. Only
+      // genuinely-stale enrollments fail here (expiresAt = enrollTime +
+      // durationDays, so any in-season player is well in the future).
+      if (userPass.expiresAt && userPass.expiresAt.getTime() <= Date.now()) {
+        throw new ForbiddenException('Sezon sona ermiş — ödüller artık alınamaz');
+      }
       if (tier > userPass.currentTier) {
         throw new BadRequestException(`Tier ${tier} henüz açılmadı. Mevcut tier: ${userPass.currentTier}`);
       }

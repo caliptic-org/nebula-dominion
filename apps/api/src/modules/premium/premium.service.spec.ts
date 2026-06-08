@@ -167,6 +167,22 @@ describe('PremiumService — MON-3 battle-pass track split', () => {
         NotFoundException,
       );
     });
+
+    it('rejects claiming from an expired season with 403 and no wallet write (BP-EXPIRE-NO-GATE)', async () => {
+      // Even an owner at a reached, unclaimed free tier must be refused once the
+      // enrollment's expiresAt has passed.
+      manager = buildManager(mockUserPass({ expiresAt: new Date(Date.now() - 86_400_000) }), true);
+      await makeService();
+
+      await expect(service.claimTierReward('user-uuid-1', 'pass-uuid-1', 1)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE user_currency'),
+        expect.anything(),
+      );
+    });
   });
 
   describe('getPassByCode / getAvailablePasses — track annotation', () => {

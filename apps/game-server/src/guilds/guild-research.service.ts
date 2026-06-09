@@ -217,7 +217,14 @@ export class GuildResearchService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const guild = await manager.findOne(Guild, { where: { id: input.guildId } });
+      // Serialize all research-starts for this guild on the guild row
+      // (cycle-29 GR-002 TOCTOU): without it, two concurrent starts both pass
+      // the weekly-slot COUNT and the duplicate-active check, blowing past the
+      // 3-slot cap / creating two active rows for the same research.
+      const guild = await manager.findOne(Guild, {
+        where: { id: input.guildId },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!guild) throw new NotFoundException(`Guild ${input.guildId} not found`);
 
       const selector = await manager.findOne(GuildMember, {
@@ -368,16 +375,25 @@ export class GuildResearchService {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      // Lock the research state row for the duration of the tx (cycle-29
+      // GR-001): the read-modify-write of xpContributed below is otherwise a
+      // lost-update race — two concurrent contributions read the same
+      // xpContributed, both += accepted, the second save overwrites the first,
+      // and the instance can fail to auto-complete despite enough total XP.
       const state = await manager.findOne(GuildResearchState, {
         where: { id: input.researchStateId },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!state) throw new NotFoundException(`Research state ${input.researchStateId} not found`);
       if (state.status !== GuildResearchStatus.RESEARCHING) {
         throw new BadRequestException(`Research is ${state.status}, not researching`);
       }
 
+      // Lock the member row too (cycle-29 GR-003): member.contributionPts is
+      // also a read-modify-write feeding the officer-promotion threshold.
       const member = await manager.findOne(GuildMember, {
         where: { guildId: state.guildId, userId: input.userId },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!member) {
         throw new ForbiddenException('Contributor is not a member of this guild');

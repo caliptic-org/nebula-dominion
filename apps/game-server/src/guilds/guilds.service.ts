@@ -461,26 +461,38 @@ export class GuildsService {
       await this.resources.invalidateCache(userId);
 
       // ── 3. Credit contribution points + write the GuildEvent ───────────
-      member.contributionPts += amount;
-      member.lastActiveAt = new Date();
+      // Re-read the member UNDER A ROW LOCK inside the tx (cycle-29 GR-003
+      // sibling): the `member` fetched at the top of this method is unlocked
+      // and pre-transaction, so contributionPts += amount on it would be a
+      // lost-update race under concurrent donations — corrupting the
+      // officer-promotion threshold. The locked row is the authoritative one.
+      const lockedMember = await manager.findOne(GuildMember, {
+        where: { guildId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedMember) {
+        throw new ForbiddenException(`User ${userId} is not a member of guild ${guildId}`);
+      }
+      lockedMember.contributionPts += amount;
+      lockedMember.lastActiveAt = new Date();
       // Cycle-18 BAL-06 — auto-promote a sustained MEMBER donor to OFFICER so
       // contributionPts converts to a real rank (officers can start research).
       let promoted = false;
       if (
-        member.role === GuildRole.MEMBER &&
-        member.contributionPts >= GUILD_OFFICER_PROMOTION_THRESHOLD
+        lockedMember.role === GuildRole.MEMBER &&
+        lockedMember.contributionPts >= GUILD_OFFICER_PROMOTION_THRESHOLD
       ) {
-        member.role = GuildRole.OFFICER;
+        lockedMember.role = GuildRole.OFFICER;
         promoted = true;
       }
-      await manager.save(member);
+      await manager.save(lockedMember);
 
       if (promoted) {
         this.emitTelemetry(TELEMETRY_GUILD_PROGRESSION, {
           userId,
           guildId,
           kind: 'auto_promoted',
-          payload: { role: GuildRole.OFFICER, contributionPts: member.contributionPts },
+          payload: { role: GuildRole.OFFICER, contributionPts: lockedMember.contributionPts },
         });
       }
 

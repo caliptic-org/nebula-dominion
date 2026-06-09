@@ -322,42 +322,59 @@ export class SubspaceService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _defenderUnitsIgnored: Record<string, unknown>[] | undefined,
   ): Promise<SubspaceBattle> {
-    const battle = await this.battleRepository.findOne({
-      where: { id: battleId, status: 'pending' },
-      relations: ['zone'],
-    });
-    if (!battle) throw new NotFoundException('Savaş bulunamadı veya zaten tamamlandı');
+    return this.dataSource.transaction(async (manager) => {
+      // Lock the battle row so two concurrent / retried resolves can't both
+      // read 'pending', compute independently, and overwrite each other
+      // (cycle-29 RACE-CONDITION-BATTLE). The winner is deterministic (a power
+      // comparison), so this is data-integrity / idempotency hardening rather
+      // than an anti-exploit — but a double-resolve still wrote the row twice
+      // with a different random durationMs. Locked WITHOUT the `zone` relation
+      // so we don't also lock the shared, read-only zone row.
+      const battle = await manager.findOne(SubspaceBattle, {
+        where: { id: battleId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!battle) throw new NotFoundException('Savaş bulunamadı veya zaten tamamlandı');
 
-    if (battle.attackerId !== userId && battle.defenderId !== userId) {
-      this.logger.warn(
-        `resolveBattle forbidden: user=${userId} tried to resolve battle=${battleId} (attacker=${battle.attackerId}, defender=${battle.defenderId ?? 'null'})`,
+      if (battle.attackerId !== userId && battle.defenderId !== userId) {
+        this.logger.warn(
+          `resolveBattle forbidden: user=${userId} tried to resolve battle=${battleId} (attacker=${battle.attackerId}, defender=${battle.defenderId ?? 'null'})`,
+        );
+        throw new ForbiddenException('Bu savaşı sonuçlandırma yetkiniz yok.');
+      }
+
+      // Idempotent: a resolve that lost the race (or a double-tap) finds the
+      // battle already resolved → return it as-is rather than re-computing.
+      if (battle.status !== 'pending') {
+        return battle;
+      }
+
+      const zone = await manager.findOne(SubspaceZone, { where: { id: battle.zoneId } });
+      if (!zone) throw new NotFoundException('Bölge bulunamadı');
+
+      // Server-derived defender roster, seeded by zone tier. Deterministic
+      // per (zone, battleId) so the row written is stable.
+      const defenderSnapshot = deriveSubspaceDefenders(zone.tier, battle.id);
+
+      const attackerSnapshot = (battle.attackerUnits || []) as unknown as SubspaceAttackerSnapshot[];
+
+      const result = this.computeBattleResult(
+        attackerSnapshot,
+        defenderSnapshot,
+        zone.modifiers as Record<string, number>,
       );
-      throw new ForbiddenException('Bu savaşı sonuçlandırma yetkiniz yok.');
-    }
 
-    // Server-derived defender roster, seeded by zone tier. Deterministic
-    // per (zone, battleId) so the row written is stable and re-resolves
-    // produce the same answer.
-    const defenderSnapshot = deriveSubspaceDefenders(battle.zone.tier, battle.id);
+      battle.status = 'completed';
+      // Persist the server-derived snapshot — useful for replay/audit and
+      // makes it obvious in the DB row that the defender wasn't client-supplied.
+      battle.defenderUnits = defenderSnapshot as unknown as Record<string, unknown>[];
+      battle.result = result;
+      battle.winnerId = result.winnerId as string;
+      battle.startedAt = new Date(Date.now() - (result.durationMs as number));
+      battle.endedAt = new Date();
 
-    const attackerSnapshot = (battle.attackerUnits || []) as unknown as SubspaceAttackerSnapshot[];
-
-    const result = this.computeBattleResult(
-      attackerSnapshot,
-      defenderSnapshot,
-      battle.zone.modifiers as Record<string, number>,
-    );
-
-    battle.status = 'completed';
-    // Persist the server-derived snapshot — useful for replay/audit and
-    // makes it obvious in the DB row that the defender wasn't client-supplied.
-    battle.defenderUnits = defenderSnapshot as unknown as Record<string, unknown>[];
-    battle.result = result;
-    battle.winnerId = result.winnerId as string;
-    battle.startedAt = new Date(Date.now() - (result.durationMs as number));
-    battle.endedAt = new Date();
-
-    return this.battleRepository.save(battle);
+      return manager.save(battle);
+    });
   }
 
   async getUserSessions(userId: string, limit = 20) {

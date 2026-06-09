@@ -96,22 +96,39 @@ jobs:
           # Bütün env interpolation'larını da resolve eder — eksik var varsa burada görünür.
           docker compose $COMPOSE_FILES --env-file $ENV_FILE config --quiet
 
-      - name: Pre-build disk snapshot
+      - name: Pre-build disk guard (reclaim if low)
         # LXC 204 30 GB. Build cache + 3 image rebuild kolayca 10+ GB peak kullanır.
-        # Eğer disk < 6 GB free ise warn; pek seyrek olur ama log'a açıkça düşsün.
-        # Manuel temizlik için: `docker builder prune -af` (sadece reclaimable cache siler).
+        # 2026-06 ENOSPC: post-build routine cleanup (24h window) bir önceki
+        # deploy'un <24h image/cache'ini SİLEMEZ → disk birikip build'i ENOSPC'le
+        # kırdı. Çözüm: build'DEN ÖNCE, free < LOW_GB ise AGGRESSIVE temizlik koş.
+        # AGGRESSIVE sadece build cache + ÇALIŞMAYAN container'lara ait image'ları
+        # siler — named volume / DB / çalışan container image'ları ASLA dokunulmaz
+        # (eski deploy hâlâ ayakta; image'ı referanslı kalır). En kötü ihtimal:
+        # bir sonraki build cache'siz başlar (yavaş ama doğru).
+        #   LOW_GB    — altına düşünce aggressive temizlik tetiklenir (default 8)
+        #   FLOOR_GB  — temizlikten SONRA hâlâ altındaysak build'i denemeden kır
+        env:
+          LOW_GB: '8'
+          FLOOR_GB: '4'
         run: |
-          echo "=== / mount ==="
-          df -h /
+          avail_gb() { df -BG --output=avail / | tail -1 | tr -dc '0-9'; }
+          echo "=== / mount (before) ==="; df -h /
+          echo ""; echo "=== docker system df ==="; docker system df
           echo ""
-          echo "=== docker system df ==="
-          docker system df
-          echo ""
-          AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-          if [ "${AVAIL_GB:-0}" -lt 6 ]; then
-            echo "::warning::Only ${AVAIL_GB}G free — build may run out of disk. Consider docker builder prune -af."
+          AVAIL_GB=$(avail_gb)
+          if [ "${AVAIL_GB:-0}" -lt "$LOW_GB" ]; then
+            echo "::warning::Only ${AVAIL_GB}G free (< ${LOW_GB}G) — running AGGRESSIVE pre-build cleanup."
+            AGGRESSIVE=1 bash infrastructure/scripts/nebula-cleanup.sh || true
+            AVAIL_GB=$(avail_gb)
+            echo "=== / mount (after cleanup) ==="; df -h /
+            echo "Reclaimed → ${AVAIL_GB}G free."
           else
-            echo "OK: ${AVAIL_GB}G free"
+            echo "OK: ${AVAIL_GB}G free (>= ${LOW_GB}G) — no pre-build cleanup needed."
+          fi
+          if [ "${AVAIL_GB:-0}" -lt "$FLOOR_GB" ]; then
+            echo "::error::Still only ${AVAIL_GB}G free after cleanup (< ${FLOOR_GB}G floor)."
+            echo "::error::Build would ENOSPC. Disk needs a human: prune named/dangling volumes or grow LXC 204."
+            exit 1
           fi
 
       - name: Build images

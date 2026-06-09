@@ -6,6 +6,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
+
+/** Constant-time string compare so the shared secret can't be inferred from
+ *  response timing (cycle-30 TIMING-SIDE-CHANNEL). Length mismatch
+ *  short-circuits (length isn't sensitive); equal-length inputs go byte-safe. */
+function timingSafeStrEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 /**
  * Allow only callers presenting a shared service secret.
@@ -68,7 +79,7 @@ export class InternalServiceGuard implements CanActivate {
       throw new UnauthorizedException('Internal service auth not configured');
     }
 
-    if (token !== internalSecret) {
+    if (!timingSafeStrEqual(token, internalSecret)) {
       this.logger.warn('Rejected /progression/award-xp: wrong service token');
       throw new UnauthorizedException('Invalid internal service token');
     }

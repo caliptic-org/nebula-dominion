@@ -192,12 +192,17 @@ hilite "Step 9 — Final verification + api↔game-server drift report"
 call GET "$GAME/api/progression/$USER_ID"; require_2xx "progression (final)"
 final_lvl=$(json_field "['level']"); final_age=$(json_field "['age']")
 ok "game-server  level=$final_lvl age=$final_age prestige=$(json_field "['prestigeLevel']")"
+# api tier_progression is a PULL-ON-READ MIRROR of the canonical game-server
+# player_levels (tier.service.ensureProgress syncs forward on every read;
+# /tier/level-up is a no-op refresh). So this GET itself triggers the sync —
+# afterwards the two MUST agree. A mismatch here means the sync FAILED (a real
+# bug), not an inherent design drift.
 call GET "$API/api/v1/tier/progress"
 if soft_2xx "tier/progress"; then
   api_lvl=$(json_field "['currentLevel']"); api_age=$(json_field "['currentAge']")
   if [ "$api_lvl" != "$final_lvl" ] || [ "$api_age" != "$final_age" ]; then
-    warn "api tier_progression drift: api=$api_lvl/$api_age vs game-server=$final_lvl/$final_age (known split-brain)"; WARN_COUNT=$((WARN_COUNT+1))
-  else ok "api + game-server agree"; fi
+    warn "tier mirror FAILED to sync: api=$api_lvl/$api_age vs game-server=$final_lvl/$final_age (pull-on-read sync bug?)"; WARN_COUNT=$((WARN_COUNT+1))
+  else ok "api tier mirror == game-server (sync OK)"; fi
 fi
 
 printf "\n%s═══ Autoplay-full complete ═══%s  grind iterations=%d  warnings=%d\n" "$BOLD$GREEN" "$RESET" "$iter" "$WARN_COUNT"

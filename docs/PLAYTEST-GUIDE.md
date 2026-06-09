@@ -4,6 +4,14 @@ Tam-akış playtest için pratik yol haritası. Hızlı bir tur için
 `GAME_SPEED_MULTIPLIER=1000` ile çevir, gerçek oyuncular için `=1`'e
 geri al.
 
+> **Otomatik playthrough:** elle gezmek yerine `bash scripts/autoplay-full.sh`
+> bir hesabı API üzerinden baştan sona oynatır (level 1 → 54/age 6 → prestige)
+> ve yol boyunca battle-XP grant, nüfus cap + disband, prestige birikimi gibi
+> sözleşmeleri **assert** eder. `GAME_SPEED_MULTIPLIER` yüksekken build/train
+> deadline'ları anında çözülür → tur saniyeler sürer. Auth: seed'li test
+> hesabıyla login olur (veya `TOKEN=`/`USER_ID=` ver). Prod için `API=`/`GAME=`
+> set et. Çağ-2'ye kadar olan eski/odaklı sürüm: `scripts/autoplay-to-age2.sh`.
+
 ---
 
 ## 1. Hız çarpanı (parametric)

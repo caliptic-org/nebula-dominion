@@ -197,6 +197,28 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     const room = await this.rooms.get(dto.roomId);
     if (!room) return fail('Room not found');
 
+    // The match is over — reject any further action (cycle-30
+    // SOCKET_ACTION_DOUBLE_FINISH). A late/stale action arriving after the
+    // game finished would otherwise re-run a handler → finishGame again →
+    // double-increment ranked_games via persistMatchRatings.
+    if (room.status === GameStatus.FINISHED) return fail('Game already finished');
+
+    // Idempotency / replay guard (cycle-30 SOCKET_ACTION_REPLAY). socket.io
+    // re-sends the same payload (same client-generated sequenceNumber) on a
+    // timeout/reconnect; every handler records lastActionSequence after a
+    // successful action, so anything not strictly newer is a duplicate and
+    // must not re-apply damage / re-advance the turn. (Bots and any caller
+    // without a sequenceNumber are exempt.)
+    const actingPlayer = room.players[userId];
+    if (
+      actingPlayer &&
+      typeof dto.sequenceNumber === 'number' &&
+      typeof actingPlayer.lastActionSequence === 'number' &&
+      dto.sequenceNumber <= actingPlayer.lastActionSequence
+    ) {
+      return fail('Action already processed');
+    }
+
     // Skip anti-cheat for bot players
     if (!userId.startsWith(BOT_USER_ID_PREFIX)) {
       const violation = this.antiCheat.validate(userId, dto, room);
@@ -633,6 +655,13 @@ export class GameService implements OnModuleInit, OnModuleDestroy {
     lastSeq: number,
     endReason: string,
   ): Promise<ActionResult> {
+    // Defence-in-depth (cycle-30 SOCKET_ACTION_DOUBLE_FINISH): if this room
+    // object is already FINISHED, don't re-run the rating persist / reward
+    // path — persistMatchRatings increments ranked_games each call, so a
+    // re-entry would corrupt the counter.
+    if (room.status === GameStatus.FINISHED) {
+      return { success: true, room, events };
+    }
     room.status = GameStatus.FINISHED;
     room.winner = winnerId;
 

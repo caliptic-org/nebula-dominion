@@ -218,6 +218,8 @@ const repoMock = (store: Store, kind: keyof Store) => ({
         return store.balances.get(where.userId) ?? null;
       case 'weekly':
         return store.weekly.get(weeklyKey(where.userId, where.isoWeekStart)) ?? null;
+      case 'members':
+        return store.members.get(memberKey(where.guildId, where.userId)) ?? null;
       default:
         return null;
     }
@@ -232,6 +234,7 @@ function makeService(store: Store) {
   };
 
   const guildRepo = repoMock(store, 'guilds');
+  const memberRepo = repoMock(store, 'members');
   const raidRepo = repoMock(store, 'raids');
   const contribRepo = repoMock(store, 'contribs');
   const dropRepo = repoMock(store, 'drops');
@@ -243,6 +246,7 @@ function makeService(store: Store) {
     providers: [
       GuildRaidsService,
       { provide: getRepositoryToken(Guild), useValue: guildRepo },
+      { provide: getRepositoryToken(GuildMember), useValue: memberRepo },
       { provide: getRepositoryToken(GuildRaid), useValue: raidRepo },
       { provide: getRepositoryToken(GuildRaidContribution), useValue: contribRepo },
       { provide: getRepositoryToken(GuildRaidDrop), useValue: dropRepo },
@@ -593,6 +597,36 @@ describe('GuildRaidsService', () => {
       await expect(service.resolveDrops('does-not-exist')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+
+    it('membership-gates the player path: a non-member cannot resolve a guild raid (cycle-31 IDOR)', async () => {
+      const store = freshStore();
+      seedGuild(store, 'g1', 5);
+      seedMember(store, 'g1', 'u1');
+      const raid: GuildRaid = {
+        id: 'r1',
+        guildId: 'g1',
+        weekStart: isoWeekStartUtc(new Date()),
+        weekEnd: new Date(Date.now() + 86_400_000),
+        tier: GuildRaidTier.NORMAL,
+        bossMaxHp: 1000,
+        bossCurrentHp: 0,
+        memberCountSnapshot: 5,
+        status: GuildRaidStatus.COMPLETED,
+        completedAt: new Date(),
+        dropsResolvedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      store.raids.set('r1', raid);
+
+      const { service } = await makeService(store);
+      // An outsider passing their own userId is rejected by the membership gate.
+      await expect(service.resolveDrops('r1', 'outsider')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      // A member is allowed; the internal cron path (no caller arg) also works.
+      await expect(service.resolveDrops('r1', 'u1')).resolves.toBeDefined();
     });
   });
 

@@ -412,8 +412,10 @@ export class GuildsController {
   @Post('raids/:raidId/resolve-drops')
   @UseGuards(HttpJwtGuard)
   @HttpCode(HttpStatus.OK)
-  resolveDrops(@Param('raidId') raidId: string) {
-    return this.raids.resolveDrops(raidId);
+  resolveDrops(@Param('raidId') raidId: string, @CurrentUser() userId: string) {
+    // Pass the caller so the service membership-gates this mutation
+    // (cycle-31 IDOR-GUILD-RAIDS-RESOLVE-DROPS).
+    return this.raids.resolveDrops(raidId, userId);
   }
 
   @Get('me/essence')

@@ -420,10 +420,18 @@ export class GuildRaidsService {
    * `dropsResolvedAt`. Honors the per-player 4-essence/week cap; excess is
    * recorded as `capped_excess` rows with amount=0 for audit.
    */
-  async resolveDrops(raidId: string): Promise<DropAward[]> {
+  async resolveDrops(raidId: string, callerUserId?: string): Promise<DropAward[]> {
     return this.dataSource.transaction(async (manager) => {
       const raid = await manager.findOne(GuildRaid, { where: { id: raidId } });
       if (!raid) throw new NotFoundException(`Raid ${raidId} not found`);
+      // Membership gate (cycle-31 IDOR-GUILD-RAIDS-RESOLVE-DROPS): the player
+      // endpoint passes callerUserId so a non-member can't trigger operational
+      // resolution on a rival guild's raid. The internal cron
+      // (resolveCompletedRaidDrops) calls without a caller → no gate, as it's
+      // already trusted. Mirrors the assertGuildMembership on every read endpoint.
+      if (callerUserId) {
+        await this.assertGuildMembership(callerUserId, raid.guildId);
+      }
       if (raid.status !== GuildRaidStatus.COMPLETED) {
         throw new BadRequestException('Drops only resolve for completed raids');
       }

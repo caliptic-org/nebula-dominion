@@ -16,6 +16,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - 'scripts/**'                    # dev/ops scripts (autoplay, smoke) — not COPY'd into any image
       - 'infrastructure/terraform/**'   # TF dosyaları stack'i etkilemiyor
       - 'infrastructure/runner/**'      # runner config'ini değiştiren PR build tetiklemesin
       - '.github/workflows/nginx-bastion.yml'

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { GalaxyNodeGarrison } from './galaxy-map.entity';
 import { CommandersService } from '../commanders/commanders.service';
 import { Resource } from '../resources/entities/resource.entity';
+import { ResourcesService } from '../resources/resources.service';
 
 /**
  * Mineral cost charged per troop committed when capturing a node.
@@ -45,6 +46,7 @@ export class GalaxyMapService {
     @InjectRepository(GalaxyNodeGarrison)
     private readonly garrisonRepo: Repository<GalaxyNodeGarrison>,
     private readonly commanders: CommandersService,
+    private readonly resources: ResourcesService,
   ) {}
 
   /** List all garrisons for a player. */
@@ -154,9 +156,18 @@ export class GalaxyMapService {
       result = await em.save(garrison);
     });
 
-    // Resource snapshot cache is cleared outside the TX — failing to
-    // invalidate doesn't corrupt anything (TTL is 60s) so it's safe
-    // post-commit.
+    // Invalidate the Redis resource snapshot post-commit (cycle-29
+    // MAP-GALAXY-001): the capture debited mineral inside the TX, but the
+    // comment here previously only *claimed* the cache was cleared — no code
+    // did it, so the FE kept showing the pre-capture mineral balance for up to
+    // the 60s TTL. Best-effort: a cache hiccup self-heals on the next tick.
+    await this.resources.invalidateCache(userId).catch((err: unknown) =>
+      this.logger.warn(
+        `capture cache invalidate failed user=${userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      ),
+    );
     this.logger.log(
       `Player ${userId} captured ${nodeId} with ${troops} troops (cost ${cost} mineral)`,
     );

@@ -30,6 +30,12 @@ export class MatchmakingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MatchmakingService.name);
   private redis: Redis;
   private tickTimer: NodeJS.Timeout;
+  // Per-mode re-entrancy guard (cycle-30 SOCKET_QUEUE_DOUBLE_MATCH): the 2s
+  // tick and a join_queue call could both run processQueue concurrently, both
+  // zrange the same pair before either zrem'd it, and emit a duplicate match.
+  // Single-instance (Node event loop) → a synchronous in-process flag set
+  // before the first await fully serializes processing per mode.
+  private readonly processingModes = new Set<GameMode>();
 
   private readonly initialEloRange: number;
   private readonly eloExpansionRate: number;
@@ -93,6 +99,20 @@ export class MatchmakingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async processQueue(mode: GameMode): Promise<MatchResult[]> {
+    // Re-entrancy guard (set synchronously BEFORE the first await): if a
+    // processQueue for this mode is already in flight, skip — it (or the next
+    // 2s tick) will match the waiting players. Prevents the duplicate-match
+    // race (cycle-30 SOCKET_QUEUE_DOUBLE_MATCH).
+    if (this.processingModes.has(mode)) return [];
+    this.processingModes.add(mode);
+    try {
+      return await this.matchQueue(mode);
+    } finally {
+      this.processingModes.delete(mode);
+    }
+  }
+
+  private async matchQueue(mode: GameMode): Promise<MatchResult[]> {
     const allIds = await this.redis.zrange(QUEUE_KEY(mode), 0, -1);
     if (allIds.length < 2) return [];
 

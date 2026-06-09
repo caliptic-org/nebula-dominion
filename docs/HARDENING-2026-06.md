@@ -112,4 +112,22 @@ play telemetry, an asset, or credentials:
 | Real iyzico payments | **API keys** (a prohibited action for an agent to handle) |
 | Per-room lock for fully concurrent-safe combat | A larger refactor; the shipped guards cover the realistic cases |
 | Run the live playthrough | A **token** (agents can't create accounts / enter passwords) |
-| Prod LXC low disk (~5G) | `docker builder prune -af` on the host when convenient |
+| Prod LXC 204 disk under-provisioned (20G/30G used, builds peak ~10G) | The deploy now self-heals (aggressive pre-build cleanup < 8G free, clean fail < 4G floor — commit `fe0d823`). **Durable fix needs a human:** grow the LXC rootfs or move BuildKit cache off `/`. |
+
+---
+
+## 6. Cycle 32 — supply-chain CVE + deploy reliability (June 9)
+
+Genuinely new work, not an audit re-run:
+
+- **CVE-2025-29927 (CRITICAL)** — `pnpm audit` surfaced the Next.js middleware
+  authorization-bypass CVE (+ 2 HIGH) in `next@14.2.3`. Bumped to `~14.2.25`;
+  prod built `next@14.2.35` and is **live** (commit `96af15b`, deploy green,
+  all 6 smoke probes pass). CVE closed in prod.
+- **Deploy ENOSPC self-heal** — the CVE deploy first failed on host
+  `ENOSPC` (the recurring low-disk warning materialized). Fail-safe held:
+  the build failed *before* "Apply stack", so prod was never touched. The
+  pre-build disk guard now runs `AGGRESSIVE=1 nebula-cleanup.sh` when free
+  space < 8G (prunes build cache + unreferenced images only — never volumes,
+  the DB, or the running deploy's images) and fails cleanly with an
+  escalation below a 4G floor instead of dying mid-build (commit `fe0d823`).

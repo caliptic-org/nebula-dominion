@@ -189,10 +189,11 @@ export class ResourcesService {
         Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * missedTicks * factor),
         resource.energyCap,
       );
-      resource.population = Math.min(
-        Math.floor(Number(resource.population) + Number(resource.populationPerTick) * missedTicks),
-        resource.populationCap,
-      );
+      // population is NOT accrued here (cycle-30 ECON-POPULATION): it is
+      // roster-derived supply-used, owned solely by UnitsService.setPopulation
+      // (see its JSDoc). Accumulating it let the tick's stale read-modify-write
+      // overwrite a fresh syncPopulation value, and offline players' rosters
+      // don't change anyway.
       // Cycle 17 BAL-02: offline players also accrue lab science over the
       // missed ticks so the trickle keeps pace whether online or offline.
       resource.science = Math.min(
@@ -517,10 +518,9 @@ export class ResourcesService {
       Math.floor(Number(resource.energy) + Number(resource.energyPerTick) * factor),
       resource.energyCap,
     );
-    resource.population = Math.min(
-      Math.floor(Number(resource.population) + Number(resource.populationPerTick)),
-      resource.populationCap,
-    );
+    // population is NOT ticked (cycle-30 ECON-POPULATION) — it's roster-derived
+    // supply written only by UnitsService.setPopulation; ticking it raced with
+    // that writer and contradicted the ECON-#6 design.
     // Cycle 17 BAL-02: science trickle accrues alongside the other
     // currencies in the single-player tick path too. Cap falls back to a
     // safe ceiling if the column is somehow null (defensive — the schema
@@ -574,7 +574,9 @@ export class ResourcesService {
       SET mineral    = LEAST(pr.mineral_cap,    FLOOR(pr.mineral    + pr.mineral_per_tick * src.factor)),
           gas        = LEAST(pr.gas_cap,        FLOOR(pr.gas        + pr.gas_per_tick     * src.factor)),
           energy     = LEAST(pr.energy_cap,     FLOOR(pr.energy     + pr.energy_per_tick  * src.factor)),
-          population = LEAST(pr.population_cap,  FLOOR(pr.population  + pr.population_per_tick)),
+          -- population is NOT ticked (cycle-30 ECON-POPULATION): roster-derived
+          -- supply written only by UnitsService.setPopulation; ticking it raced
+          -- with that writer and broke the ECON-#6 slot-based design.
           science    = LEAST(pr.science_cap,    FLOOR(pr.science     + pr.science_per_tick)),
           last_tick_at = NOW()
       FROM (

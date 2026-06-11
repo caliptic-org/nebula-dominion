@@ -85,7 +85,7 @@ const BUILDING_TYPE_TR: Record<string, string> = {
   turret:            'Burç',
 };
 
-function trBuildingType(code: string): string {
+export function trBuildingType(code: string): string {
   return BUILDING_TYPE_TR[code] ?? code;
 }
 

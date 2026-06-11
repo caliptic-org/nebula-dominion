@@ -30,6 +30,7 @@ import { useHudState } from '@/hooks/useHudState';
 import { useTrainingQueue, type TrainingQueueDto } from '@/hooks/useTrainingQueue';
 import { gameServerApi } from '@/lib/game-server-api';
 import { FetchError } from '@/lib/api';
+import { trBuildingType } from '@/lib/translate-backend-error';
 import { toast } from '@/components/handoff/Toaster';
 import { hasSession } from '@/lib/session';
 import { scaledDurationSec } from '@/lib/game-speed';
@@ -297,6 +298,25 @@ export default function ProductionPage() {
           ) ?? null
         : null;
 
+    // ── Honest production gate ──────────────────────────────────────
+    // An authed train REQUIRES an active production building — the POST
+    // below sends its buildingId. Without one we must NOT pop an optimistic
+    // queue card that never reaches the backend: that was the bug where
+    // Marine (needs Kışla) / Medic (needs Akademi) *looked* like they trained
+    // — countdown ticked, soft "info" toast — but nothing persisted, so
+    // /inventory stayed 0. Block with a clear, actionable error instead and
+    // bail BEFORE any resource deduction or queue insert. Unauthed/demo still
+    // falls through to the local-only queue below.
+    if (hasSession() && !trainingBuilding) {
+      if (liveBuildings == null) {
+        toast.error('Binalar henüz yüklenmedi — bir saniye sonra tekrar dene.');
+      } else {
+        const label = reqBuilding ? trBuildingType(reqBuilding) : 'üretim binası';
+        toast.error(`${selectedUnit.name} için önce aktif bir ${label} inşa et.`);
+      }
+      return;
+    }
+
     const a = toNum(selectedUnit.costA) * count;
     const b = toNum(selectedUnit.costB) * count;
     const total = selectedUnit.durationSec * count;
@@ -350,13 +370,12 @@ export default function ProductionPage() {
       } finally {
         setSubmittingTrain(false);
       }
-    } else if (hasSession() && unitType && !trainingBuilding) {
-      // Player is authed but doesn't own the needed training building.
-      // The local queue still ticks (optimistic) so the demo flows.
-      toast.info(
-        `${selectedUnit.name} için ${reqBuilding ?? 'eğitim binası'} gerekli — yerel kuyrukta gösteriliyor`,
-      );
     }
+    // NOTE: the old `else if (!trainingBuilding)` branch that fabricated an
+    // optimistic queue for an authed player without the required building is
+    // gone — that case now hard-blocks above (honest production gate) before
+    // any optimistic state is touched. Unauthed/demo still reaches the
+    // optimistic queue (no POST) via the falls-through path above.
   }, [selectedUnit, slotsUsed, canAfford, count, backendUnits, selected, liveBuildings, submittingTrain]);
 
   const handleSpeedUp = useCallback((id: string) => {

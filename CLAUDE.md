@@ -4,6 +4,10 @@ Bu dosya Nebula Dominion kod tabanında çalışan Claude / AI agent'lara
 **kalıcı operasyonel context** verir. README.md kullanıcıya hitap eder,
 DEPLOYMENT.md operatöre — bu dosya **bir sonraki AI agent**'a.
 
+> **Local'de çalıştırma + veri-akışı debug** (docker-compose, port/DB haritası,
+> DB sorgulama, training→inventory pipeline'ı, snake_case kolon gotcha'sı):
+> bkz. **`docs/LOCAL-DEV.md`**.
+
 ---
 
 ## Şu anki üretim durumu (2026-05-30)
